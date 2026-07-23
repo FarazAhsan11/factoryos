@@ -59,6 +59,14 @@ Copy `.env.example` → `.env.local`. All `.env*` files are gitignored.
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY` (server-only; never expose to the client)
+- `SEED_SUPER_ADMIN_EMAIL` / `SEED_SUPER_ADMIN_PASSWORD` (used only by the seed script)
+
+## Database (Supabase)
+
+- SQL migrations live in `supabase/migrations/` (versioned, `NNNN_name.sql`). The Supabase CLI is **not** installed and there's no local DB connection string, so migrations are currently applied by hand via the **Supabase Dashboard → SQL Editor** (or a direct connection string if provided). Keep the migration files as the source of truth regardless of how they're applied.
+- Schema so far (`0001_init_auth_tenancy.sql`): `user_role` enum, `factories`, `profiles` (1:1 with `auth.users`, carries `role` + nullable `factory_id`), an `on_auth_user_created` trigger that auto-creates a profile from auth metadata, and RLS (super admins full access; users read their own profile).
+- Seed the platform super admin: `node --env-file=.env.local scripts/seed-super-admin.mjs` (uses the Admin API + service-role key; idempotent). Requires the migration to be applied first.
+- `admin123!` is a **dev-only** placeholder password — rotate before any real use.
 
 ## Working notes
 

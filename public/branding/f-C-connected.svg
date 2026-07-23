@@ -1,0 +1,19 @@
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="FactoryOS">
+  <defs>
+    <linearGradient id="bg" x1="10" y1="6" x2="110" y2="114" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3B82F6"/><stop offset="0.55" stop-color="#2563EB"/><stop offset="1" stop-color="#1E56D6"/>
+    </linearGradient>
+    <radialGradient id="sheen" cx="0.3" cy="0.22" r="0.9">
+      <stop stop-color="#FFFFFF" stop-opacity="0.24"/><stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="120" height="120" rx="30" fill="url(#bg)"/>
+  <rect width="120" height="120" rx="30" fill="url(#sheen)"/>
+  <g fill="#FFFFFF">
+    <rect x="31" y="14" width="18" height="18" rx="3"/><rect x="51" y="14" width="18" height="18" rx="3"/><rect x="71" y="14" width="18" height="18" rx="3"/>
+    <rect x="31" y="34" width="18" height="18" rx="3"/>
+    <rect x="31" y="54" width="18" height="18" rx="3"/><rect x="51" y="54" width="18" height="18" rx="3"/>
+    <rect x="31" y="74" width="18" height="18" rx="3"/>
+    <rect x="31" y="94" width="18" height="12" rx="3"/>
+  </g>
+</svg>

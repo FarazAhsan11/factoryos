@@ -1,0 +1,29 @@
+<svg width="500" height="128" viewBox="0 0 500 128" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="FactoryOS">
+  <defs>
+    <linearGradient id="lBg" x1="8" y1="16" x2="104" y2="112" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3B82F6"/><stop offset="0.55" stop-color="#2563EB"/><stop offset="1" stop-color="#1E56D6"/>
+    </linearGradient>
+    <radialGradient id="lSheen" cx="0.3" cy="0.22" r="0.9">
+      <stop stop-color="#FFFFFF" stop-opacity="0.22"/><stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- mark: 96×96 tile, C design scaled 0.8 -->
+  <g transform="translate(8,16)">
+    <rect width="96" height="96" rx="24" fill="url(#lBg)"/>
+    <rect width="96" height="96" rx="24" fill="url(#lSheen)"/>
+    <rect x="0.8" y="0.8" width="94.4" height="94.4" rx="23.2" fill="none" stroke="#FFFFFF" stroke-opacity="0.12"/>
+    <g fill="#FFFFFF" transform="scale(0.8)">
+      <rect x="31" y="14" width="18" height="18" rx="3"/><rect x="51" y="14" width="18" height="18" rx="3"/><rect x="71" y="14" width="18" height="18" rx="3"/>
+      <rect x="31" y="34" width="18" height="18" rx="3"/>
+      <rect x="31" y="54" width="18" height="18" rx="3"/><rect x="51" y="54" width="18" height="18" rx="3"/>
+      <rect x="31" y="74" width="18" height="18" rx="3"/>
+      <rect x="31" y="94" width="18" height="12" rx="3"/>
+    </g>
+  </g>
+
+  <!-- wordmark -->
+  <text x="128" y="80" font-family="'Poppins','Space Grotesk','Segoe UI',sans-serif" font-size="54" font-weight="600" letter-spacing="-0.5">
+    <tspan fill="#0F1B34">Factory</tspan><tspan fill="#2563EB">OS</tspan>
+  </text>
+</svg>

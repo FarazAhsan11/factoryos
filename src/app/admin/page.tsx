@@ -9,6 +9,7 @@ import {
   type Factory,
 } from "@/components/admin/factories-console";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const metadata: Metadata = {
   title: "Super Admin · FactoryOS",
@@ -36,6 +37,45 @@ export default async function AdminPage() {
     .select("id, name, slug, created_at")
     .order("created_at", { ascending: false });
 
+  // Attach each factory's first admin (role='admin') + whether they've
+  // completed the invite (email confirmed / signed in) vs still pending.
+  const factoryIds = (factories ?? []).map((f) => f.id);
+  let withAdmins = (factories as Factory[]) ?? [];
+
+  if (factoryIds.length) {
+    const { data: adminProfiles } = await supabase
+      .from("profiles")
+      .select("id, email, factory_id")
+      .eq("role", "admin")
+      .in("factory_id", factoryIds);
+
+    const admin = createAdminClient();
+    const statuses = await Promise.all(
+      (adminProfiles ?? []).map(async (p) => {
+        const { data } = await admin.auth.admin.getUserById(p.id);
+        const active = Boolean(
+          data.user?.email_confirmed_at || data.user?.last_sign_in_at
+        );
+        return {
+          factory_id: p.factory_id as string,
+          email: p.email as string,
+          status: active ? ("active" as const) : ("invited" as const),
+        };
+      })
+    );
+    const byFactory = new Map(statuses.map((s) => [s.factory_id, s]));
+
+    withAdmins = withAdmins.map((f) => ({
+      ...f,
+      admin: byFactory.get(f.id)
+        ? {
+            email: byFactory.get(f.id)!.email,
+            status: byFactory.get(f.id)!.status,
+          }
+        : null,
+    }));
+  }
+
   return (
     <div className="min-h-svh bg-[#F6F8FC]">
       {/* top bar */}
@@ -57,7 +97,7 @@ export default async function AdminPage() {
 
       {/* content */}
       <main className="mx-auto max-w-6xl px-6 py-10">
-        <FactoriesConsole factories={(factories as Factory[]) ?? []} />
+        <FactoriesConsole factories={withAdmins} />
       </main>
     </div>
   );

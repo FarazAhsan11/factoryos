@@ -2,13 +2,13 @@
 
 _A running record of what has been built, how it fits together, and how to run it. Update as work lands._
 
-_Last updated: 2026-07-23_
+_Last updated: 2026-07-24_
 
 ---
 
 ## 1. Where the project stands
 
-FactoryOS is a multi-tenant SaaS for factory operations, being rebuilt from the `factoryos_v8_final.html` prototype into a production Next.js app. We are at the end of **Step 0 (foundation)**:
+FactoryOS is a multi-tenant SaaS for factory operations, being rebuilt from the `factoryos_v8_final.html` prototype into a production Next.js app. **Step 0 (foundation)** is complete and **Step 1 (tenant onboarding)** has started:
 
 - ✅ Next.js app scaffolded (App Router, React 19, TS strict, Tailwind v4, shadcn/ui)
 - ✅ Supabase wired for auth + Postgres
@@ -16,8 +16,9 @@ FactoryOS is a multi-tenant SaaS for factory operations, being rebuilt from the 
 - ✅ Database schema: roles, `factories`, `profiles` (+ RLS, auto-profile trigger)
 - ✅ **Super Admin** account seeded and able to log in
 - ✅ Auth flow: login → role-based routing → **Super Admin dashboard** with a factories master–detail view
+- ✅ **Create factory** (Step 1): modal (name, info, logo upload, admin email) → server action uploads the logo to Storage, inserts the factory, provisions its **Factory Admin** via a Supabase invite link, and emails a **branded invite** through nodemailer. The admin sets a password (`/set-password`) and lands on a **factory dashboard** (`/factory/[slug]`, dummy data, tenant-gated).
 
-Not built yet: functional "Create factory", factory-admin provisioning, onboarding wizard, and all operational modules.
+Not built yet: factory-admin management (delete/re-invite, provisioned-status in the detail pane), onboarding wizard, and all operational modules.
 
 ---
 
@@ -46,6 +47,8 @@ Brand blue is `#2563EB` (from the logo); the shadcn theme tokens themselves are 
    | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Publishable key (`sb_publishable_…`) — browser-safe |
    | `SUPABASE_SERVICE_ROLE_KEY` | Secret key (`sb_secret_…`) — **server only** |
    | `SEED_SUPER_ADMIN_EMAIL` / `SEED_SUPER_ADMIN_PASSWORD` | Used only by the seed script |
+   | `NEXT_PUBLIC_SITE_URL` | Public base URL (e.g. `http://localhost:3000`) — used to build invite links in emails |
+   | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | nodemailer transport for the factory-admin invite email. Gmail: host `smtp.gmail.com`, port `465`, pass = a Google **App password** |
 
    > This project uses Supabase's **new API key format**: the *Publishable* key is the anon/public key; the *Secret* key is the service-role key.
 
@@ -71,10 +74,15 @@ SQL migrations live in `supabase/migrations/`. There is **no Supabase CLI or loc
 - `handle_new_user()` trigger — auto-creates a profile on signup, reading `role` / `full_name` / `factory_id` from the auth user's metadata
 - **RLS**: users read their own profile; super admins have full access to profiles and factories; factory members can read their own factory. `is_super_admin()` is a `security definer` helper (avoids policy recursion).
 
-### Applying it
+### Migration `0002_factory_details.sql`
+
+- Adds `description` + `logo_url` to `factories`.
+- Creates a **public** Storage bucket `factory-logos`. Logos are uploaded server-side with the service-role key (bypasses RLS), so no storage policies are needed for the create-factory flow.
+
+### Applying them
 
 1. Open the SQL Editor for the project.
-2. Paste the contents of `supabase/migrations/0001_init_auth_tenancy.sql` and **Run**.
+2. Paste the contents of each `supabase/migrations/NNNN_*.sql` in order and **Run**.
 
 ### Seeding the Super Admin
 
@@ -96,11 +104,17 @@ Two sample factories (**Riverside Nutraceuticals**, **AcelPharma**) were also se
 
 ```
 /login  ──sign in──▶  look up profile.role  ──▶  super_admin → /admin
-                                              └──▶  other roles → / (placeholder)
+                                              └──▶  factory roles → /factory/[slug]
+
+Invite:  create factory ──▶ email link ──▶ /auth/confirm (verifyOtp) ──▶ /set-password ──▶ /factory/[slug]
 ```
 
-- **`middleware.ts`** (+ `src/lib/supabase/middleware.ts`) refreshes the Supabase session on every request and redirects unauthenticated users away from `/admin` → `/login`.
+- **`middleware.ts`** (+ `src/lib/supabase/middleware.ts`) refreshes the Supabase session on every request and redirects unauthenticated users away from `/admin` **and `/factory`** → `/login`.
+- **`/`** (root) is a Server Component that routes by role: super admins → `/admin`, factory members → their `/factory/[slug]`, no session → `/login`.
 - **`/admin`** is a Server Component that re-checks `auth.getUser()` and `profile.role === 'super_admin'`; anyone else is redirected to `/login`. (Defense in depth: middleware + page guard.)
+- **`/auth/confirm`** — route handler that verifies the emailed one-time token (`verifyOtp`) and sets the SSR session, then forwards to `next`. Landing point for the invite link.
+- **`/set-password`** — page where the freshly-invited admin sets a password (`auth.updateUser`), then is sent to their factory dashboard.
+- **`/factory/[slug]`** — Server Component guarded by `auth.getUser()` + tenant match (super admins may view any factory; members only their own).
 - Supabase clients:
   - `src/lib/supabase/client.ts` — browser client for Client Components
   - `src/lib/supabase/server.ts` — server client (cookies) for Server Components / Actions / Route Handlers
@@ -115,20 +129,28 @@ Routes stay thin and **compose components**; UI lives in `src/components/<featur
 ```
 src/
 ├─ app/
-│  ├─ login/page.tsx        → composes <AuthSplitLayout><LoginForm/></AuthSplitLayout>
-│  └─ admin/page.tsx        → auth guard + data fetch, renders <FactoriesConsole/>
+│  ├─ page.tsx               → role-based redirect (super_admin/factory/login)
+│  ├─ login/page.tsx         → composes <AuthSplitLayout><LoginForm/></AuthSplitLayout>
+│  ├─ set-password/page.tsx  → <AuthSplitLayout><Suspense><SetPasswordForm/></...>
+│  ├─ auth/confirm/route.ts  → verifyOtp for the emailed invite token
+│  ├─ admin/page.tsx         → auth guard + data fetch, renders <FactoriesConsole/>
+│  ├─ admin/actions.ts       → "use server"; createFactory (upload→insert→invite→email)
+│  └─ factory/[slug]/page.tsx→ tenant-gated dummy dashboard
 ├─ components/
-│  ├─ brand/
-│  │  └─ logo.tsx           → <Logo className="h-8"/>  (reads /branding SVG)
+│  ├─ brand/logo.tsx         → <Logo className="h-8"/>  (reads /branding SVG)
 │  ├─ auth/
-│  │  ├─ auth-split-layout.tsx → reusable split shell (hero + form column)
-│  │  ├─ auth-hero.tsx         → left brand panel + isometric illustration + tagline
-│  │  ├─ text-field.tsx        → reusable labeled input (icon, labelAction, trailing)
-│  │  ├─ login-form.tsx        → "use client"; real Supabase sign-in + routing
+│  │  ├─ auth-split-layout.tsx / auth-hero.tsx / text-field.tsx
+│  │  ├─ login-form.tsx        → "use client"; Supabase sign-in + routing
+│  │  ├─ set-password-form.tsx → "use client"; updateUser({password}) → dashboard
 │  │  └─ sign-out-button.tsx   → "use client"; signOut + redirect
-│  └─ admin/
-│     └─ factories-console.tsx → "use client"; factories master–detail
-└─ lib/supabase/{client,server,middleware}.ts
+│  ├─ admin/
+│  │  ├─ factories-console.tsx   → "use client"; factories master–detail
+│  │  └─ create-factory-dialog.tsx → "use client"; modal + calls createFactory action
+│  ├─ factory/factory-dashboard.tsx → tenant dashboard (dummy KPIs/shifts)
+│  └─ ui/dialog.tsx          → base-ui Dialog primitive (base-nova style)
+├─ lib/
+│  ├─ supabase/{client,server,middleware,admin}.ts  (admin = service-role client)
+│  └─ email/{transport,factory-invite}.ts           (nodemailer + branded template)
 ```
 
 **Reuse notes**
@@ -145,7 +167,11 @@ Split layout: left brand hero with a bespoke isometric factory illustration (`pu
 
 ### Super Admin dashboard (`/admin`)
 - Top bar: logo, "Super Admin" badge, current user, **Sign out**.
-- **Factories master–detail** (`FactoriesConsole`): left column is a selectable list of factory "tabs"; clicking one shows its details on the right (name, slug, Factory ID, created date, and placeholder status tiles for *First admin* / *Onboarding*). Empty states on both sides when there are no factories.
+- **Factories master–detail** (`FactoriesConsole`): left column is a selectable list of factory "tabs"; clicking one shows its details on the right (name, slug, Factory ID, created date, an **Open dashboard →** link, and placeholder status tiles for *First admin* / *Onboarding*). Empty states on both sides when there are no factories.
+- **Create factory** (`CreateFactoryDialog`): modal collecting name, short info, logo upload (with preview), and admin email → calls the `createFactory` server action; success/warning surfaced via `sonner` toast, list refreshes.
+
+### Factory dashboard (`/factory/[slug]`)
+Tenant-gated placeholder: top bar with the factory logo/name + "Factory Admin" badge, dummy KPI tiles (OEE, units, lines, on-shift) and a "today's shifts" list. Replaced by real onboarding + operational data in later steps.
 
 ---
 
@@ -166,10 +192,8 @@ Split layout: left brand hero with a bespoke isometric factory illustration (`pu
 
 ## 10. Next steps
 
-- Wire **Create factory**: a dialog that inserts a `factories` row and provisions its first **Factory Admin** (auth user with `role='admin'` + `factory_id`) via the Admin API.
-- Per-factory **delete** / manage.
-- **Factory onboarding wizard** (port from the prototype: units, processes, products, shift times, employees).
-- Route non-super-admin roles to a real factory dashboard instead of `/`.
+- Reflect real **First admin / Onboarding** status in the factory detail pane (query `profiles` per factory) instead of the hardcoded "Not provisioned" pill; add **re-invite** and per-factory **delete**.
+- **Factory onboarding wizard** (port from the prototype: units, processes, products, shift times, employees) — replaces the dummy data on `/factory/[slug]`.
 - Operational modules (pipeline, shift log, roster/attendance, actions, OEE, quality, trends, handovers) — see `docs/ARCHITECTURE_FLOW.md` for scope and the shift-based data model.
 
 ---

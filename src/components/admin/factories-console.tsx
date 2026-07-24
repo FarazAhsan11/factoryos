@@ -1,15 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { Building2, CalendarDays, Hash, Plus, UserPlus } from "lucide-react";
+import { Building2, CalendarDays, Hash, UserPlus } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { CreateFactoryDialog } from "@/components/admin/create-factory-dialog";
+
+export interface FactoryAdmin {
+  email: string;
+  status: "active" | "invited";
+}
 
 export interface Factory {
   id: string;
   name: string;
   slug: string | null;
   created_at: string;
+  admin?: FactoryAdmin | null;
 }
 
 const MONTHS = [
@@ -42,13 +49,7 @@ export function FactoriesConsole({ factories }: { factories: Factory[] }) {
             Every tenant on the platform. Select one to see its details.
           </p>
         </div>
-        <button
-          type="button"
-          className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] px-4 text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(37,99,235,0.55)] transition hover:brightness-[1.06]"
-        >
-          <Plus className="size-4" />
-          Create factory
-        </button>
+        <CreateFactoryDialog />
       </div>
 
       {/* master–detail */}
@@ -145,6 +146,14 @@ function FactoryDetail({ factory }: { factory: Factory }) {
               <CalendarDays className="size-3.5" />
               Created {formatDate(factory.created_at)}
             </span>
+            {factory.slug && (
+              <a
+                href={`/factory/${factory.slug}`}
+                className="font-medium text-[#2563EB] hover:underline"
+              >
+                Open dashboard →
+              </a>
+            )}
           </div>
         </div>
       </div>
@@ -164,15 +173,20 @@ function FactoryDetail({ factory }: { factory: Factory }) {
         </InfoTile>
 
         <InfoTile icon={UserPlus} label="First admin">
-          <div className="flex items-center gap-2">
+          {factory.admin ? (
+            <div className="flex flex-col items-start gap-1.5">
+              <span className="max-w-full truncate text-sm text-[#334155]">
+                {factory.admin.email}
+              </span>
+              {factory.admin.status === "active" ? (
+                <StatusPill tone="green">Active</StatusPill>
+              ) : (
+                <StatusPill tone="amber">Invited · pending</StatusPill>
+              )}
+            </div>
+          ) : (
             <StatusPill tone="amber">Not provisioned</StatusPill>
-            <button
-              type="button"
-              className="text-xs font-medium text-[#2563EB] hover:underline"
-            >
-              Invite admin
-            </button>
-          </div>
+          )}
         </InfoTile>
 
         <InfoTile icon={Building2} label="Onboarding">
@@ -181,8 +195,8 @@ function FactoryDetail({ factory }: { factory: Factory }) {
       </div>
 
       <p className="mt-6 text-xs text-[#94A3B8]">
-        Provisioning a first admin, onboarding status, and per-factory users
-        arrive in the next build steps.
+        Onboarding status and per-factory user management arrive in the next
+        build steps.
       </p>
     </div>
   );

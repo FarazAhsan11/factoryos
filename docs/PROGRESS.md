@@ -114,6 +114,7 @@ Invite:  create factory ──▶ email link ──▶ /auth/confirm (verifyOtp)
 - **`/admin`** is a Server Component that re-checks `auth.getUser()` and `profile.role === 'super_admin'`; anyone else is redirected to `/login`. (Defense in depth: middleware + page guard.)
 - **`/auth/confirm`** — route handler that verifies the emailed one-time token (`verifyOtp`) and sets the SSR session, then forwards to `next`. Landing point for the invite link.
 - **`/set-password`** — page where the freshly-invited admin sets a password (`auth.updateUser`), then is sent to their factory dashboard.
+- **`/forgot-password`** — code-based reset. Step 1 emails a 6-digit code (`generateLink({type:'recovery'})` → `properties.email_otp`, delivered by nodemailer). Step 2 verifies it (`verifyOtp({type:'recovery'})`, which also starts the session) and sets a new password → routed home by role. Returns a generic success even for unknown emails (no user enumeration).
 - **`/factory/[slug]`** — Server Component guarded by `auth.getUser()` + tenant match (super admins may view any factory; members only their own).
 - Supabase clients:
   - `src/lib/supabase/client.ts` — browser client for Client Components
@@ -132,6 +133,7 @@ src/
 │  ├─ page.tsx               → role-based redirect (super_admin/factory/login)
 │  ├─ login/page.tsx         → composes <AuthSplitLayout><LoginForm/></AuthSplitLayout>
 │  ├─ set-password/page.tsx  → <AuthSplitLayout><Suspense><SetPasswordForm/></...>
+│  ├─ forgot-password/{page.tsx,actions.ts} → 6-digit code reset flow
 │  ├─ auth/confirm/route.ts  → verifyOtp for the emailed invite token
 │  ├─ admin/page.tsx         → auth guard + data fetch, renders <FactoriesConsole/>
 │  ├─ admin/actions.ts       → "use server"; createFactory (upload→insert→invite→email)
@@ -150,7 +152,7 @@ src/
 │  └─ ui/dialog.tsx          → base-ui Dialog primitive (base-nova style)
 ├─ lib/
 │  ├─ supabase/{client,server,middleware,admin}.ts  (admin = service-role client)
-│  └─ email/{transport,factory-invite}.ts           (nodemailer + branded template)
+│  └─ email/{transport,factory-invite,password-reset}.ts (nodemailer + templates)
 ```
 
 **Reuse notes**

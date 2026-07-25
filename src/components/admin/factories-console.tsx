@@ -1,15 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { Building2, CalendarDays, Hash, Plus, UserPlus } from "lucide-react";
+import { Building2, CalendarDays, Hash, UserPlus } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { CreateFactoryDialog } from "@/components/admin/create-factory-dialog";
+import { DeleteFactoryDialog } from "@/components/admin/delete-factory-dialog";
+
+export interface FactoryAdmin {
+  email: string;
+  status: "active" | "invited";
+}
 
 export interface Factory {
   id: string;
   name: string;
   slug: string | null;
   created_at: string;
+  unit_label_plural?: string | null;
+  onboarded_at?: string | null;
+  admin?: FactoryAdmin | null;
 }
 
 const MONTHS = [
@@ -28,13 +38,15 @@ export function FactoriesConsole({ factories }: { factories: Factory[] }) {
   const [selectedId, setSelectedId] = useState<string | null>(
     factories[0]?.id ?? null
   );
-  const selected = factories.find((f) => f.id === selectedId) ?? null;
+  // Fall back to the first factory so a deleted selection resolves cleanly.
+  const selected =
+    factories.find((f) => f.id === selectedId) ?? factories[0] ?? null;
 
   return (
     <div>
       {/* header */}
-      <div className="flex items-end justify-between gap-4">
-        <div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
           <h1 className="text-2xl font-semibold tracking-tight text-[#0F1B34]">
             Factories
           </h1>
@@ -42,13 +54,7 @@ export function FactoriesConsole({ factories }: { factories: Factory[] }) {
             Every tenant on the platform. Select one to see its details.
           </p>
         </div>
-        <button
-          type="button"
-          className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] px-4 text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(37,99,235,0.55)] transition hover:brightness-[1.06]"
-        >
-          <Plus className="size-4" />
-          Create factory
-        </button>
+        <CreateFactoryDialog />
       </div>
 
       {/* master–detail */}
@@ -66,7 +72,7 @@ export function FactoriesConsole({ factories }: { factories: Factory[] }) {
           ) : (
             <ul className="max-h-[60vh] overflow-y-auto py-1">
               {factories.map((factory) => {
-                const active = factory.id === selectedId;
+                const active = factory.id === selected?.id;
                 return (
                   <li key={factory.id}>
                     <button
@@ -113,7 +119,10 @@ export function FactoriesConsole({ factories }: { factories: Factory[] }) {
         {/* right: detail */}
         <section className="min-h-[420px] rounded-2xl border border-[#E6EAF1] bg-white">
           {selected ? (
-            <FactoryDetail factory={selected} />
+            <FactoryDetail
+              factory={selected}
+              onDeleted={() => setSelectedId(null)}
+            />
           ) : (
             <EmptyDetail />
           )}
@@ -123,30 +132,54 @@ export function FactoriesConsole({ factories }: { factories: Factory[] }) {
   );
 }
 
-function FactoryDetail({ factory }: { factory: Factory }) {
+function FactoryDetail({
+  factory,
+  onDeleted,
+}: {
+  factory: Factory;
+  onDeleted?: () => void;
+}) {
   return (
     <div className="p-6">
-      {/* detail header */}
-      <div className="flex items-start gap-4">
-        <div className="flex size-12 items-center justify-center rounded-xl bg-[#EFF4FF] text-[#2563EB]">
-          <Building2 className="size-6" />
-        </div>
-        <div className="min-w-0">
-          <h2 className="text-xl font-semibold tracking-tight text-[#0F1B34]">
-            {factory.name}
-          </h2>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[#94A3B8]">
-            {factory.slug && (
-              <span className="rounded-full bg-[#F1F5F9] px-2 py-0.5 font-medium text-[#475569]">
-                {factory.slug}
+      {/* detail header — stacks below sm so the title never runs under the
+          delete button */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+        <div className="flex min-w-0 flex-1 items-start gap-4">
+          <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-[#EFF4FF] text-[#2563EB]">
+            <Building2 className="size-6" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-xl font-semibold tracking-tight break-words text-[#0F1B34]">
+              {factory.name}
+            </h2>
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-[#94A3B8]">
+              {factory.slug && (
+                <span className="max-w-full truncate rounded-full bg-[#F1F5F9] px-2 py-0.5 font-medium text-[#475569]">
+                  {factory.slug}
+                </span>
+              )}
+              <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                <CalendarDays className="size-3.5 shrink-0" />
+                Created {formatDate(factory.created_at)}
               </span>
-            )}
-            <span className="inline-flex items-center gap-1">
-              <CalendarDays className="size-3.5" />
-              Created {formatDate(factory.created_at)}
-            </span>
+              {factory.slug && (
+                <a
+                  href={`/factory/${factory.slug}`}
+                  className="font-medium whitespace-nowrap text-[#2563EB] hover:underline"
+                >
+                  Open dashboard →
+                </a>
+              )}
+            </div>
           </div>
         </div>
+
+        <DeleteFactoryDialog
+          factoryId={factory.id}
+          factoryName={factory.name}
+          onDeleted={onDeleted}
+          className="w-full justify-center sm:w-auto"
+        />
       </div>
 
       {/* info tiles */}
@@ -164,25 +197,42 @@ function FactoryDetail({ factory }: { factory: Factory }) {
         </InfoTile>
 
         <InfoTile icon={UserPlus} label="First admin">
-          <div className="flex items-center gap-2">
+          {factory.admin ? (
+            <div className="flex flex-col items-start gap-1.5">
+              <span className="max-w-full truncate text-sm text-[#334155]">
+                {factory.admin.email}
+              </span>
+              {factory.admin.status === "active" ? (
+                <StatusPill tone="green">Active</StatusPill>
+              ) : (
+                <StatusPill tone="amber">Invited · pending</StatusPill>
+              )}
+            </div>
+          ) : (
             <StatusPill tone="amber">Not provisioned</StatusPill>
-            <button
-              type="button"
-              className="text-xs font-medium text-[#2563EB] hover:underline"
-            >
-              Invite admin
-            </button>
-          </div>
+          )}
         </InfoTile>
 
         <InfoTile icon={Building2} label="Onboarding">
-          <StatusPill tone="gray">Not started</StatusPill>
+          {factory.onboarded_at ? (
+            <div className="flex flex-col items-start gap-1.5">
+              <StatusPill tone="green">
+                Completed {formatDate(factory.onboarded_at)}
+              </StatusPill>
+              {factory.unit_label_plural && (
+                <span className="text-xs text-[#64748B]">
+                  Production units: {factory.unit_label_plural}
+                </span>
+              )}
+            </div>
+          ) : (
+            <StatusPill tone="gray">Not started</StatusPill>
+          )}
         </InfoTile>
       </div>
 
       <p className="mt-6 text-xs text-[#94A3B8]">
-        Provisioning a first admin, onboarding status, and per-factory users
-        arrive in the next build steps.
+        Per-factory user management arrives in the next build steps.
       </p>
     </div>
   );

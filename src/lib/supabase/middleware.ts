@@ -36,8 +36,10 @@ export async function updateSession(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
 
-  // Unauthenticated users can't reach the app shell.
-  if (!user && path.startsWith("/admin")) {
+  // Unauthenticated users can't reach the app shells.
+  const isProtected =
+    path.startsWith("/admin") || path.startsWith("/factory");
+  if (!user && isProtected) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     return NextResponse.redirect(loginUrl);

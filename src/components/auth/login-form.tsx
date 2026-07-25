@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Eye, EyeOff, Lock, Mail } from "lucide-react";
 
@@ -83,12 +84,12 @@ export function LoginForm() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           labelAction={
-            <a
-              href="#"
+            <Link
+              href="/forgot-password"
               className="text-xs font-medium text-[#2563EB] hover:underline"
             >
               Forgot?
-            </a>
+            </Link>
           }
           trailing={
             <button

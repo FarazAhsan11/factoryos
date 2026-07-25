@@ -25,6 +25,7 @@ No test runner is configured yet. Environment is **Windows / PowerShell**.
 - **Tailwind CSS v4** (via `@tailwindcss/postcss`; no `tailwind.config` file — theme lives in `src/app/globals.css`)
 - **shadcn/ui** — style `base-nova`, base color `neutral`, icons `lucide-react`. Config in `components.json`.
 - **Supabase** (`@supabase/ssr`) for auth + Postgres
+- **Forms:** `react-hook-form` + `zod` (via `@hookform/resolvers/zod`) — see *Forms & validation* below
 - `sonner` (toasts), `next-themes`, `class-variance-authority` + `clsx` + `tailwind-merge`
 
 > Note: `docs/ARCHITECTURE_FLOW.md` still lists Auth/DB/ORM as "TBD (Clerk / Neon / Drizzle-or-Prisma)". The code has already moved to **Supabase** for both auth and database. Treat Supabase as the current choice; update the doc when confirmed rather than trusting its "TBD" rows.
@@ -51,6 +52,18 @@ Route files (`page.tsx`, `layout.tsx`) should stay thin: they wire metadata, fet
 - Factor out anything used more than once (inputs, cards, headers, layout shells) into a shared component instead of copy-pasting class strings.
 - Add `"use client"` only to the specific component that needs interactivity/hooks, keeping it as low in the tree as possible — don't make a whole page a Client Component to add one interactive control.
 - Merge/compose classes with `cn()` from `@/lib/utils`; expose a `className` prop on reusable components so callers can adjust spacing/size.
+
+## Forms & validation
+
+Build all forms with **`react-hook-form`** for state and **`zod`** for validation, wired together via **`@hookform/resolvers/zod`**. Do not hand-roll `useState`-per-field + manual `if` checks for new forms.
+
+- **One schema per form.** Define a `zod` schema (co-located with the form component or in a nearby `schema.ts`) and derive the TS type from it: `type Values = z.infer<typeof schema>`. The schema is the single source of truth for both validation and types — don't declare a separate interface.
+- **Wire it with the resolver:** `useForm<Values>({ resolver: zodResolver(schema) })`. Read errors from `formState.errors` and disable submit via `formState.isSubmitting` rather than a separate `loading` state.
+- **Server Actions are the trust boundary.** Client-side zod is for UX only. **Re-validate the same schema inside the Server Action** before touching Supabase — never trust client input. Share the schema between client and action where practical (put it in a plain, non-`"use server"` module so both can import it).
+- **Field components stay controlled by RHF.** Keep the reusable `TextField` (and future field primitives) presentational; connect them with `register(...)` or a `Controller`, and pass `error`/`aria-invalid` down for inline messages. Don't bake form logic into the field primitive.
+- **Match existing visuals.** Reuse `TextField`, the gradient submit button, and the red inline error note used by `LoginForm` so all forms look identical — only the state/validation mechanism changes.
+
+> The current auth forms (`login-form`, `set-password-form`, `forgot-password-form`) and `create-factory-dialog` predate this convention and still use manual state. Migrate them to RHF + zod when you next touch them; write **new** forms this way from the start.
 
 ## Environment
 

@@ -5,6 +5,7 @@ import { Building2, CalendarDays, Hash, UserPlus } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { CreateFactoryDialog } from "@/components/admin/create-factory-dialog";
+import { DeleteFactoryDialog } from "@/components/admin/delete-factory-dialog";
 
 export interface FactoryAdmin {
   email: string;
@@ -35,7 +36,9 @@ export function FactoriesConsole({ factories }: { factories: Factory[] }) {
   const [selectedId, setSelectedId] = useState<string | null>(
     factories[0]?.id ?? null
   );
-  const selected = factories.find((f) => f.id === selectedId) ?? null;
+  // Fall back to the first factory so a deleted selection resolves cleanly.
+  const selected =
+    factories.find((f) => f.id === selectedId) ?? factories[0] ?? null;
 
   return (
     <div>
@@ -67,7 +70,7 @@ export function FactoriesConsole({ factories }: { factories: Factory[] }) {
           ) : (
             <ul className="max-h-[60vh] overflow-y-auto py-1">
               {factories.map((factory) => {
-                const active = factory.id === selectedId;
+                const active = factory.id === selected?.id;
                 return (
                   <li key={factory.id}>
                     <button
@@ -114,7 +117,10 @@ export function FactoriesConsole({ factories }: { factories: Factory[] }) {
         {/* right: detail */}
         <section className="min-h-[420px] rounded-2xl border border-[#E6EAF1] bg-white">
           {selected ? (
-            <FactoryDetail factory={selected} />
+            <FactoryDetail
+              factory={selected}
+              onDeleted={() => setSelectedId(null)}
+            />
           ) : (
             <EmptyDetail />
           )}
@@ -124,7 +130,13 @@ export function FactoriesConsole({ factories }: { factories: Factory[] }) {
   );
 }
 
-function FactoryDetail({ factory }: { factory: Factory }) {
+function FactoryDetail({
+  factory,
+  onDeleted,
+}: {
+  factory: Factory;
+  onDeleted?: () => void;
+}) {
   return (
     <div className="p-6">
       {/* detail header */}
@@ -132,7 +144,7 @@ function FactoryDetail({ factory }: { factory: Factory }) {
         <div className="flex size-12 items-center justify-center rounded-xl bg-[#EFF4FF] text-[#2563EB]">
           <Building2 className="size-6" />
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h2 className="text-xl font-semibold tracking-tight text-[#0F1B34]">
             {factory.name}
           </h2>
@@ -156,6 +168,12 @@ function FactoryDetail({ factory }: { factory: Factory }) {
             )}
           </div>
         </div>
+
+        <DeleteFactoryDialog
+          factoryId={factory.id}
+          factoryName={factory.name}
+          onDeleted={onDeleted}
+        />
       </div>
 
       {/* info tiles */}

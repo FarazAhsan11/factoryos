@@ -5,9 +5,14 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendFactoryInviteEmail } from "@/lib/email/factory-invite";
+import { deleteFactorySchema, type DeleteFactoryValues } from "./schemas";
 
 export type CreateFactoryResult =
   | { ok: true; warning?: string }
+  | { error: string };
+
+export type DeleteFactoryResult =
+  | { ok: true; deletedUsers: number; warning?: string }
   | { error: string };
 
 function slugify(name: string) {
@@ -26,15 +31,13 @@ function siteUrl() {
   );
 }
 
-export async function createFactory(
-  formData: FormData
-): Promise<CreateFactoryResult> {
-  // ── 1. Authorize: only a signed-in super admin may create factories ──────
+/** Returns an error message when the caller is not a signed-in super admin. */
+async function requireSuperAdmin(action: string): Promise<string | null> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: "Not signed in." };
+  if (!user) return "Not signed in.";
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -42,8 +45,17 @@ export async function createFactory(
     .eq("id", user.id)
     .single();
   if (profile?.role !== "super_admin") {
-    return { error: "Only a super admin can create factories." };
+    return `Only a super admin can ${action}.`;
   }
+  return null;
+}
+
+export async function createFactory(
+  formData: FormData
+): Promise<CreateFactoryResult> {
+  // ── 1. Authorize: only a signed-in super admin may create factories ──────
+  const denied = await requireSuperAdmin("create factories");
+  if (denied) return { error: denied };
 
   // ── 2. Validate input ────────────────────────────────────────────────────
   const name = String(formData.get("name") ?? "").trim();
@@ -137,4 +149,96 @@ export async function createFactory(
 
   revalidatePath("/admin");
   return { ok: true };
+}
+
+/**
+ * Permanently deletes a factory and everything scoped to it: every member's
+ * auth user + profile, its stored logo files, and the factory row itself.
+ * Irreversible — the caller must retype the factory name to confirm.
+ */
+export async function deleteFactory(
+  values: DeleteFactoryValues
+): Promise<DeleteFactoryResult> {
+  // ── 1. Authorize ─────────────────────────────────────────────────────────
+  const denied = await requireSuperAdmin("delete factories");
+  if (denied) return { error: denied };
+
+  // ── 2. Re-validate on the server (client-side zod is UX only) ────────────
+  const parsed = deleteFactorySchema.safeParse(values);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid request." };
+  }
+  const { factoryId, confirmName } = parsed.data;
+
+  const admin = createAdminClient();
+
+  // ── 3. Load the factory and check the typed confirmation ────────────────
+  const { data: factory, error: loadError } = await admin
+    .from("factories")
+    .select("id, name, slug")
+    .eq("id", factoryId)
+    .maybeSingle();
+  if (loadError) return { error: loadError.message };
+  if (!factory) return { error: "That factory no longer exists." };
+
+  if (confirmName.toLowerCase() !== factory.name.trim().toLowerCase()) {
+    return { error: "The name you typed doesn't match this factory." };
+  }
+
+  // ── 4. Delete every user belonging to the factory ────────────────────────
+  // Deleting the auth user cascades to public.profiles (FK on delete cascade).
+  const { data: members, error: membersError } = await admin
+    .from("profiles")
+    .select("id, role")
+    .eq("factory_id", factory.id);
+  if (membersError) return { error: membersError.message };
+
+  const failedUsers: string[] = [];
+  let deletedUsers = 0;
+  for (const member of members ?? []) {
+    // Belt-and-braces: a super admin is never factory-scoped, never wipe one.
+    if (member.role === "super_admin") continue;
+    const { error } = await admin.auth.admin.deleteUser(member.id);
+    if (error) failedUsers.push(member.id);
+    else deletedUsers += 1;
+  }
+
+  // ── 5. Remove stored logos (bucket is keyed by slug) ─────────────────────
+  let storageWarning: string | null = null;
+  if (factory.slug) {
+    const { data: files } = await admin.storage
+      .from("factory-logos")
+      .list(factory.slug);
+    const paths = (files ?? []).map((f) => `${factory.slug}/${f.name}`);
+    if (paths.length) {
+      const { error } = await admin.storage
+        .from("factory-logos")
+        .remove(paths);
+      if (error) storageWarning = `logo files could not be removed (${error.message})`;
+    }
+  }
+
+  // ── 6. Delete the factory row ────────────────────────────────────────────
+  const { error: deleteError } = await admin
+    .from("factories")
+    .delete()
+    .eq("id", factory.id);
+  if (deleteError) return { error: deleteError.message };
+
+  revalidatePath("/admin");
+
+  const warnings = [
+    failedUsers.length
+      ? `${failedUsers.length} user account(s) could not be deleted`
+      : null,
+    storageWarning,
+  ].filter(Boolean);
+
+  return {
+    ok: true,
+    deletedUsers,
+    warning: warnings.length
+      ? `Factory deleted, but ${warnings.join(" and ")}.`
+      : undefined,
+  };
 }

@@ -2,7 +2,7 @@
 
 _A running record of what has been built, how it fits together, and how to run it. Update as work lands._
 
-_Last updated: 2026-07-24_
+_Last updated: 2026-07-26_
 
 ---
 
@@ -18,7 +18,14 @@ FactoryOS is a multi-tenant SaaS for factory operations, being rebuilt from the 
 - ✅ Auth flow: login → role-based routing → **Super Admin dashboard** with a factories master–detail view
 - ✅ **Create factory** (Step 1): modal (name, info, logo upload, admin email) → server action uploads the logo to Storage, inserts the factory, provisions its **Factory Admin** via a Supabase invite link, and emails a **branded invite** through nodemailer. The admin sets a password (`/set-password`) and lands on a **factory dashboard** (`/factory/[slug]`, dummy data, tenant-gated).
 
-Not built yet: factory-admin management (delete/re-invite, provisioned-status in the detail pane), onboarding wizard, and all operational modules.
+- ✅ **Delete factory** (Step 1b): cascading wipe of a tenant — every member's auth user + profile, its logo files, then the factory row, behind a type-the-name confirmation.
+- ✅ **Onboarding wizard** (Step 2): gates the whole factory workspace until `onboarded_at` is set; captures the site name and the tenant's production-unit vocabulary.
+- ✅ **Factory workspace shell** (Step 3): role-gated left sidebar over a shared layout; unbuilt modules show as "Soon".
+- ✅ **Admin & Settings** (Step 3): Company settings, Units and Processes management, backed by TanStack Query.
+
+> Details, migrations, and the patterns to follow for the next tab live in **`docs/IMPLEMENTATION_GUIDE.md`**.
+
+Not built yet: re-invite an admin, per-factory user management, the remaining Admin tabs (Employees, Products, Shift times), and all operational modules.
 
 ---
 
@@ -194,13 +201,14 @@ Tenant-gated placeholder: top bar with the factory logo/name + "Factory Admin" b
 
 ## 10. Next steps
 
-- Reflect real **First admin / Onboarding** status in the factory detail pane (query `profiles` per factory) instead of the hardcoded "Not provisioned" pill; add **re-invite** and per-factory **delete**.
-- **Factory onboarding wizard** (port from the prototype: units, processes, products, shift times, employees) — replaces the dummy data on `/factory/[slug]`.
+- **Re-invite** a factory admin from the super-admin console (delete and real First admin / Onboarding status are done).
+- Remaining **Admin tabs**: Employees, Products, Shift times — scaffolding and the pattern are in `docs/IMPLEMENTATION_GUIDE.md` §6.
 - Operational modules (pipeline, shift log, roster/attendance, actions, OEE, quality, trends, handovers) — see `docs/ARCHITECTURE_FLOW.md` for scope and the shift-based data model.
 
 ---
 
 ## 11. Related docs
 
+- `docs/IMPLEMENTATION_GUIDE.md` — how delete-factory, onboarding, the workspace shell, and the Admin tab are built; migrations 0003–0005; navigation/data-fetching patterns.
 - `docs/ARCHITECTURE_FLOW.md` — product scope, role hierarchy, shift-based data model, build order, open decisions.
 - `CLAUDE.md` — repo conventions (stack, layout, component conventions, database workflow).

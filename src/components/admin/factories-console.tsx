@@ -45,8 +45,8 @@ export function FactoriesConsole({ factories }: { factories: Factory[] }) {
   return (
     <div>
       {/* header */}
-      <div className="flex items-end justify-between gap-4">
-        <div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
           <h1 className="text-2xl font-semibold tracking-tight text-[#0F1B34]">
             Factories
           </h1>
@@ -141,33 +141,36 @@ function FactoryDetail({
 }) {
   return (
     <div className="p-6">
-      {/* detail header */}
-      <div className="flex items-start gap-4">
-        <div className="flex size-12 items-center justify-center rounded-xl bg-[#EFF4FF] text-[#2563EB]">
-          <Building2 className="size-6" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h2 className="text-xl font-semibold tracking-tight text-[#0F1B34]">
-            {factory.name}
-          </h2>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[#94A3B8]">
-            {factory.slug && (
-              <span className="rounded-full bg-[#F1F5F9] px-2 py-0.5 font-medium text-[#475569]">
-                {factory.slug}
+      {/* detail header — stacks below sm so the title never runs under the
+          delete button */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+        <div className="flex min-w-0 flex-1 items-start gap-4">
+          <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-[#EFF4FF] text-[#2563EB]">
+            <Building2 className="size-6" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-xl font-semibold tracking-tight break-words text-[#0F1B34]">
+              {factory.name}
+            </h2>
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-[#94A3B8]">
+              {factory.slug && (
+                <span className="max-w-full truncate rounded-full bg-[#F1F5F9] px-2 py-0.5 font-medium text-[#475569]">
+                  {factory.slug}
+                </span>
+              )}
+              <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                <CalendarDays className="size-3.5 shrink-0" />
+                Created {formatDate(factory.created_at)}
               </span>
-            )}
-            <span className="inline-flex items-center gap-1">
-              <CalendarDays className="size-3.5" />
-              Created {formatDate(factory.created_at)}
-            </span>
-            {factory.slug && (
-              <a
-                href={`/factory/${factory.slug}`}
-                className="font-medium text-[#2563EB] hover:underline"
-              >
-                Open dashboard →
-              </a>
-            )}
+              {factory.slug && (
+                <a
+                  href={`/factory/${factory.slug}`}
+                  className="font-medium whitespace-nowrap text-[#2563EB] hover:underline"
+                >
+                  Open dashboard →
+                </a>
+              )}
+            </div>
           </div>
         </div>
 
@@ -175,6 +178,7 @@ function FactoryDetail({
           factoryId={factory.id}
           factoryName={factory.name}
           onDeleted={onDeleted}
+          className="w-full justify-center sm:w-auto"
         />
       </div>
 

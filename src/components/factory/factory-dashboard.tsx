@@ -1,13 +1,4 @@
-import {
-  Activity,
-  Boxes,
-  Building2,
-  CalendarDays,
-  Gauge,
-  Users,
-} from "lucide-react";
-
-import { SignOutButton } from "@/components/auth/sign-out-button";
+import { Activity, Boxes, CalendarDays, Gauge, Users } from "lucide-react";
 
 export interface FactoryRecord {
   id: string;
@@ -55,38 +46,7 @@ const SHIFTS = [
 
 export function FactoryDashboard({ factory }: { factory: FactoryRecord }) {
   return (
-    <div className="min-h-svh bg-[#F6F8FC]">
-      {/* top bar */}
-      <header className="flex items-center justify-between border-b border-[#E6EAF1] bg-white px-6 py-3.5">
-        <div className="flex items-center gap-3">
-          {factory.logo_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={factory.logo_url}
-              alt=""
-              className="size-9 rounded-lg object-cover"
-            />
-          ) : (
-            <div className="flex size-9 items-center justify-center rounded-lg bg-[#EFF4FF] text-[#2563EB]">
-              <Building2 className="size-5" />
-            </div>
-          )}
-          <div>
-            <p className="text-sm font-semibold text-[#0F1B34]">{factory.name}</p>
-            <p className="text-xs text-[#94A3B8]">
-              {factory.slug ?? "factory"} · dashboard
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#EFF4FF] px-2.5 py-1 text-xs font-semibold text-[#2563EB]">
-            Factory Admin
-          </span>
-          <SignOutButton />
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-6xl px-6 py-10">
+    <div className="mx-auto max-w-5xl">
         <div className="flex items-end justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-[#0F1B34]">
@@ -151,10 +111,9 @@ export function FactoryDashboard({ factory }: { factory: FactoryRecord }) {
         </div>
 
         <p className="mt-6 text-xs text-[#94A3B8]">
-          Sample data. The onboarding wizard and live operational modules
-          (pipeline, shift log, OEE, quality, roster) arrive in later build steps.
+          Sample data. The live operational modules (pipeline, shift log, OEE,
+          quality, roster) arrive in later build steps.
         </p>
-      </main>
     </div>
   );
 }

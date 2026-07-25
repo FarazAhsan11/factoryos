@@ -32,10 +32,16 @@ export default async function AdminPage() {
   // Only the platform owner may see this console.
   if (!profile || profile.role !== "super_admin") redirect("/login");
 
-  const { data: factories } = await supabase
+  const { data: factories, error: factoriesError } = await supabase
     .from("factories")
-    .select("id, name, slug, created_at")
+    .select("id, name, slug, created_at, unit_label_plural, onboarded_at")
     .order("created_at", { ascending: false });
+
+  // Don't let a failed query masquerade as "no factories yet" — a missing
+  // column (unapplied migration) or an RLS problem must be visible.
+  if (factoriesError) {
+    throw new Error(`Could not load factories: ${factoriesError.message}`);
+  }
 
   // Attach each factory's first admin (role='admin') + whether they've
   // completed the invite (email confirmed / signed in) vs still pending.

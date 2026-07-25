@@ -16,6 +16,9 @@ export interface FactoryRecord {
   description: string | null;
   logo_url: string | null;
   created_at: string;
+  unit_label: string | null;
+  unit_label_plural: string | null;
+  onboarded_at: string | null;
 }
 
 const MONTHS = [
@@ -28,13 +31,21 @@ function formatDate(iso: string) {
   return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
-// Placeholder metrics until the operational modules land.
-const KPIS = [
-  { icon: Gauge, label: "OEE (today)", value: "78.4%", tone: "text-[#2563EB]" },
-  { icon: Boxes, label: "Units produced", value: "12,480", tone: "text-[#0F1B34]" },
-  { icon: Activity, label: "Active lines", value: "6 / 8", tone: "text-[#0F1B34]" },
-  { icon: Users, label: "On shift", value: "42", tone: "text-[#0F1B34]" },
-];
+// Placeholder metrics until the operational modules land. The unit label comes
+// from onboarding, so each tenant sees its own vocabulary.
+function kpis(unitsPlural: string) {
+  return [
+    { icon: Gauge, label: "OEE (today)", value: "78.4%", tone: "text-[#2563EB]" },
+    { icon: Boxes, label: "Units produced", value: "12,480", tone: "text-[#0F1B34]" },
+    {
+      icon: Activity,
+      label: `Active ${unitsPlural.toLowerCase()}`,
+      value: "6 / 8",
+      tone: "text-[#0F1B34]",
+    },
+    { icon: Users, label: "On shift", value: "42", tone: "text-[#0F1B34]" },
+  ];
+}
 
 const SHIFTS = [
   { name: "Shift A · Morning", window: "06:00 – 14:00", status: "Active", tone: "green" },
@@ -96,7 +107,7 @@ export function FactoryDashboard({ factory }: { factory: FactoryRecord }) {
 
         {/* KPI row */}
         <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {KPIS.map((k) => (
+          {kpis(factory.unit_label_plural ?? "lines").map((k) => (
             <div
               key={k.label}
               className="rounded-2xl border border-[#E6EAF1] bg-white p-5"

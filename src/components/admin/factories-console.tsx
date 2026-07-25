@@ -17,6 +17,8 @@ export interface Factory {
   name: string;
   slug: string | null;
   created_at: string;
+  unit_label_plural?: string | null;
+  onboarded_at?: string | null;
   admin?: FactoryAdmin | null;
 }
 
@@ -208,13 +210,25 @@ function FactoryDetail({
         </InfoTile>
 
         <InfoTile icon={Building2} label="Onboarding">
-          <StatusPill tone="gray">Not started</StatusPill>
+          {factory.onboarded_at ? (
+            <div className="flex flex-col items-start gap-1.5">
+              <StatusPill tone="green">
+                Completed {formatDate(factory.onboarded_at)}
+              </StatusPill>
+              {factory.unit_label_plural && (
+                <span className="text-xs text-[#64748B]">
+                  Production units: {factory.unit_label_plural}
+                </span>
+              )}
+            </div>
+          ) : (
+            <StatusPill tone="gray">Not started</StatusPill>
+          )}
         </InfoTile>
       </div>
 
       <p className="mt-6 text-xs text-[#94A3B8]">
-        Onboarding status and per-factory user management arrive in the next
-        build steps.
+        Per-factory user management arrives in the next build steps.
       </p>
     </div>
   );

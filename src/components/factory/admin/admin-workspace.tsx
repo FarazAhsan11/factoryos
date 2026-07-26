@@ -83,6 +83,12 @@ export function AdminWorkspace({
           plural="Process stages"
           placeholder="e.g. Compression, Spray Drying…"
           canManage={canManage}
+          flag={{
+            label: "This stage runs on a machine",
+            hint: "Machine stages get equipment, downtime and OEE tracking; manual stages don't.",
+            on: "Machine",
+            off: "Manual",
+          }}
         />
       </Panel>
     </>

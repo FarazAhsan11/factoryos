@@ -15,7 +15,52 @@ export interface SetupItem {
   active: boolean;
   sort_order: number;
   created_at: string;
+  /**
+   * The list's optional boolean attribute, if it has one (processes:
+   * `has_machine`). Exposed under a neutral name so one component can drive
+   * every list; `false` for tables without a flag column.
+   */
+  flag: boolean;
 }
+
+/** Which column, per table, backs `SetupItem.flag`. */
+const FLAG_COLUMN: Partial<Record<SetupTable, string>> = {
+  factory_processes: "has_machine",
+};
+
+const BASE_COLUMNS = "id, name, active, sort_order, created_at";
+
+function columns(table: SetupTable): string {
+  const flag = FLAG_COLUMN[table];
+  return flag ? `${BASE_COLUMNS}, ${flag}` : BASE_COLUMNS;
+}
+
+function toItem(table: SetupTable, row: Record<string, unknown>): SetupItem {
+  const flag = FLAG_COLUMN[table];
+  return {
+    id: row.id as string,
+    name: row.name as string,
+    active: row.active as boolean,
+    sort_order: row.sort_order as number,
+    created_at: row.created_at as string,
+    flag: flag ? Boolean(row[flag]) : false,
+  };
+}
+
+/** Translates the neutral `flag` key back to the table's real column. */
+function toRow(
+  table: SetupTable,
+  patch: SetupPatch
+): Record<string, unknown> {
+  const { flag, ...rest } = patch;
+  const column = FLAG_COLUMN[table];
+  if (flag === undefined || !column) return rest;
+  return { ...rest, [column]: flag };
+}
+
+export type SetupPatch = Partial<
+  Pick<SetupItem, "name" | "active" | "sort_order" | "flag">
+>;
 
 export const setupKeys = {
   all: (table: SetupTable, factoryId: string) => [table, factoryId] as const,
@@ -28,26 +73,33 @@ export async function fetchSetupItems(
   const supabase = createClient();
   const { data, error } = await supabase
     .from(table)
-    .select("id, name, active, sort_order, created_at")
+    .select(columns(table))
     .eq("factory_id", factoryId)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
 
   if (error) throw new Error(error.message);
-  return (data ?? []) as SetupItem[];
+  return (data ?? []).map((row) =>
+    toItem(table, row as unknown as Record<string, unknown>)
+  );
 }
 
 export async function createSetupItem(
   table: SetupTable,
   factoryId: string,
   name: string,
-  sortOrder: number
+  sortOrder: number,
+  flag = false
 ): Promise<SetupItem> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from(table)
-    .insert({ factory_id: factoryId, name: name.trim(), sort_order: sortOrder })
-    .select("id, name, active, sort_order, created_at")
+    .insert({
+      factory_id: factoryId,
+      sort_order: sortOrder,
+      ...toRow(table, { name: name.trim(), flag }),
+    })
+    .select(columns(table))
     .single();
 
   if (error) {
@@ -58,16 +110,19 @@ export async function createSetupItem(
         : error.message
     );
   }
-  return data as SetupItem;
+  return toItem(table, data as unknown as Record<string, unknown>);
 }
 
 export async function updateSetupItem(
   table: SetupTable,
   id: string,
-  patch: Partial<Pick<SetupItem, "name" | "active" | "sort_order">>
+  patch: SetupPatch
 ): Promise<void> {
   const supabase = createClient();
-  const { error } = await supabase.from(table).update(patch).eq("id", id);
+  const { error } = await supabase
+    .from(table)
+    .update(toRow(table, patch))
+    .eq("id", id);
   if (error) {
     throw new Error(
       error.code === "23505" ? "That name is already in use." : error.message

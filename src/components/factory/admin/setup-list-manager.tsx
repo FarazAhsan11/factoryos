@@ -6,7 +6,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { Check, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Check, Cog, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -24,6 +24,20 @@ const FIELD =
   "h-10 w-full rounded-xl border border-[#E6EAF1] bg-white px-3.5 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:ring-4 focus:ring-[#2563EB]/12";
 
 /**
+ * Optional boolean attribute a list can carry (Processes: "includes a
+ * machine"). Purely labels — the column it maps to lives in setup-queries.
+ */
+export interface SetupFlagConfig {
+  /** Checkbox label on the add row. */
+  label: string;
+  /** One-liner under the checkbox. */
+  hint?: string;
+  /** Pill text when the flag is on / off. */
+  on: string;
+  off: string;
+}
+
+/**
  * Add / rename / retire / delete manager for a factory's flat setup lists
  * (production units, process stages). One React Query cache key per list, so
  * switching Admin tabs re-renders from cache instead of refetching.
@@ -35,6 +49,7 @@ export function SetupListManager({
   plural,
   placeholder,
   canManage,
+  flag,
 }: {
   table: SetupTable;
   factoryId: string;
@@ -42,10 +57,12 @@ export function SetupListManager({
   plural: string;
   placeholder: string;
   canManage: boolean;
+  flag?: SetupFlagConfig;
 }) {
   const queryClient = useQueryClient();
   const queryKey = setupKeys.all(table, factoryId);
   const [draft, setDraft] = useState("");
+  const [draftFlag, setDraftFlag] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
 
@@ -59,10 +76,11 @@ export function SetupListManager({
   }
 
   const add = useMutation({
-    mutationFn: (name: string) =>
-      createSetupItem(table, factoryId, name, items.length),
+    mutationFn: ({ name, withFlag }: { name: string; withFlag: boolean }) =>
+      createSetupItem(table, factoryId, name, items.length, withFlag),
     onSuccess: async (created) => {
       setDraft("");
+      setDraftFlag(false);
       await refresh();
       toast.success(`${created.name} added.`);
     },
@@ -107,6 +125,24 @@ export function SetupListManager({
     onSettled: () => refresh(),
   });
 
+  const toggleFlag = useMutation({
+    mutationFn: ({ id, value }: { id: string; value: boolean }) =>
+      updateSetupItem(table, id, { flag: value }),
+    onMutate: async ({ id, value }) => {
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<SetupItem[]>(queryKey);
+      queryClient.setQueryData<SetupItem[]>(queryKey, (old) =>
+        (old ?? []).map((i) => (i.id === id ? { ...i, flag: value } : i))
+      );
+      return { previous };
+    },
+    onError: (e: Error, _vars, context) => {
+      queryClient.setQueryData(queryKey, context?.previous);
+      toast.error(e.message);
+    },
+    onSettled: () => refresh(),
+  });
+
   const remove = useMutation({
     mutationFn: (id: string) => deleteSetupItem(table, id),
     onMutate: async (id) => {
@@ -127,7 +163,7 @@ export function SetupListManager({
   function submitDraft() {
     const name = draft.trim();
     if (!name) return;
-    add.mutate(name);
+    add.mutate({ name, withFlag: Boolean(flag) && draftFlag });
   }
 
   return (
@@ -166,6 +202,25 @@ export function SetupListManager({
               Add
             </button>
           </div>
+
+          {flag && (
+            <label className="mt-3 flex cursor-pointer items-start gap-2.5 text-sm text-[#0F1B34]">
+              <input
+                type="checkbox"
+                checked={draftFlag}
+                onChange={(e) => setDraftFlag(e.target.checked)}
+                className="mt-0.5 size-4 shrink-0 cursor-pointer rounded border-[#CBD5E1] accent-[#2563EB]"
+              />
+              <span>
+                {flag.label}
+                {flag.hint && (
+                  <span className="mt-0.5 block text-xs text-[#94A3B8]">
+                    {flag.hint}
+                  </span>
+                )}
+              </span>
+            </label>
+          )}
         </div>
       )}
 
@@ -182,7 +237,13 @@ export function SetupListManager({
           {canManage ? " — add your first one above." : "."}
         </p>
       ) : (
-        <ul className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+        <ul
+          className={cn(
+            "grid gap-2.5 sm:grid-cols-2",
+            // The flag pill needs the extra width, so stay at two columns.
+            !flag && "lg:grid-cols-3"
+          )}
+        >
           {items.map((item) => {
             const editing = editingId === item.id;
             return (
@@ -235,6 +296,37 @@ export function SetupListManager({
                     >
                       {item.name}
                     </span>
+
+                    {flag &&
+                      (canManage ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            toggleFlag.mutate({
+                              id: item.id,
+                              value: !item.flag,
+                            })
+                          }
+                          aria-pressed={item.flag}
+                          title={item.flag ? flag.on : flag.off}
+                          className={cn(
+                            "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium transition",
+                            item.flag
+                              ? "bg-[#2563EB]/10 text-[#2563EB] hover:bg-[#2563EB]/16"
+                              : "bg-[#F1F5F9] text-[#94A3B8] hover:bg-[#E2E8F0]"
+                          )}
+                        >
+                          <Cog className="size-3" />
+                          {item.flag ? flag.on : flag.off}
+                        </button>
+                      ) : (
+                        item.flag && (
+                          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#2563EB]/10 px-2 py-0.5 text-[11px] font-medium text-[#2563EB]">
+                            <Cog className="size-3" />
+                            {flag.on}
+                          </span>
+                        )
+                      ))}
 
                     {canManage && (
                       <>

@@ -54,6 +54,10 @@ export function SetPasswordForm() {
       return;
     }
 
+    // Flips the roster's Invited → Active. Definer-rights RPC keyed on
+    // auth.uid(), so it can only ever stamp the caller's own profile.
+    await supabase.rpc("mark_profile_activated");
+
     router.replace(next);
     router.refresh();
   }

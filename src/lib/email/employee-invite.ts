@@ -4,27 +4,30 @@ const BRAND = "#2563EB";
 const INK = "#0F1B34";
 const MUTED = "#64748B";
 
-interface InviteEmailInput {
+interface EmployeeInviteInput {
   to: string;
-  /** The admin's name, used in the greeting. */
+  /** Shown in the greeting; falls back to a generic line when absent. */
   fullName?: string | null;
   factoryName: string;
+  /** Human label for the role they were given ("Admin", "Operator"). */
+  roleLabel: string;
+  /** /auth/confirm link that lands them on set-password → their dashboard. */
   inviteUrl: string;
-  /** Optional logo URL shown next to the factory name. */
   logoUrl?: string | null;
 }
 
 /**
- * Branded HTML for the factory-admin invite. Table-based with inline styles so
- * it renders consistently across email clients (Gmail, Outlook, Apple Mail).
+ * Branded HTML for a factory-member invite. Same table-based, inline-styled
+ * shape as the factory-admin invite so both render identically across clients;
+ * the copy differs because this one comes from their own factory's admin.
  */
-export function renderFactoryInviteEmail({
+export function renderEmployeeInviteEmail({
   fullName,
   factoryName,
+  roleLabel,
   inviteUrl,
   logoUrl,
-}: Omit<InviteEmailInput, "to">) {
-  // Bulletproof brand header: a blue rounded "F" tile + wordmark (no SVG).
+}: Omit<EmployeeInviteInput, "to">) {
   const brandTile = `
     <span style="display:inline-block;width:28px;height:28px;line-height:28px;text-align:center;background:${BRAND};color:#ffffff;border-radius:8px;font-weight:700;font-size:16px;vertical-align:middle;">F</span>
     <span style="display:inline-block;margin-left:8px;font-size:18px;font-weight:700;color:${INK};vertical-align:middle;">Factory<span style="color:${BRAND};">OS</span></span>`;
@@ -34,6 +37,8 @@ export function renderFactoryInviteEmail({
     : `<span style="display:inline-block;width:40px;height:40px;line-height:40px;text-align:center;background:#EFF4FF;color:${BRAND};border-radius:10px;font-weight:700;">${escapeHtml(
         factoryName.charAt(0).toUpperCase()
       )}</span>`;
+
+  const greeting = fullName ? `Hi ${escapeHtml(fullName)},` : "Hi,";
 
   return `<!doctype html>
 <html>
@@ -51,7 +56,7 @@ export function renderFactoryInviteEmail({
                   <tr>
                     <td style="padding-right:12px;">${factoryLogo}</td>
                     <td>
-                      <div style="font-size:13px;color:${MUTED};">You've been invited to manage</div>
+                      <div style="font-size:13px;color:${MUTED};">You've been added to</div>
                       <div style="font-size:20px;font-weight:700;color:${INK};">${escapeHtml(
                         factoryName
                       )}</div>
@@ -60,10 +65,11 @@ export function renderFactoryInviteEmail({
                 </table>
 
                 <p style="margin:24px 0 8px;font-size:15px;line-height:1.6;color:#334155;">
-                  ${fullName ? `Hi ${escapeHtml(fullName)}, you're` : "You're"}
-                  set up as the <strong>Factory Admin</strong> for
-                  <strong>${escapeHtml(factoryName)}</strong> on FactoryOS.
-                  Set a password to activate your account and open your dashboard.
+                  ${greeting} your team added you to
+                  <strong>${escapeHtml(factoryName)}</strong> on FactoryOS as
+                  <strong>${escapeHtml(roleLabel)}</strong>.
+                  Set a password to activate your account and open the factory
+                  dashboard.
                 </p>
 
                 <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px 0;">
@@ -84,8 +90,9 @@ export function renderFactoryInviteEmail({
             </tr>
             <tr>
               <td style="padding:18px 28px;border-top:1px solid #EEF1F6;font-size:12px;color:#94A3B8;">
-                This invite was sent by a FactoryOS platform administrator. If you
-                weren't expecting it, you can ignore this email.
+                This invite was sent by an administrator at ${escapeHtml(
+                  factoryName
+                )}. If you weren't expecting it, you can ignore this email.
               </td>
             </tr>
           </table>
@@ -104,13 +111,12 @@ function escapeHtml(s: string) {
     .replace(/"/g, "&quot;");
 }
 
-/** Sends the branded invite email. Throws if SMTP is misconfigured. */
-export async function sendFactoryInviteEmail(input: InviteEmailInput) {
-  const html = renderFactoryInviteEmail(input);
+/** Sends the member invite. Throws if SMTP is misconfigured. */
+export async function sendEmployeeInviteEmail(input: EmployeeInviteInput) {
   await getTransport().sendMail({
     from: fromAddress(),
     to: input.to,
-    subject: `You're invited to manage ${input.factoryName} on FactoryOS`,
-    html,
+    subject: `You've been added to ${input.factoryName} on FactoryOS`,
+    html: renderEmployeeInviteEmail(input),
   });
 }

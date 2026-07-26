@@ -11,18 +11,21 @@ import { cn } from "@/lib/utils";
 export function AdminTabs({
   tabs,
   active,
+  label = "Admin sections",
   onSelect,
   onPrefetch,
 }: {
   tabs: AdminTab[];
   active: string;
+  /** Accessible name for the strip — the shift log reuses this component. */
+  label?: string;
   onSelect: (value: string) => void;
   onPrefetch?: (value: string) => void;
 }) {
   return (
     <div
       role="tablist"
-      aria-label="Admin sections"
+      aria-label={label}
       className="mb-6 flex gap-1 overflow-x-auto rounded-xl border border-[#E6EAF1] bg-[#F6F8FC] p-1"
     >
       {tabs.map((tab) =>

@@ -47,7 +47,7 @@ export const FACTORY_NAV: NavSection[] = [
     items: [
       { href: "", label: "Dashboard", icon: LayoutGrid, roles: SUPERVISOR_UP, ready: true },
       { href: "/pipeline", label: "Pipeline", icon: Activity, roles: ALL, ready: false },
-      { href: "/log", label: "Shift log", icon: ListPlus, roles: ALL, ready: false },
+      { href: "/log", label: "Shift log", icon: ListPlus, roles: ALL, ready: true },
     ],
   },
   {

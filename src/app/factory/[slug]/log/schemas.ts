@@ -1,0 +1,128 @@
+import { z } from "zod";
+
+/**
+ * Shift log → Log entry. Plain module (no "use server") so the form and any
+ * future Server Action can share it.
+ *
+ * The form has two shapes driven by the selected process's `has_machine`
+ * flag from Admin → Processes: a machine process also captures speed, and a
+ * slow run has to say why. That rule can't live on a single field, so it's a
+ * `superRefine` at the end.
+ */
+
+export const ACTION_FLAGS = [
+  "Quality",
+  "Maintenance",
+  "Safety",
+  "Process",
+] as const;
+
+export type ActionFlag = (typeof ACTION_FLAGS)[number];
+
+export const ACTION_FLAG_LABELS: Record<ActionFlag, string> = {
+  Quality: "Yes — Quality issue",
+  Maintenance: "Yes — Maintenance needed",
+  Safety: "Yes — Safety concern",
+  Process: "Yes — Process deviation",
+};
+
+/** Speed units from the prototype; free-form enough to cover most lines. */
+export const SPEED_UNITS = [
+  "RPM",
+  "Caps/hr",
+  "Tabs/hr",
+  "Bags/hr",
+  "Bottles/hr",
+  "Units/hr",
+  "Batches",
+] as const;
+
+/** Why a machine ran below its target speed — feeds the OEE Pareto chart. */
+export const SLOW_REASONS = [
+  "Quality / weight issue — dosing adjustment",
+  "Capping / sealing problem",
+  "Equipment fault / mechanical issue",
+  "Operator limitation",
+  "Material / powder flow issue",
+  "Testing / validation in progress",
+  "Planned reduced speed — batch requirement",
+  "Other (add in comments)",
+] as const;
+
+/** "06:45" or "06:45:00" → "06:45". Shared with the shift-times form. */
+const clockTime = z
+  .string()
+  .trim()
+  .regex(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/, "Enter a time as HH:MM.")
+  .transform((v) => v.slice(0, 5));
+
+/** An optional number field: "" means "not recorded", not 0. */
+const optionalQty = z
+  .union([z.number(), z.nan()])
+  .optional()
+  .transform((v) => (v === undefined || Number.isNaN(v) ? undefined : v))
+  .refine((v) => v === undefined || v >= 0, "Enter a positive number.");
+
+export const logEntrySchema = z
+  .object({
+    factoryId: z.uuid(),
+    unitId: z.uuid("Select a unit."),
+    processId: z.uuid("Select an activity."),
+    shift: z.enum(["morning", "afternoon"]),
+    startTime: clockTime,
+    endTime: clockTime,
+    equipmentNo: z.string().trim().max(40).optional(),
+
+    batchNo: z.string().trim().max(60).optional(),
+    targetQty: optionalQty,
+    qty: optionalQty,
+    qtyRejected: optionalQty,
+
+    speedUnit: z.string().trim().max(20).optional(),
+    targetSpeed: optionalQty,
+    actualSpeed: optionalQty,
+    slowReason: z.string().trim().max(120).optional(),
+
+    operator1: z.string().trim().max(80).optional(),
+    operator2: z.string().trim().max(80).optional(),
+    comment: z.string().trim().max(500).optional(),
+    actionFlag: z.enum(ACTION_FLAGS).optional(),
+
+    /** Mirrors the selected process's has_machine, so the rules below can see it. */
+    hasMachine: z.boolean(),
+  })
+  .superRefine((values, ctx) => {
+    // Rejects can't exceed what was produced — a data-entry slip worth catching
+    // before it skews the quality rate.
+    if (
+      values.qty !== undefined &&
+      values.qtyRejected !== undefined &&
+      values.qtyRejected > values.qty
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["qtyRejected"],
+        message: "Rejects can't exceed the quantity produced.",
+      });
+    }
+
+    if (!values.hasMachine) return;
+
+    // Running below target is allowed — running below target *silently* isn't.
+    const { targetSpeed, actualSpeed, slowReason } = values;
+    const isSlow =
+      targetSpeed !== undefined &&
+      actualSpeed !== undefined &&
+      targetSpeed > 0 &&
+      actualSpeed < targetSpeed;
+    if (isSlow && !slowReason) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["slowReason"],
+        message: "Select a reason — this feeds the OEE Pareto chart.",
+      });
+    }
+  });
+
+export type LogEntryValues = z.input<typeof logEntrySchema>;
+export type LogEntryParsed = z.output<typeof logEntrySchema>;

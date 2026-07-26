@@ -1,9 +1,9 @@
-name,email,role
-Faraz Test One,mfarazahsan630+1@gmail.com,operator
-Faraz Test Two,mfarazahsan630+2@gmail.com,operator
-Faraz Test Three,mfarazahsan630+3@gmail.com,admin
-Faraz Test Four,mfarazahsan630+4@gmail.com,operator
-Faraz Test Five,mfarazahsan630+5@gmail.com,operator
-Faraz Test Six,mfarazahsan630+6@gmail.com,operator
-Faraz Test Seven,mfarazahsan630+7@gmail.com,admin
-Faraz Test Eight,mfarazahsan630+8@gmail.com,operator
+name,email,role,shift
+Faraz Test One,mfarazahsan630+1@gmail.com,operator,morning
+Faraz Test Two,mfarazahsan630+2@gmail.com,operator,afternoon
+Faraz Test Three,mfarazahsan630+3@gmail.com,admin,both
+Faraz Test Four,mfarazahsan630+4@gmail.com,operator,morning
+Faraz Test Five,mfarazahsan630+5@gmail.com,operator,afternoon
+Faraz Test Six,mfarazahsan630+6@gmail.com,operator,rotating
+Faraz Test Seven,mfarazahsan630+7@gmail.com,admin,morning
+Faraz Test Eight,mfarazahsan630+8@gmail.com,operator,

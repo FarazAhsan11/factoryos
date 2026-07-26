@@ -9,6 +9,8 @@ import { addEmployee } from "@/app/factory/[slug]/admin/employee-actions";
 import {
   ASSIGNABLE_ROLES,
   ROLE_LABELS,
+  SHIFT_LABELS,
+  SHIFT_SLOTS,
   addEmployeeSchema,
   type AddEmployeeValues,
 } from "@/app/factory/[slug]/admin/schemas";
@@ -35,7 +37,13 @@ export function AddEmployeeForm({
     formState: { errors, isSubmitting },
   } = useForm<AddEmployeeValues>({
     resolver: zodResolver(addEmployeeSchema),
-    defaultValues: { factoryId, fullName: "", email: "", role: "operator" },
+    defaultValues: {
+      factoryId,
+      fullName: "",
+      email: "",
+      role: "operator",
+      defaultShift: "morning",
+    },
   });
 
   async function onSubmit(values: AddEmployeeValues) {
@@ -48,7 +56,13 @@ export function AddEmployeeForm({
     if (result.warning) toast.warning(result.warning);
     else toast.success(`Invite sent to ${values.email}.`);
 
-    reset({ factoryId, fullName: "", email: "", role: "operator" });
+    reset({
+      factoryId,
+      fullName: "",
+      email: "",
+      role: "operator",
+      defaultShift: values.defaultShift,
+    });
     onAdded();
   }
 
@@ -61,7 +75,7 @@ export function AddEmployeeForm({
         Add someone to this factory
       </p>
 
-      <div className="grid gap-2.5 sm:grid-cols-[1fr_1fr_150px_auto] sm:items-end">
+      <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_130px_140px_auto] lg:items-end">
         <div className="space-y-1.5">
           <label htmlFor="emp-name" className={LABEL}>
             Full name
@@ -103,6 +117,23 @@ export function AddEmployeeForm({
           </select>
         </div>
 
+        <div className="space-y-1.5">
+          <label htmlFor="emp-shift" className={LABEL}>
+            Default shift
+          </label>
+          <select
+            id="emp-shift"
+            className={FIELD}
+            {...register("defaultShift")}
+          >
+            {SHIFT_SLOTS.map((shift) => (
+              <option key={shift} value={shift}>
+                {SHIFT_LABELS[shift]}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <button
           type="submit"
           disabled={isSubmitting}
@@ -117,11 +148,15 @@ export function AddEmployeeForm({
         </button>
       </div>
 
-      {(errors.fullName || errors.email || errors.role) && (
+      {(errors.fullName ||
+        errors.email ||
+        errors.role ||
+        errors.defaultShift) && (
         <p role="alert" className="mt-2.5 text-xs text-[#B91C1C]">
           {errors.fullName?.message ??
             errors.email?.message ??
-            errors.role?.message}
+            errors.role?.message ??
+            errors.defaultShift?.message}
         </p>
       )}
 

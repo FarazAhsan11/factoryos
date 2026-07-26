@@ -7,12 +7,15 @@ import { toast } from "sonner";
 import {
   removeEmployee,
   sendEmployeeInvite,
-  updateEmployeeRole,
+  updateEmployee,
 } from "@/app/factory/[slug]/admin/employee-actions";
 import {
   ASSIGNABLE_ROLES,
   ROLE_LABELS,
+  SHIFT_LABELS,
+  SHIFT_SLOTS,
   type AssignableRole,
+  type ShiftSlot,
 } from "@/app/factory/[slug]/admin/schemas";
 import { AddEmployeeForm } from "@/components/factory/admin/add-employee-form";
 import { EmployeeImportDialog } from "@/components/factory/admin/employee-import-dialog";
@@ -75,17 +78,29 @@ export function EmployeesPanel({
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const changeRole = useMutation({
-    mutationFn: async (vars: { profileId: string; role: AssignableRole }) => {
-      const result = await updateEmployeeRole(vars);
+  const edit = useMutation({
+    mutationFn: async (vars: {
+      profileId: string;
+      role?: AssignableRole;
+      defaultShift?: ShiftSlot;
+    }) => {
+      const result = await updateEmployee(vars);
       if ("error" in result) throw new Error(result.error);
     },
-    // Optimistic: the select shows the new role immediately.
-    onMutate: async ({ profileId, role }) => {
+    // Optimistic: the select shows the new value immediately.
+    onMutate: async ({ profileId, role, defaultShift }) => {
       await queryClient.cancelQueries({ queryKey });
       const previous = queryClient.getQueryData<Employee[]>(queryKey);
       queryClient.setQueryData<Employee[]>(queryKey, (old) =>
-        (old ?? []).map((e) => (e.id === profileId ? { ...e, role } : e))
+        (old ?? []).map((e) =>
+          e.id === profileId
+            ? {
+                ...e,
+                ...(role ? { role } : {}),
+                ...(defaultShift ? { default_shift: defaultShift } : {}),
+              }
+            : e
+        )
       );
       return { previous };
     },
@@ -155,6 +170,7 @@ export function EmployeesPanel({
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Email</th>
                 <th className="px-4 py-3">Role</th>
+                <th className="px-4 py-3">Default shift</th>
                 <th className="px-4 py-3">Status</th>
                 {isAdmin && <th className="px-4 py-3 text-right">Actions</th>}
               </tr>
@@ -184,7 +200,7 @@ export function EmployeesPanel({
                           value={person.role}
                           aria-label={`Role for ${person.email}`}
                           onChange={(e) =>
-                            changeRole.mutate({
+                            edit.mutate({
                               profileId: person.id,
                               role: e.target.value as AssignableRole,
                             })
@@ -200,6 +216,32 @@ export function EmployeesPanel({
                       ) : (
                         <span className="text-[#475569]">
                           {ROLE_LABELS[person.role] ?? person.role}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {isAdmin ? (
+                        <select
+                          value={person.default_shift}
+                          aria-label={`Default shift for ${person.email}`}
+                          onChange={(e) =>
+                            edit.mutate({
+                              profileId: person.id,
+                              defaultShift: e.target.value as ShiftSlot,
+                            })
+                          }
+                          className="h-8 rounded-lg border border-[#E6EAF1] bg-white px-2 text-sm text-[#0F1B34] outline-none transition focus:border-[#2563EB]"
+                        >
+                          {SHIFT_SLOTS.map((shift) => (
+                            <option key={shift} value={shift}>
+                              {SHIFT_LABELS[shift]}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="text-[#475569]">
+                          {SHIFT_LABELS[person.default_shift] ??
+                            person.default_shift}
                         </span>
                       )}
                     </td>

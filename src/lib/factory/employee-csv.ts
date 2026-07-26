@@ -1,8 +1,10 @@
 import {
   ASSIGNABLE_ROLES,
+  SHIFT_SLOTS,
   employeeRowSchema,
   type AssignableRole,
   type EmployeeRow,
+  type ShiftSlot,
 } from "@/app/factory/[slug]/admin/schemas";
 
 /**
@@ -22,7 +24,11 @@ export interface ParsedCsv {
   errors: CsvRowError[];
 }
 
-export const CSV_TEMPLATE = "name,email,role\nThian Mang,thian@example.com,operator\nAisha Khan,aisha@example.com,admin\n";
+export const CSV_TEMPLATE =
+  "name,email,role,shift\n" +
+  "Thian Mang,thian@example.com,operator,morning\n" +
+  "Aisha Khan,aisha@example.com,admin,afternoon\n" +
+  "Ravi Kumar,ravi@example.com,operator,both\n";
 
 /** Minimal RFC-4180 split: handles quoted fields and escaped ("") quotes. */
 function splitLine(line: string): string[] {
@@ -59,6 +65,7 @@ function splitLine(line: string): string[] {
 const NAME_HEADERS = ["name", "full name", "fullname", "full_name", "employee"];
 const EMAIL_HEADERS = ["email", "e-mail", "email address"];
 const ROLE_HEADERS = ["role", "access", "permission"];
+const SHIFT_HEADERS = ["shift", "default shift", "default_shift"];
 
 function indexOfHeader(cells: string[], candidates: string[]) {
   return cells.findIndex((c) => candidates.includes(c.toLowerCase()));
@@ -69,6 +76,16 @@ function normalizeRole(value: string): AssignableRole | null {
   if (!v) return "operator"; // blank role column → the safe default
   const match = ASSIGNABLE_ROLES.find((r) => r === v);
   return match ?? null;
+}
+
+/** Accepts the prototype's wording too: "rotating" / "both", "am" / "pm". */
+function normalizeShift(value: string): ShiftSlot | null {
+  const v = value.trim().toLowerCase();
+  if (!v) return "morning";
+  if (v === "rotating" || v === "rotate") return "both";
+  if (v === "am") return "morning";
+  if (v === "pm" || v === "evening" || v === "night") return "afternoon";
+  return SHIFT_SLOTS.find((s) => s === v) ?? null;
 }
 
 /**
@@ -95,8 +112,9 @@ export function parseEmployeeCsv(text: string): ParsedCsv {
         name: indexOfHeader(firstCells, NAME_HEADERS),
         email: indexOfHeader(firstCells, EMAIL_HEADERS),
         role: indexOfHeader(firstCells, ROLE_HEADERS),
+        shift: indexOfHeader(firstCells, SHIFT_HEADERS),
       }
-    : { name: 0, email: 1, role: 2 };
+    : { name: 0, email: 1, role: 2, shift: 3 };
 
   const body = hasHeader ? lines.slice(1) : lines;
   const rows: EmployeeRow[] = [];
@@ -122,7 +140,23 @@ export function parseEmployeeCsv(text: string): ParsedCsv {
       continue;
     }
 
-    const parsed = employeeRowSchema.safeParse({ fullName: name, email, role });
+    const shiftCell = pick(columns.shift);
+    const defaultShift = normalizeShift(shiftCell);
+    if (!defaultShift) {
+      errors.push({
+        line,
+        value: label,
+        message: `"${shiftCell}" isn't a shift — use morning, afternoon or both.`,
+      });
+      continue;
+    }
+
+    const parsed = employeeRowSchema.safeParse({
+      fullName: name,
+      email,
+      role,
+      defaultShift,
+    });
     if (!parsed.success) {
       errors.push({
         line,

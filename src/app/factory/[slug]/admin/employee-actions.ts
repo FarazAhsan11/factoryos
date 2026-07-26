@@ -10,10 +10,10 @@ import {
   addEmployeeSchema,
   employeeIdSchema,
   importEmployeesSchema,
-  updateEmployeeRoleSchema,
+  updateEmployeeSchema,
   type AddEmployeeValues,
   type ImportEmployeesValues,
-  type UpdateEmployeeRoleValues,
+  type UpdateEmployeeValues,
 } from "./schemas";
 
 /**
@@ -168,7 +168,7 @@ export async function addEmployee(
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid details." };
   }
-  const { factoryId, fullName, email, role } = parsed.data;
+  const { factoryId, fullName, email, role, defaultShift } = parsed.data;
 
   const auth = await requireFactoryAdmin(factoryId);
   if ("error" in auth) return auth;
@@ -185,7 +185,12 @@ export async function addEmployee(
       fullName,
       roleLabel: ROLE_LABELS[role] ?? role,
       factory,
-      metadata: { role, factory_id: factoryId, full_name: fullName },
+      metadata: {
+        role,
+        factory_id: factoryId,
+        full_name: fullName,
+        default_shift: defaultShift,
+      },
     });
     userId = result.userId;
   } catch (e) {
@@ -280,6 +285,7 @@ export async function importEmployees(
           role: row.role,
           factory_id: factoryId,
           full_name: row.fullName,
+          default_shift: row.defaultShift,
         },
       });
       results.push(
@@ -303,6 +309,7 @@ export async function importEmployees(
           role: row.role,
           factory_id: factoryId,
           full_name: row.fullName,
+          default_shift: row.defaultShift,
         },
       });
       if (userId) await stampInvited(admin, userId);
@@ -381,37 +388,47 @@ export async function sendEmployeeInvite(
 
 /* ── Role change / removal ──────────────────────────────────────────────── */
 
-export async function updateEmployeeRole(
-  values: UpdateEmployeeRoleValues
+/** Changes a person's role and/or default shift from the roster. */
+export async function updateEmployee(
+  values: UpdateEmployeeValues
 ): Promise<EmployeeResult> {
-  const parsed = updateEmployeeRoleSchema.safeParse(values);
+  const parsed = updateEmployeeSchema.safeParse(values);
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid request." };
   }
+  const { profileId, role, defaultShift } = parsed.data;
 
   const admin = createAdminClient();
   const { data: profile } = await admin
     .from("profiles")
-    .select("id, factory_id")
-    .eq("id", parsed.data.profileId)
+    .select("id, factory_id, role, default_shift")
+    .eq("id", profileId)
     .maybeSingle();
   if (!profile?.factory_id) return { error: "That person no longer exists." };
 
   const auth = await requireFactoryAdmin(profile.factory_id);
   if ("error" in auth) return auth;
-  if (auth.callerId === profile.id) {
+  // Shifts are harmless to self-edit; losing your own admin rights is not.
+  if (auth.callerId === profile.id && role !== undefined) {
     return { error: "You can't change your own role." };
   }
 
   const { error } = await admin
     .from("profiles")
-    .update({ role: parsed.data.role })
+    .update({
+      ...(role !== undefined ? { role } : {}),
+      ...(defaultShift !== undefined ? { default_shift: defaultShift } : {}),
+    })
     .eq("id", profile.id);
   if (error) return { error: error.message };
 
-  // Keep the auth metadata in step so a future re-invite carries the new role.
+  // Keep the auth metadata in step so a future re-invite carries the changes.
   await admin.auth.admin.updateUserById(profile.id, {
-    user_metadata: { role: parsed.data.role, factory_id: profile.factory_id },
+    user_metadata: {
+      role: role ?? profile.role,
+      default_shift: defaultShift ?? profile.default_shift,
+      factory_id: profile.factory_id,
+    },
   });
 
   return { ok: true };

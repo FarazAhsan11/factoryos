@@ -67,17 +67,35 @@ const email = z
 
 const role = z.enum(ASSIGNABLE_ROLES, { message: "Pick a role." });
 
+/** Which shift someone normally works. Mirrors the `shift_slot` enum. */
+export const SHIFT_SLOTS = ["morning", "afternoon", "both"] as const;
+export type ShiftSlot = (typeof SHIFT_SLOTS)[number];
+
+export const SHIFT_LABELS: Record<string, string> = {
+  morning: "Morning",
+  afternoon: "Afternoon",
+  both: "Rotating",
+};
+
+const defaultShift = z.enum(SHIFT_SLOTS, { message: "Pick a shift." });
+
 /** Add one employee — creates the account and emails the invite. */
 export const addEmployeeSchema = z.object({
   factoryId: z.uuid(),
   fullName,
   email,
   role,
+  defaultShift,
 });
 export type AddEmployeeValues = z.infer<typeof addEmployeeSchema>;
 
 /** One parsed CSV row. Same rules as the single-add form. */
-export const employeeRowSchema = z.object({ fullName, email, role });
+export const employeeRowSchema = z.object({
+  fullName,
+  email,
+  role,
+  defaultShift,
+});
 export type EmployeeRow = z.infer<typeof employeeRowSchema>;
 
 /**
@@ -103,8 +121,43 @@ export type ImportEmployeesValues = z.infer<typeof importEmployeesSchema>;
 
 export const employeeIdSchema = z.object({ profileId: z.uuid() });
 
-export const updateEmployeeRoleSchema = z.object({
-  profileId: z.uuid(),
-  role,
+/* ── Admin → Products ──────────────────────────────────────────────────── */
+
+/**
+ * One batch in the catalogue. Batch number and product name are the only
+ * required fields — the rest often isn't known when a batch is first raised,
+ * exactly as in the prototype.
+ */
+export const productSchema = z.object({
+  batchNo: z
+    .string()
+    .trim()
+    .min(1, "Enter the batch or work-order number.")
+    .max(40, "Keep the batch number under 40 characters."),
+  code: z.string().trim().max(40, "Keep the code under 40 characters."),
+  name: z
+    .string()
+    .trim()
+    .min(2, "Enter the product name.")
+    .max(120, "Keep the name under 120 characters."),
+  workOrder: z.string().trim().max(40).optional(),
+  // Registered with { valueAsNumber: true }, so this arrives as a number.
+  requiredQty: z
+    .number({ message: "Enter a required quantity." })
+    .min(0, "Quantity can't be negative.")
+    .max(1_000_000_000, "That quantity looks too large."),
 });
-export type UpdateEmployeeRoleValues = z.infer<typeof updateEmployeeRoleSchema>;
+
+export type ProductValues = z.infer<typeof productSchema>;
+
+/** Row-level edits on the roster. Send only the field being changed. */
+export const updateEmployeeSchema = z
+  .object({
+    profileId: z.uuid(),
+    role: role.optional(),
+    defaultShift: defaultShift.optional(),
+  })
+  .refine((v) => v.role !== undefined || v.defaultShift !== undefined, {
+    message: "Nothing to update.",
+  });
+export type UpdateEmployeeValues = z.infer<typeof updateEmployeeSchema>;

@@ -1,9 +1,10 @@
-name,email,role
-Faraz Test Nine,mfarazahsan630+9@gmail.com,operator
-"Khan, Faraz Ten",mfarazahsan630+10@gmail.com,admin
-Faraz Test Eleven,mfarazahsan630+11@gmail.com,
-Faraz Test Nine Again,mfarazahsan630+9@gmail.com,operator
-Broken Email Row,not-an-email,operator
-Bad Role Row,mfarazahsan630+12@gmail.com,supervisor
-X,mfarazahsan630+13@gmail.com,operator
-Faraz Test Fourteen,,operator
+name,email,role,shift
+Faraz Test Nine,mfarazahsan630+9@gmail.com,operator,morning
+"Khan, Faraz Ten",mfarazahsan630+10@gmail.com,admin,pm
+Faraz Test Eleven,mfarazahsan630+11@gmail.com,,
+Faraz Test Nine Again,mfarazahsan630+9@gmail.com,operator,morning
+Broken Email Row,not-an-email,operator,morning
+Bad Role Row,mfarazahsan630+12@gmail.com,supervisor,morning
+Bad Shift Row,mfarazahsan630+13@gmail.com,operator,graveyard
+X,mfarazahsan630+14@gmail.com,operator,morning
+Faraz Test Fifteen,,operator,afternoon

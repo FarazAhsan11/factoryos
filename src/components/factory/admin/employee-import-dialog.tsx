@@ -17,7 +17,10 @@ import {
   importEmployees,
   type ImportRowResult,
 } from "@/app/factory/[slug]/admin/employee-actions";
-import type { EmployeeRow } from "@/app/factory/[slug]/admin/schemas";
+import {
+  SHIFT_LABELS,
+  type EmployeeRow,
+} from "@/app/factory/[slug]/admin/schemas";
 import {
   CSV_TEMPLATE,
   chunkRows,
@@ -193,7 +196,8 @@ export function EmployeeImportDialog({
                   Choose a CSV file
                 </span>
                 <span className="text-xs text-[#94A3B8]">
-                  Columns: name, email, role (admin or operator)
+                  Columns: name, email, role (admin or operator), shift
+                  (morning, afternoon or both)
                 </span>
               </label>
               <input
@@ -259,6 +263,9 @@ export function EmployeeImportDialog({
                       </span>
                       <span className="shrink-0 rounded-full bg-[#F1F5F9] px-2 py-0.5 text-[11px] text-[#475569]">
                         {r.role}
+                      </span>
+                      <span className="shrink-0 rounded-full bg-[#EFF4FF] px-2 py-0.5 text-[11px] text-[#2563EB]">
+                        {SHIFT_LABELS[r.defaultShift]}
                       </span>
                     </li>
                   ))}

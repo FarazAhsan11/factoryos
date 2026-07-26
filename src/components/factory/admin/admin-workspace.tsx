@@ -7,9 +7,11 @@ import { AdminTabs } from "@/components/factory/admin/admin-tabs";
 import { CompanySettingsForm } from "@/components/factory/admin/company-settings-form";
 import { SetupListManager } from "@/components/factory/admin/setup-list-manager";
 import { EmployeesPanel } from "@/components/factory/admin/employees-panel";
+import { ProductsPanel } from "@/components/factory/admin/products-panel";
 import { ADMIN_TABS, TAB_TABLE } from "@/lib/factory/admin-tabs";
 import type { FactoryContext } from "@/lib/factory/context";
 import { employeeKeys, fetchEmployees } from "@/lib/factory/employee-queries";
+import { fetchProducts, productKeys } from "@/lib/factory/product-queries";
 import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
 
 /**
@@ -41,6 +43,13 @@ export function AdminWorkspace({
         queryClient.prefetchQuery({
           queryKey: employeeKeys.all(factory.id),
           queryFn: () => fetchEmployees(factory.id),
+        });
+        return;
+      }
+      if (value === "products") {
+        queryClient.prefetchQuery({
+          queryKey: productKeys.all(factory.id),
+          queryFn: () => fetchProducts(factory.id),
         });
         return;
       }
@@ -106,6 +115,10 @@ export function AdminWorkspace({
 
       <Panel active={tab === "employees"} lazy>
         <EmployeesPanel factoryId={factory.id} isAdmin={isAdmin} />
+      </Panel>
+
+      <Panel active={tab === "products"} lazy>
+        <ProductsPanel factoryId={factory.id} canManage={canManage} />
       </Panel>
     </>
   );

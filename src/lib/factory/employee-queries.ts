@@ -12,6 +12,7 @@ export interface Employee {
   email: string;
   full_name: string | null;
   role: string;
+  default_shift: string;
   invited_at: string | null;
   activated_at: string | null;
   created_at: string;
@@ -33,7 +34,9 @@ export async function fetchEmployees(factoryId: string): Promise<Employee[]> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, email, full_name, role, invited_at, activated_at, created_at")
+    .select(
+      "id, email, full_name, role, default_shift, invited_at, activated_at, created_at"
+    )
     .eq("factory_id", factoryId)
     .order("created_at", { ascending: true });
 

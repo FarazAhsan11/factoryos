@@ -6,8 +6,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { AdminTabs } from "@/components/factory/admin/admin-tabs";
 import { CompanySettingsForm } from "@/components/factory/admin/company-settings-form";
 import { SetupListManager } from "@/components/factory/admin/setup-list-manager";
+import { EmployeesPanel } from "@/components/factory/admin/employees-panel";
 import { ADMIN_TABS, TAB_TABLE } from "@/lib/factory/admin-tabs";
 import type { FactoryContext } from "@/lib/factory/context";
+import { employeeKeys, fetchEmployees } from "@/lib/factory/employee-queries";
 import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
 
 /**
@@ -19,11 +21,14 @@ import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
 export function AdminWorkspace({
   factory,
   canManage,
+  isAdmin,
   units,
   initialTab,
 }: {
   factory: FactoryContext["factory"];
   canManage: boolean;
+  /** Narrower than canManage: only an admin may add or remove people. */
+  isAdmin: boolean;
   units: { singular: string; plural: string };
   initialTab: string;
 }) {
@@ -32,6 +37,13 @@ export function AdminWorkspace({
 
   const prefetch = useCallback(
     (value: string) => {
+      if (value === "employees") {
+        queryClient.prefetchQuery({
+          queryKey: employeeKeys.all(factory.id),
+          queryFn: () => fetchEmployees(factory.id),
+        });
+        return;
+      }
       const table = TAB_TABLE[value];
       if (!table) return;
       queryClient.prefetchQuery({
@@ -90,6 +102,10 @@ export function AdminWorkspace({
             off: "Manual",
           }}
         />
+      </Panel>
+
+      <Panel active={tab === "employees"} lazy>
+        <EmployeesPanel factoryId={factory.id} isAdmin={isAdmin} />
       </Panel>
     </>
   );

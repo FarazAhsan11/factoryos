@@ -1,7 +1,4 @@
-import type {
-  ShiftClockValues,
-  ShiftTimesValues,
-} from "@/app/factory/[slug]/admin/schemas";
+import type { ShiftClockValues } from "@/app/factory/[slug]/admin/schemas";
 import { createClient } from "@/lib/supabase/client";
 
 /**

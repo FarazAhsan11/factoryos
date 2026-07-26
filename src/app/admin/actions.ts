@@ -5,7 +5,11 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendFactoryInviteEmail } from "@/lib/email/factory-invite";
-import { deleteFactorySchema, type DeleteFactoryValues } from "./schemas";
+import {
+  createFactorySchema,
+  deleteFactorySchema,
+  type DeleteFactoryValues,
+} from "./schemas";
 
 export type CreateFactoryResult =
   | { ok: true; warning?: string }
@@ -57,18 +61,18 @@ export async function createFactory(
   const denied = await requireSuperAdmin("create factories");
   if (denied) return { error: denied };
 
-  // ── 2. Validate input ────────────────────────────────────────────────────
-  const name = String(formData.get("name") ?? "").trim();
-  const description = String(formData.get("description") ?? "").trim();
-  const adminEmail = String(formData.get("adminEmail") ?? "")
-    .trim()
-    .toLowerCase();
-  const logo = formData.get("logo");
-
-  if (!name) return { error: "Factory name is required." };
-  if (!adminEmail || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(adminEmail)) {
-    return { error: "A valid admin email is required." };
+  // ── 2. Re-validate on the server (client-side zod is UX only) ────────────
+  const parsed = createFactorySchema.safeParse({
+    name: formData.get("name") ?? "",
+    description: formData.get("description") ?? "",
+    adminName: formData.get("adminName") ?? "",
+    adminEmail: formData.get("adminEmail") ?? "",
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid details." };
   }
+  const { name, description, adminName, adminEmail } = parsed.data;
+  const logo = formData.get("logo");
 
   const admin = createAdminClient();
 
@@ -99,7 +103,12 @@ export async function createFactory(
   // ── 5. Insert the factory ────────────────────────────────────────────────
   const { data: factory, error: insertError } = await admin
     .from("factories")
-    .insert({ name, slug, description: description || null, logo_url: logoUrl })
+    .insert({
+      name,
+      slug,
+      description: description || null,
+      logo_url: logoUrl,
+    })
     .select("id, slug")
     .single();
   if (insertError || !factory) {
@@ -116,7 +125,11 @@ export async function createFactory(
         type: "invite",
         email: adminEmail,
         options: {
-          data: { role: "admin", factory_id: factory.id },
+          data: {
+            role: "admin",
+            factory_id: factory.id,
+            full_name: adminName,
+          },
         },
       });
     if (linkError || !link?.properties?.hashed_token) {
@@ -132,6 +145,7 @@ export async function createFactory(
 
     await sendFactoryInviteEmail({
       to: adminEmail,
+      fullName: adminName,
       factoryName: name,
       inviteUrl,
       logoUrl,

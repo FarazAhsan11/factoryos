@@ -11,3 +11,34 @@ export const deleteFactorySchema = z.object({
 });
 
 export type DeleteFactoryValues = z.infer<typeof deleteFactorySchema>;
+
+/**
+ * Create a factory + its first admin. The logo travels separately as a File on
+ * the FormData, so it isn't part of the schema — everything textual is, and
+ * the Server Action re-parses the same shape out of the FormData.
+ */
+export const createFactorySchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(2, "Enter the factory name.")
+    .max(80, "Keep the name under 80 characters."),
+  description: z
+    .string()
+    .trim()
+    .max(280, "Keep the description under 280 characters.")
+    .optional(),
+  adminName: z
+    .string()
+    .trim()
+    .min(2, "Enter the admin's full name.")
+    .max(80, "Keep the name under 80 characters."),
+  adminEmail: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .min(1, "Enter the admin's email address.")
+    .pipe(z.email("Enter a valid email address.")),
+});
+
+export type CreateFactoryValues = z.infer<typeof createFactorySchema>;

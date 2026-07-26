@@ -6,6 +6,8 @@ const MUTED = "#64748B";
 
 interface InviteEmailInput {
   to: string;
+  /** The admin's name, used in the greeting. */
+  fullName?: string | null;
   factoryName: string;
   inviteUrl: string;
   /** Optional logo URL shown next to the factory name. */
@@ -17,6 +19,7 @@ interface InviteEmailInput {
  * it renders consistently across email clients (Gmail, Outlook, Apple Mail).
  */
 export function renderFactoryInviteEmail({
+  fullName,
   factoryName,
   inviteUrl,
   logoUrl,
@@ -57,7 +60,8 @@ export function renderFactoryInviteEmail({
                 </table>
 
                 <p style="margin:24px 0 8px;font-size:15px;line-height:1.6;color:#334155;">
-                  You're set up as the <strong>Factory Admin</strong> for
+                  ${fullName ? `Hi ${escapeHtml(fullName)}, you're` : "You're"}
+                  set up as the <strong>Factory Admin</strong> for
                   <strong>${escapeHtml(factoryName)}</strong> on FactoryOS.
                   Set a password to activate your account and open your dashboard.
                 </p>

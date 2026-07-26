@@ -2,10 +2,16 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { ImagePlus, Loader2, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { createFactory } from "@/app/admin/actions";
+import {
+  createFactorySchema,
+  type CreateFactoryValues,
+} from "@/app/admin/schemas";
 import {
   Dialog,
   DialogContent,
@@ -18,19 +24,38 @@ const FIELD =
   "h-11 w-full rounded-xl border border-[#E6EAF1] bg-[#FBFCFE] px-3.5 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:bg-white focus:ring-4 focus:ring-[#2563EB]/12";
 const LABEL = "text-xs font-medium text-[#475569]";
 
+const EMPTY: CreateFactoryValues = {
+  name: "",
+  description: "",
+  adminName: "",
+  adminEmail: "",
+};
+
 export function CreateFactoryDialog() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The logo is a File, so it stays outside the form values and rides along on
+  // the FormData the Server Action needs for the upload.
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const {
+    register,
+    handleSubmit,
+    reset: resetForm,
+    formState: { errors, isSubmitting },
+  } = useForm<CreateFactoryValues>({
+    resolver: zodResolver(createFactorySchema),
+    defaultValues: EMPTY,
+  });
 
   function reset() {
     setError(null);
     setLogoFile(null);
     setLogoPreview(null);
+    resetForm(EMPTY);
   }
 
   function onPickLogo(file: File | null) {
@@ -43,17 +68,17 @@ export function CreateFactoryDialog() {
     setLogoPreview(URL.createObjectURL(file));
   }
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function onSubmit(values: CreateFactoryValues) {
     setError(null);
-    setPending(true);
 
-    const formData = new FormData(event.currentTarget);
+    const formData = new FormData();
+    formData.set("name", values.name);
+    formData.set("description", values.description ?? "");
+    formData.set("adminName", values.adminName);
+    formData.set("adminEmail", values.adminEmail);
     if (logoFile) formData.set("logo", logoFile);
-    else formData.delete("logo");
 
     const result = await createFactory(formData);
-    setPending(false);
 
     if ("error" in result) {
       setError(result.error);
@@ -93,45 +118,52 @@ export function CreateFactoryDialog() {
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-1.5">
-              <label htmlFor="cf-name" className={LABEL}>
-                Factory name
-              </label>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <Field label="Factory name" error={errors.name?.message}>
               <input
                 id="cf-name"
-                name="name"
-                required
                 placeholder="AcelPharma"
+                aria-invalid={Boolean(errors.name)}
                 className={FIELD}
+                {...register("name")}
               />
-            </div>
+            </Field>
 
-            <div className="space-y-1.5">
-              <label htmlFor="cf-desc" className={LABEL}>
-                Short info <span className="text-[#94A3B8]">(optional)</span>
-              </label>
+            <Field
+              label="Short info"
+              optional
+              error={errors.description?.message}
+            >
               <textarea
                 id="cf-desc"
-                name="description"
                 rows={2}
                 placeholder="What this factory makes, where it is…"
                 className={`${FIELD} h-auto resize-none py-2.5`}
+                {...register("description")}
               />
-            </div>
+            </Field>
 
-            <div className="space-y-1.5">
-              <label htmlFor="cf-email" className={LABEL}>
-                Admin email
-              </label>
-              <input
-                id="cf-email"
-                name="adminEmail"
-                type="email"
-                required
-                placeholder="admin@acelpharma.com"
-                className={FIELD}
-              />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Admin name" error={errors.adminName?.message}>
+                <input
+                  id="cf-admin-name"
+                  placeholder="Thian Mang"
+                  aria-invalid={Boolean(errors.adminName)}
+                  className={FIELD}
+                  {...register("adminName")}
+                />
+              </Field>
+
+              <Field label="Admin email" error={errors.adminEmail?.message}>
+                <input
+                  id="cf-email"
+                  type="email"
+                  placeholder="admin@acelpharma.com"
+                  aria-invalid={Boolean(errors.adminEmail)}
+                  className={FIELD}
+                  {...register("adminEmail")}
+                />
+              </Field>
             </div>
 
             <div className="space-y-1.5">
@@ -200,16 +232,39 @@ export function CreateFactoryDialog() {
               </button>
               <button
                 type="submit"
-                disabled={pending}
+                disabled={isSubmitting}
                 className="inline-flex h-10 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] px-4 text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(37,99,235,0.55)] transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-70"
               >
-                {pending && <Loader2 className="size-4 animate-spin" />}
-                {pending ? "Creating…" : "Create factory"}
+                {isSubmitting && <Loader2 className="size-4 animate-spin" />}
+                {isSubmitting ? "Creating…" : "Create factory"}
               </button>
             </div>
           </form>
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+function Field({
+  label,
+  error,
+  optional,
+  children,
+}: {
+  label: string;
+  error?: string;
+  optional?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <span className={LABEL}>
+        {label}
+        {optional && <span className="text-[#94A3B8]"> (optional)</span>}
+      </span>
+      {children}
+      {error && <p className="text-xs text-[#B91C1C]">{error}</p>}
+    </div>
   );
 }

@@ -18,7 +18,7 @@ export const ADMIN_TABS: AdminTab[] = [
   { value: "processes", label: "Processes", ready: true },
   { value: "employees", label: "Employees", ready: true },
   { value: "products", label: "Products", ready: true },
-  { value: "shift-times", label: "Shift times", ready: false },
+  { value: "shift-times", label: "Shift times", ready: true },
 ];
 
 /** Sub-tabs backed by a setup list, for cache prefetching. */

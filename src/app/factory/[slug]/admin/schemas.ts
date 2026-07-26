@@ -150,6 +150,57 @@ export const productSchema = z.object({
 
 export type ProductValues = z.infer<typeof productSchema>;
 
+/* ── Admin → Shift times ───────────────────────────────────────────────── */
+
+/** `<input type="time">` gives "HH:MM"; Postgres `time` gives "HH:MM:SS". */
+const clockTime = z
+  .string()
+  .trim()
+  .regex(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/, "Enter a time as HH:MM.")
+  .transform((v) => v.slice(0, 5));
+
+const breakMinutes = z
+  .number({ message: "Enter a break length in minutes." })
+  .int()
+  .min(0, "A break can't be negative.")
+  .max(120, "Keep breaks under two hours.");
+
+/**
+ * One shift's clock. Breaks are optional — a factory that doesn't schedule a
+ * second break just leaves it blank — but a break start with no duration (or
+ * the reverse) is a half-filled row, so they're validated as a pair.
+ */
+const shiftClockSchema = z
+  .object({
+    startTime: clockTime,
+    endTime: clockTime,
+    break1Start: z.union([clockTime, z.literal("")]).optional(),
+    break1Minutes: breakMinutes,
+    break2Start: z.union([clockTime, z.literal("")]).optional(),
+    break2Minutes: breakMinutes,
+  })
+  .refine((v) => v.startTime !== v.endTime, {
+    message: "Start and end can't be the same time.",
+    path: ["endTime"],
+  })
+  .refine((v) => !v.break1Start || v.break1Minutes > 0, {
+    message: "Give the break a length, or clear its start time.",
+    path: ["break1Minutes"],
+  })
+  .refine((v) => !v.break2Start || v.break2Minutes > 0, {
+    message: "Give the break a length, or clear its start time.",
+    path: ["break2Minutes"],
+  });
+
+export const shiftTimesSchema = z.object({
+  factoryId: z.uuid(),
+  morning: shiftClockSchema,
+  afternoon: shiftClockSchema,
+});
+
+export type ShiftClockValues = z.infer<typeof shiftClockSchema>;
+export type ShiftTimesValues = z.infer<typeof shiftTimesSchema>;
+
 /** Row-level edits on the roster. Send only the field being changed. */
 export const updateEmployeeSchema = z
   .object({

@@ -9,6 +9,13 @@ import { createClient } from "@/lib/supabase/client";
 
 export type RunningShift = "morning" | "afternoon";
 
+/**
+ * One shift's clock. Re-exported under a neutral name so modules that only
+ * consume shift times (the shift log) don't reach into the Admin form's
+ * schema module for a type.
+ */
+export type ShiftClock = ShiftClockValues;
+
 /** The prototype's defaults — used until a factory saves its own. */
 export const DEFAULT_SHIFT_TIMES: Record<RunningShift, ShiftClockValues> = {
   morning: {
@@ -124,6 +131,43 @@ export function formatDuration(minutes: number): string {
   const m = minutes % 60;
   if (!h) return `${m}m`;
   return m ? `${h}h ${m}m` : `${h}h`;
+}
+
+/**
+ * Which shift is running right now. A factory's two windows don't have to
+ * tile the day (there's a gap between 15:15 and 15:05 the other way, and
+ * night hours belong to neither), so an out-of-hours time falls back to
+ * whichever shift starts next — that's the one about to be logged.
+ */
+export function resolveCurrentShift(
+  times: Record<RunningShift, ShiftClockValues>,
+  now: Date = new Date()
+): RunningShift {
+  const nowMins = now.getHours() * 60 + now.getMinutes();
+  const inside = (slot: RunningShift) => {
+    const start = minutesOfDay(times[slot].startTime);
+    if (start === null) return false;
+    const offset = (nowMins - start + 24 * 60) % (24 * 60);
+    return offset < shiftLengthMinutes(times[slot]);
+  };
+
+  if (inside("morning")) return "morning";
+  if (inside("afternoon")) return "afternoon";
+
+  const morningStart = minutesOfDay(times.morning.startTime) ?? 0;
+  return nowMins < morningStart ? "morning" : "afternoon";
+}
+
+/** Local calendar day as `YYYY-MM-DD` — a shift is logged against the wall date. */
+export function todayKey(now: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+/** "14:05" for right now, ready for an `<input type="time">`. */
+export function clockNow(now: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(now.getHours())}:${pad(now.getMinutes())}`;
 }
 
 /**

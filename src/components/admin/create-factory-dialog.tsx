@@ -19,6 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { downscaleImage, MAX_UPLOAD_BYTES } from "@/lib/images/downscale-image";
 
 const FIELD =
   "h-11 w-full rounded-xl border border-[#E6EAF1] bg-[#FBFCFE] px-3.5 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:bg-white focus:ring-4 focus:ring-[#2563EB]/12";
@@ -39,6 +40,7 @@ export function CreateFactoryDialog() {
   // the FormData the Server Action needs for the upload.
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [preparing, setPreparing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
@@ -55,17 +57,31 @@ export function CreateFactoryDialog() {
     setError(null);
     setLogoFile(null);
     setLogoPreview(null);
+    setPreparing(false);
     resetForm(EMPTY);
   }
 
-  function onPickLogo(file: File | null) {
+  async function onPickLogo(file: File | null) {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
       setError("Logo must be an image file.");
       return;
     }
-    setLogoFile(file);
-    setLogoPreview(URL.createObjectURL(file));
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setError("That image is too large — pick one under 8 MB.");
+      return;
+    }
+
+    // Shrink before it ever reaches the Server Action: the action's request
+    // body is capped, and a camera-sized logo would 413 on submit.
+    setPreparing(true);
+    try {
+      const prepared = await downscaleImage(file);
+      setLogoFile(prepared);
+      setLogoPreview(URL.createObjectURL(prepared));
+    } finally {
+      setPreparing(false);
+    }
   }
 
   async function onSubmit(values: CreateFactoryValues) {
@@ -78,7 +94,20 @@ export function CreateFactoryDialog() {
     formData.set("adminEmail", values.adminEmail);
     if (logoFile) formData.set("logo", logoFile);
 
-    const result = await createFactory(formData);
+    let result: Awaited<ReturnType<typeof createFactory>>;
+    try {
+      result = await createFactory(formData);
+    } catch (e) {
+      // A rejected action call is a transport failure, not a validation one:
+      // an oversized body (413), a dropped connection, a restarted dev server.
+      // Without this the rejection escapes as an unhandled error overlay.
+      setError(
+        e instanceof Error && /body exceeded/i.test(e.message)
+          ? "That logo is too large to upload. Try a smaller image."
+          : "Could not reach the server. Check your connection and try again."
+      );
+      return;
+    }
 
     if ("error" in result) {
       setError(result.error);
@@ -175,7 +204,7 @@ export function CreateFactoryDialog() {
                 type="file"
                 accept="image/*"
                 className="hidden"
-                onChange={(e) => onPickLogo(e.target.files?.[0] ?? null)}
+                onChange={(e) => void onPickLogo(e.target.files?.[0] ?? null)}
               />
               {logoPreview ? (
                 <div className="flex items-center gap-3 rounded-xl border border-[#E6EAF1] bg-[#FBFCFE] p-2.5">
@@ -204,11 +233,16 @@ export function CreateFactoryDialog() {
               ) : (
                 <button
                   type="button"
+                  disabled={preparing}
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex w-full items-center gap-2 rounded-xl border border-dashed border-[#CBD5E1] bg-[#FBFCFE] px-3.5 py-3 text-sm text-[#64748B] transition hover:border-[#2563EB] hover:text-[#2563EB]"
+                  className="flex w-full items-center gap-2 rounded-xl border border-dashed border-[#CBD5E1] bg-[#FBFCFE] px-3.5 py-3 text-sm text-[#64748B] transition hover:border-[#2563EB] hover:text-[#2563EB] disabled:pointer-events-none disabled:opacity-70"
                 >
-                  <ImagePlus className="size-4" />
-                  Upload a logo image
+                  {preparing ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <ImagePlus className="size-4" />
+                  )}
+                  {preparing ? "Preparing image…" : "Upload a logo image"}
                 </button>
               )}
             </div>
@@ -232,7 +266,7 @@ export function CreateFactoryDialog() {
               </button>
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || preparing}
                 className="inline-flex h-10 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] px-4 text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(37,99,235,0.55)] transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-70"
               >
                 {isSubmitting && <Loader2 className="size-4 animate-spin" />}

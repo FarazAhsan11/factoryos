@@ -28,7 +28,6 @@ export interface AmendTarget {
   unit_name: string | null;
   process_name: string | null;
   batch_no: string | null;
-  qty: number;
   amend_note: string | null;
 }
 

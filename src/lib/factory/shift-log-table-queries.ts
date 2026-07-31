@@ -30,9 +30,10 @@ export interface LogTableRow {
   batch_no: string | null;
   product_name: string | null;
   product_code: string | null;
-  target_qty: number;
-  qty: number;
-  qty_rejected: number;
+  /** Null for an activity that produces nothing (Idle, Break, cleaning). */
+  target_qty: number | null;
+  qty: number | null;
+  qty_rejected: number | null;
   accumulative: number | null;
   speed_unit: string | null;
   target_speed: number | null;

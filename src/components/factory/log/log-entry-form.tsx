@@ -11,8 +11,9 @@ import {
   ACTION_FLAGS,
   ACTION_FLAG_LABELS,
   SLOW_REASONS,
-  SPEED_UNITS,
+  SPEED_TYPES,
   logEntrySchema,
+  speedTypeTakesRate,
   type LogEntryParsed,
   type LogEntryValues,
 } from "@/app/factory/[slug]/log/schemas";
@@ -115,8 +116,10 @@ export function LogEntryForm({
       shift: "morning",
       startTime: "",
       endTime: "",
-      speedUnit: "RPM",
+      speedType: "RPM",
+      speedRate: "hr",
       hasMachine: false,
+      hasOutput: true,
     },
   });
 
@@ -127,6 +130,8 @@ export function LogEntryForm({
     endTime,
     shift,
     hasMachine,
+    hasOutput,
+    speedType,
     qty,
     operator1,
     operator2,
@@ -139,17 +144,24 @@ export function LogEntryForm({
       "endTime",
       "shift",
       "hasMachine",
+      "hasOutput",
+      "speedType",
       "qty",
       "operator1",
       "operator2",
     ],
   });
 
-  // The activity decides which half of the form exists, so its flag is mirrored
-  // into the form values — that's what the schema's cross-field rules read.
+  // The activity decides which halves of the form exist, so its flags are
+  // mirrored into the form values — that's what the schema's cross-field rules
+  // read. The two are independent: Sorting produces output with no machine,
+  // Idle does neither.
   useEffect(() => {
-    const flag = activeProcesses.find((p) => p.id === processId)?.flag ?? false;
-    setValue("hasMachine", flag);
+    const flags = activeProcesses.find((p) => p.id === processId)?.flags;
+    setValue("hasMachine", Boolean(flags?.machine));
+    // Default to "produces output" for an activity selected before the lists
+    // load, so the quantity fields don't flicker away and back.
+    setValue("hasOutput", flags ? Boolean(flags.output) : true);
   }, [processId, activeProcesses, setValue]);
 
   // Once the factory's clock arrives, default to the shift that's running and
@@ -219,10 +231,12 @@ export function LogEntryForm({
         unitId: keep.unitId,
         processId: keep.processId,
         hasMachine: keep.hasMachine,
+        hasOutput: keep.hasOutput,
         shift: keep.shift,
         startTime: keep.endTime,
         endTime: "",
-        speedUnit: keep.speedUnit,
+        speedType: keep.speedType,
+        speedRate: keep.speedRate,
         targetSpeed: keep.targetSpeed,
         // The same pair usually works the whole shift, so they carry over too.
         operator1: keep.operator1,
@@ -308,7 +322,8 @@ export function LogEntryForm({
                 {activeProcesses.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
-                    {p.flag ? " · machine" : ""}
+                    {p.flags.machine ? " · machine" : ""}
+                    {p.flags.output ? "" : " · no output"}
                   </option>
                 ))}
               </select>
@@ -411,7 +426,8 @@ export function LogEntryForm({
           />
         </section>
 
-        {/* ── Output ───────────────────────────────────────────────── */}
+        {/* ── Output — only for activities that produce something ───── */}
+        {hasOutput ? (
         <section>
           <SectionTitle>Output</SectionTitle>
           <FieldRow>
@@ -484,22 +500,39 @@ export function LogEntryForm({
             </p>
           )}
         </section>
+        ) : (
+          // Not an omission — a stated fact. A break or an idle period stores
+          // null quantities, never 0, so it can't drag an output average.
+          <p className="rounded-xl border border-dashed border-[#CBD5E1] px-3.5 py-2.5 text-xs text-[#94A3B8]">
+            This activity doesn&rsquo;t produce output, so no quantities are
+            recorded — only the time it consumed.
+          </p>
+        )}
 
         {/* ── Speed — machine activities only ──────────────────────── */}
         {hasMachine && !quick && (
           <section>
             <SectionTitle hint="→ feeds Performance OEE">Speed</SectionTitle>
             <FieldRow>
-              <Field label="Speed unit" htmlFor="log-speed-unit">
-                <select
-                  id="log-speed-unit"
-                  className={CONTROL}
-                  {...register("speedUnit")}
-                >
-                  {SPEED_UNITS.map((unit) => (
-                    <option key={unit}>{unit}</option>
-                  ))}
-                </select>
+              <Field label="Speed unit" htmlFor="log-speed-type">
+                <div className="flex gap-1.5">
+                  <select
+                    id="log-speed-type"
+                    className={cn(CONTROL, "flex-1")}
+                    {...register("speedType")}
+                  >
+                    {SPEED_TYPES.map((type) => (
+                      <option key={type.value} value={type.value}>
+                        {type.label}
+                      </option>
+                    ))}
+                  </select>
+                  {/* RPM and Batches already carry their own period, so the
+                      rate choice would be meaningless for them. */}
+                  {speedTypeTakesRate(speedType ?? "") && (
+                    <RateToggle control={control} setValue={setValue} />
+                  )}
+                </div>
               </Field>
               <Field
                 label="Target speed"
@@ -626,6 +659,48 @@ export function LogEntryForm({
         </p>
       </div>
     </form>
+  );
+}
+
+/**
+ * Per-minute or per-hour. Split out from the unit so a line measured in caps
+ * per *minute* can be logged as such — an earlier cut hardcoded "/hr", which
+ * silently recorded per-minute numbers against an hour and put every later
+ * performance figure out by 60x.
+ */
+function RateToggle({
+  control,
+  setValue,
+}: {
+  control: ReturnType<typeof useForm<LogEntryValues, unknown, LogEntryParsed>>["control"];
+  setValue: ReturnType<
+    typeof useForm<LogEntryValues, unknown, LogEntryParsed>
+  >["setValue"];
+}) {
+  const rate = useWatch({ control, name: "speedRate" }) ?? "hr";
+  return (
+    <div
+      role="group"
+      aria-label="Speed rate"
+      className="flex shrink-0 overflow-hidden rounded-xl border border-[#E6EAF1]"
+    >
+      {(["min", "hr"] as const).map((option) => (
+        <button
+          key={option}
+          type="button"
+          onClick={() => setValue("speedRate", option, { shouldDirty: true })}
+          aria-pressed={rate === option}
+          className={cn(
+            "px-2.5 text-xs font-semibold transition",
+            rate === option
+              ? "bg-[#EFF6FF] text-[#1D4ED8]"
+              : "text-[#94A3B8] hover:text-[#0F1B34]"
+          )}
+        >
+          /{option}
+        </button>
+      ))}
+    </div>
   );
 }
 

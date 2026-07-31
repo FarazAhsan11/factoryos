@@ -240,7 +240,16 @@ export function DataTableWorkspace({
       )}
 
       <AmendEntryDialog
-        entry={amendTarget}
+        entry={
+          amendTarget && {
+            id: amendTarget.id,
+            log_date: amendTarget.log_date,
+            unit_name: amendTarget.unit_name,
+            process_name: amendTarget.process_name,
+            batch_no: amendTarget.batch_no,
+            amend_note: amendTarget.amend_note,
+          }
+        }
         factoryId={factoryId}
         onClose={() => setAmendTarget(null)}
       />

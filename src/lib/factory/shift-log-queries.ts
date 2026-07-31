@@ -1,4 +1,7 @@
-import type { LogEntryParsed } from "@/app/factory/[slug]/log/schemas";
+import {
+  composeSpeedUnit,
+  type LogEntryParsed,
+} from "@/app/factory/[slug]/log/schemas";
 import { createClient } from "@/lib/supabase/client";
 import type { RunningShift } from "@/lib/factory/shift-time-queries";
 
@@ -20,9 +23,10 @@ export interface LogEntry {
   duration_minutes: number;
   equipment_no: string | null;
   batch_no: string | null;
-  target_qty: number;
-  qty: number;
-  qty_rejected: number;
+  /** Null for an activity that produces nothing (Idle, Break, cleaning). */
+  target_qty: number | null;
+  qty: number | null;
+  qty_rejected: number | null;
   speed_unit: string | null;
   target_speed: number | null;
   actual_speed: number | null;
@@ -124,6 +128,11 @@ export async function createLogEntry(
 ): Promise<LogEntry> {
   const supabase = createClient();
   const machine = values.hasMachine;
+  const output = values.hasOutput;
+  // "Caps" + "hr" → "Caps/hr"; RPM and Batches carry no rate.
+  const speedUnit = values.speedType
+    ? composeSpeedUnit(values.speedType, values.speedRate ?? "hr")
+    : null;
 
   const { data, error } = await supabase
     .from("shift_log_entries")
@@ -139,12 +148,15 @@ export async function createLogEntry(
       equipment_no: values.equipmentNo || null,
       batch_no: values.batchNo || null,
       product_id: productId,
-      target_qty: values.targetQty ?? 0,
-      qty: values.qty ?? 0,
-      qty_rejected: values.qtyRejected ?? 0,
+      // Quantities belong to activities that produce something. A break or an
+      // idle period stores null, not 0 — otherwise a hundred legitimate zeroes
+      // drag every output and quality average computed over them.
+      target_qty: output ? values.targetQty ?? null : null,
+      qty: output ? values.qty ?? null : null,
+      qty_rejected: output ? values.qtyRejected ?? null : null,
       // Speed belongs to machine processes only — a manual entry stores null
       // rather than zeroes, so OEE can tell "not applicable" from "stopped".
-      speed_unit: machine ? values.speedUnit || null : null,
+      speed_unit: machine ? speedUnit : null,
       target_speed: machine ? values.targetSpeed ?? null : null,
       actual_speed: machine ? values.actualSpeed ?? null : null,
       slow_reason: machine ? values.slowReason || null : null,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   useMutation,
   useQuery,
@@ -24,10 +24,16 @@ const FIELD =
   "h-10 w-full rounded-xl border border-[#E6EAF1] bg-white px-3.5 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:ring-4 focus:ring-[#2563EB]/12";
 
 /**
- * Optional boolean attribute a list can carry (Processes: "includes a
- * machine"). Purely labels — the column it maps to lives in setup-queries.
+ * A boolean attribute a list can carry. Processes have two — "runs on a
+ * machine" and "produces output" — and they are independent: Sorting produces
+ * output with no machine, Idle does neither.
+ *
+ * Purely labels and an icon; the column each key maps to lives in
+ * setup-queries, so this component never learns a table's schema.
  */
 export interface SetupFlagConfig {
+  /** Neutral key matching `SetupItem.flags` (e.g. "machine", "output"). */
+  key: string;
   /** Checkbox label on the add row. */
   label: string;
   /** One-liner under the checkbox. */
@@ -35,6 +41,9 @@ export interface SetupFlagConfig {
   /** Pill text when the flag is on / off. */
   on: string;
   off: string;
+  icon?: typeof Cog;
+  /** Ticked by default on the add row — output is the norm, machines aren't. */
+  defaultOn?: boolean;
 }
 
 /**
@@ -49,7 +58,7 @@ export function SetupListManager({
   plural,
   placeholder,
   canManage,
-  flag,
+  flags,
 }: {
   table: SetupTable;
   factoryId: string;
@@ -57,12 +66,19 @@ export function SetupListManager({
   plural: string;
   placeholder: string;
   canManage: boolean;
-  flag?: SetupFlagConfig;
+  flags?: SetupFlagConfig[];
 }) {
+  const flagList = useMemo(() => flags ?? [], [flags]);
+  const flagDefaults = useMemo(
+    () =>
+      Object.fromEntries(flagList.map((f) => [f.key, Boolean(f.defaultOn)])),
+    [flagList]
+  );
   const queryClient = useQueryClient();
   const queryKey = setupKeys.all(table, factoryId);
   const [draft, setDraft] = useState("");
-  const [draftFlag, setDraftFlag] = useState(false);
+  const [draftFlags, setDraftFlags] =
+    useState<Record<string, boolean>>(flagDefaults);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
 
@@ -76,11 +92,16 @@ export function SetupListManager({
   }
 
   const add = useMutation({
-    mutationFn: ({ name, withFlag }: { name: string; withFlag: boolean }) =>
-      createSetupItem(table, factoryId, name, items.length, withFlag),
+    mutationFn: ({
+      name,
+      withFlags,
+    }: {
+      name: string;
+      withFlags: Record<string, boolean>;
+    }) => createSetupItem(table, factoryId, name, items.length, withFlags),
     onSuccess: async (created) => {
       setDraft("");
-      setDraftFlag(false);
+      setDraftFlags(flagDefaults);
       await refresh();
       toast.success(`${created.name} added.`);
     },
@@ -126,13 +147,22 @@ export function SetupListManager({
   });
 
   const toggleFlag = useMutation({
-    mutationFn: ({ id, value }: { id: string; value: boolean }) =>
-      updateSetupItem(table, id, { flag: value }),
-    onMutate: async ({ id, value }) => {
+    mutationFn: ({
+      id,
+      key,
+      value,
+    }: {
+      id: string;
+      key: string;
+      value: boolean;
+    }) => updateSetupItem(table, id, { flags: { [key]: value } }),
+    onMutate: async ({ id, key, value }) => {
       await queryClient.cancelQueries({ queryKey });
       const previous = queryClient.getQueryData<SetupItem[]>(queryKey);
       queryClient.setQueryData<SetupItem[]>(queryKey, (old) =>
-        (old ?? []).map((i) => (i.id === id ? { ...i, flag: value } : i))
+        (old ?? []).map((i) =>
+          i.id === id ? { ...i, flags: { ...i.flags, [key]: value } } : i
+        )
       );
       return { previous };
     },
@@ -163,7 +193,7 @@ export function SetupListManager({
   function submitDraft() {
     const name = draft.trim();
     if (!name) return;
-    add.mutate({ name, withFlag: Boolean(flag) && draftFlag });
+    add.mutate({ name, withFlags: draftFlags });
   }
 
   return (
@@ -203,24 +233,32 @@ export function SetupListManager({
             </button>
           </div>
 
-          {flag && (
-            <label className="mt-3 flex cursor-pointer items-start gap-2.5 text-sm text-[#0F1B34]">
+          {flagList.map((f) => (
+            <label
+              key={f.key}
+              className="mt-3 flex cursor-pointer items-start gap-2.5 text-sm text-[#0F1B34]"
+            >
               <input
                 type="checkbox"
-                checked={draftFlag}
-                onChange={(e) => setDraftFlag(e.target.checked)}
+                checked={Boolean(draftFlags[f.key])}
+                onChange={(e) =>
+                  setDraftFlags((current) => ({
+                    ...current,
+                    [f.key]: e.target.checked,
+                  }))
+                }
                 className="mt-0.5 size-4 shrink-0 cursor-pointer rounded border-[#CBD5E1] accent-[#2563EB]"
               />
               <span>
-                {flag.label}
-                {flag.hint && (
+                {f.label}
+                {f.hint && (
                   <span className="mt-0.5 block text-xs text-[#94A3B8]">
-                    {flag.hint}
+                    {f.hint}
                   </span>
                 )}
               </span>
             </label>
-          )}
+          ))}
         </div>
       )}
 
@@ -240,8 +278,8 @@ export function SetupListManager({
         <ul
           className={cn(
             "grid gap-2.5 sm:grid-cols-2",
-            // The flag pill needs the extra width, so stay at two columns.
-            !flag && "lg:grid-cols-3"
+            // The flag pills need the extra width, so stay at two columns.
+            flagList.length === 0 && "lg:grid-cols-3"
           )}
         >
           {items.map((item) => {
@@ -297,36 +335,45 @@ export function SetupListManager({
                       {item.name}
                     </span>
 
-                    {flag &&
-                      (canManage ? (
+                    {flagList.map((f) => {
+                      const on = Boolean(item.flags[f.key]);
+                      const Icon = f.icon ?? Cog;
+                      if (!canManage) {
+                        return on ? (
+                          <span
+                            key={f.key}
+                            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#2563EB]/10 px-2 py-0.5 text-[11px] font-medium text-[#2563EB]"
+                          >
+                            <Icon className="size-3" />
+                            {f.on}
+                          </span>
+                        ) : null;
+                      }
+                      return (
                         <button
+                          key={f.key}
                           type="button"
                           onClick={() =>
                             toggleFlag.mutate({
                               id: item.id,
-                              value: !item.flag,
+                              key: f.key,
+                              value: !on,
                             })
                           }
-                          aria-pressed={item.flag}
-                          title={item.flag ? flag.on : flag.off}
+                          aria-pressed={on}
+                          title={on ? f.on : f.off}
                           className={cn(
                             "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium transition",
-                            item.flag
+                            on
                               ? "bg-[#2563EB]/10 text-[#2563EB] hover:bg-[#2563EB]/16"
                               : "bg-[#F1F5F9] text-[#94A3B8] hover:bg-[#E2E8F0]"
                           )}
                         >
-                          <Cog className="size-3" />
-                          {item.flag ? flag.on : flag.off}
+                          <Icon className="size-3" />
+                          {on ? f.on : f.off}
                         </button>
-                      ) : (
-                        item.flag && (
-                          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#2563EB]/10 px-2 py-0.5 text-[11px] font-medium text-[#2563EB]">
-                            <Cog className="size-3" />
-                            {flag.on}
-                          </span>
-                        )
-                      ))}
+                      );
+                    })}
 
                     {canManage && (
                       <>

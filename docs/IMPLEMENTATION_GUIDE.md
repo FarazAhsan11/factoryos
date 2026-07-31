@@ -44,6 +44,7 @@ Applied by hand via **Supabase Dashboard → SQL Editor**, in order. The files s
 | `0010_factory_shift_times.sql` | `factory_shift_times` (slot, start/end, two breaks) with `slot <> 'both'`, 0–120-minute break checks, unique `(factory_id, slot)` and RLS |
 | `0011_shift_log_entries.sql` | `shift_log_entries` — the first operational table; insert-only RLS, **no delete policy**, and a `shift_log_amend_guard` trigger enforcing amendments |
 | `0012_shift_log_table.sql` | `shift_log_entries_expanded` — a `security_invoker` **view** flattening the unit/process/product names onto each entry and adding the running `accumulative` window total; plus `shift_log_stats()`, the aggregate RPC behind the data table's totals bar |
+| `0013_process_output_flag.sql` | `factory_processes.has_output` (default true, back-stamped false for Idle/Break/Set Up/cleaning/maintenance); makes `shift_log_entries.target_qty` / `qty` / `qty_rejected` **nullable** and clears the all-zero rows already logged against non-producing stages |
 
 New dependency: **`@tanstack/react-query`** (`npm install` picks it up).
 
@@ -163,14 +164,23 @@ The first cut felt sluggish because both the sidebar and the sub-tabs did full R
 
 ---
 
-## 6. Processes — the machine flag
+## 6. Processes — the machine and output flags
 
-A process either runs on a machine (its downtime and OEE are machine-attributable) or is manual. That's one boolean, so `SetupListManager` was **generalized rather than forked**:
+A stage carries **two independent booleans**, and keeping them independent is the point:
 
-- `setup-queries.ts` maps a per-table optional boolean through a neutral `flag` field: `FLAG_COLUMN = { factory_processes: "has_machine" }`. `factory_units` never selects a column it doesn't have, and `SetupItem.flag` is `false` there.
-- `SetupListManager` takes an optional `flag?: SetupFlagConfig` (`{ label, hint?, on, off }`). When present it renders a checkbox under the add input and a Machine/Manual pill per row (toggled optimistically); when absent the component is byte-for-byte the old Units panel.
+| Flag | Question | Drives |
+|---|---|---|
+| `has_machine` (0006) | does it run on a machine? | the **speed** fields |
+| `has_output` (0013) | does it produce anything? | the **quantity** fields |
 
-**When the next list needs its own boolean**, add it to `FLAG_COLUMN` and pass a `flag` config — don't copy the component.
+They genuinely come apart. Sorting and Testing produce output with no machine; Idle, Break and Set Up do neither. An earlier cut had only `has_machine`, so the log form asked for a quantity on a tea break and stored `0` — the same mistake the speed-nulls rule exists to prevent, since a hundred legitimate zeroes drag every output and quality average computed over them. **Quantities are now nullable and a non-producing stage stores null.**
+
+`SetupListManager` was **generalized rather than forked**, twice:
+
+- `setup-queries.ts` maps per-table booleans through a neutral `flags` record: `FLAG_COLUMNS = { factory_processes: { machine: "has_machine", output: "has_output" } }`. `factory_units` never selects a column it doesn't have, and `SetupItem.flags` is `{}` there.
+- `SetupListManager` takes `flags?: SetupFlagConfig[]` (`{ key, label, hint?, on, off, icon?, defaultOn? }`). It renders one checkbox per flag under the add input and one pill per flag on each row, toggled optimistically. Pass none and the component is byte-for-byte the old Units panel.
+
+**When the next list needs a boolean**, add it to `FLAG_COLUMNS` and append a config — don't copy the component and don't add a second `flag` prop.
 
 ---
 
@@ -282,17 +292,20 @@ Forms follow the repo convention (`CLAUDE.md` → *Forms & validation*): one zod
 
 The prototype decided which fields to show from a hardcoded `RUNNING_STAGES` list. We have that as data instead: **the selected process's `has_machine` flag** (Admin → Processes, migration 0006) drives it.
 
-| Section | Machine process | Manual process |
+| Section | `has_machine` | `has_output` |
 |---|---|---|
-| Where & when, times, duration | ✓ | ✓ |
-| Equipment no. | ✓ | hidden |
-| Batch + auto-fill, Output | ✓ | ✓ |
-| Speed unit / target / actual | ✓ | hidden |
-| Slow-run reason | required when actual < target | n/a |
+| Where & when, times, duration | always | always |
+| Equipment no. | ✓ | — |
+| Speed type + rate, target / actual | ✓ | — |
+| Slow-run reason | required when actual < target | — |
+| Batch + auto-fill | always | always |
+| Target qty / qty / rejected | — | ✓ |
 
-The flag is mirrored into the form values as `hasMachine` so the schema's cross-field rules can see it — a `superRefine` in `app/factory/[slug]/log/schemas.ts` is what makes the reason mandatory, because no single field can express "required only when two *other* fields disagree".
+Both flags are mirrored into the form values as `hasMachine` / `hasOutput` so the schema's cross-field rules can see them — a `superRefine` in `app/factory/[slug]/log/schemas.ts` is what makes the slow reason mandatory, because no single field can express "required only when two *other* fields disagree". The two rules inside it are deliberately **not** short-circuited by an early `return`: they key off different flags, and a machine stage that produces no output still has to explain a slow run.
 
-> Speed columns are stored **null** for manual work, never `0`. OEE has to be able to tell "not applicable" from "stopped"; zeroes would quietly poison the performance average.
+> Speed columns are stored **null** for manual work and quantity columns **null** for a non-producing stage — never `0`. OEE has to tell "not applicable" from "stopped"/"produced nothing"; zeroes would quietly poison the performance and output averages.
+
+**Speed is a type plus a rate**, composed at write time into what `speed_unit` stores: `Caps/hr`, `Caps/min`, `RPM`. `SPEED_TYPES` marks which types take a rate — RPM and Batches don't, so the /min–/hr toggle is hidden for them. An earlier cut hardcoded `/hr`, which silently recorded per-minute numbers against an hour and put every later performance figure out by 60×.
 
 ### Audit protection lives in Postgres, not the UI
 

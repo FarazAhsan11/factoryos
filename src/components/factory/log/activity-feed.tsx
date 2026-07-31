@@ -16,13 +16,13 @@ import { cn } from "@/lib/utils";
 /** Colour-codes a row the way the prototype's feed dots do. */
 function tone(entry: LogEntry): string {
   if (entry.action_flag) return "#DC2626";
-  if (entry.qty_rejected > 0) return "#F59E0B";
-  if (entry.qty > 0) return "#16A34A";
+  if (Number(entry.qty_rejected ?? 0) > 0) return "#F59E0B";
+  if (Number(entry.qty ?? 0) > 0) return "#16A34A";
   return "#2563EB";
 }
 
-function fmt(n: number) {
-  return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+function fmt(n: number | null) {
+  return Number(n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
 /**
@@ -159,7 +159,6 @@ export function ActivityFeed({
             unit_name: amendTarget.unit?.name ?? null,
             process_name: amendTarget.process?.name ?? null,
             batch_no: amendTarget.batch_no,
-            qty: amendTarget.qty,
             amend_note: amendTarget.amend_note,
           }
         }
@@ -199,7 +198,7 @@ function FeedRow({
           {entry.product && (
             <span className="text-[#64748B]"> · {entry.product.name}</span>
           )}
-          {entry.qty > 0 && (
+          {Number(entry.qty ?? 0) > 0 && (
             <span className="font-semibold text-[#2563EB]">
               {" "}
               {fmt(entry.qty)} units
@@ -252,7 +251,7 @@ function FeedRow({
           </p>
         ) : null}
 
-        {entry.qty_rejected > 0 && (
+        {Number(entry.qty_rejected ?? 0) > 0 && (
           <p className="text-[11px] font-medium text-[#B91C1C]">
             ⚠ {fmt(entry.qty_rejected)} rejected / rework
           </p>

@@ -21,11 +21,13 @@ export function LogWorkspace({
   userId,
   units,
   initialTab,
+  canManage,
 }: {
   factoryId: string;
   userId: string;
   units: { singular: string; plural: string };
   initialTab: string;
+  canManage: boolean;
 }) {
   const [tab, setTab] = useState(initialTab);
 
@@ -48,7 +50,12 @@ export function LogWorkspace({
           <LogEntryForm factoryId={factoryId} userId={userId} units={units} />
         </div>
 
-        <ActivityFeed factoryId={factoryId} units={units} />
+        <ActivityFeed
+          factoryId={factoryId}
+          units={units}
+          userId={userId}
+          canManage={canManage}
+        />
       </div>
     </>
   );

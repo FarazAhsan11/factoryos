@@ -19,7 +19,7 @@ export default async function ShiftLogPage({
 }) {
   const { slug } = await params;
   const { tab } = await searchParams;
-  const { factory } = await getFactoryContext(slug);
+  const { factory, canManage } = await getFactoryContext(slug);
 
   // Everyone in the factory logs entries, so there's no role gate here — but
   // the insert is stamped with the signed-in user, which RLS checks.
@@ -49,6 +49,7 @@ export default async function ShiftLogPage({
         userId={user.id}
         units={unitWords(factory)}
         initialTab={resolveLogTab(tab)}
+        canManage={canManage}
       />
     </div>
   );

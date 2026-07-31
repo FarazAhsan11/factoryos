@@ -126,3 +126,23 @@ export const logEntrySchema = z
 
 export type LogEntryValues = z.input<typeof logEntrySchema>;
 export type LogEntryParsed = z.output<typeof logEntrySchema>;
+
+/**
+ * An amendment to a filed entry. The original row is never rewritten and
+ * never deleted — this only attaches a correction note, which is exactly what
+ * `shift_log_amend_guard` (migration 0011) requires before it will stamp
+ * `amended_at` / `amended_by`.
+ *
+ * The minimum length is deliberate: "typo" is not an audit trail. The note has
+ * to say what was wrong and what the truth is, because the original numbers
+ * stay in the row and only this text explains them.
+ */
+export const amendEntrySchema = z.object({
+  note: z
+    .string()
+    .trim()
+    .min(10, "Say what was incorrect and what the correct information is.")
+    .max(500, "Keep the note under 500 characters."),
+});
+
+export type AmendEntryValues = z.infer<typeof amendEntrySchema>;

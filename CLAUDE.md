@@ -4,9 +4,27 @@ Guidance for Claude Code working in this repository.
 
 ## What this is
 
-**FactoryOS** — a multi-tenant SaaS platform for factory / manufacturing operations management. Each factory is an isolated tenant. It is a production rebuild of a ~4,100-line single-file HTML prototype (`factoryos_v8_final.html`, not in repo — lives at `C:\Users\Dell\Downloads\`).
+**FactoryOS** — a multi-tenant SaaS platform for factory / manufacturing operations management. Each factory is an isolated tenant. It is a production rebuild of a single-file HTML prototype (not in repo — the current version lives at `C:\Users\Dell\Downloads\factoryos_v11.html`).
 
-The project is at **Step 0 (foundation)**: the Next.js app is scaffolded, Supabase clients are wired, and a design-only login screen exists. There is no database schema, no auth flow, and no operational feature code yet. **Read `docs/ARCHITECTURE_FLOW.md` before doing design work** — it is the living source of truth for product scope, the role hierarchy, the shift-based data model, build order, and open decisions.
+### What actually exists
+
+Auth, tenancy and factory setup are **built and working**; the first operational module has landed. Assume all of this is real before proposing to build it:
+
+- **Auth** — login, password reset, invite → set-password flow, middleware session refresh, role-based routing.
+- **Super-admin console** (`/admin`) — create / delete a factory (cascading wipe), branded email invites via nodemailer.
+- **Factory workspace** (`/factory/[slug]`) — onboarding wizard gate, sidebar shell, dashboard.
+- **Admin & Settings** (`/factory/[slug]/admin`) — six working tabs: Company, Units, Processes, Employees (invite + CSV import), Products, Shift times.
+- **Shift log** (`/factory/[slug]/log`) — the entry form, activity feed, and amendments.
+- **Data table** (`/factory/[slug]/data`) — server-side filter / sort / paginate over the shift log, CSV export.
+- **Database** — 13 migrations in `supabase/migrations/`, with RLS on every tenant table.
+
+Not built: Pipeline, Actions, OEE & Downtime, Quality, Trends, handover reports, and the log's Roster / CI-ideas tabs (they render as "Soon" from `nav.ts`).
+
+### Which doc to read
+
+- **`docs/IMPLEMENTATION_GUIDE.md`** — how everything above is built and the patterns to follow for the next module. **Read this first for any feature work.** It also lists, in order, the migrations that must be applied by hand.
+- `docs/PROGRESS.md` — narrative record of what landed when.
+- `docs/ARCHITECTURE_FLOW.md` — product scope, role hierarchy, shift-based data model, build order. Still useful for *intent*, but it predates most of the code: where it disagrees with the implementation guide, the guide wins.
 
 ## Commands
 
@@ -77,12 +95,16 @@ Copy `.env.example` → `.env.local`. All `.env*` files are gitignored.
 ## Database (Supabase)
 
 - SQL migrations live in `supabase/migrations/` (versioned, `NNNN_name.sql`). The Supabase CLI is **not** installed and there's no local DB connection string, so migrations are currently applied by hand via the **Supabase Dashboard → SQL Editor** (or a direct connection string if provided). Keep the migration files as the source of truth regardless of how they're applied.
-- Schema so far (`0001_init_auth_tenancy.sql`): `user_role` enum, `factories`, `profiles` (1:1 with `auth.users`, carries `role` + nullable `factory_id`), an `on_auth_user_created` trigger that auto-creates a profile from auth metadata, and RLS (super admins full access; users read their own profile).
-- Seed the platform super admin: `node --env-file=.env.local scripts/seed-super-admin.mjs` (uses the Admin API + service-role key; idempotent). Requires the migration to be applied first.
+- **13 migrations exist** (`0001`–`0013`). `docs/IMPLEMENTATION_GUIDE.md` §0 lists each one and what it does — check there before assuming a table or column is missing.
+- Core shape: `factories` and `profiles` (1:1 with `auth.users`, carrying `role` + nullable `factory_id`) from `0001`; per-tenant setup lists (`factory_units`, `factory_processes`, `factory_products`, `factory_shift_times`); and `shift_log_entries`, the first operational table.
+- RLS helpers to reuse rather than re-derive: `is_super_admin()`, `current_factory_id()`, `can_manage_factory(uuid)`.
+- **Shift-log entries are audit-protected**: no delete policy at all, insert requires `logged_by = auth.uid()`, and updates pass through the `shift_log_amend_guard` trigger, which demands an `amend_note` and forces provenance columns back to their originals. Never add a delete path.
+- Seed scripts: `node --env-file=.env.local scripts/seed-super-admin.mjs` (platform super admin) and `node --env-file=.env.local scripts/seed-factory-setup.mjs <slug>` (demo units / processes / products for one factory). Both idempotent.
 - `admin123!` is a **dev-only** placeholder password — rotate before any real use.
 
 ## Working notes
 
-- The login screen (`src/app/login/page.tsx`) is **presentational only** — the form does not submit and no auth is wired. Don't assume auth exists.
-- Multi-tenancy is row-level by design: nearly every operational table will carry `factoryId`, and most also carry `shift` + `date` (see the shift-based operating model in the architecture doc). Bake tenant + shift scoping into any schema or query work from the start.
-- This is a phase-by-phase build reviewed at each step — prefer small, self-contained changes aligned with the build order in the architecture doc over large speculative scaffolding.
+- Multi-tenancy is row-level by design: nearly every operational table carries `factory_id`, and most also carry `shift` + `log_date`. Bake tenant + shift scoping into any schema or query work from the start.
+- **Which trust boundary?** Browser-direct under RLS for ordinary tenant data — that is what makes the optimistic updates cheap. A Server Action only when the write needs the service-role key (creating or deleting auth users) or must not be expressible from the client.
+- **Store null, not zero,** for a measurement that doesn't apply: speed on a manual stage, quantities on a stage that produces nothing. OEE has to tell "not applicable" from "produced nothing", and zeroes silently drag every average computed over them.
+- This is a phase-by-phase build reviewed at each step — prefer small, self-contained changes over large speculative scaffolding.

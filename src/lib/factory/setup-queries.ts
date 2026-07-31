@@ -16,50 +16,64 @@ export interface SetupItem {
   sort_order: number;
   created_at: string;
   /**
-   * The list's optional boolean attribute, if it has one (processes:
-   * `has_machine`). Exposed under a neutral name so one component can drive
-   * every list; `false` for tables without a flag column.
+   * The list's optional boolean attributes, keyed by a neutral name so one
+   * component can drive every list without knowing any table's columns.
+   * Processes carry two: `machine` and `output`. Empty for tables with none.
    */
-  flag: boolean;
+  flags: Record<string, boolean>;
 }
 
-/** Which column, per table, backs `SetupItem.flag`. */
-const FLAG_COLUMN: Partial<Record<SetupTable, string>> = {
-  factory_processes: "has_machine",
+/**
+ * Which columns, per table, back `SetupItem.flags` — neutral key → real
+ * column. Processes have two independent booleans and they must stay
+ * independent: an activity can produce output without running a machine
+ * (Sorting, Testing) or run neither (Idle, Break).
+ */
+const FLAG_COLUMNS: Partial<Record<SetupTable, Record<string, string>>> = {
+  factory_processes: { machine: "has_machine", output: "has_output" },
 };
 
 const BASE_COLUMNS = "id, name, active, sort_order, created_at";
 
 function columns(table: SetupTable): string {
-  const flag = FLAG_COLUMN[table];
-  return flag ? `${BASE_COLUMNS}, ${flag}` : BASE_COLUMNS;
+  const extra = Object.values(FLAG_COLUMNS[table] ?? {});
+  return extra.length ? `${BASE_COLUMNS}, ${extra.join(", ")}` : BASE_COLUMNS;
 }
 
 function toItem(table: SetupTable, row: Record<string, unknown>): SetupItem {
-  const flag = FLAG_COLUMN[table];
+  const flags: Record<string, boolean> = {};
+  for (const [key, column] of Object.entries(FLAG_COLUMNS[table] ?? {})) {
+    flags[key] = Boolean(row[column]);
+  }
   return {
     id: row.id as string,
     name: row.name as string,
     active: row.active as boolean,
     sort_order: row.sort_order as number,
     created_at: row.created_at as string,
-    flag: flag ? Boolean(row[flag]) : false,
+    flags,
   };
 }
 
-/** Translates the neutral `flag` key back to the table's real column. */
+/** Translates neutral flag keys back to the table's real columns. */
 function toRow(
   table: SetupTable,
   patch: SetupPatch
 ): Record<string, unknown> {
-  const { flag, ...rest } = patch;
-  const column = FLAG_COLUMN[table];
-  if (flag === undefined || !column) return rest;
-  return { ...rest, [column]: flag };
+  const { flags, ...rest } = patch;
+  const columnFor = FLAG_COLUMNS[table] ?? {};
+  const row: Record<string, unknown> = { ...rest };
+  for (const [key, value] of Object.entries(flags ?? {})) {
+    // Silently skips a key this table has no column for, so a caller can pass
+    // a whole flag set without knowing which list it is talking to.
+    const column = columnFor[key];
+    if (column) row[column] = value;
+  }
+  return row;
 }
 
 export type SetupPatch = Partial<
-  Pick<SetupItem, "name" | "active" | "sort_order" | "flag">
+  Pick<SetupItem, "name" | "active" | "sort_order" | "flags">
 >;
 
 export const setupKeys = {
@@ -89,7 +103,7 @@ export async function createSetupItem(
   factoryId: string,
   name: string,
   sortOrder: number,
-  flag = false
+  flags: Record<string, boolean> = {}
 ): Promise<SetupItem> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -97,7 +111,7 @@ export async function createSetupItem(
     .insert({
       factory_id: factoryId,
       sort_order: sortOrder,
-      ...toRow(table, { name: name.trim(), flag }),
+      ...toRow(table, { name: name.trim(), flags }),
     })
     .select(columns(table))
     .single();

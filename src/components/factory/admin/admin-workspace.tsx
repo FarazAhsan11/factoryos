@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { Cog, Package } from "lucide-react";
 
 import { AdminTabs } from "@/components/factory/admin/admin-tabs";
 import { CompanySettingsForm } from "@/components/factory/admin/company-settings-form";
@@ -116,12 +117,28 @@ export function AdminWorkspace({
           plural="Process stages"
           placeholder="e.g. Compression, Spray Drying…"
           canManage={canManage}
-          flag={{
-            label: "This stage runs on a machine",
-            hint: "Machine stages get equipment, downtime and OEE tracking; manual stages don't.",
-            on: "Machine",
-            off: "Manual",
-          }}
+          // Two independent facts about a stage. Sorting produces output with
+          // no machine; Idle and Break do neither. Collapsing them into one
+          // flag is what made the log form ask for a quantity on a tea break.
+          flags={[
+            {
+              key: "machine",
+              label: "This stage runs on a machine",
+              hint: "Machine stages get equipment, speed, downtime and OEE tracking; manual stages don't.",
+              on: "Machine",
+              off: "Manual",
+              icon: Cog,
+            },
+            {
+              key: "output",
+              label: "This stage produces output",
+              hint: "Untick for stages that use shift time but make nothing — Idle, Break, Set Up, cleaning. The log form then stops asking for quantities.",
+              on: "Output",
+              off: "No output",
+              icon: Package,
+              defaultOn: true,
+            },
+          ]}
         />
       </Panel>
 

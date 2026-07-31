@@ -1,4 +1,7 @@
-import type { LogEntryParsed } from "@/app/factory/[slug]/log/schemas";
+import {
+  composeSpeedUnit,
+  type LogEntryParsed,
+} from "@/app/factory/[slug]/log/schemas";
 import { createClient } from "@/lib/supabase/client";
 import type { RunningShift } from "@/lib/factory/shift-time-queries";
 
@@ -20,9 +23,10 @@ export interface LogEntry {
   duration_minutes: number;
   equipment_no: string | null;
   batch_no: string | null;
-  target_qty: number;
-  qty: number;
-  qty_rejected: number;
+  /** Null for an activity that produces nothing (Idle, Break, cleaning). */
+  target_qty: number | null;
+  qty: number | null;
+  qty_rejected: number | null;
   speed_unit: string | null;
   target_speed: number | null;
   actual_speed: number | null;
@@ -34,6 +38,8 @@ export interface LogEntry {
   created_at: string;
   amended_at: string | null;
   amend_note: string | null;
+  /** Who filed it — decides whether this viewer may amend it. */
+  logged_by: string | null;
   /** Joined names, so the feed never has to cross-reference three caches. */
   unit: { name: string } | null;
   process: { name: string; has_machine: boolean } | null;
@@ -46,7 +52,7 @@ const COLUMNS = `
   target_qty, qty, qty_rejected,
   speed_unit, target_speed, actual_speed, slow_reason,
   operator_1, operator_2, comment, action_flag,
-  created_at, amended_at, amend_note,
+  created_at, amended_at, amend_note, logged_by,
   unit:factory_units ( name ),
   process:factory_processes ( name, has_machine ),
   product:factory_products ( name, code )
@@ -122,6 +128,11 @@ export async function createLogEntry(
 ): Promise<LogEntry> {
   const supabase = createClient();
   const machine = values.hasMachine;
+  const output = values.hasOutput;
+  // "Caps" + "hr" → "Caps/hr"; RPM and Batches carry no rate.
+  const speedUnit = values.speedType
+    ? composeSpeedUnit(values.speedType, values.speedRate ?? "hr")
+    : null;
 
   const { data, error } = await supabase
     .from("shift_log_entries")
@@ -134,15 +145,21 @@ export async function createLogEntry(
       start_time: values.startTime,
       end_time: values.endTime,
       duration_minutes: durationMinutes(values.startTime, values.endTime),
-      equipment_no: values.equipmentNo || null,
+      // Equipment belongs to a machine stage, same rule as speed below. Without
+      // this, typing an equipment number and then switching to a manual
+      // activity files a manual entry carrying kit it never touched.
+      equipment_no: machine ? values.equipmentNo || null : null,
       batch_no: values.batchNo || null,
       product_id: productId,
-      target_qty: values.targetQty ?? 0,
-      qty: values.qty ?? 0,
-      qty_rejected: values.qtyRejected ?? 0,
+      // Quantities belong to activities that produce something. A break or an
+      // idle period stores null, not 0 — otherwise a hundred legitimate zeroes
+      // drag every output and quality average computed over them.
+      target_qty: output ? values.targetQty ?? null : null,
+      qty: output ? values.qty ?? null : null,
+      qty_rejected: output ? values.qtyRejected ?? null : null,
       // Speed belongs to machine processes only — a manual entry stores null
       // rather than zeroes, so OEE can tell "not applicable" from "stopped".
-      speed_unit: machine ? values.speedUnit || null : null,
+      speed_unit: machine ? speedUnit : null,
       target_speed: machine ? values.targetSpeed ?? null : null,
       actual_speed: machine ? values.actualSpeed ?? null : null,
       slow_reason: machine ? values.slowReason || null : null,
@@ -157,4 +174,47 @@ export async function createLogEntry(
 
   if (error) throw new Error(error.message);
   return data as unknown as LogEntry;
+}
+
+/**
+ * Files an amendment against an entry.
+ *
+ * The write goes to `shift_log_entries` directly, never the
+ * `shift_log_entries_expanded` view — a view carrying a window function is
+ * not updatable.
+ *
+ * Nothing here stamps who or when: `shift_log_amend_guard` does that in the
+ * database, and it rejects the update outright if the note is blank. RLS
+ * decides who may amend at all (the author, or a manager). That means this
+ * function is deliberately thin — the rules it looks like it's missing are
+ * enforced a layer below, where a future caller can't skip them.
+ *
+ * A second amendment **appends** rather than overwrites. `amend_note` is one
+ * column and the guard resets `amended_at` on every write, so appending is
+ * what keeps the earlier correction readable instead of silently replacing
+ * the record of it.
+ */
+export async function amendLogEntry(
+  entryId: string,
+  note: string,
+  existingNote: string | null
+): Promise<void> {
+  const supabase = createClient();
+  const stamp = new Date().toISOString().slice(0, 10);
+  const entry = `[${stamp}] ${note.trim()}`;
+
+  const { error } = await supabase
+    .from("shift_log_entries")
+    .update({ amend_note: existingNote ? `${existingNote}\n${entry}` : entry })
+    .eq("id", entryId);
+
+  if (error) {
+    // An RLS refusal surfaces as "no rows updated" rather than a 403, so the
+    // generic message would read as a bug rather than a permission problem.
+    throw new Error(
+      error.code === "42501"
+        ? "You can only amend your own entries, unless you're a manager."
+        : error.message
+    );
+  }
 }

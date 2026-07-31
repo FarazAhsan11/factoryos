@@ -5,6 +5,7 @@ import {
   ListPlus,
   Settings,
   Sparkles,
+  Table2,
   TrendingUp,
   Zap,
 } from "lucide-react";
@@ -48,6 +49,7 @@ export const FACTORY_NAV: NavSection[] = [
       { href: "", label: "Dashboard", icon: LayoutGrid, roles: SUPERVISOR_UP, ready: true },
       { href: "/pipeline", label: "Pipeline", icon: Activity, roles: ALL, ready: false },
       { href: "/log", label: "Shift log", icon: ListPlus, roles: ALL, ready: true },
+      { href: "/data", label: "Data table", icon: Table2, roles: ALL, ready: true },
     ],
   },
   {

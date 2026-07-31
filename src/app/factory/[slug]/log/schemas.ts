@@ -26,16 +26,36 @@ export const ACTION_FLAG_LABELS: Record<ActionFlag, string> = {
   Process: "Yes — Process deviation",
 };
 
-/** Speed units from the prototype; free-form enough to cover most lines. */
-export const SPEED_UNITS = [
-  "RPM",
-  "Caps/hr",
-  "Tabs/hr",
-  "Bags/hr",
-  "Bottles/hr",
-  "Units/hr",
-  "Batches",
+/**
+ * Speed is a **unit type** plus a **rate**, composed into what's stored:
+ * `Caps/hr`, `Caps/min`, `RPM`. Hardcoding `/hr` (as an earlier cut did) is
+ * not cosmetic — a line measured per minute gets its number recorded against
+ * an hour, so every downstream performance figure is out by 60×.
+ *
+ * RPM and Batches are `perTime: false`: they already carry their own period
+ * or aren't a rate at all, so the /min–/hr choice is hidden for them.
+ */
+export const SPEED_TYPES = [
+  { value: "RPM", label: "RPM (rotations)", perTime: false },
+  { value: "Caps", label: "Capsules", perTime: true },
+  { value: "Tabs", label: "Tablets", perTime: true },
+  { value: "Bags", label: "Bags", perTime: true },
+  { value: "Bottles", label: "Bottles", perTime: true },
+  { value: "Units", label: "Units (generic)", perTime: true },
+  { value: "Batches", label: "Batches", perTime: false },
 ] as const;
+
+export type SpeedType = (typeof SPEED_TYPES)[number]["value"];
+export type SpeedRate = "min" | "hr";
+
+export function speedTypeTakesRate(type: string): boolean {
+  return SPEED_TYPES.find((t) => t.value === type)?.perTime ?? false;
+}
+
+/** ("Caps", "hr") → "Caps/hr"; ("RPM", …) → "RPM". */
+export function composeSpeedUnit(type: string, rate: SpeedRate): string {
+  return speedTypeTakesRate(type) ? `${type}/${rate}` : type;
+}
 
 /** Why a machine ran below its target speed — feeds the OEE Pareto chart. */
 export const SLOW_REASONS = [
@@ -78,7 +98,8 @@ export const logEntrySchema = z
     qty: optionalQty,
     qtyRejected: optionalQty,
 
-    speedUnit: z.string().trim().max(20).optional(),
+    speedType: z.string().trim().max(20).optional(),
+    speedRate: z.enum(["min", "hr"]).optional(),
     targetSpeed: optionalQty,
     actualSpeed: optionalQty,
     slowReason: z.string().trim().max(120).optional(),
@@ -90,11 +111,22 @@ export const logEntrySchema = z
 
     /** Mirrors the selected process's has_machine, so the rules below can see it. */
     hasMachine: z.boolean(),
+    /**
+     * Mirrors has_output. Independent of hasMachine: Sorting produces output
+     * without a machine, Idle does neither.
+     */
+    hasOutput: z.boolean(),
   })
   .superRefine((values, ctx) => {
     // Rejects can't exceed what was produced — a data-entry slip worth catching
     // before it skews the quality rate.
+    //
+    // Only for an activity that produces something: a no-output stage stores
+    // null quantities, so there is nothing to compare. Deliberately not an
+    // early `return` — the speed rule below is about a different flag and must
+    // still run for a machine stage that happens to produce no output.
     if (
+      values.hasOutput &&
       values.qty !== undefined &&
       values.qtyRejected !== undefined &&
       values.qtyRejected > values.qty
@@ -126,3 +158,23 @@ export const logEntrySchema = z
 
 export type LogEntryValues = z.input<typeof logEntrySchema>;
 export type LogEntryParsed = z.output<typeof logEntrySchema>;
+
+/**
+ * An amendment to a filed entry. The original row is never rewritten and
+ * never deleted — this only attaches a correction note, which is exactly what
+ * `shift_log_amend_guard` (migration 0011) requires before it will stamp
+ * `amended_at` / `amended_by`.
+ *
+ * The minimum length is deliberate: "typo" is not an audit trail. The note has
+ * to say what was wrong and what the truth is, because the original numbers
+ * stay in the row and only this text explains them.
+ */
+export const amendEntrySchema = z.object({
+  note: z
+    .string()
+    .trim()
+    .min(10, "Say what was incorrect and what the correct information is.")
+    .max(500, "Keep the note under 500 characters."),
+});
+
+export type AmendEntryValues = z.infer<typeof amendEntrySchema>;

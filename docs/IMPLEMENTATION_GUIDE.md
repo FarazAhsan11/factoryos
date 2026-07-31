@@ -2,7 +2,7 @@
 
 _How the factory delete, onboarding wizard, workspace shell, Admin tab and Shift log are built — and the patterns to follow when adding the next module._
 
-_Last updated: 2026-07-27_
+_Last updated: 2026-07-31_
 
 Covers everything landed after the create-factory flow described in `docs/PROGRESS.md`:
 
@@ -20,8 +20,11 @@ Covers everything landed after the create-factory flow described in `docs/PROGRE
 | 10 | Create factory asks for the admin's name | `/admin` |
 | 11 | **Shift log — Log entry** (the first operational module) | `/factory/[slug]/log` |
 | 12 | Demo-data seed script | `scripts/seed-factory-setup.mjs` |
+| 13 | **Shift log — data table** (filter / sort / paginate / export) | `/factory/[slug]/data` |
 
-Sections 1–5 cover the first cut of the Admin tab; sections 6–10 completed the tab set; **sections 11–12 are the newest work** — the first module that *writes* production data rather than configuring it.
+Sections 1–5 cover the first cut of the Admin tab; sections 6–10 completed the tab set; §12 is the first module that *writes* production data rather than configuring it, and **§13 is the newest work** — the module that reads it back.
+
+> Section numbers below track the build order, not the rows in this table.
 
 ---
 
@@ -40,6 +43,8 @@ Applied by hand via **Supabase Dashboard → SQL Editor**, in order. The files s
 | `0009_employee_default_shift.sql` | `shift_slot` enum (`morning｜afternoon｜both`), `profiles.default_shift`, and a **rewritten `handle_new_user()`** that reads `default_shift` from the invite metadata |
 | `0010_factory_shift_times.sql` | `factory_shift_times` (slot, start/end, two breaks) with `slot <> 'both'`, 0–120-minute break checks, unique `(factory_id, slot)` and RLS |
 | `0011_shift_log_entries.sql` | `shift_log_entries` — the first operational table; insert-only RLS, **no delete policy**, and a `shift_log_amend_guard` trigger enforcing amendments |
+| `0012_shift_log_table.sql` | `shift_log_entries_expanded` — a `security_invoker` **view** flattening the unit/process/product names onto each entry and adding the running `accumulative` window total; plus `shift_log_stats()`, the aggregate RPC behind the data table's totals bar |
+| `0013_process_output_flag.sql` | `factory_processes.has_output` (default true, back-stamped false for Idle/Break/Set Up/cleaning/maintenance); makes `shift_log_entries.target_qty` / `qty` / `qty_rejected` **nullable** and clears the all-zero rows already logged against non-producing stages |
 
 New dependency: **`@tanstack/react-query`** (`npm install` picks it up).
 
@@ -60,11 +65,16 @@ The action is deliberately ordered — read the ordering before changing it:
 3. **Confirm** the typed name matches the factory's real name (case-insensitive). The dialog requires retyping it.
 4. **Delete every member**: `admin.auth.admin.deleteUser(profile.id)` for each `profiles` row with that `factory_id`. Deleting the auth user cascades to `profiles` (FK `on delete cascade`). Any `super_admin` is skipped as a guard.
 5. **Clear storage**: list and remove `factory-logos/<slug>/*`.
-6. **Delete the factory row**, then `revalidatePath("/admin")`.
+6. **Delete the shift log** for that factory, explicitly (see below).
+7. **Delete the factory row**, then `revalidatePath("/admin")`.
 
 Partial failures (a stuck user, a storage error) come back as `{ ok: true, warning }` rather than a false success.
 
-> ⚠️ When operational tables land, give their `factory_id` FKs `on delete cascade` — otherwise step 6 starts failing on references. `profiles.factory_id` is `on delete set null`, which is safe only because step 4 removes those rows first.
+> ⚠️ **Step 6 is not redundant with the cascade — it is what makes the cascade possible.**
+>
+> `shift_log_entries.factory_id` *is* `on delete cascade`, but `unit_id` and `process_id` are `on delete restrict`, so a room with shift history can't be deleted out from under its entries. That protection also fires when the whole factory goes: the cascade reaches `factory_units` while its entries are still there, and RESTRICT is checked **immediately** — it is not satisfied by "another branch of the same cascade will delete them too" (that is `no action`'s deferred behaviour). Without step 6, deleting any factory that has ever logged an entry fails.
+>
+> The general rule for the next operational table: `factory_id` gets `on delete cascade`, and **any `restrict` FK it points at means an explicit delete before step 7**. `profiles.factory_id` is `on delete set null`, safe only because step 4 removes those rows first.
 
 ---
 
@@ -159,14 +169,23 @@ The first cut felt sluggish because both the sidebar and the sub-tabs did full R
 
 ---
 
-## 6. Processes — the machine flag
+## 6. Processes — the machine and output flags
 
-A process either runs on a machine (its downtime and OEE are machine-attributable) or is manual. That's one boolean, so `SetupListManager` was **generalized rather than forked**:
+A stage carries **two independent booleans**, and keeping them independent is the point:
 
-- `setup-queries.ts` maps a per-table optional boolean through a neutral `flag` field: `FLAG_COLUMN = { factory_processes: "has_machine" }`. `factory_units` never selects a column it doesn't have, and `SetupItem.flag` is `false` there.
-- `SetupListManager` takes an optional `flag?: SetupFlagConfig` (`{ label, hint?, on, off }`). When present it renders a checkbox under the add input and a Machine/Manual pill per row (toggled optimistically); when absent the component is byte-for-byte the old Units panel.
+| Flag | Question | Drives |
+|---|---|---|
+| `has_machine` (0006) | does it run on a machine? | the **speed** fields |
+| `has_output` (0013) | does it produce anything? | the **quantity** fields |
 
-**When the next list needs its own boolean**, add it to `FLAG_COLUMN` and pass a `flag` config — don't copy the component.
+They genuinely come apart. Sorting and Testing produce output with no machine; Idle, Break and Set Up do neither. An earlier cut had only `has_machine`, so the log form asked for a quantity on a tea break and stored `0` — the same mistake the speed-nulls rule exists to prevent, since a hundred legitimate zeroes drag every output and quality average computed over them. **Quantities are now nullable and a non-producing stage stores null.**
+
+`SetupListManager` was **generalized rather than forked**, twice:
+
+- `setup-queries.ts` maps per-table booleans through a neutral `flags` record: `FLAG_COLUMNS = { factory_processes: { machine: "has_machine", output: "has_output" } }`. `factory_units` never selects a column it doesn't have, and `SetupItem.flags` is `{}` there.
+- `SetupListManager` takes `flags?: SetupFlagConfig[]` (`{ key, label, hint?, on, off, icon?, defaultOn? }`). It renders one checkbox per flag under the add input and one pill per flag on each row, toggled optimistically. Pass none and the component is byte-for-byte the old Units panel.
+
+**When the next list needs a boolean**, add it to `FLAG_COLUMNS` and append a config — don't copy the component and don't add a second `flag` prop.
 
 ---
 
@@ -278,17 +297,22 @@ Forms follow the repo convention (`CLAUDE.md` → *Forms & validation*): one zod
 
 The prototype decided which fields to show from a hardcoded `RUNNING_STAGES` list. We have that as data instead: **the selected process's `has_machine` flag** (Admin → Processes, migration 0006) drives it.
 
-| Section | Machine process | Manual process |
+| Section | `has_machine` | `has_output` |
 |---|---|---|
-| Where & when, times, duration | ✓ | ✓ |
-| Equipment no. | ✓ | hidden |
-| Batch + auto-fill, Output | ✓ | ✓ |
-| Speed unit / target / actual | ✓ | hidden |
-| Slow-run reason | required when actual < target | n/a |
+| Where & when, times, duration | always | always |
+| Equipment no. | ✓ | — |
+| Speed type + rate, target / actual | ✓ | — |
+| Slow-run reason | required when actual < target | — |
+| Batch + auto-fill | always | always |
+| Target qty / qty / rejected | — | ✓ |
 
-The flag is mirrored into the form values as `hasMachine` so the schema's cross-field rules can see it — a `superRefine` in `app/factory/[slug]/log/schemas.ts` is what makes the reason mandatory, because no single field can express "required only when two *other* fields disagree".
+Both flags are mirrored into the form values as `hasMachine` / `hasOutput` so the schema's cross-field rules can see them — a `superRefine` in `app/factory/[slug]/log/schemas.ts` is what makes the slow reason mandatory, because no single field can express "required only when two *other* fields disagree". The two rules inside it are deliberately **not** short-circuited by an early `return`: they key off different flags, and a machine stage that produces no output still has to explain a slow run.
 
-> Speed columns are stored **null** for manual work, never `0`. OEE has to be able to tell "not applicable" from "stopped"; zeroes would quietly poison the performance average.
+> Speed columns are stored **null** for manual work and quantity columns **null** for a non-producing stage — never `0`. OEE has to tell "not applicable" from "stopped"/"produced nothing"; zeroes would quietly poison the performance and output averages.
+
+**Quick mode clears what it hides.** Toggling Quick on wipes `targetSpeed` / `actualSpeed` / `slowReason` rather than just hiding them. Leaving the values in form state was a trap: the schema still demanded a reason when actual < target, so submit failed against a field that wasn't on screen — an error with nowhere to render. Any future section Quick hides must clear its validated fields the same way.
+
+**Speed is a type plus a rate**, composed at write time into what `speed_unit` stores: `Caps/hr`, `Caps/min`, `RPM`. `SPEED_TYPES` marks which types take a rate — RPM and Batches don't, so the /min–/hr toggle is hidden for them. An earlier cut hardcoded `/hr`, which silently recorded per-minute numbers against an hour and put every later performance figure out by 60×.
 
 ### Audit protection lives in Postgres, not the UI
 
@@ -325,11 +349,66 @@ The entry stores the operator's **name, not their profile id**: a shift record h
 
 ### Not built yet
 
-`action_flag` is captured but nothing consumes it — the Actions module is where an entry becomes an action item. There's no amend UI (the schema and guard are ready), no timeline view of the feed, and Roster / CI ideas are placeholders.
+`action_flag` is captured but nothing consumes it — the Actions module is where an entry becomes an action item. There's no timeline view of the feed, and Roster / CI ideas are placeholders. (Amending landed with the data table — see §13.)
 
 ---
 
-## 13. Seeding a factory for testing
+## 13. Shift log — data table
+
+`/factory/[slug]/data` ("Data table" in the sidebar, under Production). **No role gate**, matching the log itself: whoever files entries can read back what the factory logged.
+
+### Amending an entry
+
+The one write on this screen, and the only one the module has. It matches the prototype's model exactly: **the original entry is never edited and never deleted** — an amendment attaches a correction note beside it. Migration 0011 already had everything needed (`shift_log_amend_guard` refuses an update without a note and stamps `amended_at` / `amended_by`; there is no delete policy at all), so this is UI over rules that were already in the database.
+
+- `amendLogEntry()` (`shift-log-queries.ts`) writes to **`shift_log_entries`**, never the view — a view carrying a window function isn't updatable.
+- A second amendment **appends** to `amend_note` rather than overwriting it. It's one column and the guard resets `amended_at` on every write, so appending is what keeps the earlier correction readable.
+- The Amend button appears only where `canManage || logged_by === userId` — the same test as the `shift_log_amend` policy. That's cosmetic; RLS is still the enforcement. It's why the view selects `logged_by`.
+- Unlike the prototype there is **no "Amended by" field to type**. The prototype had no accounts so it asked; here the database stamps `amended_by` from `auth.uid()`, and a free-text name would be an unverified claim sitting in an audit record.
+
+The same dialog (`amend-entry-dialog.tsx`) is reused by the shift log's activity feed, where the button appears on row hover.
+
+### Postgres does the work, not the browser
+
+This is the difference from the prototype, which rendered every entry into the DOM and re-filtered an in-memory array. A factory logs thousands of entries a month, so **filtering, sorting and paging are all server-side** (`src/lib/factory/shift-log-table-queries.ts`): the browser holds one page of rows and never the table.
+
+Two queries back the screen and they answer different questions:
+
+| Query | Returns | Why it can't be the other one |
+|---|---|---|
+| `fetchLogTablePage` | one `.range()` of rows + `count: "exact"` | the pager needs the total, not the page length |
+| `fetchLogTableStats` → `shift_log_stats()` RPC | qty / rejected / duration / quality rate | summing 25 visible rows describes the page, not the filtered set |
+
+`fetchLogTableExportRows` is the third: the CSV must be the **filtered set**, so it re-queries without the range, capped at `EXPORT_LIMIT` (5,000) with a toast when the cap is hit rather than a silently truncated file.
+
+### Why migration 0012 is a view
+
+Two things are impossible with PostgREST embeds:
+
+- **Search across joined names.** The box searches product, room and activity as well as the entry's own columns. An embedded resource can't join a top-level `or` filter; a flattened column can.
+- **`accumulative`.** It's a window function over every entry for that batch + activity — by definition it can't be computed from one page of rows. The prototype stored it per row; the view derives it, so it stays correct when an earlier entry is amended.
+
+> ⚠ `with (security_invoker = true)` on the view is load-bearing. Without it the view runs as its owner and **every tenant sees every factory's shift log**. Same for `shift_log_stats()`: it is deliberately *not* `security definer`.
+
+### Filter semantics live in one module
+
+`LogTableFilters` is the contract, and both sides implement it identically — the page query in TypeScript, the stats RPC in SQL. They must agree, or the totals bar describes a different set than the rows below it. The one place that shows: free-text search leaves `%` and `_` in the term (they reach `ilike` as wildcards and only widen the match) precisely **because** the RPC interpolates the same term into the same `ilike`. Only PostgREST's grammar characters (`,()"\`) are stripped.
+
+Sorting is a **whitelist** (`SORTABLE`), not free text — the value is passed to `.order()` as a raw column name. Every page query also carries a `created_at` tiebreaker: without one, two entries sharing a date and start time can appear on two pages while another appears on none.
+
+### Cache reuse and pagination feel
+
+- The room and activity dropdowns read the **same `setupKeys` caches** the Admin panels and the log form use, so arriving from either has them populated.
+- `placeholderData: keepPreviousData` keeps the previous page on screen while the next loads — the table dims instead of collapsing to a spinner and back.
+- Search debounces in the **change handler**, not an effect (no props-into-state mirroring). "Clear filters" resyncs the box by bumping a `key` that remounts the filter bar.
+
+### Formatting
+
+The table formats for a human (thousands separators, `31 Jul`, em-dashes for empty, tinted rows for flagged/rejected, performance % beside actual speed); `shift-log-csv.ts` does the opposite and writes raw ISO dates and unformatted numbers so a spreadsheet can sum them. Its `escape()` also prefixes a tab to any value starting `=`, `+`, `-` or `@` — otherwise a comment or batch number is executed as a formula when the file opens in Excel.
+
+---
+
+## 14. Seeding a factory for testing
 
 ```bash
 node --env-file=.env.local scripts/seed-factory-setup.mjs <factory-slug> [--no-products]
@@ -341,10 +420,10 @@ The machine/manual split is the point — it's what exercises both shapes of the
 
 ---
 
-## 14. File map for this work
+## 15. File map for this work
 
 ```
-supabase/migrations/{0003…0011}_*.sql
+supabase/migrations/{0003…0012}_*.sql
 scripts/{seed-super-admin.mjs,seed-factory-setup.mjs}
 
 src/app/
@@ -354,6 +433,7 @@ src/app/
    ├─ layout.tsx, loading.tsx, page.tsx
    ├─ {actions.ts,schemas.ts}         → completeOnboarding + unit presets
    ├─ log/{page.tsx,loading.tsx,schemas.ts}
+   ├─ data/{page.tsx,loading.tsx}     → the shift-log data table
    └─ admin/
       ├─ page.tsx, loading.tsx
       ├─ actions.ts                   → updateCompanySettings, updateShiftTimes
@@ -372,25 +452,33 @@ src/components/
    │  ├─ employees-panel.tsx, add-employee-form.tsx, employee-import-dialog.tsx
    │  ├─ products-panel.tsx, add-product-form.tsx
    │  └─ shift-times-form.tsx
-   └─ log/
-      ├─ log-workspace.tsx               → tabs + two-column layout
-      ├─ log-entry-form.tsx              → the adaptive form
-      ├─ log-fields.tsx                  → Field / FieldRow / SectionTitle
-      ├─ shift-banner.tsx, batch-autofill.tsx, operator-picker.tsx
-      └─ activity-feed.tsx               → today's entries, date-pickable
+   ├─ log/
+   │  ├─ log-workspace.tsx               → tabs + two-column layout
+   │  ├─ log-entry-form.tsx              → the adaptive form
+   │  ├─ log-fields.tsx                  → Field / FieldRow / SectionTitle
+   │  ├─ shift-banner.tsx, batch-autofill.tsx, operator-picker.tsx
+   │  └─ activity-feed.tsx               → today's entries, date-pickable
+   └─ data/
+      ├─ data-table-workspace.tsx        → filter/sort/page state + export
+      ├─ data-table-filters.tsx          → the filter bar (debounced search)
+      ├─ data-table-stats.tsx            → totals for the filtered set
+      ├─ shift-log-table.tsx             → sortable, sticky-header table
+      ├─ table-pagination.tsx            → page window + rows-per-page
+      └─ amend-entry-dialog.tsx          → shared with the log's activity feed
 
 src/lib/
 ├─ email/{transport.ts,factory-invite.ts}
 └─ factory/{context.ts,nav.ts,admin-tabs.ts,log-tabs.ts,setup-queries.ts,
             employee-queries.ts,employee-csv.ts,product-queries.ts,
-            shift-time-queries.ts,shift-log-queries.ts}
+            shift-time-queries.ts,shift-log-queries.ts,
+            shift-log-table-queries.ts,shift-log-csv.ts}
 
 docs/samples/{employees-sample.csv,employees-sample-messy.csv}
 ```
 
 ---
 
-## 15. Related docs
+## 16. Related docs
 
 - `docs/PROGRESS.md` — running record of what's built and how to run it.
 - `docs/ARCHITECTURE_FLOW.md` — product scope, role hierarchy, shift-based data model, build order.

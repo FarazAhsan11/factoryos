@@ -49,32 +49,38 @@ const UNITS = [
 // `machine: true` is what splits the shift-log form in two: those stages ask
 // for equipment + speed and feed the OEE performance figure. Everything else
 // is a state or a manual task, where a speed number would be meaningless.
+// Two independent flags per stage (migrations 0006 + 0013):
+//   machine → does it run on a machine?  (drives the speed fields)
+//   output  → does it produce anything?  (drives the quantity fields)
+// They come apart: Sorting and Testing produce output with no machine;
+// Idle, Break and Set Up do neither. That split is the point of this list —
+// it is what exercises all four shapes of the log form.
 const PROCESSES = [
-  { name: "Manning", machine: false },
-  { name: "Materials", machine: false },
-  { name: "Set Up", machine: false },
-  { name: "Mixing", machine: true },
-  { name: "Dispensing", machine: true },
-  { name: "Sieving", machine: true },
-  { name: "Drying", machine: true },
-  { name: "Encapsulation", machine: true },
-  { name: "Compression", machine: true },
-  { name: "Coating", machine: true },
-  { name: "Powder Fill", machine: true },
-  { name: "Powder Pack", machine: true },
-  { name: "Liquid Filling", machine: true },
-  { name: "Labelling", machine: true },
-  { name: "Liquid Packing", machine: true },
-  { name: "Sorting", machine: false },
-  { name: "Testing", machine: false },
-  { name: "Reduced Speed", machine: false },
-  { name: "Document Recon", machine: false },
-  { name: "Prov. Clean", machine: false },
-  { name: "Full Clean", machine: false },
-  { name: "Maintenance", machine: false },
-  { name: "Quality Issue", machine: false },
-  { name: "Idle", machine: false },
-  { name: "Ready", machine: false },
+  { name: "Manning", machine: false, output: false },
+  { name: "Materials", machine: false, output: false },
+  { name: "Set Up", machine: false, output: false },
+  { name: "Mixing", machine: true, output: true },
+  { name: "Dispensing", machine: true, output: true },
+  { name: "Sieving", machine: true, output: true },
+  { name: "Drying", machine: true, output: true },
+  { name: "Encapsulation", machine: true, output: true },
+  { name: "Compression", machine: true, output: true },
+  { name: "Coating", machine: true, output: true },
+  { name: "Powder Fill", machine: true, output: true },
+  { name: "Powder Pack", machine: true, output: true },
+  { name: "Liquid Filling", machine: true, output: true },
+  { name: "Labelling", machine: true, output: true },
+  { name: "Liquid Packing", machine: true, output: true },
+  { name: "Sorting", machine: false, output: true },
+  { name: "Testing", machine: false, output: true },
+  { name: "Reduced Speed", machine: false, output: true },
+  { name: "Document Recon", machine: false, output: false },
+  { name: "Prov. Clean", machine: false, output: false },
+  { name: "Full Clean", machine: false, output: false },
+  { name: "Maintenance", machine: false, output: false },
+  { name: "Quality Issue", machine: false, output: false },
+  { name: "Idle", machine: false, output: false },
+  { name: "Ready", machine: false, output: false },
 ];
 
 const PRODUCTS = [
@@ -160,6 +166,7 @@ async function main() {
       factory_id: factory.id,
       name: p.name,
       has_machine: p.machine,
+      has_output: p.output,
       sort_order: i,
       active: true,
     })),

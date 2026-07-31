@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
+import { AmendEntryDialog } from "@/components/factory/data/amend-entry-dialog";
 import {
   fetchLogEntries,
   formatMinutes,
@@ -15,28 +16,35 @@ import { cn } from "@/lib/utils";
 /** Colour-codes a row the way the prototype's feed dots do. */
 function tone(entry: LogEntry): string {
   if (entry.action_flag) return "#DC2626";
-  if (entry.qty_rejected > 0) return "#F59E0B";
-  if (entry.qty > 0) return "#16A34A";
+  if (Number(entry.qty_rejected ?? 0) > 0) return "#F59E0B";
+  if (Number(entry.qty ?? 0) > 0) return "#16A34A";
   return "#2563EB";
 }
 
-function fmt(n: number) {
-  return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+function fmt(n: number | null) {
+  return Number(n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
 /**
  * Today's entries, newest first — the operator's receipt that a log landed,
- * and the supervisor's running view of the shift. Read-only: entries are
- * immutable, so there is nothing to edit here (amendments come with the
- * Actions/audit step).
+ * and the supervisor's running view of the shift.
+ *
+ * Entries are never edited or deleted here. The only write is an amendment:
+ * a correction note attached beside the original, offered on hover to whoever
+ * the update policy would actually allow (the author, or a manager).
  */
 export function ActivityFeed({
   factoryId,
   units,
+  userId,
+  canManage,
 }: {
   factoryId: string;
   units: { singular: string; plural: string };
+  userId: string;
+  canManage: boolean;
 }) {
+  const [amendTarget, setAmendTarget] = useState<LogEntry | null>(null);
   const [unitFilter, setUnitFilter] = useState("all");
   // The feed is scoped to one working day. It defaults to today, but the day
   // is pickable — an afternoon shift that runs to 23:35 spills over midnight,
@@ -132,23 +140,51 @@ export function ActivityFeed({
         ) : (
           <ul className="space-y-3">
             {visible.map((entry) => (
-              <FeedRow key={entry.id} entry={entry} />
+              <FeedRow
+                key={entry.id}
+                entry={entry}
+                canAmend={canManage || entry.logged_by === userId}
+                onAmend={() => setAmendTarget(entry)}
+              />
             ))}
           </ul>
         )}
       </div>
+
+      <AmendEntryDialog
+        entry={
+          amendTarget && {
+            id: amendTarget.id,
+            log_date: amendTarget.log_date,
+            unit_name: amendTarget.unit?.name ?? null,
+            process_name: amendTarget.process?.name ?? null,
+            batch_no: amendTarget.batch_no,
+            amend_note: amendTarget.amend_note,
+          }
+        }
+        factoryId={factoryId}
+        onClose={() => setAmendTarget(null)}
+      />
     </aside>
   );
 }
 
-function FeedRow({ entry }: { entry: LogEntry }) {
+function FeedRow({
+  entry,
+  canAmend,
+  onAmend,
+}: {
+  entry: LogEntry;
+  canAmend: boolean;
+  onAmend: () => void;
+}) {
   const perf =
     entry.target_speed && entry.actual_speed
       ? Math.round((entry.actual_speed / entry.target_speed) * 100)
       : null;
 
   return (
-    <li className="flex gap-2.5">
+    <li className="group flex gap-2.5">
       <span
         className="mt-1.5 size-2 shrink-0 rounded-full"
         style={{ background: tone(entry) }}
@@ -162,7 +198,7 @@ function FeedRow({ entry }: { entry: LogEntry }) {
           {entry.product && (
             <span className="text-[#64748B]"> · {entry.product.name}</span>
           )}
-          {entry.qty > 0 && (
+          {Number(entry.qty ?? 0) > 0 && (
             <span className="font-semibold text-[#2563EB]">
               {" "}
               {fmt(entry.qty)} units
@@ -215,7 +251,7 @@ function FeedRow({ entry }: { entry: LogEntry }) {
           </p>
         ) : null}
 
-        {entry.qty_rejected > 0 && (
+        {Number(entry.qty_rejected ?? 0) > 0 && (
           <p className="text-[11px] font-medium text-[#B91C1C]">
             ⚠ {fmt(entry.qty_rejected)} rejected / rework
           </p>
@@ -224,7 +260,24 @@ function FeedRow({ entry }: { entry: LogEntry }) {
         {entry.comment && (
           <p className="text-[11px] italic text-[#64748B]">{entry.comment}</p>
         )}
+
+        {entry.amend_note && (
+          <p className="whitespace-pre-line text-[11px] text-[#7C3AED]">
+            ↳ {entry.amend_note}
+          </p>
+        )}
       </div>
+
+      {canAmend && (
+        <button
+          type="button"
+          onClick={onAmend}
+          title="Attach a correction note — the original entry is preserved"
+          className="h-6 shrink-0 self-start rounded-md border border-[#E6EAF1] px-1.5 text-[10px] font-medium text-[#94A3B8] opacity-0 transition hover:border-[#B45309] hover:text-[#B45309] focus-visible:opacity-100 group-hover:opacity-100"
+        >
+          Amend
+        </button>
+      )}
     </li>
   );
 }

@@ -69,6 +69,25 @@ export function LogEntryForm({
   const queryClient = useQueryClient();
   const [quick, setQuick] = useState(false);
 
+  /**
+   * Quick mode hides the Speed fields, so it must also clear them.
+   *
+   * Leaving the numbers in form state was a trap: the schema still demands a
+   * slow-run reason when actual < target, so submitting would fail validation
+   * against a field that isn't on screen — an error with nowhere to render and
+   * nothing the operator could do about it. Clearing them also matches what
+   * Quick means: a fast routine entry that doesn't record speed at all.
+   */
+  function toggleQuick() {
+    const on = !quick;
+    setQuick(on);
+    if (on) {
+      setValue("targetSpeed", undefined);
+      setValue("actualSpeed", undefined);
+      setValue("slowReason", "");
+    }
+  }
+
   const { data: unitList = [] } = useQuery({
     queryKey: setupKeys.all("factory_units", factoryId),
     queryFn: () => fetchSetupItems("factory_units", factoryId),
@@ -274,7 +293,7 @@ export function LogEntryForm({
           </span>
           <button
             type="button"
-            onClick={() => setQuick((q) => !q)}
+            onClick={() => toggleQuick()}
             title="Quick mode: fewer fields for routine hourly entries"
             className={cn(
               "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition",

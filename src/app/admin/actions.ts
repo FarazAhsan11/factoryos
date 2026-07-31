@@ -167,8 +167,10 @@ export async function createFactory(
 
 /**
  * Permanently deletes a factory and everything scoped to it: every member's
- * auth user + profile, its stored logo files, and the factory row itself.
- * Irreversible — the caller must retype the factory name to confirm.
+ * auth user + profile, its stored logo files, its shift log, and the factory
+ * row itself. Irreversible — the caller must retype the factory name.
+ *
+ * The step order is load-bearing; see the comments inline before changing it.
  */
 export async function deleteFactory(
   values: DeleteFactoryValues
@@ -232,7 +234,29 @@ export async function deleteFactory(
     }
   }
 
-  // ── 6. Delete the factory row ────────────────────────────────────────────
+  // ── 6. Delete operational rows that block the cascade ────────────────────
+  // `shift_log_entries.unit_id` / `process_id` are `on delete restrict`, so a
+  // room or stage with shift history can never be deleted out from under its
+  // entries. That protection also fires when the *factory* is deleted: the
+  // cascade reaches `factory_units` while its entries are still present, and
+  // RESTRICT is checked immediately — it is not satisfied by "another branch
+  // of the same cascade will remove them too".
+  //
+  // So the entries have to go first, explicitly. Deleting a factory is already
+  // an irreversible, type-the-name operation; its shift log goes with it.
+  const { error: logError } = await admin
+    .from("shift_log_entries")
+    .delete()
+    .eq("factory_id", factory.id);
+  if (logError) {
+    return {
+      error: `Could not clear the factory's shift log: ${logError.message}`,
+    };
+  }
+
+  // ── 7. Delete the factory row ────────────────────────────────────────────
+  // Everything still referencing it now cascades cleanly: units, processes,
+  // products, shift times.
   const { error: deleteError } = await admin
     .from("factories")
     .delete()

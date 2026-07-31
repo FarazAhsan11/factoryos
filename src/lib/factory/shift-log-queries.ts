@@ -145,7 +145,10 @@ export async function createLogEntry(
       start_time: values.startTime,
       end_time: values.endTime,
       duration_minutes: durationMinutes(values.startTime, values.endTime),
-      equipment_no: values.equipmentNo || null,
+      // Equipment belongs to a machine stage, same rule as speed below. Without
+      // this, typing an equipment number and then switching to a manual
+      // activity files a manual entry carrying kit it never touched.
+      equipment_no: machine ? values.equipmentNo || null : null,
       batch_no: values.batchNo || null,
       product_id: productId,
       // Quantities belong to activities that produce something. A break or an

@@ -65,11 +65,16 @@ The action is deliberately ordered — read the ordering before changing it:
 3. **Confirm** the typed name matches the factory's real name (case-insensitive). The dialog requires retyping it.
 4. **Delete every member**: `admin.auth.admin.deleteUser(profile.id)` for each `profiles` row with that `factory_id`. Deleting the auth user cascades to `profiles` (FK `on delete cascade`). Any `super_admin` is skipped as a guard.
 5. **Clear storage**: list and remove `factory-logos/<slug>/*`.
-6. **Delete the factory row**, then `revalidatePath("/admin")`.
+6. **Delete the shift log** for that factory, explicitly (see below).
+7. **Delete the factory row**, then `revalidatePath("/admin")`.
 
 Partial failures (a stuck user, a storage error) come back as `{ ok: true, warning }` rather than a false success.
 
-> ⚠️ When operational tables land, give their `factory_id` FKs `on delete cascade` — otherwise step 6 starts failing on references. `profiles.factory_id` is `on delete set null`, which is safe only because step 4 removes those rows first.
+> ⚠️ **Step 6 is not redundant with the cascade — it is what makes the cascade possible.**
+>
+> `shift_log_entries.factory_id` *is* `on delete cascade`, but `unit_id` and `process_id` are `on delete restrict`, so a room with shift history can't be deleted out from under its entries. That protection also fires when the whole factory goes: the cascade reaches `factory_units` while its entries are still there, and RESTRICT is checked **immediately** — it is not satisfied by "another branch of the same cascade will delete them too" (that is `no action`'s deferred behaviour). Without step 6, deleting any factory that has ever logged an entry fails.
+>
+> The general rule for the next operational table: `factory_id` gets `on delete cascade`, and **any `restrict` FK it points at means an explicit delete before step 7**. `profiles.factory_id` is `on delete set null`, safe only because step 4 removes those rows first.
 
 ---
 
@@ -304,6 +309,8 @@ The prototype decided which fields to show from a hardcoded `RUNNING_STAGES` lis
 Both flags are mirrored into the form values as `hasMachine` / `hasOutput` so the schema's cross-field rules can see them — a `superRefine` in `app/factory/[slug]/log/schemas.ts` is what makes the slow reason mandatory, because no single field can express "required only when two *other* fields disagree". The two rules inside it are deliberately **not** short-circuited by an early `return`: they key off different flags, and a machine stage that produces no output still has to explain a slow run.
 
 > Speed columns are stored **null** for manual work and quantity columns **null** for a non-producing stage — never `0`. OEE has to tell "not applicable" from "stopped"/"produced nothing"; zeroes would quietly poison the performance and output averages.
+
+**Quick mode clears what it hides.** Toggling Quick on wipes `targetSpeed` / `actualSpeed` / `slowReason` rather than just hiding them. Leaving the values in form state was a trap: the schema still demanded a reason when actual < target, so submit failed against a field that wasn't on screen — an error with nowhere to render. Any future section Quick hides must clear its validated fields the same way.
 
 **Speed is a type plus a rate**, composed at write time into what `speed_unit` stores: `Caps/hr`, `Caps/min`, `RPM`. `SPEED_TYPES` marks which types take a rate — RPM and Batches don't, so the /min–/hr toggle is hidden for them. An earlier cut hardcoded `/hr`, which silently recorded per-minute numbers against an hour and put every later performance figure out by 60×.
 

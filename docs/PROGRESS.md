@@ -2,13 +2,13 @@
 
 _A running record of what has been built, how it fits together, and how to run it. Update as work lands._
 
-_Last updated: 2026-07-26_
+_Last updated: 2026-07-31_
 
 ---
 
 ## 1. Where the project stands
 
-FactoryOS is a multi-tenant SaaS for factory operations, being rebuilt from the `factoryos_v8_final.html` prototype into a production Next.js app. **Step 0 (foundation)** is complete and **Step 1 (tenant onboarding)** has started:
+FactoryOS is a multi-tenant SaaS for factory operations, being rebuilt from a single-file HTML prototype (currently `factoryos_v11.html`) into a production Next.js app. **Steps 0–3 are complete**, and the **first operational module (Shift log) has landed** along with its data table:
 
 - ✅ Next.js app scaffolded (App Router, React 19, TS strict, Tailwind v4, shadcn/ui)
 - ✅ Supabase wired for auth + Postgres
@@ -16,16 +16,18 @@ FactoryOS is a multi-tenant SaaS for factory operations, being rebuilt from the 
 - ✅ Database schema: roles, `factories`, `profiles` (+ RLS, auto-profile trigger)
 - ✅ **Super Admin** account seeded and able to log in
 - ✅ Auth flow: login → role-based routing → **Super Admin dashboard** with a factories master–detail view
-- ✅ **Create factory** (Step 1): modal (name, info, logo upload, admin email) → server action uploads the logo to Storage, inserts the factory, provisions its **Factory Admin** via a Supabase invite link, and emails a **branded invite** through nodemailer. The admin sets a password (`/set-password`) and lands on a **factory dashboard** (`/factory/[slug]`, dummy data, tenant-gated).
+- ✅ **Create factory** (Step 1): modal (name, info, logo upload, admin email) → server action uploads the logo to Storage, inserts the factory, provisions its **Factory Admin** via a Supabase invite link, and emails a **branded invite** through nodemailer. The admin sets a password (`/set-password`) and lands on the **factory workspace** (`/factory/[slug]`, tenant-gated; the dashboard itself is still placeholder data).
 
 - ✅ **Delete factory** (Step 1b): cascading wipe of a tenant — every member's auth user + profile, its logo files, then the factory row, behind a type-the-name confirmation.
 - ✅ **Onboarding wizard** (Step 2): gates the whole factory workspace until `onboarded_at` is set; captures the site name and the tenant's production-unit vocabulary.
 - ✅ **Factory workspace shell** (Step 3): role-gated left sidebar over a shared layout; unbuilt modules show as "Soon".
-- ✅ **Admin & Settings** (Step 3): Company settings, Units and Processes management, backed by TanStack Query.
+- ✅ **Admin & Settings — full tab set**: Company, Units, Processes (machine + output flags), **Employees** (invite, CSV import, roster), **Products** (batch list), **Shift times** (morning + afternoon clock).
+- ✅ **Shift log — Log entry** (`/factory/[slug]/log`): the first module that *writes* production data. Adaptive form driven by the selected stage's flags, batch auto-fill, operator picker, live activity feed. Entries are audit-protected — no delete path, corrections are amendments.
+- ✅ **Shift log — Data table** (`/factory/[slug]/data`): server-side filter / sort / pagination over every entry, live totals, CSV export, and the amend dialog.
 
-> Details, migrations, and the patterns to follow for the next tab live in **`docs/IMPLEMENTATION_GUIDE.md`**.
+> Details, migrations, and the patterns to follow for the next module live in **`docs/IMPLEMENTATION_GUIDE.md`** — that is the working reference; this file is the narrative record.
 
-Not built yet: re-invite an admin, per-factory user management, the remaining Admin tabs (Employees, Products, Shift times), and all operational modules.
+Not built yet: Pipeline, Actions, OEE & Downtime, Quality, Trends, handover reports, and the shift log's Roster / CI-ideas tabs. They render as "Soon" in the sidebar from `nav.ts`.
 
 ---
 
@@ -201,9 +203,13 @@ Tenant-gated placeholder: top bar with the factory logo/name + "Factory Admin" b
 
 ## 10. Next steps
 
-- **Re-invite** a factory admin from the super-admin console (delete and real First admin / Onboarding status are done).
-- Remaining **Admin tabs**: Employees, Products, Shift times — scaffolding and the pattern are in `docs/IMPLEMENTATION_GUIDE.md` §6.
-- Operational modules (pipeline, shift log, roster/attendance, actions, OEE, quality, trends, handovers) — see `docs/ARCHITECTURE_FLOW.md` for scope and the shift-based data model.
+- **Actions** — `action_flag` is captured on every log entry but nothing consumes it yet; this is where a flagged entry becomes a tracked action item.
+- **OEE & Downtime** — the first module to *read* the shift log analytically. The clock maths it needs (`shiftLengthMinutes`, `productiveMinutes`) already lives in `shift-time-queries.ts`, and the machine / output flags on each stage are what make availability and performance computable.
+- **Roster / attendance** and **CI ideas** — the two placeholder tabs in the shift log.
+- **Pipeline**, **Quality**, **Trends**, **handover reports** — see `docs/ARCHITECTURE_FLOW.md` for scope.
+- **Re-invite** a factory admin from the super-admin console.
+
+> Patterns to follow for any of these are in `docs/IMPLEMENTATION_GUIDE.md` — §11 for a new Admin tab, §13 for a data-heavy read module.
 
 ---
 

@@ -138,6 +138,11 @@ export function LogEntryForm({
       endTime: "",
       speedType: "RPM",
       speedRate: "hr",
+      // Empty strings, not undefined: an unset field should read as "nothing
+      // chosen yet", which the schema's own messages cover, rather than as a
+      // missing key that trips zod's type check first.
+      operator1: "",
+      operator2: "",
       hasMachine: false,
       hasOutput: true,
     },
@@ -262,9 +267,12 @@ export function LogEntryForm({
     duration
   );
 
+  // Never typed, in either direction. Clearing it when the inputs stop
+  // supporting a target matters as much as setting it: switching Capsules to
+  // RPM, or turning Quick on, would otherwise leave the last computed number
+  // sitting there looking like it still meant something.
   useEffect(() => {
-    if (derivedTarget === null) return;
-    setValue("targetQty", derivedTarget, { shouldValidate: true });
+    setValue("targetQty", derivedTarget ?? undefined, { shouldValidate: true });
   }, [derivedTarget, setValue]);
 
   const submit = useMutation({
@@ -516,11 +524,7 @@ export function LogEntryForm({
           <FieldRow>
             <Field
               label="Shift target qty"
-              note={
-                derivedTarget !== null
-                  ? "(auto — target speed × duration)"
-                  : "(this entry)"
-              }
+              note="(auto)"
               htmlFor="log-target-qty"
               error={errors.targetQty?.message}
             >
@@ -532,14 +536,14 @@ export function LogEntryForm({
                 // Read-only rather than disabled: a disabled input is skipped
                 // by form serialisation and drops out of the tab order, and
                 // the operator still needs to see and copy the number.
-                readOnly={derivedTarget !== null}
+                readOnly
+                tabIndex={-1}
                 className={cn(
                   CONTROL,
                   MONO,
-                  derivedTarget !== null &&
-                    "cursor-default border-[#E6EAF1] bg-[#F1F5F9] font-semibold text-[#2563EB] focus:border-[#E6EAF1] focus:bg-[#F1F5F9] focus:ring-0"
+                  "cursor-default border-[#E6EAF1] bg-[#F1F5F9] font-semibold text-[#2563EB] focus:border-[#E6EAF1] focus:bg-[#F1F5F9] focus:ring-0"
                 )}
-                placeholder="e.g. 270000"
+                placeholder="Set a target speed"
                 {...register("targetQty", { valueAsNumber: true })}
               />
             </Field>

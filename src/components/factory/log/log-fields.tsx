@@ -56,8 +56,11 @@ export function Field({
   className?: string;
   children: React.ReactNode;
 }) {
+  // `h-full` + `mt-auto` keeps the controls in a FieldRow on one line even when
+  // one label wraps to two: the label grows upward inside its own cell instead
+  // of shoving its input below its neighbours'.
   return (
-    <div className={cn("space-y-1.5", className)}>
+    <div className={cn("flex h-full flex-col space-y-1.5", className)}>
       <label
         htmlFor={htmlFor}
         className="block text-xs font-medium text-[#475569]"
@@ -70,8 +73,10 @@ export function Field({
           </span>
         )}
       </label>
-      {children}
-      {error && <p className="text-xs text-[#B91C1C]">{error}</p>}
+      <div className="mt-auto space-y-1.5">
+        {children}
+        {error && <p className="text-xs text-[#B91C1C]">{error}</p>}
+      </div>
     </div>
   );
 }

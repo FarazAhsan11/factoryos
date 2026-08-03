@@ -281,7 +281,21 @@ export function LogEntryForm({
 
   return (
     <form
-      onSubmit={handleSubmit((values) => submit.mutateAsync(values))}
+      onSubmit={handleSubmit(
+        (values) => submit.mutateAsync(values),
+        // A silent no-op is the worst failure this form can have: the operator
+        // presses Log entry, nothing happens, and there is nothing on screen to
+        // read. Any field whose error isn't rendered — or is inside a section
+        // Quick mode has collapsed — gets said out loud here.
+        (errs) => {
+          const first = Object.values(errs).find((e) => e?.message);
+          toast.error(
+            first?.message
+              ? String(first.message)
+              : "Some details are missing — check the highlighted fields."
+          );
+        }
+      )}
       className="rounded-2xl border border-[#E6EAF1] bg-white"
     >
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-[#EEF1F6] px-5 py-4">
@@ -409,7 +423,7 @@ export function LogEntryForm({
         {hasMachine && !quick && (
           <Field
             label="Equipment no."
-            note="(optional)"
+            optional
             htmlFor="log-equipment"
             error={errors.equipmentNo?.message}
           >
@@ -427,6 +441,7 @@ export function LogEntryForm({
           <SectionTitle hint="→ auto-fills product details">Batch</SectionTitle>
           <Field
             label="Batch number"
+            optional
             htmlFor="log-batch"
             error={errors.batchNo?.message}
           >
@@ -483,7 +498,7 @@ export function LogEntryForm({
             </Field>
             <Field
               label="Qty rejected"
-              note="/ rework"
+              note="/ rework — blank counts as none"
               htmlFor="log-rejected"
               error={errors.qtyRejected?.message}
             >
@@ -555,6 +570,7 @@ export function LogEntryForm({
               </Field>
               <Field
                 label="Target speed"
+                optional
                 htmlFor="log-target-speed"
                 error={errors.targetSpeed?.message}
               >
@@ -570,6 +586,7 @@ export function LogEntryForm({
               </Field>
               <Field
                 label="Actual speed"
+                optional
                 htmlFor="log-actual-speed"
                 error={errors.actualSpeed?.message}
               >
@@ -596,43 +613,51 @@ export function LogEntryForm({
           </section>
         )}
 
-        {/* ── People & notes ───────────────────────────────────────── */}
+        {/* ── Operators ────────────────────────────────────────────────
+            Outside the Quick gate on purpose. Quick mode trims the fields a
+            hurried operator can fill in later; it can't trim who did the work,
+            because nothing downstream can reconstruct that from the row. */}
+        <section>
+          <SectionTitle>Operators</SectionTitle>
+          {/* The pickers render even with an empty roster: "Not on the list…"
+              opens a free-text name, so a factory mid-setup can still file a
+              shift instead of hitting a required field it has no way to fill. */}
+          {employees.length === 0 && (
+            <p className="mb-2 rounded-xl border border-dashed border-[#CBD5E1] px-3.5 py-3 text-xs text-[#94A3B8]">
+              No one on the roster yet — add people in Admin &amp; Settings →
+              Employees and they&rsquo;ll appear here. Until then, use
+              &ldquo;Not on the list…&rdquo; to type a name.
+            </p>
+          )}
+          <FieldRow cols={2}>
+            <OperatorPicker
+              control={control}
+              name="operator1"
+              label="Operator 1"
+              employees={employees}
+              shift={shift as RunningShift}
+              exclude={operator2}
+            />
+            <OperatorPicker
+              control={control}
+              name="operator2"
+              label="Operator 2"
+              optional
+              employees={employees}
+              shift={shift as RunningShift}
+              exclude={operator1}
+            />
+          </FieldRow>
+        </section>
+
+        {/* ── Notes ────────────────────────────────────────────────── */}
         {!quick && (
           <>
-            <section>
-              <SectionTitle>Operators</SectionTitle>
-              {employees.length === 0 ? (
-                <p className="rounded-xl border border-dashed border-[#CBD5E1] px-3.5 py-3 text-xs text-[#94A3B8]">
-                  No one on the roster yet — add people in Admin &amp; Settings
-                  → Employees and they&rsquo;ll appear here.
-                </p>
-              ) : (
-                <FieldRow cols={2}>
-                  <OperatorPicker
-                    control={control}
-                    name="operator1"
-                    label="Operator 1"
-                    employees={employees}
-                    shift={shift as RunningShift}
-                    exclude={operator2}
-                  />
-                  <OperatorPicker
-                    control={control}
-                    name="operator2"
-                    label="Operator 2"
-                    note="(optional)"
-                    employees={employees}
-                    shift={shift as RunningShift}
-                    exclude={operator1}
-                  />
-                </FieldRow>
-              )}
-            </section>
-
             <section className="space-y-3">
               <SectionTitle>Notes</SectionTitle>
               <Field
                 label="Comments"
+                optional
                 htmlFor="log-comment"
                 error={errors.comment?.message}
               >
@@ -647,6 +672,7 @@ export function LogEntryForm({
                 label="Flag for action?"
                 note="(creates an action item)"
                 htmlFor="log-flag"
+                error={errors.actionFlag?.message}
               >
                 <select
                   id="log-flag"

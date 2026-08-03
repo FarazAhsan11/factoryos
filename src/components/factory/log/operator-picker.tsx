@@ -33,6 +33,7 @@ export function OperatorPicker({
   name,
   label,
   note,
+  optional,
   employees,
   shift,
   exclude,
@@ -41,6 +42,7 @@ export function OperatorPicker({
   name: Extract<FieldPath<LogEntryValues>, "operator1" | "operator2">;
   label: string;
   note?: string;
+  optional?: boolean;
   employees: Employee[];
   shift: RunningShift;
   /** The name already chosen in the other field, so nobody is picked twice. */
@@ -70,7 +72,12 @@ export function OperatorPicker({
   const selectValue = freeText ? OTHER : roster.includes(value) ? value : "";
 
   return (
-    <Field label={label} note={note} error={fieldState.error?.message}>
+    <Field
+      label={label}
+      note={note}
+      optional={optional}
+      error={fieldState.error?.message}
+    >
       <select
         className={CONTROL}
         value={selectValue}
@@ -86,7 +93,9 @@ export function OperatorPicker({
         onBlur={field.onBlur}
         aria-label={label}
       >
-        <option value="">{note ? "None" : "Select…"}</option>
+        {/* Both operators may be left blank, so neither placeholder should
+            read as a prompt the form will insist on. */}
+        <option value="">{optional ? "None" : "Select…"}</option>
         {onShift.length > 0 && (
           <optgroup label={`On ${shift} shift`}>
             {[...onShift].sort((a, b) => a.localeCompare(b)).map((n) => (

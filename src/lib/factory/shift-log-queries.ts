@@ -156,7 +156,11 @@ export async function createLogEntry(
       // drag every output and quality average computed over them.
       target_qty: output ? values.targetQty ?? null : null,
       qty: output ? values.qty ?? null : null,
-      qty_rejected: output ? values.qtyRejected ?? null : null,
+      // Rejects are the one quantity left blankable, and blank means zero here
+      // rather than unknown: on a stage that produced something, "none were
+      // rejected" is a real measurement. Null would drop the entry out of the
+      // quality rate's denominator and quietly flatter it.
+      qty_rejected: output ? values.qtyRejected ?? 0 : null,
       // Speed belongs to machine processes only — a manual entry stores null
       // rather than zeroes, so OEE can tell "not applicable" from "stopped".
       speed_unit: machine ? speedUnit : null,

@@ -35,14 +35,22 @@ export function SectionTitle({
 export function Field({
   label,
   note,
+  optional,
   error,
   htmlFor,
   className,
   children,
 }: {
   label: string;
-  /** Small grey qualifier after the label — "(optional)", "(auto)". */
+  /** Small grey qualifier after the label — "(this entry)", "(auto)". */
   note?: string;
+  /**
+   * Renders the "(optional)" marker. A separate flag rather than more `note`
+   * text so a field can say both what it means and that it may be left blank,
+   * and so every optional field is marked identically — an operator shouldn't
+   * have to submit the form to discover which ones the validator will reject.
+   */
+  optional?: boolean;
   error?: string;
   htmlFor?: string;
   className?: string;
@@ -56,6 +64,11 @@ export function Field({
       >
         {label}
         {note && <span className="ml-1 text-[10px] text-[#94A3B8]">{note}</span>}
+        {optional && (
+          <span className="ml-1 text-[10px] font-normal text-[#94A3B8]">
+            (optional)
+          </span>
+        )}
       </label>
       {children}
       {error && <p className="text-xs text-[#B91C1C]">{error}</p>}

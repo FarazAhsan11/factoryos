@@ -104,10 +104,32 @@ export const logEntrySchema = z
     actualSpeed: optionalQty,
     slowReason: z.string().trim().max(120).optional(),
 
-    operator1: z.string().trim().max(80).optional(),
+    /**
+     * Required, unlike everything else in this section. An entry nobody is
+     * named on can't be followed up: the amendment trail records who *filed*
+     * the row, not who ran the activity, and Actions / handovers have no other
+     * source for that. "Not on the list…" keeps cover staff and contractors
+     * loggable without a login, so requiring a name never blocks a real shift.
+     */
+    operator1: z
+      .string()
+      .trim()
+      .min(1, "Select who ran this — or use “Not on the list…”.")
+      .max(80),
     operator2: z.string().trim().max(80).optional(),
     comment: z.string().trim().max(500).optional(),
-    actionFlag: z.enum(ACTION_FLAGS).optional(),
+    /**
+     * "" is the "No — routine entry" option, and it has to parse. A bare
+     * `z.enum(...).optional()` rejects it — `optional` means *absent*, and a
+     * registered `<select>` submits an empty string, not `undefined`. That put
+     * the form in a state where the default option failed validation against a
+     * field with no visible error, so the submit button appeared dead until you
+     * picked something else.
+     */
+    actionFlag: z
+      .union([z.enum(ACTION_FLAGS), z.literal("")])
+      .optional()
+      .transform((v) => (v ? v : undefined)),
 
     /** Mirrors the selected process's has_machine, so the rules below can see it. */
     hasMachine: z.boolean(),
@@ -118,6 +140,28 @@ export const logEntrySchema = z
     hasOutput: z.boolean(),
   })
   .superRefine((values, ctx) => {
+    // An activity flagged `has_output` exists to produce something, so the
+    // numbers it produced aren't optional — a blank there is an unfinished
+    // entry, not a measurement. They stay `optionalQty` at the field level
+    // because the *same* fields must be absent on a no-output stage; only this
+    // rule knows which shape the form is currently in.
+    if (values.hasOutput) {
+      if (values.qty === undefined) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["qty"],
+          message: "Enter how much this activity produced.",
+        });
+      }
+      if (values.targetQty === undefined) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["targetQty"],
+          message: "Enter the target — performance is measured against it.",
+        });
+      }
+    }
+
     // Rejects can't exceed what was produced — a data-entry slip worth catching
     // before it skews the quality rate.
     //

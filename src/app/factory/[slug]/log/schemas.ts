@@ -57,6 +57,36 @@ export function composeSpeedUnit(type: string, rate: SpeedRate): string {
   return speedTypeTakesRate(type) ? `${type}/${rate}` : type;
 }
 
+/**
+ * What this entry *should* have produced: target speed × the time it ran.
+ * 60 minutes at 10/min is 600; the same 10 read as /hr is 10.
+ *
+ * Returns null when the target can't be derived rather than guessing one:
+ *
+ * - **RPM / Batches** (`perTime: false`) aren't an output rate. Rotations per
+ *   minute say nothing about capsules, and multiplying them by duration would
+ *   invent a target that reads as real.
+ * - **No speed recorded** — a manual stage that still produces output (Sorting)
+ *   has no speed fields at all, and Quick mode clears them.
+ *
+ * The caller falls back to asking for the number in those cases.
+ */
+export function targetQtyFromSpeed(
+  speedType: string | undefined,
+  speedRate: SpeedRate | undefined,
+  targetSpeed: number | undefined,
+  durationMins: number
+): number | null {
+  if (!speedType || !speedTypeTakesRate(speedType)) return null;
+  if (!targetSpeed || !Number.isFinite(targetSpeed) || targetSpeed <= 0) {
+    return null;
+  }
+  if (!durationMins || durationMins <= 0) return null;
+
+  const perMinute = speedRate === "min" ? targetSpeed : targetSpeed / 60;
+  return Math.round(perMinute * durationMins);
+}
+
 /** Why a machine ran below its target speed — feeds the OEE Pareto chart. */
 export const SLOW_REASONS = [
   "Quality / weight issue — dosing adjustment",

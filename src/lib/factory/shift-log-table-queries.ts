@@ -85,6 +85,7 @@ export const SORTABLE = {
   process_name: "process_name",
   batch_no: "batch_no",
   product_name: "product_name",
+  product_code: "product_code",
   duration_minutes: "duration_minutes",
   qty: "qty",
   target_qty: "target_qty",

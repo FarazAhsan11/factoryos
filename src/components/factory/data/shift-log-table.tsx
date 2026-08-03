@@ -68,11 +68,12 @@ const COLUMNS: Column[] = [
   { key: "log_date", label: "Date" },
   { key: "shift", label: "Shift" },
   { key: "start_time", label: "Start → End" },
+  { key: "duration_minutes", label: "Duration", numeric: true },
   { key: "unit_name", label: "Room" },
   { key: "process_name", label: "Activity / Stage" },
   { key: "batch_no", label: "Batch" },
   { key: "product_name", label: "Product" },
-  { key: "duration_minutes", label: "Duration", numeric: true },
+  { key: "product_code", label: "Code" },
   { key: "qty", label: "Qty produced", numeric: true },
   { key: "target_qty", label: "Shift target", numeric: true },
   { key: "qty_rejected", label: "Rejected", numeric: true },
@@ -249,6 +250,20 @@ function Row({
         )}
       </td>
 
+      {/* Rendered as "7h 37min", not 457: an activity that ran most of a
+          shift shouldn't need mental arithmetic to read. The exact minute
+          count stays on hover, and the CSV exports the raw number so a
+          spreadsheet can still sum it. Sorting is unaffected — it happens in
+          Postgres on `duration_minutes`. */}
+      <td
+        className={cn(TD, MONO, "whitespace-nowrap text-right text-[#475569]")}
+        title={
+          row.duration_minutes > 0 ? `${row.duration_minutes} min` : undefined
+        }
+      >
+        {row.duration_minutes > 0 ? formatMinutes(row.duration_minutes) : DASH}
+      </td>
+
       <td className={cn(TD, "whitespace-nowrap font-semibold text-[#0F1B34]")}>
         {row.unit_name ?? DASH}
       </td>
@@ -268,18 +283,8 @@ function Row({
         {row.product_name ?? DASH}
       </td>
 
-      {/* Rendered as "7h 37min", not 457: an activity that ran most of a
-          shift shouldn't need mental arithmetic to read. The exact minute
-          count stays on hover, and the CSV exports the raw number so a
-          spreadsheet can still sum it. Sorting is unaffected — it happens in
-          Postgres on `duration_minutes`. */}
-      <td
-        className={cn(TD, MONO, "whitespace-nowrap text-right text-[#475569]")}
-        title={
-          row.duration_minutes > 0 ? `${row.duration_minutes} min` : undefined
-        }
-      >
-        {row.duration_minutes > 0 ? formatMinutes(row.duration_minutes) : DASH}
+      <td className={cn(TD, MONO, "whitespace-nowrap text-[#475569]")}>
+        {row.product_code || DASH}
       </td>
 
       <td

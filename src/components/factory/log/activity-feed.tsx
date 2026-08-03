@@ -46,11 +46,12 @@ export function ActivityFeed({
 }) {
   const [amendTarget, setAmendTarget] = useState<LogEntry | null>(null);
   const [unitFilter, setUnitFilter] = useState("all");
-  // The feed is scoped to one working day. It defaults to today, but the day
-  // is pickable — an afternoon shift that runs to 23:35 spills over midnight,
-  // and its entries must not vanish from view at 00:00.
-  const [date, setDate] = useState(() => todayKey());
-  const isToday = date === todayKey();
+  // Today only. This is the operator's receipt that an entry landed and the
+  // supervisor's running view of the shift in progress — history is the Data
+  // table's job, and a date picker here just built a second, worse one.
+  // Recomputed each render rather than held in state, so a session left open
+  // rolls onto the new day at midnight instead of freezing on yesterday.
+  const date = todayKey();
 
   const { data: entries = [], isPending, isError, error } = useQuery({
     queryKey: logKeys.day(factoryId, date),
@@ -79,26 +80,6 @@ export function ActivityFeed({
           ● Live · immutable
         </span>
       </header>
-
-      <div className="flex items-center gap-2 border-b border-[#EEF1F6] px-4 py-2.5">
-        <input
-          type="date"
-          value={date}
-          max={todayKey()}
-          onChange={(e) => setDate(e.target.value || todayKey())}
-          aria-label="Show entries for"
-          className="h-9 flex-1 rounded-lg border border-[#E6EAF1] bg-[#FBFCFE] px-2.5 text-xs text-[#0F1B34] outline-none focus:border-[#2563EB]"
-        />
-        {!isToday && (
-          <button
-            type="button"
-            onClick={() => setDate(todayKey())}
-            className="h-9 shrink-0 rounded-lg px-2.5 text-xs font-medium text-[#2563EB] transition hover:bg-[#EFF6FF]"
-          >
-            Today
-          </button>
-        )}
-      </div>
 
       {unitNames.length > 1 && (
         <div className="border-b border-[#EEF1F6] px-4 py-2.5">
@@ -132,9 +113,7 @@ export function ActivityFeed({
         ) : visible.length === 0 ? (
           <p className="py-10 text-center text-xs text-[#94A3B8]">
             {entries.length === 0
-              ? isToday
-                ? "Nothing logged yet today."
-                : "Nothing was logged on this day."
+              ? "Nothing logged yet today."
               : `No entries for ${unitFilter}.`}
           </p>
         ) : (

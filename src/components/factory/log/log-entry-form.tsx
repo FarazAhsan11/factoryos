@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -14,6 +14,7 @@ import {
   SPEED_TYPES,
   logEntrySchema,
   speedTypeTakesRate,
+  targetQtyFromSpeed,
   type LogEntryParsed,
   type LogEntryValues,
 } from "@/app/factory/[slug]/log/schemas";
@@ -26,7 +27,6 @@ import {
   SectionTitle,
 } from "@/components/factory/log/log-fields";
 import { OperatorPicker } from "@/components/factory/log/operator-picker";
-import { ShiftBanner } from "@/components/factory/log/shift-banner";
 import { employeeKeys, fetchEmployees } from "@/lib/factory/employee-queries";
 import { fetchProducts, productKeys } from "@/lib/factory/product-queries";
 import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
@@ -34,6 +34,7 @@ import {
   clockNow,
   fetchShiftTimes,
   resolveCurrentShift,
+  resolveShiftForEntry,
   shiftTimeKeys,
   todayKey,
   type RunningShift,
@@ -151,6 +152,8 @@ export function LogEntryForm({
     hasMachine,
     hasOutput,
     speedType,
+    speedRate,
+    targetSpeed,
     qty,
     operator1,
     operator2,
@@ -165,6 +168,8 @@ export function LogEntryForm({
       "hasMachine",
       "hasOutput",
       "speedType",
+      "speedRate",
+      "targetSpeed",
       "qty",
       "operator1",
       "operator2",
@@ -183,13 +188,15 @@ export function LogEntryForm({
     setValue("hasOutput", flags ? Boolean(flags.output) : true);
   }, [processId, activeProcesses, setValue]);
 
-  // Once the factory's clock arrives, default to the shift that's running and
-  // start the entry at the shift start — the operator usually just adjusts it.
+  // Once the factory's clock arrives, start the entry at the running shift's
+  // start time — the operator usually just adjusts it. Strictly once, so a
+  // refetch (a window refocus is enough) can't overwrite what they typed.
+  const startPrefilled = useRef(false);
   useEffect(() => {
-    if (!shiftTimes) return;
-    const current = resolveCurrentShift(shiftTimes);
-    setValue("shift", current);
+    if (!shiftTimes || startPrefilled.current) return;
+    startPrefilled.current = true;
     if (!getValues("startTime")) {
+      const current = resolveCurrentShift(shiftTimes);
       setValue("startTime", shiftTimes[current].startTime);
     }
   }, [shiftTimes, setValue, getValues]);
@@ -220,6 +227,45 @@ export function LogEntryForm({
 
   const duration =
     startTime && endTime ? durationMinutes(startTime, endTime) : 0;
+
+  /**
+   * The shift is a fact about the entry's own times, not about when someone
+   * got round to typing it, so it's derived rather than picked: whichever
+   * window holds more of the activity wins. A run from 14:40 to 15:40
+   * straddles the handover and belongs to the morning it mostly happened in,
+   * even when it's filed at 16:00.
+   */
+  useEffect(() => {
+    if (!shiftTimes) return;
+    setValue(
+      "shift",
+      resolveShiftForEntry(shiftTimes, startTime ?? "", duration) ??
+        resolveCurrentShift(shiftTimes)
+    );
+  }, [shiftTimes, startTime, duration, setValue]);
+
+  /**
+   * The shift target is arithmetic, not an opinion: target speed × how long
+   * the activity ran. Deriving it kills a whole class of entry that used to
+   * pass validation while being meaningless — a target of 2 against 18,899
+   * produced, which reads as 945,000% of plan in every later average.
+   *
+   * Null means the inputs don't support a target (see `targetQtyFromSpeed`),
+   * and the field falls back to being typed.
+   */
+  const derivedTarget = targetQtyFromSpeed(
+    speedType,
+    speedRate,
+    typeof targetSpeed === "number" && !Number.isNaN(targetSpeed)
+      ? targetSpeed
+      : undefined,
+    duration
+  );
+
+  useEffect(() => {
+    if (derivedTarget === null) return;
+    setValue("targetQty", derivedTarget, { shouldValidate: true });
+  }, [derivedTarget, setValue]);
 
   const submit = useMutation({
     // The working day is read at submit time, not when the page loaded — a
@@ -326,7 +372,7 @@ export function LogEntryForm({
         {/* ── Where & when ─────────────────────────────────────────── */}
         <section>
           <SectionTitle>Where &amp; when</SectionTitle>
-          <FieldRow cols={2}>
+          <FieldRow cols={3}>
             <Field
               label={units.singular}
               htmlFor="log-unit"
@@ -352,28 +398,31 @@ export function LogEntryForm({
                 {...register("processId")}
               >
                 <option value="">Select…</option>
+                {/* Name only. The machine / output flags are configuration,
+                    not something the operator picks between — the form already
+                    shows their effect by revealing or hiding Speed and Output
+                    the moment a stage is selected. */}
                 {activeProcesses.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
-                    {p.flags.machine ? " · machine" : ""}
-                    {p.flags.output ? "" : " · no output"}
                   </option>
                 ))}
               </select>
             </Field>
+            {/* Read-only: the start and end times already say which shift this
+                was, so asking again would only invite the two to disagree. */}
+            <Field label="Shift" note="(auto)">
+              <output
+                className={cn(
+                  CONTROL,
+                  "flex items-center font-medium capitalize text-[#0F1B34]"
+                )}
+              >
+                {shift ?? "—"}
+              </output>
+            </Field>
           </FieldRow>
         </section>
-
-        {shiftTimes && (
-          <ShiftBanner
-            shift={shift as RunningShift}
-            clock={shiftTimes[shift as RunningShift]}
-            onSwitch={(next) => {
-              setValue("shift", next);
-              setValue("startTime", shiftTimes[next].startTime);
-            }}
-          />
-        )}
 
         <FieldRow>
           <Field
@@ -466,8 +515,12 @@ export function LogEntryForm({
           <SectionTitle>Output</SectionTitle>
           <FieldRow>
             <Field
-              label="Target qty"
-              note="(this entry)"
+              label="Shift target qty"
+              note={
+                derivedTarget !== null
+                  ? "(auto — target speed × duration)"
+                  : "(this entry)"
+              }
               htmlFor="log-target-qty"
               error={errors.targetQty?.message}
             >
@@ -476,7 +529,16 @@ export function LogEntryForm({
                 type="number"
                 step="any"
                 min={0}
-                className={cn(CONTROL, MONO)}
+                // Read-only rather than disabled: a disabled input is skipped
+                // by form serialisation and drops out of the tab order, and
+                // the operator still needs to see and copy the number.
+                readOnly={derivedTarget !== null}
+                className={cn(
+                  CONTROL,
+                  MONO,
+                  derivedTarget !== null &&
+                    "cursor-default border-[#E6EAF1] bg-[#F1F5F9] font-semibold text-[#2563EB] focus:border-[#E6EAF1] focus:bg-[#F1F5F9] focus:ring-0"
+                )}
                 placeholder="e.g. 270000"
                 {...register("targetQty", { valueAsNumber: true })}
               />

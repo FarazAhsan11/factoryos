@@ -158,6 +158,63 @@ export function resolveCurrentShift(
   return nowMins < morningStart ? "morning" : "afternoon";
 }
 
+/**
+ * How many minutes of `[start, start + durationMins)` fall inside a shift's
+ * window. Both are treated as arcs on a 24-hour circle, so an activity that
+ * runs past midnight — or a shift that does — is measured correctly rather
+ * than truncated at 00:00.
+ */
+export function overlapWithShift(
+  shift: ShiftClockValues,
+  startClock: string,
+  durationMins: number
+): number {
+  const entryStart = minutesOfDay(startClock);
+  const windowStart = minutesOfDay(shift.startTime);
+  const windowLength = shiftLengthMinutes(shift);
+  if (entryStart === null || windowStart === null || durationMins <= 0) return 0;
+
+  const DAY = 24 * 60;
+  // Rotate so the window sits at [0, windowLength).
+  const rel = (entryStart - windowStart + DAY) % DAY;
+  const head = Math.max(0, Math.min(rel + durationMins, windowLength) - rel);
+  // The part of the entry that wrapped past the rotated midnight.
+  const tail = Math.max(0, Math.min(rel + durationMins - DAY, windowLength));
+  return Math.min(head + tail, durationMins);
+}
+
+/**
+ * Which shift an entry belongs to, decided by **its own times** rather than by
+ * the clock when someone got round to typing it: whichever window holds more
+ * of the activity wins.
+ *
+ * That's the honest reading of a shift boundary. A run from 14:40 to 15:40
+ * straddles the handover; calling it "afternoon" because it was filed at 16:00
+ * would move an hour of morning work onto the wrong shift's numbers.
+ *
+ * Ties, and entries that touch neither window (night hours), fall back to the
+ * shift running at the entry's start time.
+ */
+export function resolveShiftForEntry(
+  times: Record<RunningShift, ShiftClockValues>,
+  startClock: string,
+  durationMins: number
+): RunningShift | null {
+  if (!startClock || durationMins <= 0) return null;
+
+  const morning = overlapWithShift(times.morning, startClock, durationMins);
+  const afternoon = overlapWithShift(times.afternoon, startClock, durationMins);
+
+  if (morning === 0 && afternoon === 0) {
+    const [h, m] = startClock.split(":").map(Number);
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+    const at = new Date();
+    at.setHours(h, m, 0, 0);
+    return resolveCurrentShift(times, at);
+  }
+  return afternoon > morning ? "afternoon" : "morning";
+}
+
 /** Local calendar day as `YYYY-MM-DD` — a shift is logged against the wall date. */
 export function todayKey(now: Date = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, "0");

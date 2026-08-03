@@ -57,6 +57,36 @@ export function composeSpeedUnit(type: string, rate: SpeedRate): string {
   return speedTypeTakesRate(type) ? `${type}/${rate}` : type;
 }
 
+/**
+ * What this entry *should* have produced: target speed × the time it ran.
+ * 60 minutes at 10/min is 600; the same 10 read as /hr is 10.
+ *
+ * Returns null when the target can't be derived rather than guessing one:
+ *
+ * - **RPM / Batches** (`perTime: false`) aren't an output rate. Rotations per
+ *   minute say nothing about capsules, and multiplying them by duration would
+ *   invent a target that reads as real.
+ * - **No speed recorded** — a manual stage that still produces output (Sorting)
+ *   has no speed fields at all, and Quick mode clears them.
+ *
+ * The caller falls back to asking for the number in those cases.
+ */
+export function targetQtyFromSpeed(
+  speedType: string | undefined,
+  speedRate: SpeedRate | undefined,
+  targetSpeed: number | undefined,
+  durationMins: number
+): number | null {
+  if (!speedType || !speedTypeTakesRate(speedType)) return null;
+  if (!targetSpeed || !Number.isFinite(targetSpeed) || targetSpeed <= 0) {
+    return null;
+  }
+  if (!durationMins || durationMins <= 0) return null;
+
+  const perMinute = speedRate === "min" ? targetSpeed : targetSpeed / 60;
+  return Math.round(perMinute * durationMins);
+}
+
 /** Why a machine ran below its target speed — feeds the OEE Pareto chart. */
 export const SLOW_REASONS = [
   "Quality / weight issue — dosing adjustment",
@@ -71,7 +101,7 @@ export const SLOW_REASONS = [
 
 /** "06:45" or "06:45:00" → "06:45". Shared with the shift-times form. */
 const clockTime = z
-  .string()
+  .string({ error: "Enter a time as HH:MM." })
   .trim()
   .regex(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/, "Enter a time as HH:MM.")
   .transform((v) => v.slice(0, 5));
@@ -111,8 +141,13 @@ export const logEntrySchema = z
      * source for that. "Not on the list…" keeps cover staff and contractors
      * loggable without a login, so requiring a name never blocks a real shift.
      */
+    //
+    // The message is on `z.string()` as well as `.min(1)`. `.min` only runs
+    // once the value is known to be a string, so an untouched picker — which
+    // reports `undefined`, not "" — fell through to zod's own wording and put
+    // "expected string, received undefined" in front of an operator.
     operator1: z
-      .string()
+      .string({ error: "Select who ran this — or use “Not on the list…”." })
       .trim()
       .min(1, "Select who ran this — or use “Not on the list…”.")
       .max(80),
@@ -141,25 +176,23 @@ export const logEntrySchema = z
   })
   .superRefine((values, ctx) => {
     // An activity flagged `has_output` exists to produce something, so the
-    // numbers it produced aren't optional — a blank there is an unfinished
-    // entry, not a measurement. They stay `optionalQty` at the field level
-    // because the *same* fields must be absent on a no-output stage; only this
+    // quantity it produced isn't optional — a blank there is an unfinished
+    // entry, not a measurement. It stays `optionalQty` at the field level
+    // because the *same* field must be absent on a no-output stage; only this
     // rule knows which shape the form is currently in.
-    if (values.hasOutput) {
-      if (values.qty === undefined) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["qty"],
-          message: "Enter how much this activity produced.",
-        });
-      }
-      if (values.targetQty === undefined) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["targetQty"],
-          message: "Enter the target — performance is measured against it.",
-        });
-      }
+    //
+    // `targetQty` is deliberately NOT required alongside it. It is derived
+    // from target speed × duration and never typed, so there are entries for
+    // which no target exists — an RPM-rated machine, a manual stage that still
+    // produces output, a Quick entry with no speed recorded. Demanding one
+    // would block those outright; storing null says "no target applies", which
+    // is the truth and keeps it out of every average.
+    if (values.hasOutput && values.qty === undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["qty"],
+        message: "Enter how much this activity produced.",
+      });
     }
 
     // Rejects can't exceed what was produced — a data-entry slip worth catching

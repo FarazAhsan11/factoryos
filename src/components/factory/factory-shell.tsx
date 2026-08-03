@@ -2,6 +2,7 @@ import { Building2 } from "lucide-react";
 
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { FactorySidebar } from "@/components/factory/factory-sidebar";
+import { ShiftIndicator } from "@/components/factory/shift-indicator";
 import type { FactoryContext } from "@/lib/factory/context";
 
 const ROLE_LABELS: Record<FactoryContext["role"], string> = {
@@ -51,6 +52,11 @@ export function FactoryShell({
           </div>
         </div>
         <div className="flex items-center gap-4">
+          {/* Workspace-wide context, so it lives in the workspace chrome: the
+              feed, the data table and the entry form are all read against the
+              running shift, and none of them owns it. Hidden on narrow screens
+              — the tenant identity and Sign out win that space. */}
+          <ShiftIndicator factoryId={factory.id} className="hidden md:flex" />
           <span className="inline-flex items-center gap-1.5 rounded-full bg-[#EFF4FF] px-2.5 py-1 text-xs font-semibold text-[#2563EB]">
             {ROLE_LABELS[role]}
           </span>

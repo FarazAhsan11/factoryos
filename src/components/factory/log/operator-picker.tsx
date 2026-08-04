@@ -33,33 +33,35 @@ export function OperatorPicker({
   name,
   label,
   note,
-  optional,
+  action,
   employees,
   shift,
   exclude,
 }: {
   control: Control<LogEntryValues, unknown, LogEntryParsed>;
-  name: Extract<FieldPath<LogEntryValues>, "operator1" | "operator2">;
+  name: Extract<FieldPath<LogEntryValues>, `operators.${number}.name`>;
   label: string;
   note?: string;
-  optional?: boolean;
+  /** Rendered opposite the label — the "Remove" button on an added operator. */
+  action?: React.ReactNode;
   employees: Employee[];
   shift: RunningShift;
-  /** The name already chosen in the other field, so nobody is picked twice. */
-  exclude?: string;
+  /** Names already chosen in the other rows, so nobody is picked twice. */
+  exclude?: string[];
 }) {
   const { field, fieldState } = useController({ control, name });
   const value = (field.value as string | undefined) ?? "";
 
+  const taken = new Set(exclude ?? []);
   const roster = employees
     .map(employeeName)
-    .filter((n) => n && n !== exclude)
+    .filter((n) => n && !taken.has(n))
     .sort((a, b) => a.localeCompare(b));
 
   const onShift = employees
     .filter((e) => e.default_shift === shift || e.default_shift === "both")
     .map(employeeName)
-    .filter((n) => n && n !== exclude);
+    .filter((n) => n && !taken.has(n));
   const onShiftSet = new Set(onShift);
   const others = roster.filter((n) => !onShiftSet.has(n));
 
@@ -75,7 +77,7 @@ export function OperatorPicker({
     <Field
       label={label}
       note={note}
-      optional={optional}
+      action={action}
       error={fieldState.error?.message}
     >
       <select
@@ -93,9 +95,9 @@ export function OperatorPicker({
         onBlur={field.onBlur}
         aria-label={label}
       >
-        {/* Both operators may be left blank, so neither placeholder should
-            read as a prompt the form will insist on. */}
-        <option value="">{optional ? "None" : "Select…"}</option>
+        {/* Every row that exists is required — an unwanted one is removed,
+            not left blank — so the placeholder reads as a prompt. */}
+        <option value="">Select…</option>
         {onShift.length > 0 && (
           <optgroup label={`On ${shift} shift`}>
             {[...onShift].sort((a, b) => a.localeCompare(b)).map((n) => (

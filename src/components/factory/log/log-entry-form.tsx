@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useForm, useWatch } from "react-hook-form";
+import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, ShieldCheck, Zap } from "lucide-react";
+import { Loader2, Plus, ShieldCheck, Zap } from "lucide-react";
 import { toast } from "sonner";
 
 import {
   ACTION_FLAGS,
   ACTION_FLAG_LABELS,
+  MAX_OPERATORS,
   SLOW_REASONS,
   SPEED_TYPES,
   logEntrySchema,
@@ -69,6 +70,7 @@ export function LogEntryForm({
 }) {
   const queryClient = useQueryClient();
   const [quick, setQuick] = useState(false);
+
 
   /**
    * Quick mode hides the Speed fields, so it must also clear them.
@@ -138,15 +140,25 @@ export function LogEntryForm({
       endTime: "",
       speedType: "RPM",
       speedRate: "hr",
-      // Empty strings, not undefined: an unset field should read as "nothing
-      // chosen yet", which the schema's own messages cover, rather than as a
-      // missing key that trips zod's type check first.
-      operator1: "",
-      operator2: "",
+      // One row, empty. Empty string rather than undefined: an unset field
+      // should read as "nothing chosen yet", which the schema's own message
+      // covers, rather than as a missing key that trips zod's type check first.
+      operators: [{ name: "" }],
       hasMachine: false,
       hasOutput: true,
     },
   });
+
+  /**
+   * One row per person, added and removed on demand. Beyond the first they're
+   * the exception, so the form opens with a single picker rather than a wall
+   * of empty dropdowns.
+   */
+  const {
+    fields: operatorFields,
+    append: addOperator,
+    remove: removeOperator,
+  } = useFieldArray({ control, name: "operators" });
 
   const [
     processId,
@@ -160,8 +172,7 @@ export function LogEntryForm({
     speedRate,
     targetSpeed,
     qty,
-    operator1,
-    operator2,
+    operators,
   ] = useWatch({
     control,
     name: [
@@ -176,8 +187,7 @@ export function LogEntryForm({
       "speedRate",
       "targetSpeed",
       "qty",
-      "operator1",
-      "operator2",
+      "operators",
     ],
   });
 
@@ -311,9 +321,9 @@ export function LogEntryForm({
         speedType: keep.speedType,
         speedRate: keep.speedRate,
         targetSpeed: keep.targetSpeed,
-        // The same pair usually works the whole shift, so they carry over too.
-        operator1: keep.operator1,
-        operator2: keep.operator2,
+        // The same people usually work the whole shift, so the whole list
+        // carries over — including however many rows were added for it.
+        operators: keep.operators,
       });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -696,23 +706,57 @@ export function LogEntryForm({
             </p>
           )}
           <FieldRow cols={2}>
-            <OperatorPicker
-              control={control}
-              name="operator1"
-              label="Operator 1"
-              employees={employees}
-              shift={shift as RunningShift}
-              exclude={operator2}
-            />
-            <OperatorPicker
-              control={control}
-              name="operator2"
-              label="Operator 2"
-              optional
-              employees={employees}
-              shift={shift as RunningShift}
-              exclude={operator1}
-            />
+            {operatorFields.map((row, i) => (
+              <OperatorPicker
+                // `row.id`, not the index: removing a middle row would
+                // otherwise re-key every picker below it and carry the wrong
+                // free-text state down with it.
+                key={row.id}
+                control={control}
+                name={`operators.${i}.name`}
+                label={`Operator ${i + 1}`}
+                employees={employees}
+                shift={shift as RunningShift}
+                // Everyone picked in the *other* rows, so nobody is named twice.
+                exclude={(operators ?? [])
+                  .filter((_, j) => j !== i)
+                  .map((o) => o?.name)
+                  .filter((n): n is string => Boolean(n))}
+                action={
+                  // The first row is the required one and has no Remove — the
+                  // schema would reject an empty list anyway, so offering it
+                  // would only be a button that fails.
+                  i > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => removeOperator(i)}
+                      className="text-[11px] font-semibold text-[#94A3B8] transition hover:text-[#B91C1C]"
+                    >
+                      Remove
+                    </button>
+                  ) : undefined
+                }
+              />
+            ))}
+            {/* Takes the next cell in the same grid, so it lands beside the
+                last picker on an odd count and starts a fresh row on an even
+                one. The blank line stands in for a label, which is what lines
+                the button up with the dropdowns rather than their labels. */}
+            {operatorFields.length < MAX_OPERATORS && (
+              <div className="flex flex-col space-y-1.5">
+                <span className="text-xs" aria-hidden>
+                  &nbsp;
+                </span>
+                <button
+                  type="button"
+                  onClick={() => addOperator({ name: "" })}
+                  className="flex h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-[#CBD5E1] text-sm font-medium text-[#64748B] transition hover:border-[#2563EB] hover:bg-[#2563EB]/5 hover:text-[#2563EB]"
+                >
+                  <Plus className="size-4" aria-hidden />
+                  Add operator
+                </button>
+              </div>
+            )}
           </FieldRow>
         </section>
 

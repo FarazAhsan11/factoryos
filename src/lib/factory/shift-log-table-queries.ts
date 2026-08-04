@@ -40,8 +40,9 @@ export interface LogTableRow {
   actual_speed: number | null;
   slow_reason: string | null;
   equipment_no: string | null;
-  operator_1: string | null;
-  operator_2: string | null;
+  operators: string[];
+  /** The array joined with " / " — what search and sort actually run against. */
+  operators_text: string | null;
   action_flag: string | null;
   comment: string | null;
   amended_at: string | null;
@@ -56,7 +57,7 @@ const COLUMNS = `
   batch_no, product_name, product_code,
   target_qty, qty, qty_rejected, accumulative,
   speed_unit, target_speed, actual_speed, slow_reason,
-  equipment_no, operator_1, operator_2, action_flag, comment,
+  equipment_no, operators, operators_text, action_flag, comment,
   amended_at, amend_note, logged_by
 `;
 
@@ -95,7 +96,9 @@ export const SORTABLE = {
   actual_speed: "actual_speed",
   slow_reason: "slow_reason",
   equipment_no: "equipment_no",
-  operator_1: "operator_1",
+  // The flattened text, not the array: ordering by a text[] compares element
+  // by element, which reads as arbitrary once two entries share a first name.
+  operators_text: "operators_text",
   action_flag: "action_flag",
   comment: "comment",
 } as const;
@@ -144,8 +147,9 @@ const SEARCH_COLUMNS = [
   "product_code",
   "unit_name",
   "process_name",
-  "operator_1",
-  "operator_2",
+  // `ilike` has nothing to say about a text[], so search reads the flattened
+  // column the view derives from it.
+  "operators_text",
   "comment",
   "equipment_no",
   "slow_reason",

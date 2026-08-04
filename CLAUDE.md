@@ -16,7 +16,7 @@ Auth, tenancy and factory setup are **built and working**; the first operational
 - **Admin & Settings** (`/factory/[slug]/admin`) — six working tabs: Company, Units, Processes, Employees (invite + CSV import), Products, Shift times.
 - **Shift log** (`/factory/[slug]/log`) — the entry form, activity feed, and amendments.
 - **Data table** (`/factory/[slug]/data`) — server-side filter / sort / paginate over the shift log, CSV export.
-- **Database** — 13 migrations in `supabase/migrations/`, with RLS on every tenant table.
+- **Database** — 14 migrations in `supabase/migrations/`, with RLS on every tenant table.
 
 Not built: Pipeline, Actions, OEE & Downtime, Quality, Trends, handover reports, and the log's Roster / CI-ideas tabs (they render as "Soon" from `nav.ts`).
 
@@ -95,7 +95,7 @@ Copy `.env.example` → `.env.local`. All `.env*` files are gitignored.
 ## Database (Supabase)
 
 - SQL migrations live in `supabase/migrations/` (versioned, `NNNN_name.sql`). The Supabase CLI is **not** installed and there's no local DB connection string, so migrations are currently applied by hand via the **Supabase Dashboard → SQL Editor** (or a direct connection string if provided). Keep the migration files as the source of truth regardless of how they're applied.
-- **13 migrations exist** (`0001`–`0013`). `docs/IMPLEMENTATION_GUIDE.md` §0 lists each one and what it does — check there before assuming a table or column is missing.
+- **14 migrations exist** (`0001`–`0014`). `docs/IMPLEMENTATION_GUIDE.md` §0 lists each one and what it does — check there before assuming a table or column is missing.
 - Core shape: `factories` and `profiles` (1:1 with `auth.users`, carrying `role` + nullable `factory_id`) from `0001`; per-tenant setup lists (`factory_units`, `factory_processes`, `factory_products`, `factory_shift_times`); and `shift_log_entries`, the first operational table.
 - RLS helpers to reuse rather than re-derive: `is_super_admin()`, `current_factory_id()`, `can_manage_factory(uuid)`.
 - **Shift-log entries are audit-protected**: no delete policy at all, insert requires `logged_by = auth.uid()`, and updates pass through the `shift_log_amend_guard` trigger, which demands an `amend_note` and forces provenance columns back to their originals. Never add a delete path.

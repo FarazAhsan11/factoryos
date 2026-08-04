@@ -82,7 +82,7 @@ const COLUMNS: Column[] = [
   { key: "actual_speed", label: "Actual speed" },
   { key: "slow_reason", label: "Slow reason" },
   { key: "equipment_no", label: "EQ No." },
-  { key: "operator_1", label: "Operator" },
+  { key: "operators_text", label: "Operators" },
   { key: "action_flag", label: "Flag" },
   { key: "comment", label: "Comments" },
 ];
@@ -359,10 +359,24 @@ function Row({
         {row.equipment_no || DASH}
       </td>
 
-      <td className={cn(TD, "max-w-[140px] truncate text-[11.5px] text-[#334155]")}>
-        {row.operator_1 ?? DASH}
-        {row.operator_2 && (
-          <span className="text-[#94A3B8]"> / {row.operator_2}</span>
+      {/* Truncated, with the full list on hover: an entry run by five people
+          would otherwise stretch the column past everything beside it. */}
+      <td
+        className={cn(TD, "max-w-[140px] truncate text-[11.5px] text-[#334155]")}
+        title={row.operators?.join(" / ") || undefined}
+      >
+        {row.operators?.length ? (
+          <>
+            {row.operators[0]}
+            {row.operators.length > 1 && (
+              <span className="text-[#94A3B8]">
+                {" "}
+                / {row.operators.slice(1).join(" / ")}
+              </span>
+            )}
+          </>
+        ) : (
+          DASH
         )}
       </td>
 

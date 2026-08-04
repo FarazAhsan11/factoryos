@@ -106,6 +106,66 @@ const clockTime = z
   .regex(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/, "Enter a time as HH:MM.")
   .transform((v) => v.slice(0, 5));
 
+const OPERATOR_REQUIRED = "Select who ran this — or use “Not on the list…”.";
+
+/**
+ * Not a product limit — no shift is run by twenty people — but the ceiling
+ * the `shift_log_entries_operators_bounded` check enforces in the database
+ * (migration 0014). The client writes this array directly under RLS, so the
+ * two have to agree or a legal-looking form submits and the insert is refused.
+ */
+export const MAX_OPERATORS = 20;
+
+/**
+ * Everyone who ran the activity. At least one name, no fixed ceiling: a line
+ * can be run by two, or by four plus a technician through a changeover, and
+ * every one of those names is what Actions and handovers follow up on.
+ *
+ * Two shapes on purpose. The **input** is `{ name }[]` — react-hook-form's
+ * `useFieldArray` needs objects to give each row a stable key, and a flat
+ * array of strings re-mounts every field whenever one is removed. The
+ * **output** is a plain `string[]`, which is what the column stores.
+ *
+ * The required message sits on `z.string()` as well as `.min(1)`: `.min` only
+ * runs once the value is known to be a string, so an untouched picker — which
+ * reports `undefined`, not "" — used to fall through to zod's own wording and
+ * put "expected string, received undefined" in front of an operator.
+ *
+ * Names, not ids. A shift record has to keep saying who ran the machine even
+ * after that account is renamed or removed, and cover staff and contractors
+ * work real shifts without ever having a login.
+ */
+const operatorList = z
+  .array(
+    z.object({
+      name: z
+        .string({ error: OPERATOR_REQUIRED })
+        .trim()
+        .min(1, OPERATOR_REQUIRED)
+        .max(80),
+    })
+  )
+  .min(1, OPERATOR_REQUIRED)
+  .max(MAX_OPERATORS, `That's more than ${MAX_OPERATORS} people — check the entry.`)
+  .superRefine((rows, ctx) => {
+    // The pickers already hide a name chosen in another row, but
+    // "Not on the list…" is free text and can repeat one.
+    const seen = new Set<string>();
+    rows.forEach((row, i) => {
+      const key = row.name.toLowerCase();
+      if (!key) return;
+      if (seen.has(key)) {
+        ctx.addIssue({
+          code: "custom",
+          path: [i, "name"],
+          message: "Already added above.",
+        });
+      }
+      seen.add(key);
+    });
+  })
+  .transform((rows) => rows.map((row) => row.name));
+
 /** An optional number field: "" means "not recorded", not 0. */
 const optionalQty = z
   .union([z.number(), z.nan()])
@@ -134,24 +194,7 @@ export const logEntrySchema = z
     actualSpeed: optionalQty,
     slowReason: z.string().trim().max(120).optional(),
 
-    /**
-     * Required, unlike everything else in this section. An entry nobody is
-     * named on can't be followed up: the amendment trail records who *filed*
-     * the row, not who ran the activity, and Actions / handovers have no other
-     * source for that. "Not on the list…" keeps cover staff and contractors
-     * loggable without a login, so requiring a name never blocks a real shift.
-     */
-    //
-    // The message is on `z.string()` as well as `.min(1)`. `.min` only runs
-    // once the value is known to be a string, so an untouched picker — which
-    // reports `undefined`, not "" — fell through to zod's own wording and put
-    // "expected string, received undefined" in front of an operator.
-    operator1: z
-      .string({ error: "Select who ran this — or use “Not on the list…”." })
-      .trim()
-      .min(1, "Select who ran this — or use “Not on the list…”.")
-      .max(80),
-    operator2: z.string().trim().max(80).optional(),
+    operators: operatorList,
     comment: z.string().trim().max(500).optional(),
     /**
      * "" is the "No — routine entry" option, and it has to parse. A bare

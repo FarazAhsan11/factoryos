@@ -31,8 +31,10 @@ const HEADERS = [
   "Performance %",
   "Slow reason",
   "Equipment no.",
-  "Operator 1",
-  "Operator 2",
+  // One column, not one per operator: the count varies row to row, so a
+  // fixed set of columns would either truncate the long entries or pad every
+  // short one with blanks.
+  "Operators",
   "Flag",
   "Comments",
   "Amended",
@@ -66,8 +68,7 @@ function cells(row: LogTableRow): (string | number | null)[] {
     perf ?? "",
     row.slow_reason ?? "",
     row.equipment_no ?? "",
-    row.operator_1 ?? "",
-    row.operator_2 ?? "",
+    row.operators?.join(" / ") ?? "",
     row.action_flag ?? "",
     row.comment ?? "",
     row.amended_at ? "Yes" : "",

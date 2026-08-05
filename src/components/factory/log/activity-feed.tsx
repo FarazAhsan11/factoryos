@@ -201,8 +201,7 @@ function FeedRow({
           {entry.duration_minutes > 0 &&
             ` · ${formatMinutes(entry.duration_minutes)}`}
           {entry.equipment_no && ` · ${entry.equipment_no}`}
-          {entry.operator_1 && ` · ${entry.operator_1}`}
-          {entry.operator_2 && ` / ${entry.operator_2}`}
+          {entry.operators?.length > 0 && ` · ${entry.operators.join(" / ")}`}
         </p>
 
         {entry.target_speed ? (

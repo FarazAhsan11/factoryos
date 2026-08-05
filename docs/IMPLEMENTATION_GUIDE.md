@@ -45,6 +45,7 @@ Applied by hand via **Supabase Dashboard → SQL Editor**, in order. The files s
 | `0011_shift_log_entries.sql` | `shift_log_entries` — the first operational table; insert-only RLS, **no delete policy**, and a `shift_log_amend_guard` trigger enforcing amendments |
 | `0012_shift_log_table.sql` | `shift_log_entries_expanded` — a `security_invoker` **view** flattening the unit/process/product names onto each entry and adding the running `accumulative` window total; plus `shift_log_stats()`, the aggregate RPC behind the data table's totals bar |
 | `0013_process_output_flag.sql` | `factory_processes.has_output` (default true, back-stamped false for Idle/Break/Set Up/cleaning/maintenance); makes `shift_log_entries.target_qty` / `qty` / `qty_rejected` **nullable** and clears the all-zero rows already logged against non-producing stages |
+| `0014_shift_log_operators_array.sql` | replaces `operator_1` / `operator_2` with **`operators text[]`** (backfilled, capped at 20 by a check constraint) and rebuilds the 0012 view + `shift_log_stats()` around it, adding a flattened `operators_text` for search and sort |
 
 New dependency: **`@tanstack/react-query`** (`npm install` picks it up).
 

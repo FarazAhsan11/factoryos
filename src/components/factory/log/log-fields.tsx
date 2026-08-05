@@ -36,6 +36,7 @@ export function Field({
   label,
   note,
   optional,
+  action,
   error,
   htmlFor,
   className,
@@ -51,29 +52,47 @@ export function Field({
    * have to submit the form to discover which ones the validator will reject.
    */
   optional?: boolean;
+  /**
+   * A control rendered opposite the label — currently the "Remove" affordance
+   * on an added operator. It sits in the label row rather than under the input
+   * so it can't be mistaken for part of the value, and so adding it doesn't
+   * change the field's height and break the row alignment below.
+   */
+  action?: React.ReactNode;
   error?: string;
   htmlFor?: string;
   className?: string;
   children: React.ReactNode;
 }) {
-  // `h-full` + `mt-auto` keeps the controls in a FieldRow on one line even when
-  // one label wraps to two: the label grows upward inside its own cell instead
-  // of shoving its input below its neighbours'.
+  // Controls in a FieldRow line up because every label is exactly one line
+  // tall — hence `truncate`, which is doing real work: a label long enough to
+  // wrap would otherwise shove its own input below its neighbours'.
+  //
+  // Bottom-aligning them instead (`h-full` + `mt-auto`) also fixed that, but
+  // broke the moment one cell grew taller than its neighbours for a different
+  // reason — an operator picker with its free-text name box open dragged the
+  // dropdown beside it to the floor of the row.
   return (
-    <div className={cn("flex h-full flex-col space-y-1.5", className)}>
-      <label
-        htmlFor={htmlFor}
-        className="block text-xs font-medium text-[#475569]"
-      >
-        {label}
-        {note && <span className="ml-1 text-[10px] text-[#94A3B8]">{note}</span>}
-        {optional && (
-          <span className="ml-1 text-[10px] font-normal text-[#94A3B8]">
-            (optional)
-          </span>
-        )}
-      </label>
-      <div className="mt-auto space-y-1.5">
+    <div className={cn("flex flex-col space-y-1.5", className)}>
+      <div className="flex items-baseline justify-between gap-2">
+        <label
+          htmlFor={htmlFor}
+          className="block min-w-0 truncate text-xs font-medium text-[#475569]"
+        >
+          {label}
+          {note && (
+            <span className="ml-1 text-[10px] text-[#94A3B8]">{note}</span>
+          )}
+          {optional && (
+            <span className="ml-1 text-[10px] font-normal text-[#94A3B8]">
+              (optional)
+            </span>
+          )}
+        </label>
+        {/* Never squeezed by a long label — the label truncates instead. */}
+        <span className="shrink-0">{action}</span>
+      </div>
+      <div className="space-y-1.5">
         {children}
         {error && <p className="text-xs text-[#B91C1C]">{error}</p>}
       </div>

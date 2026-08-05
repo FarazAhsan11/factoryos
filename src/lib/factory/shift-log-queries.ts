@@ -31,8 +31,8 @@ export interface LogEntry {
   target_speed: number | null;
   actual_speed: number | null;
   slow_reason: string | null;
-  operator_1: string | null;
-  operator_2: string | null;
+  /** Everyone who ran it, in the order entered. Never null — `{}` if unknown. */
+  operators: string[];
   comment: string | null;
   action_flag: string | null;
   created_at: string;
@@ -51,7 +51,7 @@ const COLUMNS = `
   duration_minutes, equipment_no, batch_no,
   target_qty, qty, qty_rejected,
   speed_unit, target_speed, actual_speed, slow_reason,
-  operator_1, operator_2, comment, action_flag,
+  operators, comment, action_flag,
   created_at, amended_at, amend_note, logged_by,
   unit:factory_units ( name ),
   process:factory_processes ( name, has_machine ),
@@ -167,8 +167,9 @@ export async function createLogEntry(
       target_speed: machine ? values.targetSpeed ?? null : null,
       actual_speed: machine ? values.actualSpeed ?? null : null,
       slow_reason: machine ? values.slowReason || null : null,
-      operator_1: values.operator1 || null,
-      operator_2: values.operator2 || null,
+      // Already trimmed and de-duplicated by the schema; the filter is for the
+      // empty strings a picker left open on "Not on the list…" can produce.
+      operators: values.operators.filter(Boolean),
       comment: values.comment || null,
       action_flag: values.actionFlag ?? null,
       logged_by: loggedBy,

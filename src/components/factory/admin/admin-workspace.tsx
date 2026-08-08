@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Cog, Package } from "lucide-react";
+import { Cog, Flag, Package } from "lucide-react";
 
 import { AdminTabs } from "@/components/factory/admin/admin-tabs";
 import { CompanySettingsForm } from "@/components/factory/admin/company-settings-form";
@@ -137,6 +137,20 @@ export function AdminWorkspace({
               off: "No output",
               icon: Package,
               defaultOn: true,
+            },
+            // Unlike the two above, this one is a choice *between* stages: a
+            // batch is dispensed, encapsulated, sorted and packed, and each
+            // logs roughly the full quantity. Without naming which of them
+            // means "the batch is done", completion is unknowable — summing
+            // them finishes a job at a quarter of the work, and taking the
+            // largest finishes it when the first stage does.
+            {
+              key: "final",
+              label: "This is the final stage",
+              hint: "The stage whose output IS the finished batch — usually the last pack or label step. Pipeline jobs complete when it reaches the required quantity. Only one stage can hold this; ticking it here clears it from the other.",
+              on: "Final",
+              off: "Not final",
+              icon: Flag,
             },
           ]}
         />

@@ -30,6 +30,7 @@ import {
 } from "@/components/factory/log/log-fields";
 import { OperatorPicker } from "@/components/factory/log/operator-picker";
 import { employeeKeys, fetchEmployees } from "@/lib/factory/employee-queries";
+import { pipelineKeys } from "@/lib/factory/pipeline-queries";
 import { fetchProducts, productKeys } from "@/lib/factory/product-queries";
 import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
 import {
@@ -308,6 +309,13 @@ export function LogEntryForm({
       });
       await queryClient.invalidateQueries({
         queryKey: ["shift_log_batch", factoryId],
+      });
+      // This entry may have just moved a card: started a planned job, held one
+      // on a flag, released a hold, or completed a batch. The move happens in
+      // the database trigger, so the only thing to do here is stop trusting
+      // the copy of the board we already have.
+      await queryClient.invalidateQueries({
+        queryKey: pipelineKeys.all(factoryId),
       });
       toast.success(
         `Logged — ${entry.unit?.name ?? ""} · ${entry.process?.name ?? ""}` +

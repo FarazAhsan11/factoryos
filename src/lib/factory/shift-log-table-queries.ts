@@ -264,6 +264,12 @@ export async function fetchLogTablePage(
 export interface LogTableStats {
   entryCount: number;
   totalQty: number;
+  /**
+   * Summed over the entries that *have* a target — `sum` skips nulls, and a
+   * null target means none applies (an RPM-rated machine, a manual stage),
+   * not a target of zero. Against `totalQty` it reads as plan attainment.
+   */
+  totalTargetQty: number;
   totalRejected: number;
   totalMinutes: number;
   /** Good units as a share of produced units; null when nothing was produced. */
@@ -295,6 +301,9 @@ export async function fetchLogTableStats(
   const row = (data ?? {}) as {
     entry_count?: number;
     total_qty?: number;
+    // Absent until migration 0015 is applied, which reads as 0 and renders as
+    // an em-dash — the footer degrades to a missing total rather than an error.
+    total_target_qty?: number;
     total_rejected?: number;
     total_minutes?: number;
   };
@@ -305,6 +314,7 @@ export async function fetchLogTableStats(
   return {
     entryCount: Number(row.entry_count ?? 0),
     totalQty,
+    totalTargetQty: Number(row.total_target_qty ?? 0),
     totalRejected,
     totalMinutes: Number(row.total_minutes ?? 0),
     qualityRate:

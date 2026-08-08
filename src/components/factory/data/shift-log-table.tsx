@@ -12,6 +12,7 @@ import { formatMinutes } from "@/lib/factory/shift-log-queries";
 import type {
   LogTableRow,
   LogTableSort,
+  LogTableStats,
   SortColumn,
 } from "@/lib/factory/shift-log-table-queries";
 import { cn } from "@/lib/utils";
@@ -92,6 +93,41 @@ const TH =
 const TD = "px-2.5 py-2 align-middle";
 const MONO = "font-mono text-[11.5px]";
 
+/* ── Footer totals ───────────────────────────────────────────────────────
+   Which columns a total is a truthful answer for. Deliberately short:
+
+   · Accum. is already a running total. Summing running totals adds the same
+     units in once per entry and produces a number with no meaning at all.
+   · Target and actual speed are rates, not amounts. 1,200 caps/hr plus
+     980 caps/hr is not 2,180 of anything; the honest summary of a rate
+     column is a duration-weighted average, which is OEE's job, not a
+     footer's.
+
+   Keyed by column so the row is built by walking COLUMNS — a column added or
+   moved above carries its footer cell with it instead of silently shifting
+   every total one place to the left. */
+const TOTALS: Partial<
+  Record<SortColumn, (stats: LogTableStats) => number>
+> = {
+  duration_minutes: (s) => s.totalMinutes,
+  qty: (s) => s.totalQty,
+  target_qty: (s) => s.totalTargetQty,
+  qty_rejected: (s) => s.totalRejected,
+};
+
+const FIRST_TOTAL = COLUMNS.findIndex((c) => c.key in TOTALS);
+const LAST_TOTAL = COLUMNS.map((c) => c.key in TOTALS).lastIndexOf(true);
+
+/**
+ * Truncates rather than rounds, so a rate below 100 never *displays* as 100.
+ * One reject in 11,000 units is 99.9909% — rounding that to "100.0%" tells a
+ * supervisor the shift was clean when it wasn't. Only a genuinely defect-free
+ * slice shows 100%.
+ */
+function formatQualityRate(rate: number): string {
+  return (Math.floor(rate * 10) / 10).toFixed(1);
+}
+
 export function ShiftLogTable({
   rows,
   sort,
@@ -101,6 +137,10 @@ export function ShiftLogTable({
   hasFilters,
   canAmend,
   onAmend,
+  showTotals,
+  stats,
+  statsPending,
+  statsError,
 }: {
   rows: LogTableRow[];
   sort: LogTableSort;
@@ -112,6 +152,16 @@ export function ShiftLogTable({
   /** Mirrors the update policy: the author, or a manager. */
   canAmend: (row: LogTableRow) => boolean;
   onAmend: (row: LogTableRow) => void;
+  /**
+   * Whether the footer exists at all. A separate flag from `stats` being
+   * present so the row doesn't blink out of the table on every refetch —
+   * totals are shown or not shown by the filters, not by load state.
+   */
+  showTotals: boolean;
+  /** Totals for the whole filtered set, not the page on screen. */
+  stats?: LogTableStats;
+  statsPending?: boolean;
+  statsError?: Error | null;
 }) {
   if (!isPending && rows.length === 0) {
     return (
@@ -202,8 +252,139 @@ export function ShiftLogTable({
             />
           ))}
         </tbody>
+
+        {showTotals && (
+          <TotalsRow
+            stats={stats}
+            isPending={Boolean(statsPending)}
+            error={statsError}
+            shown={rows.length}
+          />
+        )}
       </table>
     </div>
+  );
+}
+
+/**
+ * Totals for the filtered set, under the columns they total.
+ *
+ * They describe every matching entry, not the 25 rows on screen — the numbers
+ * come from the `shift_log_stats` RPC, because summing the visible page would
+ * quietly answer a different question on any table with more than one page.
+ * "Showing 25 of 812" in the first cell is what keeps that readable rather
+ * than looking like an arithmetic error.
+ *
+ * A `<tfoot>` rather than a bar above the table: a total that sits in the
+ * "Rejected" column needs no label to say what it totals, and it scrolls
+ * sideways in step with the column it belongs to.
+ */
+function TotalsRow({
+  stats,
+  isPending,
+  error,
+  shown,
+}: {
+  stats?: LogTableStats;
+  isPending: boolean;
+  error?: Error | null;
+  shown: number;
+}) {
+  // Two signals, not one: a rule dark enough to read as a boundary rather
+  // than another row separator, and a background a shade deeper than the
+  // header's. The rows above are sometimes tinted (a flagged entry is pink,
+  // a reject amber), so a pale line like the body's #F1F5F9 dividers
+  // disappeared against them and the totals read as one more entry.
+  const TF =
+    "border-t-2 border-[#94A3B8] bg-[#F1F5F9] px-2.5 py-3 text-[11px] font-semibold text-[#0F1B34]";
+
+  if (error) {
+    return (
+      <tfoot>
+        <tr>
+          <td colSpan={COLUMNS.length + 1} className={cn(TF, "text-[#B91C1C]")}>
+            Totals unavailable: {error.message}
+          </td>
+        </tr>
+      </tfoot>
+    );
+  }
+
+  const quality = stats?.qualityRate ?? null;
+
+  return (
+    <tfoot className={cn("transition-opacity", isPending && "opacity-50")}>
+      <tr>
+        <td
+          colSpan={FIRST_TOTAL}
+          className={cn(TF, "whitespace-nowrap text-[#64748B]")}
+        >
+          Showing <strong className="text-[#0F1B34]">{num(shown)}</strong> of{" "}
+          <strong className="text-[#0F1B34]">
+            {stats ? num(stats.entryCount) : DASH}
+          </strong>{" "}
+          entries
+        </td>
+
+        {COLUMNS.slice(FIRST_TOTAL, LAST_TOTAL + 1).map((column) => {
+          // The totalled columns aren't contiguous — Room, Activity, Batch,
+          // Product and Code sit between Duration and Qty produced. Their
+          // cells exist to hold the row's shape and are left *empty*: an
+          // em-dash there reads as a missing total for a column that can't
+          // have one, and lands right-aligned under a left-aligned header.
+          const totalOf = TOTALS[column.key];
+          if (!totalOf) return <td key={column.key} className={TF} />;
+
+          const total = stats ? totalOf(stats) : undefined;
+          return (
+            <td
+              key={column.key}
+              className={cn(
+                TF,
+                MONO,
+                "whitespace-nowrap text-right",
+                // The one total worth colouring: rejects are what a supervisor
+                // filters down to find, and zero of them is good news.
+                column.key === "qty_rejected" &&
+                  total !== undefined &&
+                  total > 0 &&
+                  "text-[#B91C1C]"
+              )}
+            >
+              {total === undefined
+                ? DASH
+                : column.key === "duration_minutes"
+                  ? total > 0
+                    ? formatMinutes(total)
+                    : DASH
+                  : num(total)}
+            </td>
+          );
+        })}
+
+        {/* Not a column total — a ratio derived from two of them, parked in
+            the space the un-totallable columns leave. Labelled, so it can't
+            be read as a total of the column it happens to sit under. */}
+        <td
+          colSpan={COLUMNS.length - LAST_TOTAL}
+          className={cn(TF, "whitespace-nowrap")}
+        >
+          {quality !== null && (
+            <span
+              className={cn(
+                quality >= 98
+                  ? "text-[#16A34A]"
+                  : quality >= 95
+                    ? "text-[#B45309]"
+                    : "text-[#DC2626]"
+              )}
+            >
+              Quality rate: {formatQualityRate(quality)}%
+            </span>
+          )}
+        </td>
+      </tr>
+    </tfoot>
   );
 }
 

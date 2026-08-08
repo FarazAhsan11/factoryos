@@ -117,19 +117,19 @@ const OPERATOR_REQUIRED = "Select who ran this — or use “Not on the list…�
 export const MAX_OPERATORS = 20;
 
 /**
- * Everyone who ran the activity. At least one name, no fixed ceiling: a line
- * can be run by two, or by four plus a technician through a changeover, and
- * every one of those names is what Actions and handovers follow up on.
+ * Everyone who ran the activity. No fixed ceiling below `MAX_OPERATORS`: a
+ * line can be run by two, or by four plus a technician through a changeover,
+ * and every one of those names is what Actions and handovers follow up on.
  *
  * Two shapes on purpose. The **input** is `{ name }[]` — react-hook-form's
  * `useFieldArray` needs objects to give each row a stable key, and a flat
  * array of strings re-mounts every field whenever one is removed. The
- * **output** is a plain `string[]`, which is what the column stores.
+ * **output** is a plain `string[]` with the blanks dropped, which is what the
+ * column stores.
  *
- * The required message sits on `z.string()` as well as `.min(1)`: `.min` only
- * runs once the value is known to be a string, so an untouched picker — which
- * reports `undefined`, not "" — used to fall through to zod's own wording and
- * put "expected string, received undefined" in front of an operator.
+ * Whether *any* name is required is not decided here — see `operatorsRequired`
+ * and the rule in the schema's `superRefine`. It depends on the selected
+ * activity's flags, which this field can't see.
  *
  * Names, not ids. A shift record has to keep saying who ran the machine even
  * after that account is renamed or removed, and cover staff and contractors
@@ -138,14 +138,13 @@ export const MAX_OPERATORS = 20;
 const operatorList = z
   .array(
     z.object({
-      name: z
-        .string({ error: OPERATOR_REQUIRED })
-        .trim()
-        .min(1, OPERATOR_REQUIRED)
-        .max(80),
+      // No `.min(1)`: an empty row is dropped by the transform below rather
+      // than rejected, because on a waiting-time activity it is the correct
+      // answer. The message on `z.string()` still covers a picker reporting
+      // `undefined`, which would otherwise surface zod's own wording.
+      name: z.string({ error: OPERATOR_REQUIRED }).trim().max(80),
     })
   )
-  .min(1, OPERATOR_REQUIRED)
   .max(MAX_OPERATORS, `That's more than ${MAX_OPERATORS} people — check the entry.`)
   .superRefine((rows, ctx) => {
     // The pickers already hide a name chosen in another row, but
@@ -164,7 +163,28 @@ const operatorList = z
       seen.add(key);
     });
   })
-  .transform((rows) => rows.map((row) => row.name));
+  .transform((rows) => rows.map((row) => row.name).filter(Boolean));
+
+/**
+ * Does this activity need a name against it?
+ *
+ * No, for an activity that is **both** manual and non-producing — Manning,
+ * Set Up, Idle, Ready, waiting on materials. Nobody is operating anything;
+ * the entry exists to account for shift time that passed. Demanding a name
+ * there produces one of two bad outcomes: a blocked entry, or an operator
+ * typing whoever comes to mind, which puts an unearned name into an
+ * audit-protected record that Actions and handovers then chase.
+ *
+ * Yes for everything else. A machine ran, or units were produced — both are
+ * things a person did, and nothing downstream can reconstruct who from the
+ * rest of the row.
+ */
+export function operatorsRequired(
+  hasMachine: boolean,
+  hasOutput: boolean
+): boolean {
+  return hasMachine || hasOutput;
+}
 
 /** An optional number field: "" means "not recorded", not 0. */
 const optionalQty = z
@@ -218,6 +238,20 @@ export const logEntrySchema = z
     hasOutput: z.boolean(),
   })
   .superRefine((values, ctx) => {
+    // Who did the work — required unless the activity is waiting time. The
+    // issue is pinned to the first picker rather than the array, so it renders
+    // inline on the control the operator has to act on.
+    if (
+      operatorsRequired(values.hasMachine, values.hasOutput) &&
+      values.operators.length === 0
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["operators", 0, "name"],
+        message: OPERATOR_REQUIRED,
+      });
+    }
+
     // An activity flagged `has_output` exists to produce something, so the
     // quantity it produced isn't optional — a blank there is an unfinished
     // entry, not a measurement. It stays `optionalQty` at the field level

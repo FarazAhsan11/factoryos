@@ -55,7 +55,7 @@ export const FACTORY_NAV: NavSection[] = [
   {
     label: "Accountability",
     items: [
-      { href: "/actions", label: "Actions", icon: Zap, roles: SUPERVISOR_UP, ready: false },
+      { href: "/actions", label: "Actions", icon: Zap, roles: SUPERVISOR_UP, ready: true },
     ],
   },
   {

@@ -30,6 +30,7 @@ import {
 } from "@/components/factory/log/log-fields";
 import { OperatorPicker } from "@/components/factory/log/operator-picker";
 import { employeeKeys, fetchEmployees } from "@/lib/factory/employee-queries";
+import { actionKeys } from "@/lib/factory/action-queries";
 import { pipelineKeys } from "@/lib/factory/pipeline-queries";
 import { fetchProducts, productKeys } from "@/lib/factory/product-queries";
 import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
@@ -316,6 +317,10 @@ export function LogEntryForm({
       // the copy of the board we already have.
       await queryClient.invalidateQueries({
         queryKey: pipelineKeys.all(factoryId),
+      });
+      // A flagged entry also raises an action, by the same route.
+      await queryClient.invalidateQueries({
+        queryKey: actionKeys.all(factoryId),
       });
       toast.success(
         `Logged — ${entry.unit?.name ?? ""} · ${entry.process?.name ?? ""}` +

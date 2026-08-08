@@ -481,6 +481,7 @@ docs/samples/{employees-sample.csv,employees-sample-messy.csv}
 
 ## 16. Related docs
 
+- **`docs/IMPLEMENTATION_GUIDE_2.md` — continues this file.** Pipeline (Kanban), Actions & escalations, the product bulk import, the `Final` stage tag, and this round of shift-log / data-table changes. Migrations `0015`–`0017` are listed there.
 - `docs/PROGRESS.md` — running record of what's built and how to run it.
 - `docs/ARCHITECTURE_FLOW.md` — product scope, role hierarchy, shift-based data model, build order.
 - `CLAUDE.md` — repo conventions (component structure, forms, database workflow).

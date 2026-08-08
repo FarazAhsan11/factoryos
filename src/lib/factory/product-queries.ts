@@ -75,6 +75,72 @@ export async function createProduct(
   return data as Product;
 }
 
+/** What became of one row of a bulk import. */
+export interface ProductImportResult {
+  batchNo: string;
+  ok: boolean;
+  error?: string;
+}
+
+/** Rows per insert. Big enough to be one round-trip for a normal paste. */
+const IMPORT_CHUNK = 50;
+
+/**
+ * Bulk-inserts catalogue rows, reporting the outcome of every one.
+ *
+ * Chunked rather than one statement so a 300-row paste doesn't ride on a
+ * single request, and **not** an upsert: silently overwriting a batch's
+ * required quantity because someone re-pasted last month's sheet is the kind
+ * of quiet data loss this catalogue can't afford. Existing batches are
+ * identified in the review step instead (`splitExisting`) and skipped.
+ *
+ * A chunk that fails is retried row by row. Postgres rejects the whole
+ * statement on one bad row and the error names no batch, so without the
+ * retry a single late duplicate would report 50 failures and leave the
+ * operator to work out which one it was.
+ */
+export async function createProducts(
+  factoryId: string,
+  rows: ProductValues[]
+): Promise<ProductImportResult[]> {
+  const supabase = createClient();
+  const results: ProductImportResult[] = [];
+
+  const toRow = (values: ProductValues) => ({
+    factory_id: factoryId,
+    batch_no: values.batchNo,
+    code: values.code || null,
+    name: values.name,
+    work_order: values.workOrder?.trim() || values.batchNo,
+    required_qty: values.requiredQty,
+  });
+
+  for (let i = 0; i < rows.length; i += IMPORT_CHUNK) {
+    const batch = rows.slice(i, i + IMPORT_CHUNK);
+    const { error } = await supabase
+      .from("factory_products")
+      .insert(batch.map(toRow));
+
+    if (!error) {
+      results.push(...batch.map((r) => ({ batchNo: r.batchNo, ok: true })));
+      continue;
+    }
+
+    for (const row of batch) {
+      const { error: rowError } = await supabase
+        .from("factory_products")
+        .insert(toRow(row));
+      results.push({
+        batchNo: row.batchNo,
+        ok: !rowError,
+        error: rowError ? toMessage(rowError, row.batchNo) : undefined,
+      });
+    }
+  }
+
+  return results;
+}
+
 export async function updateProduct(
   id: string,
   patch: Partial<

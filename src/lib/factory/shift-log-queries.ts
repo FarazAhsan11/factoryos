@@ -167,9 +167,10 @@ export async function createLogEntry(
       target_speed: machine ? values.targetSpeed ?? null : null,
       actual_speed: machine ? values.actualSpeed ?? null : null,
       slow_reason: machine ? values.slowReason || null : null,
-      // Already trimmed and de-duplicated by the schema; the filter is for the
-      // empty strings a picker left open on "Not on the list…" can produce.
-      operators: values.operators.filter(Boolean),
+      // Trimmed, de-duplicated and stripped of blanks by the schema. Empty on
+      // a waiting-time activity, which the column allows — its only constraint
+      // is a ceiling of 20, never a floor.
+      operators: values.operators,
       comment: values.comment || null,
       action_flag: values.actionFlag ?? null,
       logged_by: loggedBy,

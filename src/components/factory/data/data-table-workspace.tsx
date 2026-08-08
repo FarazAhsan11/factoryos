@@ -7,7 +7,6 @@ import { toast } from "sonner";
 
 import { AmendEntryDialog } from "@/components/factory/data/amend-entry-dialog";
 import { DataTableFilters } from "@/components/factory/data/data-table-filters";
-import { DataTableStats } from "@/components/factory/data/data-table-stats";
 import { ShiftLogTable } from "@/components/factory/data/shift-log-table";
 import { TablePagination } from "@/components/factory/data/table-pagination";
 import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
@@ -79,6 +78,8 @@ export function DataTableWorkspace({
     queryFn: () => fetchSetupItems("factory_processes", factoryId),
   });
 
+  const isDefault = useMemo(() => filtersAreDefault(filters), [filters]);
+
   const pageQuery = useQuery({
     queryKey: logTableKeys.page(factoryId, filters, sort, page, pageSize),
     queryFn: () => fetchLogTablePage(factoryId, filters, sort, page, pageSize),
@@ -91,6 +92,9 @@ export function DataTableWorkspace({
     queryKey: logTableKeys.stats(factoryId, filters),
     queryFn: () => fetchLogTableStats(factoryId, filters),
     placeholderData: keepPreviousData,
+    // Only asked for when the bar is on screen — see the render below. An
+    // untouched table would otherwise pay for an aggregate nobody reads.
+    enabled: !isDefault,
   });
 
   /** Any filter change invalidates the current page number, not just the rows. */
@@ -138,7 +142,6 @@ export function DataTableWorkspace({
     onError: (e: Error) => toast.error(`Export failed: ${e.message}`),
   });
 
-  const isDefault = useMemo(() => filtersAreDefault(filters), [filters]);
   const rows = pageQuery.data?.rows ?? [];
 
   /**
@@ -202,13 +205,6 @@ export function DataTableWorkspace({
         unitWord={units.singular}
       />
 
-      <DataTableStats
-        stats={statsQuery.data}
-        isPending={statsQuery.isFetching}
-        error={statsQuery.error as Error | null}
-        shown={rows.length}
-      />
-
       {pageQuery.isError ? (
         <p className="rounded-2xl border border-[#FECACA] bg-[#FEF2F2] px-4 py-6 text-center text-sm text-[#B91C1C]">
           Could not load the shift log: {(pageQuery.error as Error).message}
@@ -224,6 +220,15 @@ export function DataTableWorkspace({
             hasFilters={!isDefault}
             canAmend={canAmend}
             onAmend={setAmendTarget}
+            // Totals describe a *selection*, so the footer only exists once
+            // the filters make one. Unfiltered, it was summing the factory's
+            // whole last 30 days directly above the table showing those same
+            // rows — a headline-looking figure answering no question anyone
+            // asked, and easy to misread as a total for the page on screen.
+            showTotals={!isDefault}
+            stats={statsQuery.data}
+            statsPending={statsQuery.isFetching}
+            statsError={statsQuery.error as Error | null}
           />
 
           <TablePagination

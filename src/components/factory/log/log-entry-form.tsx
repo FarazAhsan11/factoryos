@@ -14,6 +14,7 @@ import {
   SLOW_REASONS,
   SPEED_TYPES,
   logEntrySchema,
+  operatorsRequired,
   speedTypeTakesRate,
   targetQtyFromSpeed,
   type LogEntryParsed,
@@ -29,6 +30,8 @@ import {
 } from "@/components/factory/log/log-fields";
 import { OperatorPicker } from "@/components/factory/log/operator-picker";
 import { employeeKeys, fetchEmployees } from "@/lib/factory/employee-queries";
+import { actionKeys } from "@/lib/factory/action-queries";
+import { pipelineKeys } from "@/lib/factory/pipeline-queries";
 import { fetchProducts, productKeys } from "@/lib/factory/product-queries";
 import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
 import {
@@ -243,6 +246,15 @@ export function LogEntryForm({
   const duration =
     startTime && endTime ? durationMinutes(startTime, endTime) : 0;
 
+  // An activity that is both manual and non-producing is waiting time — no
+  // one is operating anything, so no name is demanded. Same predicate the
+  // schema validates with, so the marking on screen and the rule that blocks
+  // submit can't disagree.
+  const needsOperators = operatorsRequired(
+    Boolean(hasMachine),
+    Boolean(hasOutput)
+  );
+
   /**
    * The shift is a fact about the entry's own times, not about when someone
    * got round to typing it, so it's derived rather than picked: whichever
@@ -298,6 +310,17 @@ export function LogEntryForm({
       });
       await queryClient.invalidateQueries({
         queryKey: ["shift_log_batch", factoryId],
+      });
+      // This entry may have just moved a card: started a planned job, held one
+      // on a flag, released a hold, or completed a batch. The move happens in
+      // the database trigger, so the only thing to do here is stop trusting
+      // the copy of the board we already have.
+      await queryClient.invalidateQueries({
+        queryKey: pipelineKeys.all(factoryId),
+      });
+      // A flagged entry also raises an action, by the same route.
+      await queryClient.invalidateQueries({
+        queryKey: actionKeys.all(factoryId),
       });
       toast.success(
         `Logged — ${entry.unit?.name ?? ""} · ${entry.process?.name ?? ""}` +
@@ -692,13 +715,20 @@ export function LogEntryForm({
         {/* ── Operators ────────────────────────────────────────────────
             Outside the Quick gate on purpose. Quick mode trims the fields a
             hurried operator can fill in later; it can't trim who did the work,
-            because nothing downstream can reconstruct that from the row. */}
+            because nothing downstream can reconstruct that from the row.
+
+            Waiting time is the one exception, and it comes from the activity
+            rather than from Quick — see `operatorsRequired`. */}
         <section>
-          <SectionTitle>Operators</SectionTitle>
+          <SectionTitle
+            hint={needsOperators ? undefined : "→ waiting time, so optional"}
+          >
+            Operators
+          </SectionTitle>
           {/* The pickers render even with an empty roster: "Not on the list…"
               opens a free-text name, so a factory mid-setup can still file a
               shift instead of hitting a required field it has no way to fill. */}
-          {employees.length === 0 && (
+          {employees.length === 0 && needsOperators && (
             <p className="mb-2 rounded-xl border border-dashed border-[#CBD5E1] px-3.5 py-3 text-xs text-[#94A3B8]">
               No one on the roster yet — add people in Admin &amp; Settings →
               Employees and they&rsquo;ll appear here. Until then, use
@@ -715,6 +745,7 @@ export function LogEntryForm({
                 control={control}
                 name={`operators.${i}.name`}
                 label={`Operator ${i + 1}`}
+                optional={!needsOperators}
                 employees={employees}
                 shift={shift as RunningShift}
                 // Everyone picked in the *other* rows, so nobody is named twice.

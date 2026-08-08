@@ -17,6 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { pipelineKeys } from "@/lib/factory/pipeline-queries";
 import { amendLogEntry, logKeys } from "@/lib/factory/shift-log-queries";
 import { logTableKeys } from "@/lib/factory/shift-log-table-queries";
 import { cn } from "@/lib/utils";
@@ -72,10 +73,13 @@ export function AmendEntryDialog({
       return amendLogEntry(entry.id, values.note, entry.amend_note);
     },
     onSuccess: async () => {
-      // Both readers of this row: the data table's pages and the log feed.
+      // Every reader of this row: the data table's pages, the log feed, and
+      // the pipeline board — an amendment re-runs the status trigger, so a
+      // corrected flag can release a hold.
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: logTableKeys.all(factoryId) }),
         queryClient.invalidateQueries({ queryKey: logKeys.factory(factoryId) }),
+        queryClient.invalidateQueries({ queryKey: pipelineKeys.all(factoryId) }),
       ]);
       toast.success("Amendment recorded — the original entry is unchanged.");
       reset({ note: "" });

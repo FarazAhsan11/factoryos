@@ -25,12 +25,22 @@ export interface SetupItem {
 
 /**
  * Which columns, per table, back `SetupItem.flags` — neutral key → real
- * column. Processes have two independent booleans and they must stay
+ * column. Processes have three booleans. `machine` and `output` are
  * independent: an activity can produce output without running a machine
  * (Sorting, Testing) or run neither (Idle, Break).
+ *
+ * `final` is different in kind — it is a *choice between* processes, not a
+ * property of one. At most one per factory may hold it, enforced by a partial
+ * unique index, and setting it demotes the previous holder through a trigger
+ * (migration 0016). That is why the client only ever sends "make this one
+ * final" and never has to clear the other.
  */
 const FLAG_COLUMNS: Partial<Record<SetupTable, Record<string, string>>> = {
-  factory_processes: { machine: "has_machine", output: "has_output" },
+  factory_processes: {
+    machine: "has_machine",
+    output: "has_output",
+    final: "is_final_stage",
+  },
 };
 
 const BASE_COLUMNS = "id, name, active, sort_order, created_at";

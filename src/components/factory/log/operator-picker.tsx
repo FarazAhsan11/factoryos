@@ -33,6 +33,7 @@ export function OperatorPicker({
   name,
   label,
   note,
+  optional,
   action,
   employees,
   shift,
@@ -42,6 +43,8 @@ export function OperatorPicker({
   name: Extract<FieldPath<LogEntryValues>, `operators.${number}.name`>;
   label: string;
   note?: string;
+  /** Marks the field as skippable — set for waiting-time activities. */
+  optional?: boolean;
   /** Rendered opposite the label — the "Remove" button on an added operator. */
   action?: React.ReactNode;
   employees: Employee[];
@@ -77,6 +80,7 @@ export function OperatorPicker({
     <Field
       label={label}
       note={note}
+      optional={optional}
       action={action}
       error={fieldState.error?.message}
     >
@@ -95,8 +99,9 @@ export function OperatorPicker({
         onBlur={field.onBlur}
         aria-label={label}
       >
-        {/* Every row that exists is required — an unwanted one is removed,
-            not left blank — so the placeholder reads as a prompt. */}
+        {/* On a producing or machine activity every row that exists is
+            required — an unwanted one is removed, not left blank. On waiting
+            time it may simply be left here, and the entry files without it. */}
         <option value="">Select…</option>
         {onShift.length > 0 && (
           <optgroup label={`On ${shift} shift`}>

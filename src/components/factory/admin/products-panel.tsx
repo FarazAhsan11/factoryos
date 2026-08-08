@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import type { ProductValues } from "@/app/factory/[slug]/admin/schemas";
 import { AddProductForm } from "@/components/factory/admin/add-product-form";
+import { ProductImportDialog } from "@/components/factory/admin/product-import-dialog";
 import {
   createProduct,
   deleteProduct,
@@ -131,16 +132,33 @@ export function ProductsPanel({
         <AddProductForm onAdd={(values) => add.mutateAsync(values).then(() => {})} />
       )}
 
-      {products.length > 0 && (
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-[#94A3B8]" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by batch, code or product name…"
-            aria-label="Search the catalogue"
-            className="h-10 w-full rounded-xl border border-[#E6EAF1] bg-white pl-10 pr-3.5 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:ring-4 focus:ring-[#2563EB]/12"
-          />
+      {/* Import sits beside the search rather than inside the Add form: it is
+          a second way to fill the catalogue, not a field of the first. The row
+          renders for a manager even on an empty catalogue, which is exactly
+          when a bulk import is most wanted. */}
+      {(canManage || products.length > 0) && (
+        <div className="flex items-center gap-2">
+          {products.length > 0 && (
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-[#94A3B8]" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by batch, code or product name…"
+                aria-label="Search the catalogue"
+                className="h-10 w-full rounded-xl border border-[#E6EAF1] bg-white pl-10 pr-3.5 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:ring-4 focus:ring-[#2563EB]/12"
+              />
+            </div>
+          )}
+          {canManage && (
+            <ProductImportDialog
+              factoryId={factoryId}
+              // The catalogue is already loaded here, so the dialog can name
+              // the batches it will skip before writing anything.
+              existingBatchNos={products.map((p) => p.batch_no)}
+              onImported={refresh}
+            />
+          )}
         </div>
       )}
 

@@ -7,17 +7,24 @@ import {
   type ShiftSlot,
 } from "@/app/factory/[slug]/admin/schemas";
 
+import {
+  chunk,
+  detectDelimiter,
+  indexOfHeader,
+  numberedLines,
+  splitLine,
+  type CsvRowError,
+} from "@/lib/factory/csv";
+
 /**
  * CSV parsing for the employee bulk import. Kept in a plain module (no React,
  * no Supabase) so the dialog stays presentational and this stays testable.
+ *
+ * The row-splitting, header-matching and chunking live in `csv.ts`, shared
+ * with the product importer. Only what "an employee row" means is here.
  */
 
-export interface CsvRowError {
-  /** 1-based line number in the file, so the message points somewhere real. */
-  line: number;
-  value: string;
-  message: string;
-}
+export type { CsvRowError };
 
 export interface ParsedCsv {
   rows: EmployeeRow[];
@@ -30,46 +37,10 @@ export const CSV_TEMPLATE =
   "Aisha Khan,aisha@example.com,admin,afternoon\n" +
   "Ravi Kumar,ravi@example.com,operator,both\n";
 
-/** Minimal RFC-4180 split: handles quoted fields and escaped ("") quotes. */
-function splitLine(line: string): string[] {
-  const out: string[] = [];
-  let field = "";
-  let quoted = false;
-
-  for (let i = 0; i < line.length; i += 1) {
-    const char = line[i];
-    if (quoted) {
-      if (char === '"') {
-        if (line[i + 1] === '"') {
-          field += '"';
-          i += 1;
-        } else {
-          quoted = false;
-        }
-      } else {
-        field += char;
-      }
-    } else if (char === '"') {
-      quoted = true;
-    } else if (char === "," || char === ";") {
-      out.push(field);
-      field = "";
-    } else {
-      field += char;
-    }
-  }
-  out.push(field);
-  return out.map((f) => f.trim());
-}
-
 const NAME_HEADERS = ["name", "full name", "fullname", "full_name", "employee"];
 const EMAIL_HEADERS = ["email", "e-mail", "email address"];
 const ROLE_HEADERS = ["role", "access", "permission"];
 const SHIFT_HEADERS = ["shift", "default shift", "default_shift"];
-
-function indexOfHeader(cells: string[], candidates: string[]) {
-  return cells.findIndex((c) => candidates.includes(c.toLowerCase()));
-}
 
 function normalizeRole(value: string): AssignableRole | null {
   const v = value.trim().toLowerCase();
@@ -95,14 +66,11 @@ function normalizeShift(value: string): ShiftSlot | null {
  * emails within the file are collapsed to the first occurrence.
  */
 export function parseEmployeeCsv(text: string): ParsedCsv {
-  const lines = text
-    .split(/\r?\n/)
-    .map((l, i) => ({ line: i + 1, raw: l }))
-    .filter(({ raw }) => raw.trim().length > 0);
-
+  const lines = numberedLines(text);
   if (lines.length === 0) return { rows: [], errors: [] };
 
-  const firstCells = splitLine(lines[0].raw);
+  const delimiter = detectDelimiter(lines[0].raw);
+  const firstCells = splitLine(lines[0].raw, delimiter);
   const hasHeader =
     indexOfHeader(firstCells, EMAIL_HEADERS) !== -1 ||
     indexOfHeader(firstCells, NAME_HEADERS) !== -1;
@@ -122,7 +90,7 @@ export function parseEmployeeCsv(text: string): ParsedCsv {
   const seen = new Set<string>();
 
   for (const { line, raw } of body) {
-    const cells = splitLine(raw);
+    const cells = splitLine(raw, delimiter);
     const pick = (index: number) => (index >= 0 ? cells[index] ?? "" : "");
 
     const name = pick(columns.name);
@@ -184,9 +152,5 @@ export function parseEmployeeCsv(text: string): ParsedCsv {
 
 /** Splits validated rows into action-sized batches (the schema caps at 25). */
 export function chunkRows(rows: EmployeeRow[], size = 10): EmployeeRow[][] {
-  const batches: EmployeeRow[][] = [];
-  for (let i = 0; i < rows.length; i += size) {
-    batches.push(rows.slice(i, i + size));
-  }
-  return batches;
+  return chunk(rows, size);
 }

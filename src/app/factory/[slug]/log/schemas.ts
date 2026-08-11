@@ -332,3 +332,43 @@ export const amendEntrySchema = z.object({
 });
 
 export type AmendEntryValues = z.infer<typeof amendEntrySchema>;
+
+/* ── Shift log → Kaizen ─────────────────────────────────────────────────── */
+
+/**
+ * One improvement idea from the floor.
+ *
+ * There is no "submitted by" field, and its absence is the design: the person
+ * is signed in, so the name is already known. A text box for it can be left
+ * blank, misspelt, or filled in with somebody else's name — turning the one
+ * piece of attribution that makes anyone bother submitting a second idea into
+ * something the client asserts. It's stamped from the session instead.
+ *
+ * The 20-character floor is doing real work. "Move the press" is not an idea
+ * anyone can act on a fortnight later, and the field's whole value is that it
+ * says what the problem is well enough to be read by someone who wasn't there.
+ */
+export const kaizenIdeaSchema = z.object({
+  idea: z
+    .string()
+    .trim()
+    .min(20, "Say a little more — what's the problem, and what would fix it?")
+    .max(1000, "Keep it under 1000 characters."),
+  category: z.string().min(1, "Pick a category."),
+  impact: z.enum(["quick_win", "medium", "major"], {
+    message: "Pick an expected impact.",
+  }),
+});
+
+export type KaizenIdeaValues = z.infer<typeof kaizenIdeaSchema>;
+
+/**
+ * A reviewer's decision. The note is optional here and required by the form
+ * when the decision is Decline — "no" with no reason is the fastest way to
+ * stop the next idea ever being submitted.
+ */
+export const kaizenReviewSchema = z.object({
+  note: z.string().trim().max(500, "Keep the note under 500 characters."),
+});
+
+export type KaizenReviewValues = z.infer<typeof kaizenReviewSchema>;

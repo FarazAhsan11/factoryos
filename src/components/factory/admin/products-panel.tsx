@@ -2,12 +2,20 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Search, Trash2, X } from "lucide-react";
+import { CalendarPlus, Check, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
-import type { ProductValues } from "@/app/factory/[slug]/admin/schemas";
+import {
+  plannedForField,
+  type ProductValues,
+} from "@/app/factory/[slug]/admin/schemas";
 import { AddProductForm } from "@/components/factory/admin/add-product-form";
 import { ProductImportDialog } from "@/components/factory/admin/product-import-dialog";
+import { formatDay, todayKey } from "@/lib/factory/dates";
+import {
+  fetchPipelineJobs,
+  pipelineKeys,
+} from "@/lib/factory/pipeline-queries";
 import {
   createProduct,
   deleteProduct,
@@ -40,11 +48,30 @@ export function ProductsPanel({
   const [search, setSearch] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editQty, setEditQty] = useState("");
+  const [editingDateId, setEditingDateId] = useState<string | null>(null);
+  const [editDate, setEditDate] = useState("");
 
   const { data: products = [], isPending, isError, error } = useQuery({
     queryKey,
     queryFn: () => fetchProducts(factoryId),
   });
+
+  /**
+   * Which batches are already on the pipeline board.
+   *
+   * Same cache key the Pipeline page uses, so this is usually free, and it is
+   * what decides whether a planned date is still editable: once a job exists
+   * the schedule has been acted on, and migration 0018 refuses to change it.
+   * Read here so the table can say so before anyone tries.
+   */
+  const { data: jobs = [] } = useQuery({
+    queryKey: pipelineKeys.all(factoryId),
+    queryFn: () => fetchPipelineJobs(factoryId),
+  });
+  const onBoard = useMemo(
+    () => new Set(jobs.map((job) => job.product_id)),
+    [jobs]
+  );
 
   function refresh() {
     return queryClient.invalidateQueries({ queryKey });
@@ -80,7 +107,10 @@ export function ProductsPanel({
       queryClient.setQueryData(queryKey, context?.previous);
       toast.error(e.message);
     },
-    onSuccess: () => setEditingId(null),
+    onSuccess: () => {
+      setEditingId(null);
+      setEditingDateId(null);
+    },
     onSettled: () => refresh(),
   });
 
@@ -124,6 +154,30 @@ export function ProductsPanel({
       return;
     }
     patch.mutate({ id: product.id, values: { required_qty: value } });
+  }
+
+  /**
+   * Saves a planned date, or clears it when the field is emptied.
+   *
+   * Validated with the same `plannedForField` the Add form and the CSV import
+   * use — three entry points, one rule about what a schedule may be. The
+   * database re-checks it either way; this is what turns "check_violation"
+   * into a sentence before the round-trip.
+   */
+  function saveDate(product: Product) {
+    const value = editDate.trim();
+    if (value === (product.planned_for ?? "")) {
+      setEditingDateId(null);
+      return;
+    }
+
+    const parsed = plannedForField.safeParse(value);
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0]?.message ?? "Invalid date.");
+      return;
+    }
+
+    patch.mutate({ id: product.id, values: { planned_for: value || null } });
   }
 
   return (
@@ -179,7 +233,7 @@ export function ProductsPanel({
         </p>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-[#E6EAF1] bg-white">
-          <table className="w-full min-w-[720px] text-sm">
+          <table className="w-full min-w-[860px] text-sm">
             <thead>
               <tr className="border-b border-[#EEF1F6] text-left text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">
                 <th className="px-4 py-3">Batch</th>
@@ -187,12 +241,15 @@ export function ProductsPanel({
                 <th className="px-4 py-3">Product name</th>
                 <th className="px-4 py-3">Work order</th>
                 <th className="px-4 py-3 text-right">Required qty</th>
+                <th className="px-4 py-3">Planned for</th>
                 {canManage && <th className="px-4 py-3 text-right">Actions</th>}
               </tr>
             </thead>
             <tbody>
               {visible.map((product) => {
                 const editing = editingId === product.id;
+                const editingDate = editingDateId === product.id;
+                const promoted = onBoard.has(product.id);
                 return (
                   <tr
                     key={product.id}
@@ -265,6 +322,92 @@ export function ProductsPanel({
                         formatQty(product.required_qty)
                       )}
                     </td>
+
+                    {/* The schedule. Three states, and they are genuinely
+                        different things: a date still to come, a batch already
+                        on the board (frozen — the schedule has been acted on),
+                        and no schedule at all, which is not a gap but the
+                        other way of working: New job, by hand, on the day. */}
+                    <td className="px-4 py-3 text-[13px]">
+                      {editingDate ? (
+                        <span className="inline-flex items-center gap-1">
+                          <input
+                            autoFocus
+                            type="date"
+                            min={todayKey()}
+                            value={editDate}
+                            onChange={(e) => setEditDate(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") saveDate(product);
+                              if (e.key === "Escape") setEditingDateId(null);
+                            }}
+                            aria-label={`Planned date for batch ${product.batch_no}`}
+                            className="h-8 w-36 rounded-lg border border-[#E6EAF1] px-2 text-[13px] outline-none focus:border-[#2563EB]"
+                          />
+                          <IconButton
+                            label="Save planned date"
+                            onClick={() => saveDate(product)}
+                          >
+                            <Check className="size-4 text-[#16A34A]" />
+                          </IconButton>
+                          <IconButton
+                            label="Cancel"
+                            onClick={() => setEditingDateId(null)}
+                          >
+                            <X className="size-4" />
+                          </IconButton>
+                        </span>
+                      ) : promoted ? (
+                        // No dash when there is no date: a batch added by hand
+                        // from New job never had a schedule, so a dash reads as
+                        // a missing value rather than an inapplicable one. The
+                        // chip already says everything true about the row.
+                        <span
+                          title={
+                            product.planned_for
+                              ? `Scheduled for ${product.planned_for} and already on the pipeline board, so the date is now fixed.`
+                              : "Added to the pipeline board by hand from New job."
+                          }
+                          className="inline-flex items-center gap-1.5 text-[#64748B]"
+                        >
+                          {product.planned_for && formatDay(product.planned_for)}
+                          <span className="rounded-full bg-[#EFF6FF] px-1.5 py-0.5 text-[10px] font-semibold text-[#2563EB]">
+                            On board
+                          </span>
+                        </span>
+                      ) : canManage ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingDateId(product.id);
+                            setEditDate(product.planned_for ?? "");
+                          }}
+                          title="The day this batch joins the pipeline as Planned"
+                          className={cn(
+                            "inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 transition hover:bg-[#F1F5F9]",
+                            product.planned_for
+                              ? "font-medium text-[#0F1B34]"
+                              : "text-[#94A3B8]"
+                          )}
+                        >
+                          {product.planned_for ? (
+                            formatDay(product.planned_for)
+                          ) : (
+                            <>
+                              <CalendarPlus className="size-3.5" />
+                              Schedule
+                            </>
+                          )}
+                        </button>
+                      ) : (
+                        <span className="text-[#64748B]">
+                          {product.planned_for
+                            ? formatDay(product.planned_for)
+                            : "—"}
+                        </span>
+                      )}
+                    </td>
+
                     {canManage && (
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1.5">
@@ -300,7 +443,9 @@ export function ProductsPanel({
       {canManage && products.length > 0 && (
         <p className="text-xs text-[#94A3B8]">
           Retire a finished batch to keep its shift history but hide it from new
-          entries. Click a quantity to correct it.
+          entries. Click a quantity or a planned date to change it. A batch with
+          a planned date joins the pipeline as <strong>Planned</strong> on that
+          day; one without is added by hand from <strong>New job</strong>.
         </p>
       )}
     </div>

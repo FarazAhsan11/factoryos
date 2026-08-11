@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { formatDay } from "@/lib/factory/dates";
 import { createPipelineJobs } from "@/lib/factory/pipeline-queries";
 import type { Product } from "@/lib/factory/product-queries";
 import { cn } from "@/lib/utils";
@@ -200,6 +201,18 @@ export function NewJobDialog({
                           <span className="min-w-0 flex-1 truncate text-sm text-[#334155]">
                             {product.name}
                           </span>
+                          {/* Already scheduled, and shown rather than hidden:
+                              a batch due on Thursday is still a legitimate
+                              thing to start today. What a planner needs is to
+                              know it was going to arrive on its own. */}
+                          {product.planned_for && (
+                            <span
+                              title={`Scheduled to join Planned on ${product.planned_for}`}
+                              className="shrink-0 rounded-full bg-[#F5F3FF] px-1.5 py-0.5 text-[10px] font-semibold text-[#7C3AED]"
+                            >
+                              {formatDay(product.planned_for)}
+                            </span>
+                          )}
                           <span className="shrink-0 font-mono text-[11px] text-[#64748B]">
                             {fmt(product.required_qty)}
                           </span>

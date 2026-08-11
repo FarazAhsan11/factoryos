@@ -20,9 +20,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { CsvRowError } from "@/lib/factory/csv";
+import { formatDay } from "@/lib/factory/dates";
 import {
-  PRODUCT_CSV_TEMPLATE,
   parseProductCsv,
+  productCsvTemplate,
   splitExisting,
 } from "@/lib/factory/product-csv";
 import {
@@ -118,8 +119,9 @@ export function ProductImportDialog({
   }
 
   function downloadTemplate() {
+    // Built at click time so the example dates are always still ahead.
     const url = URL.createObjectURL(
-      new Blob([PRODUCT_CSV_TEMPLATE], { type: "text/csv" })
+      new Blob([productCsvTemplate()], { type: "text/csv" })
     );
     const a = document.createElement("a");
     a.href = url;
@@ -174,7 +176,8 @@ export function ProductImportDialog({
                   Choose a CSV file
                 </span>
                 <span className="text-xs text-[#94A3B8]">
-                  Columns: batch, code, product name, work order, required qty
+                  Columns: batch, code, product name, work order, required qty,
+                  planned for
                 </span>
               </label>
               <input
@@ -200,6 +203,17 @@ export function ProductImportDialog({
               <p className="text-xs text-[#94A3B8]">
                 In Excel or Sheets: File → Save As (or Download) → CSV. Keep the
                 header row — it&rsquo;s what lets the columns be in any order.
+              </p>
+              <p className="text-xs text-[#94A3B8]">
+                <strong className="font-semibold text-[#475569]">
+                  Planned for
+                </strong>{" "}
+                is optional: a date puts the batch on the pipeline as Planned
+                that day. Write it as{" "}
+                <span className="font-mono">YYYY-MM-DD</span> —{" "}
+                <span className="font-mono">14/08</span> means two different
+                days either side of the Atlantic, so it&rsquo;s refused rather
+                than guessed. Leave it blank to add the batch by hand later.
               </p>
             </div>
           )}
@@ -262,6 +276,14 @@ export function ProductImportDialog({
                       <span className="min-w-0 flex-1 truncate text-[#334155]">
                         {r.name}
                       </span>
+                      {r.plannedFor && (
+                        <span
+                          title={`Joins the pipeline as Planned on ${r.plannedFor}`}
+                          className="shrink-0 rounded-full bg-[#F5F3FF] px-1.5 py-0.5 text-[10px] font-semibold text-[#7C3AED]"
+                        >
+                          {formatDay(r.plannedFor)}
+                        </span>
+                      )}
                       <span className="shrink-0 font-mono text-[12px] text-[#64748B]">
                         {r.requiredQty.toLocaleString(undefined, {
                           maximumFractionDigits: 2,

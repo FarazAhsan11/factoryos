@@ -105,6 +105,34 @@ export function parseQuantity(value: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/**
+ * "2026-08-14" → "2026-08-14"; "" → ""; anything else → null.
+ *
+ * Deliberately ISO-only, and this is the one place in the importer where being
+ * strict is kinder than being clever. A spreadsheet saved in the UK writes
+ * `08/09/2026` for 8 September and one saved in the US writes it for 9 August,
+ * and nothing in the cell says which — so a parser that accepted slashes would
+ * schedule a batch a month out roughly half the time, with no way for any
+ * later screen to tell. Unlike a mangled quantity, the row would look entirely
+ * correct.
+ *
+ * The calendar is checked too, not just the shape: `2026-02-31` matches the
+ * pattern and is not a day.
+ */
+export function parseIsoDate(value: string): string | null {
+  const cleaned = value.trim();
+  if (!cleaned) return "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) return null;
+
+  const [y, m, d] = cleaned.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  const roundTrips =
+    date.getFullYear() === y &&
+    date.getMonth() === m - 1 &&
+    date.getDate() === d;
+  return roundTrips ? cleaned : null;
+}
+
 /** Splits validated rows into batches the caller can send one at a time. */
 export function chunk<T>(rows: T[], size: number): T[][] {
   const batches: T[][] = [];

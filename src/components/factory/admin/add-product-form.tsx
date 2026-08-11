@@ -8,6 +8,7 @@ import {
   productSchema,
   type ProductValues,
 } from "@/app/factory/[slug]/admin/schemas";
+import { todayKey } from "@/lib/factory/dates";
 
 const FIELD =
   "h-10 w-full rounded-xl border border-[#E6EAF1] bg-white px-3.5 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:ring-4 focus:ring-[#2563EB]/12";
@@ -20,6 +21,7 @@ const EMPTY: ProductValues = {
   name: "",
   workOrder: "",
   requiredQty: 0,
+  plannedFor: "",
 };
 
 /**
@@ -51,7 +53,12 @@ export function AddProductForm({
     errors.batchNo?.message ??
     errors.name?.message ??
     errors.code?.message ??
-    errors.requiredQty?.message;
+    errors.requiredQty?.message ??
+    errors.plannedFor?.message;
+
+  // Read once per render rather than at module load: a tab left open overnight
+  // would otherwise still be refusing today.
+  const today = todayKey();
 
   return (
     <form
@@ -65,7 +72,7 @@ export function AddProductForm({
         </span>
       </p>
 
-      <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-[110px_130px_1fr_110px_130px_auto] lg:items-end">
+      <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-[105px_120px_1fr_105px_115px_150px_auto] lg:items-end">
         <div className="space-y-1.5">
           <label htmlFor="p-batch" className={LABEL}>
             Batch / W.O.
@@ -129,6 +136,27 @@ export function AddProductForm({
             aria-invalid={Boolean(errors.requiredQty)}
             className={`${FIELD} ${MONO}`}
             {...register("requiredQty", { valueAsNumber: true })}
+          />
+        </div>
+
+        {/* The batch's own start date. Optional — leave it blank and the batch
+            reaches the pipeline the other way, when a manager ticks it in New
+            job. `min` stops the picker offering a past day at all; the schema
+            and migration 0018 both re-check it, because a date can still be
+            typed straight into the field. */}
+        <div className="space-y-1.5">
+          <label htmlFor="p-planned" className={LABEL}>
+            Plan for{" "}
+            <span className="text-[10px] text-[#94A3B8]">(optional)</span>
+          </label>
+          <input
+            id="p-planned"
+            type="date"
+            min={today}
+            title="The day this batch joins the pipeline as Planned"
+            aria-invalid={Boolean(errors.plannedFor)}
+            className={FIELD}
+            {...register("plannedFor")}
           />
         </div>
 

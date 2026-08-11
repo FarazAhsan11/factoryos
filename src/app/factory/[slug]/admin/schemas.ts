@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { todayKey } from "@/lib/factory/dates";
+
 /** Admin → Company. Shared by the form and the Server Action. */
 export const companySettingsSchema = z.object({
   factoryId: z.uuid(),
@@ -123,6 +125,41 @@ export const employeeIdSchema = z.object({ profileId: z.uuid() });
 
 /* ── Admin → Products ──────────────────────────────────────────────────── */
 
+/** How far ahead a batch may be scheduled. A year is already generous. */
+const MAX_PLAN_DAYS = 365;
+
+/**
+ * The day a batch is due to start, as `YYYY-MM-DD` — the shape both
+ * `<input type="date">` and a Postgres `date` speak, so it needs no parsing
+ * in either direction.
+ *
+ * Optional, and empty means optional: a batch with no date is added to the
+ * pipeline by hand from New job, which is how every batch worked before this
+ * field existed.
+ *
+ * **Never in the past.** A date that has gone by is not a schedule, and the
+ * promotion in migration 0018 runs on `planned_for <= current_date` — so
+ * backdating one wouldn't sit quietly in the catalogue, it would put the batch
+ * straight onto the board the next time anyone opened it. Compared against the
+ * *browser's* local day, which is the calendar the planner is looking at; the
+ * database keeps a one-day-wider floor so no real timezone is refused.
+ */
+export const plannedForField = z
+  .union([z.literal(""), z.iso.date("Enter the date as YYYY-MM-DD.")])
+  .optional()
+  .refine((v) => !v || v >= todayKey(), {
+    message: "A planned date can't be in the past.",
+  })
+  .refine(
+    (v) => {
+      if (!v) return true;
+      const limit = new Date();
+      limit.setDate(limit.getDate() + MAX_PLAN_DAYS);
+      return v <= todayKey(limit);
+    },
+    { message: `Schedule within the next ${MAX_PLAN_DAYS} days.` }
+  );
+
 /**
  * One batch in the catalogue. Batch number and product name are the only
  * required fields — the rest often isn't known when a batch is first raised,
@@ -146,6 +183,7 @@ export const productSchema = z.object({
     .number({ message: "Enter a required quantity." })
     .min(0, "Quantity can't be negative.")
     .max(1_000_000_000, "That quantity looks too large."),
+  plannedFor: plannedForField,
 });
 
 export type ProductValues = z.infer<typeof productSchema>;

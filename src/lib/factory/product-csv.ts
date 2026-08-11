@@ -6,10 +6,12 @@ import {
   detectDelimiter,
   indexOfHeader,
   numberedLines,
+  parseIsoDate,
   parseQuantity,
   splitLine,
   type CsvRowError,
 } from "@/lib/factory/csv";
+import { todayKey } from "@/lib/factory/dates";
 
 /**
  * Parsing for the product bulk import. Plain module (no React, no Supabase)
@@ -32,11 +34,28 @@ export interface ParsedProductCsv {
  * the point of an example is to show what a batch number and a quantity
  * actually look like here.
  */
-export const PRODUCT_CSV_TEMPLATE =
-  "batch,code,product name,work order,required qty\n" +
-  "46004,PC2934,JSHealth Vaginal Probiotic Capsules,46004,540000\n" +
-  "45972,PC1868,Quercesorb Capsules,45972,540000\n" +
-  "45721,PC1870,TriMagnesium Citrate 900mg Capsules,45721,1875000\n";
+export const PRODUCT_CSV_HEADERS =
+  "batch,code,product name,work order,required qty,planned for";
+
+/**
+ * The template's dates are written relative to when it is downloaded, not
+ * baked in. A fixed example date is in the past by the time anyone opens the
+ * file, and pasting a past date back in is the one thing the column refuses —
+ * so a hard-coded sample would teach the format by demonstrating the error.
+ */
+export function productCsvTemplate(now: Date = new Date()): string {
+  const inDays = (n: number) => {
+    const d = new Date(now);
+    d.setDate(d.getDate() + n);
+    return todayKey(d);
+  };
+  return (
+    `${PRODUCT_CSV_HEADERS}\n` +
+    `46004,PC2934,JSHealth Vaginal Probiotic Capsules,46004,540000,${inDays(1)}\n` +
+    `45972,PC1868,Quercesorb Capsules,45972,540000,${inDays(4)}\n` +
+    `45721,PC1870,TriMagnesium Citrate 900mg Capsules,45721,1875000,\n`
+  );
+}
 
 const BATCH_HEADERS = [
   "batch",
@@ -74,6 +93,19 @@ const QTY_HEADERS = [
   "target",
   "target qty",
 ];
+const PLANNED_HEADERS = [
+  "planned for",
+  "planned_for",
+  "planned",
+  "plan for",
+  "planned date",
+  "plan date",
+  "start date",
+  "scheduled",
+  "scheduled for",
+  "schedule",
+  "date",
+];
 
 /**
  * Parses pasted or uploaded text into validated rows plus a per-line error
@@ -103,7 +135,7 @@ export function parseProductCsv(text: string): ParsedProductCsv {
 
   /**
    * A headerless file is read positionally, which is only safe when it has
-   * exactly the five columns that order describes. A narrower one shifts every
+   * exactly the columns that order describes. A narrower one shifts every
    * value left and imports rows that look fine and aren't: a three-column file
    * put the product name into `code`, the quantity into `name`, and left
    * `required_qty` at 0 — every field it landed in happened to accept a
@@ -111,8 +143,13 @@ export function parseProductCsv(text: string): ParsedProductCsv {
    *
    * Refused outright rather than guessed at. Which three columns someone meant
    * is not recoverable from the data, and a header row says it exactly.
+   *
+   * Five is still accepted alongside six: the planned date was added after
+   * this importer shipped, and a sheet written to the old shape is a complete
+   * catalogue with nothing scheduled — which is exactly what a blank date
+   * means anyway.
    */
-  if (!hasHeader && firstCells.length !== 5) {
+  if (!hasHeader && firstCells.length !== 5 && firstCells.length !== 6) {
     return {
       rows: [],
       errors: [
@@ -121,8 +158,8 @@ export function parseProductCsv(text: string): ParsedProductCsv {
           value: "",
           message:
             firstCells.length === 1
-              ? "Columns couldn't be found — the file needs commas between values, and a header row (batch, code, product name, work order, required qty)."
-              : `Found ${firstCells.length} columns and no header row. Add a header (batch, code, product name, work order, required qty) so each column can be identified.`,
+              ? `Columns couldn't be found — the file needs commas between values, and a header row (${PRODUCT_CSV_HEADERS.replace(/,/g, ", ")}).`
+              : `Found ${firstCells.length} columns and no header row. Add a header (${PRODUCT_CSV_HEADERS.replace(/,/g, ", ")}) so each column can be identified.`,
         },
       ],
     };
@@ -135,8 +172,17 @@ export function parseProductCsv(text: string): ParsedProductCsv {
         name: indexOfHeader(firstCells, NAME_HEADERS),
         workOrder: indexOfHeader(firstCells, WORK_ORDER_HEADERS),
         qty: indexOfHeader(firstCells, QTY_HEADERS),
+        planned: indexOfHeader(firstCells, PLANNED_HEADERS),
       }
-    : { batch: 0, code: 1, name: 2, workOrder: 3, qty: 4 };
+    : {
+        batch: 0,
+        code: 1,
+        name: 2,
+        workOrder: 3,
+        qty: 4,
+        // -1 for a five-column file, which `pick` reads as absent.
+        planned: firstCells.length === 6 ? 5 : -1,
+      };
 
   const body = hasHeader ? lines.slice(1) : lines;
   const rows: ProductValues[] = [];
@@ -162,6 +208,20 @@ export function parseProductCsv(text: string): ParsedProductCsv {
       continue;
     }
 
+    // Reported as its own error rather than left to the schema, because the
+    // fix is a specific one: it is almost always a spreadsheet writing
+    // 14/08/2026, and the message has to say which format to save in.
+    const plannedCell = pick(columns.planned);
+    const plannedFor = parseIsoDate(plannedCell);
+    if (plannedFor === null) {
+      errors.push({
+        line,
+        value: label,
+        message: `"${plannedCell}" isn't a date. Write planned dates as YYYY-MM-DD (e.g. ${todayKey()}).`,
+      });
+      continue;
+    }
+
     const parsed = productSchema.safeParse({
       batchNo,
       code: pick(columns.code),
@@ -170,6 +230,7 @@ export function parseProductCsv(text: string): ParsedProductCsv {
       // track work orders separately — same rule as `createProduct`.
       workOrder: pick(columns.workOrder) || batchNo,
       requiredQty,
+      plannedFor,
     });
     if (!parsed.success) {
       errors.push({

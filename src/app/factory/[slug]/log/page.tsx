@@ -19,7 +19,7 @@ export default async function ShiftLogPage({
 }) {
   const { slug } = await params;
   const { tab } = await searchParams;
-  const { factory, canManage } = await getFactoryContext(slug);
+  const { factory, canManage, role } = await getFactoryContext(slug);
 
   // Everyone in the factory logs entries, so there's no role gate here — but
   // the insert is stamped with the signed-in user, which RLS checks.
@@ -28,6 +28,30 @@ export default async function ShiftLogPage({
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  // The Kaizen form shows who an idea will be credited to instead of asking
+  // for a name. Read here rather than in the client so the panel doesn't
+  // render "Submitted as …" empty for a moment on every open.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name, email")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const userName =
+    profile?.full_name?.trim() ||
+    profile?.email?.split("@")[0] ||
+    "your account";
+
+  // Wider than `canManage` on purpose: reviewing improvement ideas is the
+  // supervisor's job, and routing every one through an admin is how a queue
+  // stops moving. Mirrors `can_review_factory()` in migration 0019, which is
+  // what actually enforces it.
+  const canReview =
+    role === "super_admin" ||
+    role === "admin" ||
+    role === "manager" ||
+    role === "supervisor";
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -47,9 +71,11 @@ export default async function ShiftLogPage({
       <LogWorkspace
         factoryId={factory.id}
         userId={user.id}
+        userName={userName}
         units={unitWords(factory)}
         initialTab={resolveLogTab(tab)}
         canManage={canManage}
+        canReview={canReview}
       />
     </div>
   );

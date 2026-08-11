@@ -7,8 +7,7 @@ import type { AdminTab } from "@/lib/factory/admin-tabs";
  */
 export const LOG_TABS: AdminTab[] = [
   { value: "entry", label: "Log entry", ready: true },
-  { value: "roster", label: "Roster", ready: false },
-  { value: "ci", label: "CI ideas", ready: false },
+  { value: "kaizen", label: "Kaizen", ready: true },
 ];
 
 /** Falls back to Log entry for an unknown, unbuilt, or missing ?tab=. */

@@ -15,12 +15,18 @@ export interface Product {
   name: string;
   work_order: string | null;
   required_qty: number;
+  /**
+   * `YYYY-MM-DD` — the day this batch joins the pipeline as Planned, or null
+   * for a batch that is only ever added by hand from New job. Kept after the
+   * job is created, as the record of what was scheduled (migration 0018).
+   */
+  planned_for: string | null;
   active: boolean;
   created_at: string;
 }
 
 const COLUMNS =
-  "id, batch_no, code, name, work_order, required_qty, active, created_at";
+  "id, batch_no, code, name, work_order, required_qty, planned_for, active, created_at";
 
 export const productKeys = {
   all: (factoryId: string) => ["factory_products", factoryId] as const,
@@ -67,6 +73,8 @@ export async function createProduct(
       // order is tracked; keep that so the shift log always has something.
       work_order: values.workOrder?.trim() || values.batchNo,
       required_qty: values.requiredQty,
+      // "" from an untouched date input is "not scheduled", not an empty date.
+      planned_for: values.plannedFor || null,
     })
     .select(COLUMNS)
     .single();
@@ -113,6 +121,7 @@ export async function createProducts(
     name: values.name,
     work_order: values.workOrder?.trim() || values.batchNo,
     required_qty: values.requiredQty,
+    planned_for: values.plannedFor || null,
   });
 
   for (let i = 0; i < rows.length; i += IMPORT_CHUNK) {
@@ -141,12 +150,27 @@ export async function createProducts(
   return results;
 }
 
+/**
+ * Row-level edits from the catalogue table.
+ *
+ * `planned_for` is in here like any other column, but the database has the
+ * final say on it: `factory_products_planned_for_guard` (migration 0018)
+ * refuses a date in the past, and refuses any change at all once the batch has
+ * a pipeline job. Both come back as readable messages naming the batch, so
+ * they are passed through rather than restated here.
+ */
 export async function updateProduct(
   id: string,
   patch: Partial<
     Pick<
       Product,
-      "batch_no" | "code" | "name" | "work_order" | "required_qty" | "active"
+      | "batch_no"
+      | "code"
+      | "name"
+      | "work_order"
+      | "required_qty"
+      | "planned_for"
+      | "active"
     >
   >
 ): Promise<void> {

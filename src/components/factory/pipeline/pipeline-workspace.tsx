@@ -12,6 +12,7 @@ import {
   deletePipelineJob,
   fetchPipelineJobs,
   pipelineKeys,
+  promoteScheduledJobs,
   type PipelineJob,
 } from "@/lib/factory/pipeline-queries";
 import { fetchProducts, productKeys } from "@/lib/factory/product-queries";
@@ -46,7 +47,22 @@ export function PipelineWorkspace({
     error,
   } = useQuery({
     queryKey: pipelineKeys.all(factoryId),
-    queryFn: () => fetchPipelineJobs(factoryId),
+    // Scheduled batches are promoted immediately before the board is read, so
+    // a batch dated for today is already in Planned by the time it renders.
+    // The promotion is idempotent, which is what makes running it on every
+    // load — rather than on a timer nobody can see — the simple option.
+    queryFn: async () => {
+      // Deliberately swallowed: a promotion that fails must not blank the
+      // board. The jobs that already exist are the more important half, and a
+      // date that missed its window is picked up by the next load anyway.
+      const promoted = await promoteScheduledJobs(factoryId).catch(() => 0);
+      if (promoted > 0) {
+        toast.success(
+          `${promoted} scheduled batch${promoted === 1 ? "" : "es"} added to Planned.`
+        );
+      }
+      return fetchPipelineJobs(factoryId);
+    },
   });
 
   // Same cache keys as Admin and the log form, so arriving from either has

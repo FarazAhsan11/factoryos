@@ -66,6 +66,30 @@ export const PIPELINE_COLUMNS: {
   { status: "finished", label: "Finished", accent: "#16A34A", tint: "#F0FDF4" },
 ];
 
+/**
+ * Adds the jobs for every scheduled batch whose date has arrived, and says how
+ * many that was.
+ *
+ * The second way onto the board, beside the New job modal: a batch given a
+ * `planned_for` date in Admin → Products joins Planned on that day without
+ * anyone re-entering it. Called immediately before the board is read, because
+ * a job is a row and cannot be derived on read the way a status can — see
+ * migration 0018 for why this stands in for a scheduler.
+ *
+ * Idempotent, so calling it on every page load is not a mistake: the insert
+ * skips any batch that already has a job.
+ */
+export async function promoteScheduledJobs(
+  factoryId: string
+): Promise<number> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("promote_scheduled_jobs", {
+    p_factory_id: factoryId,
+  });
+  if (error) throw new Error(error.message);
+  return Number(data ?? 0);
+}
+
 export async function fetchPipelineJobs(
   factoryId: string
 ): Promise<PipelineJob[]> {

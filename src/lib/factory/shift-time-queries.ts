@@ -215,11 +215,14 @@ export function resolveShiftForEntry(
   return afternoon > morning ? "afternoon" : "morning";
 }
 
-/** Local calendar day as `YYYY-MM-DD` — a shift is logged against the wall date. */
-export function todayKey(now: Date = new Date()): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-}
+/**
+ * Local calendar day as `YYYY-MM-DD` — a shift is logged against the wall date.
+ *
+ * Re-exported from `@/lib/factory/dates` rather than defined twice: the zod
+ * schemas need the same day for the product planning date and can't import
+ * this module (it pulls in the Supabase browser client).
+ */
+export { todayKey } from "@/lib/factory/dates";
 
 /** "14:05" for right now, ready for an `<input type="time">`. */
 export function clockNow(now: Date = new Date()): string {

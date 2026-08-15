@@ -19,6 +19,7 @@ Continues `docs/IMPLEMENTATION_GUIDE.md`, which covers everything up to and incl
 | 9 | **Issues & CAPAs — the staged flow** (§6a) | `/factory/[slug]/actions` |
 | 10 | **Shift Report** (§12) | `/factory/[slug]/report` |
 | 11 | **Overproduction flag** (§13) | `/factory/[slug]/log`, `/data` |
+| 12 | **Viewport workspace layout** (§14) | `factory-shell.tsx` |
 
 ---
 
@@ -624,7 +625,54 @@ So `fetchOverrunFlags(factoryId, date)` is a small second read keyed per day and
 
 ---
 
-## 14. Related docs
+## 14. The workspace is a frame, not a page
+
+**Files:** `factory-shell.tsx`, `factory-sidebar.tsx`, the `data` and `report` pages and their workspaces, `shift-log-table.tsx`, `shift-report-table.tsx`.
+
+From **`lg` up**, the viewport is the frame and scrolling happens *inside* it:
+
+```
+h-svh flex flex-col overflow-hidden
+├── header                     shrink-0
+└── flex min-h-0 flex-1
+    ├── sidebar wrapper        overflow-y-auto
+    └── <main>                 flex flex-col overflow-y-auto   ← the scroller
+```
+
+### Why it was needed
+
+`<thead>` already carried `sticky top-0` and it did nothing, because **sticky resolves against the nearest scrolling ancestor** — and that was the document. Scrolling a twenty-column table meant losing the header and scrolling back up to find out which column a number was in.
+
+### How a page opts in — no prop, no route-sniffing
+
+`<main>` is the scroll container, so ordinary pages overflow it and scroll exactly as they did; only the scrollbar moved from the document to `<main>`.
+
+A page that wants the viewport instead makes its **own root** `lg:flex lg:min-h-0 lg:flex-1 lg:flex-col` and passes `lg:min-h-0 lg:flex-1` down to the element that should absorb the slack. It then fits `<main>` exactly, never overflows, and the table inside becomes the only scroller. The layout needs no `fullHeight` prop and no `usePathname()` — the page decides by how it sizes itself.
+
+`min-h-0` on every flex ancestor is the load-bearing part. A flex item's default `min-height: auto` refuses to shrink below its content, so one missing `min-h-0` and the table pushes the frame open and the page scrolls again.
+
+### Below `lg`, and on paper
+
+Both are exempt, deliberately:
+
+- **Mobile** keeps document scroll. The rail stacks *above* the content there, so a locked viewport would pin the whole nav on screen and leave a sliver for the page.
+- **Print** unwinds the frame (`print:h-auto`, `print:overflow-visible`, `print:block`, `print:static` on the sticky cells). A fixed-height frame prints exactly one screen — it would have silently truncated the shift report to its first dozen rooms.
+
+### Sticky goes on the cells, never the row
+
+`position: sticky` on a `<tr>` is ignored everywhere except Firefox. Both tables put it on the `<th>` (and the data table's `<td>` totals), each with its own background so body rows don't show through.
+
+The data table's `<tfoot>` is `sticky bottom-0` for the same reason as the header: a total you have to scroll to the end to read is a total nobody reads.
+
+### Filters collapse
+
+The data table's filter bar is seven controls tall, read once; the table under it is read all day. It is now behind a **Filters** button, collapsed by default, carrying a badge of how many filters are active — so a narrowed table can never be mistaken for the whole log.
+
+`activeFilterCount()` counts the date range as **one**, not two: "16 Jul → 15 Aug" is a single decision, and counting both inputs would show `2` on a table nobody has touched.
+
+---
+
+## 15. Related docs
 
 - `docs/IMPLEMENTATION_GUIDE.md` — everything up to and including the shift log and data table. **Read first.**
 - `docs/PROGRESS.md` — narrative record of what landed when.

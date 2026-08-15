@@ -23,7 +23,7 @@ export default async function ShiftReportPage({
   const { factory } = await getFactoryContext(slug);
 
   return (
-    <div className="mx-auto max-w-[1400px]">
+    <div className="mx-auto w-full max-w-[1400px] lg:flex lg:min-h-0 lg:flex-1 lg:flex-col print:block">
       <ShiftReportWorkspace
         factoryId={factory.id}
         factoryName={factory.name}

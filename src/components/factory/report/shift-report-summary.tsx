@@ -39,7 +39,7 @@ export function ShiftReportSummary({
   ];
 
   return (
-    <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5 print:grid-cols-5">
+    <div className="mb-4 grid shrink-0 grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5 print:grid-cols-5">
       {cards.map((card) => (
         <div
           key={card.label}

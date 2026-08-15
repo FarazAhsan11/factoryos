@@ -2,7 +2,13 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
-import { Download, Loader2, X } from "lucide-react";
+import {
+  ChevronDown,
+  Download,
+  Loader2,
+  SlidersHorizontal,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { AmendEntryDialog } from "@/components/factory/data/amend-entry-dialog";
@@ -11,6 +17,7 @@ import { DataTableFilters } from "@/components/factory/data/data-table-filters";
 import { ShiftLogTable } from "@/components/factory/data/shift-log-table";
 import { TablePagination } from "@/components/factory/data/table-pagination";
 import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
+import { cn } from "@/lib/utils";
 import {
   csvFilename,
   downloadCsv,
@@ -24,6 +31,7 @@ import {
   fetchLogTableExportRows,
   fetchLogTablePage,
   fetchLogTableStats,
+  activeFilterCount,
   filtersAreDefault,
   logTableKeys,
   type LogTableFilters,
@@ -68,6 +76,11 @@ export function DataTableWorkspace({
   const [resetToken, setResetToken] = useState(0);
   const [amendTarget, setAmendTarget] = useState<LogTableRow | null>(null);
   const [overrunTarget, setOverrunTarget] = useState<LogTableRow | null>(null);
+  // Collapsed by default: the filter bar is seven controls tall and is read
+  // once, while the table under it is read all day. Closed, it hands three
+  // more rows to the part anyone is actually looking at — and the button
+  // carries a count so a narrowed table never looks like the whole log.
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   // Same cache keys the Admin panels and the log form use, so arriving from
   // either has the dropdowns populated already.
@@ -81,6 +94,7 @@ export function DataTableWorkspace({
   });
 
   const isDefault = useMemo(() => filtersAreDefault(filters), [filters]);
+  const activeCount = useMemo(() => activeFilterCount(filters), [filters]);
 
   const pageQuery = useQuery({
     queryKey: logTableKeys.page(factoryId, filters, sort, page, pageSize),
@@ -157,8 +171,8 @@ export function DataTableWorkspace({
   );
 
   return (
-    <>
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+    <div className="lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
+      <div className="mb-4 flex shrink-0 flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">
             Shift log
@@ -173,6 +187,32 @@ export function DataTableWorkspace({
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((open) => !open)}
+            aria-expanded={filtersOpen}
+            aria-controls="data-table-filters"
+            className={cn(
+              "inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition",
+              filtersOpen || activeCount > 0
+                ? "border-[#2563EB] bg-[#EFF4FF] text-[#1D4ED8]"
+                : "border-[#E6EAF1] text-[#475569] hover:border-[#2563EB] hover:text-[#2563EB]"
+            )}
+          >
+            <SlidersHorizontal className="size-3.5" />
+            Filters
+            {activeCount > 0 && (
+              <span className="rounded-full bg-[#2563EB] px-1.5 text-[10px] font-bold text-white">
+                {activeCount}
+              </span>
+            )}
+            <ChevronDown
+              className={cn(
+                "size-3.5 transition-transform",
+                filtersOpen && "rotate-180"
+              )}
+            />
+          </button>
           <button
             type="button"
             onClick={clearFilters}
@@ -198,21 +238,25 @@ export function DataTableWorkspace({
         </div>
       </div>
 
-      <DataTableFilters
-        key={resetToken}
-        filters={filters}
-        onChange={updateFilters}
-        units={unitList}
-        processes={processList}
-        unitWord={units.singular}
-      />
+      {filtersOpen && (
+        <div id="data-table-filters" className="shrink-0">
+          <DataTableFilters
+            key={resetToken}
+            filters={filters}
+            onChange={updateFilters}
+            units={unitList}
+            processes={processList}
+            unitWord={units.singular}
+          />
+        </div>
+      )}
 
       {pageQuery.isError ? (
         <p className="rounded-2xl border border-[#FECACA] bg-[#FEF2F2] px-4 py-6 text-center text-sm text-[#B91C1C]">
           Could not load the shift log: {(pageQuery.error as Error).message}
         </p>
       ) : (
-        <>
+        <div className="lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
           <ShiftLogTable
             rows={rows}
             sort={sort}
@@ -235,17 +279,19 @@ export function DataTableWorkspace({
             statsError={statsQuery.error as Error | null}
           />
 
-          <TablePagination
-            page={page}
-            pageSize={pageSize}
-            total={pageQuery.data?.total ?? 0}
-            onPageChange={setPage}
-            onPageSizeChange={(size) => {
-              setPageSize(size);
-              setPage(0);
-            }}
-          />
-        </>
+          <div className="shrink-0">
+            <TablePagination
+              page={page}
+              pageSize={pageSize}
+              total={pageQuery.data?.total ?? 0}
+              onPageChange={setPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setPage(0);
+              }}
+            />
+          </div>
+        </div>
       )}
 
       <AmendEntryDialog
@@ -281,7 +327,7 @@ export function DataTableWorkspace({
         factoryId={factoryId}
         onClose={() => setOverrunTarget(null)}
       />
-    </>
+    </div>
   );
 }
 

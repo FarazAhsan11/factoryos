@@ -29,9 +29,15 @@ export function ShiftReportTable({
   unitWord: string;
 }) {
   return (
-    <div className="overflow-x-auto rounded-2xl border border-[#E6EAF1] bg-white print:overflow-visible print:rounded-none print:border-0">
+    /* Its own scroll box on screen so the sticky header holds and the summary
+       strip stays put; on paper the box is undone entirely — a printed sheet
+       has no scrollbar, and clipping the report to one viewport would lose
+       every room past the first dozen. */
+    <div className="overflow-auto rounded-2xl border border-[#E6EAF1] bg-white lg:min-h-0 lg:flex-1 print:block print:overflow-visible print:rounded-none print:border-0">
       <table className="w-full min-w-[1180px] border-collapse text-[12px]">
         <thead>
+          {/* The colour is on the row, but the stickiness has to be on the
+              cells: `position: sticky` on a `<tr>` is ignored outside Firefox. */}
           <tr className="bg-[#0F1B34] text-white print:bg-white print:text-black">
             <Th>{unitWord}</Th>
             <Th>Status / stage</Th>
@@ -239,7 +245,8 @@ function Th({
   return (
     <th
       className={cn(
-        "whitespace-nowrap px-3 py-2 text-[10.5px] font-bold uppercase tracking-wide",
+        "sticky top-0 z-10 whitespace-nowrap bg-[#0F1B34] px-3 py-2 text-[10.5px] font-bold uppercase tracking-wide",
+        "print:static print:bg-white",
         align === "right" ? "text-right" : "text-left"
       )}
     >

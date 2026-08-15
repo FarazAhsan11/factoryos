@@ -33,7 +33,7 @@ export function ShiftReportHeader({
   const supervisor = clock?.supervisorName?.trim();
 
   return (
-    <div className="mb-4 flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-[#E6EAF1] bg-white px-4 py-3.5 print:rounded-none print:px-0">
+    <div className="mb-4 flex shrink-0 flex-wrap items-start justify-between gap-3 rounded-2xl border border-[#E6EAF1] bg-white px-4 py-3.5 print:rounded-none print:px-0">
       <div>
         <p className="flex items-center gap-1.5 text-sm font-bold text-[#0F1B34]">
           {morning ? (

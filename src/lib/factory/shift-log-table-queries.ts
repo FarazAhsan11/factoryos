@@ -396,6 +396,25 @@ export const DEFAULT_SORT: LogTableSort = {
   direction: "desc",
 };
 
+/**
+ * How many filters are doing something, for the collapsed filter button.
+ *
+ * The date range counts as **one** even though it is two inputs: "16 Jul →
+ * 15 Aug" is one decision, and counting it twice would make the badge read 2
+ * on a table nobody has touched.
+ */
+export function activeFilterCount(f: LogTableFilters): number {
+  const d = defaultFilters();
+  let count = 0;
+  if (f.from !== d.from || f.to !== d.to) count += 1;
+  if (f.shift !== "all") count += 1;
+  if (f.unitId !== "all") count += 1;
+  if (f.processId !== "all") count += 1;
+  if (f.flag !== "all") count += 1;
+  if (f.search.trim() !== "") count += 1;
+  return count;
+}
+
 /** True when the user has changed anything worth offering to clear. */
 export function filtersAreDefault(f: LogTableFilters): boolean {
   const d = defaultFilters();

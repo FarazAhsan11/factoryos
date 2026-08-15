@@ -188,9 +188,13 @@ export function ShiftLogTable({
   }
 
   return (
+    /* Scrolls in both directions inside its own box rather than growing the
+       page. That box is what `sticky` on the header and footer rows resolves
+       against — while the document was the scroller, `sticky top-0` on
+       `<thead>` had nothing to stick to and the header simply scrolled away. */
     <div
       className={cn(
-        "overflow-x-auto rounded-2xl border border-[#E6EAF1] bg-white transition-opacity",
+        "overflow-auto rounded-2xl border border-[#E6EAF1] bg-white transition-opacity lg:min-h-0 lg:flex-1",
         isPending && "opacity-60"
       )}
     >
@@ -303,8 +307,12 @@ function TotalsRow({
   // header's. The rows above are sometimes tinted (a flagged entry is pink,
   // a reject amber), so a pale line like the body's #F1F5F9 dividers
   // disappeared against them and the totals read as one more entry.
+  //
+  // Pinned to the bottom of the scroll box, for the same reason the header is
+  // pinned to the top: a total you have to scroll to the end of the page to
+  // read is a total nobody reads.
   const TF =
-    "border-t-2 border-[#94A3B8] bg-[#F1F5F9] px-2.5 py-3 text-[11px] font-semibold text-[#0F1B34]";
+    "sticky bottom-0 z-10 border-t-2 border-[#94A3B8] bg-[#F1F5F9] px-2.5 py-3 text-[11px] font-semibold text-[#0F1B34]";
 
   if (error) {
     return (

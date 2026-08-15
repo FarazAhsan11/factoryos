@@ -1,0 +1,50 @@
+import { z } from "zod";
+
+/**
+ * One schema per stage boundary.
+ *
+ * These are for the person typing, not for the database — the
+ * `actions_stage_transition` trigger re-checks every one of them and is the
+ * only thing that actually cannot be bypassed. Their job here is to say what
+ * is missing *before* a round-trip, and to keep the minimums honest: a root
+ * cause of "broken" and a verification of "ok" pass any not-blank check and
+ * tell the next person nothing.
+ */
+
+const required = (min: number, message: string) =>
+  z.string().trim().min(min, message);
+
+/** open → investigating. The stage's whole content is that it has an owner. */
+export const investigateSchema = z.object({
+  assignedTo: required(2, "Who is looking into this?"),
+});
+
+/** investigating → action_taken. */
+export const actionTakenSchema = z.object({
+  rootCause: required(8, "Say what actually caused it, not just what broke."),
+  correctiveAction: required(8, "Describe what was done about it."),
+  // The P in CAPA, and the only optional field: not every issue has a
+  // generalisable fix, and a mandatory box with nothing to say fills up with
+  // "N/A" until it means nothing.
+  preventiveAction: z.string().trim().optional(),
+});
+
+/** action_taken → closed. Supervisor and up; the trigger enforces the role. */
+export const closeSchema = z.object({
+  verification: required(8, "How do you know the fix worked?"),
+});
+
+/** Any backward move. The reason is the price of undoing someone's work. */
+export const revertSchema = z.object({
+  reason: required(8, "Say why this is going back."),
+});
+
+/** Saving an investigation in progress, without moving the issue on. */
+export const rootCauseDraftSchema = z.object({
+  rootCause: z.string().trim().optional(),
+});
+
+export type InvestigateValues = z.infer<typeof investigateSchema>;
+export type ActionTakenValues = z.infer<typeof actionTakenSchema>;
+export type CloseValues = z.infer<typeof closeSchema>;
+export type RevertValues = z.infer<typeof revertSchema>;

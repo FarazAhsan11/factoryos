@@ -48,6 +48,7 @@ interface ShiftTimeRow {
   break1_minutes: number;
   break2_start: string | null;
   break2_minutes: number;
+  supervisor_name: string | null;
 }
 
 /** Postgres returns "06:45:00"; `<input type="time">` wants "06:45". */
@@ -63,6 +64,7 @@ function toValues(row: ShiftTimeRow): ShiftClockValues {
     break1Minutes: row.break1_minutes,
     break2Start: toClock(row.break2_start),
     break2Minutes: row.break2_minutes,
+    supervisorName: row.supervisor_name ?? "",
   };
 }
 
@@ -77,7 +79,7 @@ export async function fetchShiftTimes(
   const { data, error } = await supabase
     .from("factory_shift_times")
     .select(
-      "slot, start_time, end_time, break1_start, break1_minutes, break2_start, break2_minutes"
+      "slot, start_time, end_time, break1_start, break1_minutes, break2_start, break2_minutes, supervisor_name"
     )
     .eq("factory_id", factoryId);
 

@@ -1,6 +1,7 @@
 import {
   Activity,
   BarChart3,
+  ClipboardList,
   LayoutGrid,
   ListPlus,
   Settings,
@@ -55,12 +56,13 @@ export const FACTORY_NAV: NavSection[] = [
   {
     label: "Accountability",
     items: [
-      { href: "/actions", label: "Actions", icon: Zap, roles: SUPERVISOR_UP, ready: true },
+      { href: "/actions", label: "Issues & CAPAs", icon: Zap, roles: SUPERVISOR_UP, ready: true },
     ],
   },
   {
     label: "Analytics",
     items: [
+      { href: "/report", label: "Shift report", icon: ClipboardList, roles: SUPERVISOR_UP, ready: true },
       { href: "/oee", label: "OEE & Downtime", icon: BarChart3, roles: SUPERVISOR_UP, ready: false },
       { href: "/quality", label: "Quality", icon: Sparkles, roles: SUPERVISOR_UP, ready: false },
       { href: "/trends", label: "Trends", icon: TrendingUp, roles: MANAGER_UP, ready: false },

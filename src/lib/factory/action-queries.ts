@@ -1,17 +1,21 @@
+import type { FactoryRole } from "@/lib/factory/context";
 import { createClient } from "@/lib/supabase/client";
 
 /**
- * Actions & escalations. Reads the `actions_expanded` view (migration 0017),
- * where `is_overdue` and `is_escalated` are computed from the clock on every
- * read rather than stored — so an action escalates at 2am whether or not
- * anyone has the app open.
+ * Issues & CAPAs. Reads the `actions_expanded` view (migrations 0017, 0020),
+ * where both clocks are computed on every read rather than stored — so an
+ * issue escalates at 2am whether or not anyone has the app open.
  *
- * Browser-direct under RLS. Nothing here writes `resolved_at`, `resolved_by`
- * or the status history: a trigger stamps those, so the record of who closed
- * something can't be a claim the client made.
+ * The stage flow is `open → investigating → action_taken → closed`, one step
+ * at a time, each move paid for with the evidence that stage exists to
+ * produce. Nothing in this file enforces that: the `actions_stage_transition`
+ * trigger does. Issues are written browser-direct under RLS, so a rule that
+ * lives only here is a rule anyone with a session can PATCH straight past.
+ * What is here is the UI's half — knowing which move is available next so the
+ * form for the wrong one is never rendered in the first place.
  */
 
-export type ActionStatus = "open" | "in_progress" | "resolved";
+export type ActionStage = "open" | "investigating" | "action_taken" | "closed";
 export type ActionPriority = "critical" | "high" | "medium" | "low";
 
 export const ACTION_CATEGORIES = [
@@ -43,11 +47,66 @@ const DUE_HOURS: Record<ActionPriority, number> = {
   low: 24,
 };
 
-export const STATUS_LABELS: Record<ActionStatus, string> = {
+/* ── The stages ───────────────────────────────────────────────────────── */
+
+/** Declaration order is comparison order, here and in the Postgres enum. */
+export const ACTION_STAGES: ActionStage[] = [
+  "open",
+  "investigating",
+  "action_taken",
+  "closed",
+];
+
+export const STAGE_LABELS: Record<ActionStage, string> = {
   open: "Open",
-  in_progress: "In progress",
-  resolved: "Resolved",
+  investigating: "Investigating",
+  action_taken: "Action taken",
+  closed: "Closed",
 };
+
+/** What the stage is *for* — shown under each step of the timeline. */
+export const STAGE_BLURBS: Record<ActionStage, string> = {
+  open: "Raised and waiting for an owner.",
+  investigating: "Someone owns it and is finding the cause.",
+  action_taken: "The fix is in, waiting on sign-off.",
+  closed: "Verified and signed off.",
+};
+
+export function stageIndex(stage: ActionStage): number {
+  return ACTION_STAGES.indexOf(stage);
+}
+
+/** The one stage this issue can move forward to, or null at the end. */
+export function nextStage(stage: ActionStage): ActionStage | null {
+  return ACTION_STAGES[stageIndex(stage) + 1] ?? null;
+}
+
+/**
+ * The one stage it can go back to — `action_taken → investigating` when
+ * verification fails, `closed → open` to re-open. There is deliberately no
+ * `investigating → open`: un-assigning is what that means, and it is a field
+ * on the issue, not a stage change.
+ */
+export function prevStage(stage: ActionStage): ActionStage | null {
+  if (stage === "action_taken") return "investigating";
+  if (stage === "closed") return "open";
+  return null;
+}
+
+const REVIEWER_ROLES: FactoryRole[] = [
+  "super_admin",
+  "admin",
+  "manager",
+  "supervisor",
+];
+
+/**
+ * Supervisor and up, mirroring `can_review_factory()` in migration 0019.
+ * Closing an issue is a review, and so is undoing one.
+ */
+export function canReview(role: FactoryRole): boolean {
+  return REVIEWER_ROLES.includes(role);
+}
 
 export interface FactoryAction {
   id: string;
@@ -56,17 +115,29 @@ export interface FactoryAction {
   unit_name: string | null;
   category: string;
   priority: ActionPriority;
-  status: ActionStatus;
+  status: ActionStage;
   assigned_to: string | null;
   due_at: string;
   notes: string | null;
   shift_log_entry_id: string | null;
   created_at: string;
-  resolved_at: string | null;
+
+  /** What each stage produced. Null until the issue has been through it. */
+  root_cause: string | null;
+  corrective_action: string | null;
+  preventive_action: string | null;
+  verification: string | null;
+  investigating_at: string | null;
+  action_taken_at: string | null;
+  closed_at: string | null;
+
   /** Derived in the view, never stored. */
   is_overdue: boolean;
   is_escalated: boolean;
   escalates_at: string;
+  /** Null unless the issue is actually waiting on a sign-off. */
+  verify_due_at: string | null;
+  is_verify_overdue: boolean;
   note_count: number;
 }
 
@@ -79,8 +150,11 @@ export interface ActionNote {
 
 const COLUMNS = `
   id, title, unit_id, unit_name, category, priority, status,
-  assigned_to, due_at, notes, shift_log_entry_id,
-  created_at, resolved_at, is_overdue, is_escalated, escalates_at, note_count
+  assigned_to, due_at, notes, shift_log_entry_id, created_at,
+  root_cause, corrective_action, preventive_action, verification,
+  investigating_at, action_taken_at, closed_at,
+  is_overdue, is_escalated, escalates_at,
+  verify_due_at, is_verify_overdue, note_count
 `;
 
 export const actionKeys = {
@@ -89,10 +163,10 @@ export const actionKeys = {
 };
 
 /**
- * Every action for the factory, most urgent first.
+ * Every issue for the factory, most urgent first.
  *
- * Ordered in Postgres by what actually demands attention: unresolved before
- * resolved, then by due time. An escalated action is by definition the most
+ * Ordered in Postgres by what actually demands attention: unclosed before
+ * closed, then by due time. An escalated issue is by definition the most
  * overdue, so it rises to the top without a separate sort key.
  */
 export async function fetchActions(
@@ -103,7 +177,7 @@ export async function fetchActions(
     .from("actions_expanded")
     .select(COLUMNS)
     .eq("factory_id", factoryId)
-    .order("resolved_at", { ascending: true, nullsFirst: true })
+    .order("closed_at", { ascending: true, nullsFirst: true })
     .order("due_at", { ascending: true });
 
   if (error) throw new Error(error.message);
@@ -153,7 +227,7 @@ export async function createAction(
     category: values.category,
     priority: values.priority,
     assigned_to: values.assignedTo.trim() || null,
-    // A blank due date isn't "no deadline" — an action with no clock can never
+    // A blank due date isn't "no deadline" — an issue with no clock can never
     // be overdue and so never escalates, which is the one thing this module
     // exists to prevent. The priority's own window stands in.
     due_at: values.dueAt
@@ -166,19 +240,80 @@ export async function createAction(
   if (error) throw new Error(error.message);
 }
 
-export async function updateActionStatus(
+/* ── Moving through the stages ────────────────────────────────────────── */
+
+/** What each forward move has to carry. Everything else is stage-specific. */
+export interface AdvancePayload {
+  /** → investigating. Blank means "keep whoever is already assigned". */
+  assignedTo?: string;
+  /** → action_taken. */
+  rootCause?: string;
+  correctiveAction?: string;
+  preventiveAction?: string;
+  /** → closed. */
+  verification?: string;
+}
+
+/**
+ * Moves an issue one stage forward, carrying that stage's evidence.
+ *
+ * Evidence and status go up in a **single** update, and they have to: the
+ * `actions_evidence_follows_stage` constraint refuses a row holding a
+ * corrective action while still open, so writing the text first and the
+ * status second is not a sequence the database will accept. Which is the
+ * point — it is exactly the "fill in the fix without investigating" path.
+ */
+export async function advanceAction(
   actionId: string,
-  status: ActionStatus
+  to: ActionStage,
+  payload: AdvancePayload = {}
 ): Promise<void> {
   const supabase = createClient();
+
+  const patch: Record<string, string | null> = { status: to };
+
+  if (to === "investigating" && payload.assignedTo?.trim()) {
+    patch.assigned_to = payload.assignedTo.trim();
+  }
+  if (to === "action_taken") {
+    patch.root_cause = payload.rootCause?.trim() ?? null;
+    patch.corrective_action = payload.correctiveAction?.trim() ?? null;
+    patch.preventive_action = payload.preventiveAction?.trim() || null;
+  }
+  if (to === "closed") {
+    patch.verification = payload.verification?.trim() ?? null;
+  }
+
   const { error } = await supabase
     .from("actions")
-    .update({ status })
+    .update(patch)
     .eq("id", actionId);
   if (error) throw new Error(error.message);
 }
 
-/** Reassigns an action. Empty string clears it back to unassigned. */
+/**
+ * Moves an issue back a stage, with the reason attached.
+ *
+ * Through the `revert_action` RPC rather than a plain update, because a
+ * backward move without a recorded reason should not be *expressible*. The
+ * function writes the reason into the thread and flips the stage in one
+ * statement; a direct update to an earlier stage is rejected by the trigger.
+ */
+export async function revertAction(
+  actionId: string,
+  to: ActionStage,
+  reason: string
+): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc("revert_action", {
+    p_action: actionId,
+    p_to: to,
+    p_reason: reason.trim(),
+  });
+  if (error) throw new Error(error.message);
+}
+
+/** Reassigns an issue. Empty string clears it back to unassigned. */
 export async function assignAction(
   actionId: string,
   assignedTo: string
@@ -189,6 +324,63 @@ export async function assignAction(
     .update({ assigned_to: assignedTo.trim() || null })
     .eq("id", actionId);
   if (error) throw new Error(error.message);
+}
+
+/**
+ * Saves the root cause without moving the issue on.
+ *
+ * An investigation is rarely one sitting, and the alternative is retyping it
+ * from a scrap of paper when the answer finally lands. Allowed at
+ * `investigating` and beyond by the evidence constraint, which is exactly the
+ * window where it makes sense.
+ */
+export async function saveRootCause(
+  actionId: string,
+  rootCause: string
+): Promise<void> {
+  return updateEvidence(actionId, "root_cause", rootCause);
+}
+
+/** The four fields a stage records, and what to call them to someone. */
+export const EVIDENCE_FIELDS = {
+  root_cause: "Root cause",
+  corrective_action: "Corrective action",
+  preventive_action: "Preventive action",
+  verification: "Verification",
+} as const;
+
+export type EvidenceField = keyof typeof EVIDENCE_FIELDS;
+
+/**
+ * Corrects what a stage recorded, in place.
+ *
+ * Amendable but never silently: `actions_stage_transition` writes the previous
+ * text into the thread on every change, refuses to let a stage already passed
+ * be emptied, and requires a reviewer once the issue is closed. Same bargain
+ * the shift log strikes — the record can be fixed, but not quietly re-authored.
+ */
+export async function updateEvidence(
+  actionId: string,
+  field: EvidenceField,
+  value: string
+): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("actions")
+    .update({ [field]: value.trim() || null })
+    .eq("id", actionId);
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Whether this viewer may correct a recorded field right now.
+ *
+ * Only the closed case is restricted, and the UI mirrors the trigger rather
+ * than inventing its own rule: amending a closed issue rewrites something a
+ * supervisor signed, so it takes the standing that signing it took.
+ */
+export function canAmend(action: FactoryAction, role: FactoryRole): boolean {
+  return action.status !== "closed" || canReview(role);
 }
 
 export async function addActionNote(
@@ -237,42 +429,27 @@ export function relativeTime(iso: string, now: number = Date.now()): string {
   return diff >= 0 ? `in ${label}` : `${label} ago`;
 }
 
-/** The filter chips across the top of the list. */
-export const ACTION_FILTERS = [
-  "all",
-  "open",
-  "in_progress",
-  "escalated",
-  "resolved",
-] as const;
-
-export type ActionFilter = (typeof ACTION_FILTERS)[number];
-
-export const FILTER_LABELS: Record<ActionFilter, string> = {
-  all: "All",
-  open: "Open",
-  in_progress: "In progress",
-  escalated: "Escalated",
-  resolved: "Resolved",
-};
+/**
+ * The tabs across the top: one per stage, and nothing else.
+ *
+ * Escalated is deliberately *not* a fifth tab. An escalated issue is already
+ * sitting in Open or Investigating, so a tab for it would show the same rows
+ * twice and make the counts lie. It is a toggle that cuts across the four —
+ * see `escalatedOnly` in the workspace.
+ */
+export function stageCounts(
+  actions: FactoryAction[]
+): Record<ActionStage, number> {
+  const counts = { open: 0, investigating: 0, action_taken: 0, closed: 0 };
+  for (const action of actions) counts[action.status] += 1;
+  return counts;
+}
 
 /**
- * Escalated is a *filter*, not a status — it cuts across open and in-progress
- * alike. An action someone started and then left for a shift is exactly the
- * one worth surfacing, so "in progress" does not exempt it.
+ * Needs someone's attention right now: escalated while the fix is outstanding,
+ * or sat past its sign-off window. One toggle, both clocks — from the floor's
+ * point of view "this has been ignored too long" is a single idea.
  */
-export function matchesFilter(
-  action: FactoryAction,
-  filter: ActionFilter
-): boolean {
-  switch (filter) {
-    case "all":
-      return true;
-    case "escalated":
-      return action.is_escalated;
-    case "resolved":
-      return action.status === "resolved";
-    default:
-      return action.status === filter;
-  }
+export function needsAttention(action: FactoryAction): boolean {
+  return action.is_escalated || action.is_verify_overdue;
 }

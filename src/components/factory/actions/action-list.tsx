@@ -3,7 +3,7 @@
 import { AlertTriangle, ArrowUpRight, User } from "lucide-react";
 
 import {
-  STATUS_LABELS,
+  STAGE_LABELS,
   formatDue,
   relativeTime,
   type ActionPriority,
@@ -23,10 +23,11 @@ const PRIORITY_BAR: Record<ActionPriority, string> = {
   low: "#94A3B8",
 };
 
-const STATUS_PILL: Record<string, string> = {
+const STAGE_PILL: Record<string, string> = {
   open: "bg-[#FEF3C7] text-[#B45309]",
-  in_progress: "bg-[#DBEAFE] text-[#1D4ED8]",
-  resolved: "bg-[#DCFCE7] text-[#15803D]",
+  investigating: "bg-[#DBEAFE] text-[#1D4ED8]",
+  action_taken: "bg-[#E0E7FF] text-[#4338CA]",
+  closed: "bg-[#DCFCE7] text-[#15803D]",
 };
 
 export function ActionList({
@@ -66,13 +67,21 @@ export function ActionList({
                     Overdue
                   </span>
                 )}
+                {/* The second clock. A fix waiting on a signature isn't
+                    urgent, but it isn't done either — and this is the state
+                    an issue quietly dies in. */}
+                {action.is_verify_overdue && (
+                  <span className="rounded-full bg-[#FEF3C7] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#B45309]">
+                    Sign-off late
+                  </span>
+                )}
                 <span
                   className={cn(
                     "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                    STATUS_PILL[action.status]
+                    STAGE_PILL[action.status]
                   )}
                 >
-                  {STATUS_LABELS[action.status]}
+                  {STAGE_LABELS[action.status]}
                 </span>
               </div>
             </div>
@@ -97,9 +106,26 @@ export function ActionList({
                 {action.assigned_to ?? "Unassigned"}
               </span>
 
+              {/* Whichever clock is actually running. Showing the fix
+                  deadline on an issue whose fix is already in would be
+                  answering a question nobody is asking. */}
               <span className="font-mono text-[11px] text-[#94A3B8]">
-                {action.status === "resolved" ? (
-                  <>Resolved {action.resolved_at && relativeTime(action.resolved_at)}</>
+                {action.status === "closed" ? (
+                  <>Closed {action.closed_at && relativeTime(action.closed_at)}</>
+                ) : action.verify_due_at ? (
+                  <>
+                    Sign-off: {formatDue(action.verify_due_at)}
+                    <span
+                      className={cn(
+                        "ml-1.5 font-semibold",
+                        action.is_verify_overdue
+                          ? "text-[#B45309]"
+                          : "text-[#64748B]"
+                      )}
+                    >
+                      {relativeTime(action.verify_due_at)}
+                    </span>
+                  </>
                 ) : (
                   <>
                     Due: {formatDue(action.due_at)}

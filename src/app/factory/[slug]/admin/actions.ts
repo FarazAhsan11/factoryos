@@ -103,6 +103,7 @@ export async function updateShiftTimes(
     break1_minutes: shift.break1Start ? shift.break1Minutes : 0,
     break2_start: shift.break2Start || null,
     break2_minutes: shift.break2Start ? shift.break2Minutes : 0,
+    supervisor_name: shift.supervisorName?.trim() || null,
     updated_at: new Date().toISOString(),
   });
 

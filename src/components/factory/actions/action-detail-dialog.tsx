@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Loader2, Play } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { ActionStageForm } from "@/components/factory/actions/action-stage-form";
+import { ActionStageTimeline } from "@/components/factory/actions/action-stage-timeline";
 import {
   Dialog,
   DialogContent,
@@ -12,15 +14,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import type { FactoryRole } from "@/lib/factory/context";
 import {
+  STAGE_LABELS,
   actionKeys,
   addActionNote,
   assignAction,
   fetchActionNotes,
   formatDue,
   relativeTime,
-  updateActionStatus,
-  type ActionStatus,
   type FactoryAction,
 } from "@/lib/factory/action-queries";
 import { cn } from "@/lib/utils";
@@ -28,24 +30,34 @@ import { cn } from "@/lib/utils";
 const CONTROL =
   "h-10 w-full rounded-xl border border-[#E6EAF1] bg-[#FBFCFE] px-3.5 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:bg-white";
 
+const STAGE_PILL: Record<string, string> = {
+  open: "bg-[#FEF3C7] text-[#B45309]",
+  investigating: "bg-[#DBEAFE] text-[#1D4ED8]",
+  action_taken: "bg-[#E0E7FF] text-[#4338CA]",
+  closed: "bg-[#DCFCE7] text-[#15803D]",
+};
+
 /**
- * One action in full: its facts, its thread, and the two buttons that move it.
+ * One issue in full: where it has got to, what each stage produced, and the
+ * single move it can make next.
  *
- * Adding a note and changing the status are deliberately separate. Half of
- * what happens to an action is progress that changes nothing — "waiting on the
- * part", "retest booked for Thursday" — and forcing that through a status
- * change would either lose it or produce a fake status. The prototype got this
- * right and it is worth keeping.
+ * The thread and the stages are deliberately separate. Half of what happens to
+ * an issue is progress that changes nothing — "waiting on the part", "retest
+ * booked for Thursday" — and forcing that through a stage gate would either
+ * lose it or produce a fake stage. The gates carry the record; the thread
+ * carries the conversation.
  */
 export function ActionDetailDialog({
   action,
   factoryId,
   userId,
+  role,
   onClose,
 }: {
   action: FactoryAction | null;
   factoryId: string;
   userId: string;
+  role: FactoryRole;
   onClose: () => void;
 }) {
   return (
@@ -55,17 +67,18 @@ export function ActionDetailDialog({
         if (!open) onClose();
       }}
     >
-      <DialogContent className="max-w-xl">
-        {/* Keyed by the action, so opening a different one remounts the body
+      <DialogContent className="max-h-[88vh] max-w-xl overflow-y-auto">
+        {/* Keyed by the issue, so opening a different one remounts the body
             with fresh state. The alternative — an effect resetting the note
             and assignee fields — runs a render late and leaks half-typed text
-            from one action into the next. */}
+            from one issue into the next. */}
         {action && (
           <Body
             key={action.id}
             action={action}
             factoryId={factoryId}
             userId={userId}
+            role={role}
             onClose={onClose}
           />
         )}
@@ -78,11 +91,13 @@ function Body({
   action,
   factoryId,
   userId,
+  role,
   onClose,
 }: {
   action: FactoryAction;
   factoryId: string;
   userId: string;
+  role: FactoryRole;
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
@@ -111,37 +126,19 @@ function Body({
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const setStatus = useMutation({
-    mutationFn: async (status: ActionStatus) => {
-      // A note typed before pressing Resolve is part of that update, not
-      // something to discard — save it first so the thread reads in order.
-      if (note.trim()) {
-        await addActionNote(factoryId, action.id, note, userId);
-      }
-      await updateActionStatus(action.id, status);
-    },
-    onSuccess: async () => {
-      setNote("");
-      await refresh();
-      toast.success("Action updated.");
-      onClose();
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
   const reassign = useMutation({
     mutationFn: () => assignAction(action.id, assignee),
     onSuccess: async () => {
       await refresh();
       toast.success(
-        assignee.trim() ? `Assigned to ${assignee.trim()}.` : "Unassigned.",
+        assignee.trim() ? `Assigned to ${assignee.trim()}.` : "Unassigned."
       );
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const busy = saveNote.isPending || setStatus.isPending || reassign.isPending;
-  const resolved = action.status === "resolved";
+  const closed = action.status === "closed";
+  const busy = saveNote.isPending || reassign.isPending;
 
   return (
     <>
@@ -160,84 +157,103 @@ function Body({
         {action.is_overdue && !action.is_escalated && (
           <Badge className="bg-[#FEE2E2] text-[#B91C1C]">Overdue</Badge>
         )}
-        <Badge
-          className={cn(
-            resolved
-              ? "bg-[#DCFCE7] text-[#15803D]"
-              : action.status === "in_progress"
-                ? "bg-[#DBEAFE] text-[#1D4ED8]"
-                : "bg-[#FEF3C7] text-[#B45309]",
-          )}
-        >
-          {resolved
-            ? "Resolved"
-            : action.status === "in_progress"
-              ? "In progress"
-              : "Open"}
+        {action.is_verify_overdue && (
+          <Badge className="bg-[#FEF3C7] text-[#B45309]">Sign-off late</Badge>
+        )}
+        <Badge className={STAGE_PILL[action.status]}>
+          {STAGE_LABELS[action.status]}
         </Badge>
       </div>
 
+      {/* Which clock is running depends on the stage: the fix clock while the
+          problem is live, the slower sign-off clock once the fix is in. Only
+          one of them is ever the answer to "is this late?" */}
       <dl className="space-y-1.5 rounded-xl border border-[#E6EAF1] bg-[#FBFCFE] p-3.5 text-sm">
-        <Row label="Due">
-          {formatDue(action.due_at)}
-          {!resolved && (
+        {!closed && action.status !== "action_taken" && (
+          <>
+            <Row label="Due">
+              {formatDue(action.due_at)}
+              <span
+                className={cn(
+                  "ml-1.5 text-xs font-semibold",
+                  action.is_overdue ? "text-[#B91C1C]" : "text-[#64748B]"
+                )}
+              >
+                {relativeTime(action.due_at)}
+              </span>
+            </Row>
+            {!action.is_escalated && (
+              <Row label="Escalates">
+                {formatDue(action.escalates_at)}
+                <span className="ml-1.5 text-xs text-[#64748B]">
+                  {relativeTime(action.escalates_at)}
+                </span>
+              </Row>
+            )}
+          </>
+        )}
+
+        {action.verify_due_at && (
+          <Row label="Sign-off due">
+            {formatDue(action.verify_due_at)}
             <span
               className={cn(
                 "ml-1.5 text-xs font-semibold",
-                action.is_overdue ? "text-[#B91C1C]" : "text-[#64748B]",
+                action.is_verify_overdue ? "text-[#B45309]" : "text-[#64748B]"
               )}
             >
-              {relativeTime(action.due_at)}
-            </span>
-          )}
-        </Row>
-        {!resolved && !action.is_escalated && (
-          <Row label="Escalates">
-            {formatDue(action.escalates_at)}
-            <span className="ml-1.5 text-xs text-[#64748B]">
-              {relativeTime(action.escalates_at)}
+              {relativeTime(action.verify_due_at)}
             </span>
           </Row>
         )}
-        {action.resolved_at && (
-          <Row label="Resolved">{formatDue(action.resolved_at)}</Row>
+
+        {action.closed_at && (
+          <Row label="Closed">{formatDue(action.closed_at)}</Row>
         )}
       </dl>
 
-      {action.notes && (
-        <p className="rounded-xl bg-[#F8FAFC] px-3.5 py-3 text-[13px] text-[#334155]">
-          {action.notes}
-        </p>
+      {/* Reassignment only, and only once the investigation is under way.
+          While an issue is still Open, naming an owner *is* the first stage —
+          the start-investigation form below collects it. Showing this box
+          there too put two controls for one column in one dialog, which read
+          as the app asking the same question twice. Once closed, the owner is
+          part of the record rather than a field. */}
+      {!closed && action.status !== "open" && (
+        <div className="space-y-1.5">
+          <label
+            htmlFor="action-assignee"
+            className="block text-xs font-medium text-[#475569]"
+          >
+            Assigned to
+          </label>
+          <div className="flex gap-2">
+            <input
+              id="action-assignee"
+              value={assignee}
+              onChange={(e) => setAssignee(e.target.value)}
+              placeholder="Name — or leave blank to unassign"
+              className={CONTROL}
+            />
+            <button
+              type="button"
+              onClick={() => reassign.mutate()}
+              disabled={busy || assignee === (action.assigned_to ?? "")}
+              className="h-10 shrink-0 rounded-xl border border-[#E6EAF1] px-3 text-sm font-medium text-[#475569] transition hover:border-[#2563EB] hover:text-[#2563EB] disabled:pointer-events-none disabled:opacity-40"
+            >
+              Save
+            </button>
+          </div>
+        </div>
       )}
 
-      {/* Assignment lives in the body, not a separate screen: the most
-                common thing to do with an unassigned action is give it to
-                someone, and that shouldn't need a second dialog. */}
-      <div className="space-y-1.5">
-        <label
-          htmlFor="action-assignee"
-          className="block text-xs font-medium text-[#475569]"
-        >
-          Assigned to
-        </label>
-        <div className="flex gap-2">
-          <input
-            id="action-assignee"
-            value={assignee}
-            onChange={(e) => setAssignee(e.target.value)}
-            placeholder="Name — or leave blank to unassign"
-            className={CONTROL}
-          />
-          <button
-            type="button"
-            onClick={() => reassign.mutate()}
-            disabled={busy || assignee === (action.assigned_to ?? "")}
-            className="h-10 shrink-0 rounded-xl border border-[#E6EAF1] px-3 text-sm font-medium text-[#475569] transition hover:border-[#2563EB] hover:text-[#2563EB] disabled:pointer-events-none disabled:opacity-40"
-          >
-            Save
-          </button>
-        </div>
+      <div className="space-y-2">
+        <p className="text-[10px] font-bold uppercase tracking-[0.6px] text-[#94A3B8]">
+          Progress
+        </p>
+        <ActionStageTimeline action={action} role={role} onSaved={refresh} />
       </div>
+
+      <ActionStageForm action={action} role={role} onDone={refresh} />
 
       <div className="space-y-2">
         <p className="text-[10px] font-bold uppercase tracking-[0.6px] text-[#94A3B8]">
@@ -259,10 +275,10 @@ function Body({
                   "rounded-xl px-3 py-2 text-[13px]",
                   entry.is_system
                     ? "bg-[#F8FAFC] text-[#64748B] italic"
-                    : "border border-[#E6EAF1] text-[#0F1B34]",
+                    : "border border-[#E6EAF1] text-[#0F1B34]"
                 )}
               >
-                {entry.note}
+                <span className="whitespace-pre-wrap">{entry.note}</span>
                 <span className="mt-0.5 block text-[10.5px] not-italic text-[#94A3B8]">
                   {formatDue(entry.created_at)}
                 </span>
@@ -272,7 +288,7 @@ function Body({
         )}
       </div>
 
-      {!resolved && (
+      {!closed && (
         <div className="space-y-2 rounded-xl bg-[#F8FAFC] p-3">
           <label
             htmlFor="action-note"
@@ -280,7 +296,7 @@ function Body({
           >
             Add note{" "}
             <span className="font-normal normal-case">
-              (without changing status)
+              (without changing stage)
             </span>
           </label>
           <textarea
@@ -297,62 +313,20 @@ function Body({
             disabled={busy || !note.trim()}
             className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#E6EAF1] bg-white px-3 text-xs font-medium text-[#475569] transition hover:border-[#2563EB] hover:text-[#2563EB] disabled:pointer-events-none disabled:opacity-40"
           >
-            {saveNote.isPending && (
-              <Loader2 className="size-3.5 animate-spin" />
-            )}
+            {saveNote.isPending && <Loader2 className="size-3.5 animate-spin" />}
             Add note
           </button>
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={onClose}
-          disabled={busy}
-          className="h-10 flex-1 rounded-xl border border-[#E6EAF1] text-sm font-medium text-[#475569] transition hover:border-[#2563EB] hover:text-[#2563EB] disabled:opacity-60"
-        >
-          Close
-        </button>
-
-        {resolved ? (
-          <button
-            type="button"
-            onClick={() => setStatus.mutate("open")}
-            disabled={busy}
-            className="h-10 rounded-xl border border-[#E6EAF1] px-4 text-sm font-medium text-[#475569] transition hover:border-[#B45309] hover:text-[#B45309] disabled:opacity-60"
-          >
-            Re-open
-          </button>
-        ) : (
-          <>
-            {action.status !== "in_progress" && (
-              <button
-                type="button"
-                onClick={() => setStatus.mutate("in_progress")}
-                disabled={busy}
-                className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] px-4 text-sm font-semibold text-white transition hover:brightness-[1.06] disabled:opacity-60"
-              >
-                <Play className="size-3.5" />
-                In progress
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => setStatus.mutate("resolved")}
-              disabled={busy}
-              className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-[#16A34A] px-4 text-sm font-semibold text-white transition hover:brightness-[1.06] disabled:opacity-60"
-            >
-              {setStatus.isPending ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : (
-                <Check className="size-3.5" />
-              )}
-              Resolve
-            </button>
-          </>
-        )}
-      </div>
+      <button
+        type="button"
+        onClick={onClose}
+        disabled={busy}
+        className="h-10 w-full rounded-xl border border-[#E6EAF1] text-sm font-medium text-[#475569] transition hover:border-[#2563EB] hover:text-[#2563EB] disabled:opacity-60"
+      >
+        Close
+      </button>
     </>
   );
 }
@@ -368,7 +342,7 @@ function Badge({
     <span
       className={cn(
         "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
-        className,
+        className
       )}
     >
       {children}

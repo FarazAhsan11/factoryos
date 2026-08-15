@@ -28,7 +28,9 @@ export function FactoryShell({
 }) {
   return (
     <div className="min-h-svh bg-[#F6F8FC]">
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-[#E6EAF1] bg-white px-6 py-3.5">
+      {/* The workspace chrome is navigation, and navigation is meaningless on
+          paper. The shift report prints; the rail and the top bar don't. */}
+      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-[#E6EAF1] bg-white px-6 py-3.5 print:hidden">
         <div className="flex items-center gap-3">
           {factory.logo_url ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -65,8 +67,12 @@ export function FactoryShell({
       </header>
 
       <div className="lg:flex">
-        <FactorySidebar slug={factory.slug ?? ""} role={role} />
-        <main className="min-w-0 flex-1 px-6 py-8">{children}</main>
+        <div className="print:hidden">
+          <FactorySidebar slug={factory.slug ?? ""} role={role} />
+        </div>
+        <main className="min-w-0 flex-1 px-6 py-8 print:px-0 print:py-0">
+          {children}
+        </main>
       </div>
     </div>
   );

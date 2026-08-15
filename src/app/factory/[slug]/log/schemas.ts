@@ -333,6 +333,24 @@ export const amendEntrySchema = z.object({
 
 export type AmendEntryValues = z.infer<typeof amendEntrySchema>;
 
+/**
+ * Why a batch produced more than its work order required.
+ *
+ * Manager-only, and enforced by `shift_log_amend_guard` (migration 0023)
+ * rather than here — this is the UX half. The minimum length is the same
+ * argument as an amendment note: the flag exists because a number needs
+ * accounting for, and "extra" accounts for nothing.
+ */
+export const explainOverrunSchema = z.object({
+  note: z
+    .string()
+    .trim()
+    .min(10, "Say why the extra was produced, and what happens to it.")
+    .max(500, "Keep the note under 500 characters."),
+});
+
+export type ExplainOverrunValues = z.infer<typeof explainOverrunSchema>;
+
 /* ── Shift log → Kaizen ─────────────────────────────────────────────────── */
 
 /**

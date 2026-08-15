@@ -39,6 +39,15 @@ const HEADERS = [
   "Comments",
   "Amended",
   "Amendment note",
+  // Overproduction. Exported because the whole point of a manager-only
+  // clearance is that it can be audited later, and an audit that stops at the
+  // screen is not one.
+  "Required qty",
+  "Over by",
+  "Overrun status",
+  "Overrun reason",
+  "Overrun explained by",
+  "Overrun explained at",
 ];
 
 function cells(row: LogTableRow): (string | number | null)[] {
@@ -73,6 +82,16 @@ function cells(row: LogTableRow): (string | number | null)[] {
     row.comment ?? "",
     row.amended_at ? "Yes" : "",
     row.amend_note ?? "",
+    row.required_qty ?? "",
+    row.overrun_qty ?? "",
+    row.needs_overrun_note
+      ? "Needs explanation"
+      : row.is_overrun
+        ? "Explained"
+        : "",
+    row.overrun_note ?? "",
+    row.overrun_cleared_by_name ?? "",
+    row.overrun_cleared_at ?? "",
   ];
 }
 

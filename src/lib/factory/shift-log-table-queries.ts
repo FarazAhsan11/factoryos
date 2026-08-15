@@ -49,6 +49,17 @@ export interface LogTableRow {
   amend_note: string | null;
   /** Who filed it — decides whether this viewer may amend it. */
   logged_by: string | null;
+
+  /* Overproduction. All three are computed on read (migration 0023) — the
+     stored half is `overrun_note`, the explanation that clears the flag. */
+  required_qty: number | null;
+  is_overrun: boolean;
+  overrun_qty: number | null;
+  needs_overrun_note: boolean;
+  overrun_note: string | null;
+  overrun_cleared_at: string | null;
+  /** Who explained it — the point of a manager-only clearance. */
+  overrun_cleared_by_name: string | null;
 }
 
 const COLUMNS = `
@@ -58,7 +69,9 @@ const COLUMNS = `
   target_qty, qty, qty_rejected, accumulative,
   speed_unit, target_speed, actual_speed, slow_reason,
   equipment_no, operators, operators_text, action_flag, comment,
-  amended_at, amend_note, logged_by
+  amended_at, amend_note, logged_by,
+  required_qty, is_overrun, overrun_qty, needs_overrun_note,
+  overrun_note, overrun_cleared_at, overrun_cleared_by_name
 `;
 
 /** "All entries" / "Flagged only" / one specific flag. */

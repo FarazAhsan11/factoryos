@@ -6,6 +6,7 @@ import { Download, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { AmendEntryDialog } from "@/components/factory/data/amend-entry-dialog";
+import { ExplainOverrunDialog } from "@/components/factory/data/explain-overrun-dialog";
 import { DataTableFilters } from "@/components/factory/data/data-table-filters";
 import { ShiftLogTable } from "@/components/factory/data/shift-log-table";
 import { TablePagination } from "@/components/factory/data/table-pagination";
@@ -66,6 +67,7 @@ export function DataTableWorkspace({
   // the debounced search box to the cleared value without an effect.
   const [resetToken, setResetToken] = useState(0);
   const [amendTarget, setAmendTarget] = useState<LogTableRow | null>(null);
+  const [overrunTarget, setOverrunTarget] = useState<LogTableRow | null>(null);
 
   // Same cache keys the Admin panels and the log form use, so arriving from
   // either has the dropdowns populated already.
@@ -220,6 +222,8 @@ export function DataTableWorkspace({
             hasFilters={!isDefault}
             canAmend={canAmend}
             onAmend={setAmendTarget}
+            canExplainOverrun={canManage}
+            onExplainOverrun={setOverrunTarget}
             // Totals describe a *selection*, so the footer only exists once
             // the filters make one. Unfiltered, it was summing the factory's
             // whole last 30 days directly above the table showing those same
@@ -257,6 +261,25 @@ export function DataTableWorkspace({
         }
         factoryId={factoryId}
         onClose={() => setAmendTarget(null)}
+      />
+
+      <ExplainOverrunDialog
+        entry={
+          overrunTarget && {
+            id: overrunTarget.id,
+            log_date: overrunTarget.log_date,
+            unit_name: overrunTarget.unit_name,
+            process_name: overrunTarget.process_name,
+            batch_no: overrunTarget.batch_no,
+            product_name: overrunTarget.product_name,
+            accumulative: overrunTarget.accumulative,
+            required_qty: overrunTarget.required_qty,
+            overrun_qty: overrunTarget.overrun_qty,
+            overrun_note: overrunTarget.overrun_note,
+          }
+        }
+        factoryId={factoryId}
+        onClose={() => setOverrunTarget(null)}
       />
     </>
   );

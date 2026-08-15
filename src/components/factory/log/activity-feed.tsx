@@ -4,11 +4,14 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { AmendEntryDialog } from "@/components/factory/data/amend-entry-dialog";
+import { ExplainOverrunDialog } from "@/components/factory/data/explain-overrun-dialog";
 import {
   fetchLogEntries,
+  fetchOverrunFlags,
   formatMinutes,
   logKeys,
   type LogEntry,
+  type OverrunFlag,
 } from "@/lib/factory/shift-log-queries";
 import { todayKey } from "@/lib/factory/shift-time-queries";
 import { cn } from "@/lib/utils";
@@ -45,6 +48,7 @@ export function ActivityFeed({
   canManage: boolean;
 }) {
   const [amendTarget, setAmendTarget] = useState<LogEntry | null>(null);
+  const [overrunTarget, setOverrunTarget] = useState<LogEntry | null>(null);
   const [unitFilter, setUnitFilter] = useState("all");
   // Today only. This is the operator's receipt that an entry landed and the
   // supervisor's running view of the shift in progress — history is the Data
@@ -56,6 +60,14 @@ export function ActivityFeed({
   const { data: entries = [], isPending, isError, error } = useQuery({
     queryKey: logKeys.day(factoryId, date),
     queryFn: () => fetchLogEntries(factoryId, date),
+  });
+
+  // Separate from the feed's own read: an overrun compares a batch's running
+  // total against its requirement, and that total is a window function that
+  // only exists in `shift_log_entries_expanded`. Merged by id below.
+  const { data: overruns } = useQuery({
+    queryKey: logKeys.overruns(factoryId, date),
+    queryFn: () => fetchOverrunFlags(factoryId, date),
   });
 
   const unitNames = useMemo(
@@ -122,8 +134,11 @@ export function ActivityFeed({
               <FeedRow
                 key={entry.id}
                 entry={entry}
+                overrun={overruns?.get(entry.id)}
                 canAmend={canManage || entry.logged_by === userId}
                 onAmend={() => setAmendTarget(entry)}
+                canExplainOverrun={canManage}
+                onExplainOverrun={() => setOverrunTarget(entry)}
               />
             ))}
           </ul>
@@ -144,18 +159,44 @@ export function ActivityFeed({
         factoryId={factoryId}
         onClose={() => setAmendTarget(null)}
       />
+
+      <ExplainOverrunDialog
+        entry={
+          overrunTarget && {
+            id: overrunTarget.id,
+            log_date: overrunTarget.log_date,
+            unit_name: overrunTarget.unit?.name ?? null,
+            process_name: overrunTarget.process?.name ?? null,
+            batch_no: overrunTarget.batch_no,
+            product_name: overrunTarget.product?.name ?? null,
+            accumulative: null,
+            required_qty: null,
+            overrun_qty: overruns?.get(overrunTarget.id)?.overrun_qty ?? null,
+            overrun_note: overruns?.get(overrunTarget.id)?.overrun_note ?? null,
+          }
+        }
+        factoryId={factoryId}
+        onClose={() => setOverrunTarget(null)}
+      />
     </aside>
   );
 }
 
 function FeedRow({
   entry,
+  overrun,
   canAmend,
   onAmend,
+  canExplainOverrun,
+  onExplainOverrun,
 }: {
   entry: LogEntry;
+  /** Undefined while the overrun query is still in flight. */
+  overrun?: OverrunFlag;
   canAmend: boolean;
   onAmend: () => void;
+  canExplainOverrun: boolean;
+  onExplainOverrun: () => void;
 }) {
   const perf =
     entry.target_speed && entry.actual_speed
@@ -188,12 +229,47 @@ function FeedRow({
               {entry.action_flag}
             </span>
           )}
+          {/* Clickable for a manager, because the feed is where a supervisor
+              is actually looking when the overrun lands — making them go to
+              the data table to clear it is how a flag gets ignored. */}
+          {overrun?.needs_overrun_note &&
+            (canExplainOverrun ? (
+              <button
+                type="button"
+                onClick={onExplainOverrun}
+                title={`Over the required quantity by ${fmt(overrun.overrun_qty)} — tap to explain`}
+                className="ml-1.5 rounded-full bg-[#FEF3C7] px-1.5 py-0.5 text-[9.5px] font-bold text-[#B45309] transition hover:bg-[#FDE68A]"
+              >
+                Attention · +{fmt(overrun.overrun_qty)}
+              </button>
+            ) : (
+              <span
+                title={`Over the required quantity by ${fmt(overrun.overrun_qty)} — a manager has to explain it`}
+                className="ml-1.5 rounded-full bg-[#FEF3C7] px-1.5 py-0.5 text-[9.5px] font-bold text-[#B45309]"
+              >
+                Attention · +{fmt(overrun.overrun_qty)}
+              </span>
+            ))}
           {entry.amended_at && (
             <span className="ml-1.5 rounded-full bg-[#F1F5F9] px-1.5 py-0.5 text-[9.5px] font-semibold text-[#475569]">
               Amended
             </span>
           )}
         </p>
+
+        {/* Once explained, the reason and the name stay on the entry. The
+            flag is gone; the record of why is not. */}
+        {overrun?.overrun_note && (
+          <p className="text-[11px] leading-snug text-[#B45309]">
+            ↳ Overrun: {overrun.overrun_note}
+            {overrun.overrun_cleared_by_name && (
+              <span className="text-[#92400E]">
+                {" "}
+                — {overrun.overrun_cleared_by_name}
+              </span>
+            )}
+          </p>
+        )}
 
         <p className="text-[11px] text-[#94A3B8]">
           {entry.start_time?.slice(0, 5) ?? "—"}

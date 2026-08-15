@@ -18,6 +18,7 @@ Continues `docs/IMPLEMENTATION_GUIDE.md`, which covers everything up to and incl
 | 8 | Dialog primitive — max height | `src/components/ui/dialog.tsx` |
 | 9 | **Issues & CAPAs — the staged flow** (§6a) | `/factory/[slug]/actions` |
 | 10 | **Shift Report** (§12) | `/factory/[slug]/report` |
+| 11 | **Overproduction flag** (§13) | `/factory/[slug]/log`, `/data` |
 
 ---
 
@@ -33,6 +34,7 @@ Applied by hand via **Supabase Dashboard → SQL Editor**, in order, continuing 
 | `0020_action_stages.sql` | The staged CAPA flow — see §6a. Replaces `action_status` with the four-value `action_stage`, **renames** `resolved_at/_by` → `closed_at/_by`, adds the evidence columns + the `actions_evidence_follows_stage` constraint, `actions_stage_transition()` (drops `actions_log_status_change()`), the `revert_action()` RPC, and rebuilds `actions_expanded` with the second clock. Drops and recreates the view — Postgres will not alter a column type a view depends on |
 | `0021_action_evidence_amend.sql` | `action_amend_note()` + the amendment path in `actions_stage_transition()`: recorded evidence can be corrected in place, the previous text is kept in the thread, and a stage already passed cannot be emptied |
 | `0022_shift_supervisor.sql` | `factory_shift_times.supervisor_name` — the one field the shift report needs that nothing else knew. See §12 |
+| `0023_overrun_flag.sql` | Overproduction: `overrun_note` / `_cleared_by` / `_cleared_at` on `shift_log_entries`, a rewritten `shift_log_amend_guard` that tells a clearance from an amendment, and `shift_log_entries_expanded` rebuilt with `is_overrun` / `overrun_qty` / `needs_overrun_note`. See §13 |
 
 No new npm dependencies.
 
@@ -558,7 +560,71 @@ The report *is* a handover document — printed at the end of a shift and handed
 
 ---
 
-## 13. Related docs
+## 13. Overproduction — flagged on the entry, cleared by a manager
+
+**Files:** migration `0023`, `shift-log-queries.ts`, `shift-log-table-queries.ts`, `shift-log-csv.ts`, `log/schemas.ts`, `explain-overrun-dialog.tsx`, `activity-feed.tsx`, `shift-log-table.tsx`, `data-table-workspace.tsx`.
+
+A batch has a `required_qty`. When the running total for a batch **and activity** goes past it, the entry is still filed — the units exist, and refusing to record them would only make the log wrong — but it carries an **Attention** flag until a manager writes down why there is more product than the work order asked for.
+
+### The flag is computed, not stored
+
+Nothing holds an `is_overrun` boolean. It is `accumulative > required_qty`, evaluated on every read in the view — same call as `is_overdue` on an issue.
+
+A stored flag goes stale the moment someone amends the quantity down: the numbers would read 14,900 of 15,000 and a flag would still sit there claiming an overrun that no longer exists. Computed, **correcting the entry clears the flag by itself**.
+
+What *is* stored is the only part a comparison cannot derive: the explanation. Three columns — `overrun_note`, `overrun_cleared_by`, `overrun_cleared_at` — and the note's presence is what clears the badge.
+
+`required_qty` comes through as `nullif(pr.required_qty, 0)`: the column defaults to 0, and a product with no requirement must never look overrun.
+
+### Clearing is not an amendment
+
+This is the subtle part. Every update to `shift_log_entries` passes through `shift_log_amend_guard`, which demands an `amend_note` and stamps `amended_at`. Explaining an overrun changes none of the logged numbers, so routing it through that path would mark the row as *corrected* when nothing about the shift was corrected.
+
+The guard was rewritten to recognise a **clearance-only** update — one touching nothing but the three overrun columns:
+
+```sql
+probe := new;
+probe.overrun_note := old.overrun_note;        -- …and the other two
+clearance_only := (new is distinct from old) and (probe is not distinct from old);
+```
+
+A clearance needs no `amend_note`, leaves `amended_at` alone, is refused unless `can_manage_factory()`, and has `overrun_cleared_by` / `_at` stamped by the trigger rather than sent by the client.
+
+The manager-only rule **has** to live there, not in the dialog: `shift_log_amend` lets an operator update their own entry, so without it the person who logged the overrun could wave it away themselves — the one thing this feature exists to prevent.
+
+The amendment branch also forces the three overrun columns back to their old values, so a correction cannot smuggle an explanation in alongside the numbers.
+
+### Where the explanation is visible
+
+An audit trail nobody can read is a control on paper only, so the note and the name are surfaced, not buried in a tooltip:
+
+- **Data table** — a second line under Comments: `↳ Overrun: <reason> — <name>`, plus an **Overrun explained** pill where the flag was.
+- **Log feed** — the same line under the entry.
+- **CSV export** — six columns: required qty, over by, status, reason, explained by, explained at.
+
+`overrun_cleared_by_name` is resolved in the view by joining `profiles`; `profiles_factory_read` (migration 0007) lets a member read every profile in their own tenant, and the view is `security_invoker`, so it stays inside the tenant boundary.
+
+### Two badge states, not one
+
+**Attention** (unexplained) is the thing to act on. Once explained it becomes **Overrun explained** rather than disappearing — the batch still ran over, and that is a fact about the batch, not a problem that went away because someone described it.
+
+In the feed the Attention badge is a **button** for a manager: the feed is where a supervisor is actually looking when the overrun lands, and making them walk to the data table to clear it is how a flag gets ignored.
+
+### Why the feed needs a second query
+
+`ActivityFeed` reads `shift_log_entries` directly — it needs the nested unit/process/product shape, and the insert returns that same shape for the optimistic update. The overrun flag can't come from there: it compares a batch's running total against its requirement, and that total is a window function that only exists in `shift_log_entries_expanded`.
+
+So `fetchOverrunFlags(factoryId, date)` is a small second read keyed per day and merged by id in the browser — cheaper than reshaping the feed's read around one badge. Its cache key sits under `logKeys.factory(factoryId)`, so the log form's existing invalidation already covers it.
+
+### Decisions taken
+
+- **Any excess flags.** 15,001 of 15,000 counts. No tolerance setting yet — see §11 if it proves noisy.
+- **Manager and admin only** (`can_manage_factory()`), not supervisors.
+- **No CAPA is raised.** Overproduction is usually explained in a sentence; routing every one through Investigating → Action taken → Closed would bury the board.
+
+---
+
+## 14. Related docs
 
 - `docs/IMPLEMENTATION_GUIDE.md` — everything up to and including the shift log and data table. **Read first.**
 - `docs/PROGRESS.md` — narrative record of what landed when.

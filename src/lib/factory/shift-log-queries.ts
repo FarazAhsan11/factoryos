@@ -64,7 +64,81 @@ export const logKeys = {
   /** One key per factory + working day: the feed is a day's worth of shift. */
   day: (factoryId: string, date: string) =>
     ["shift_log_entries", factoryId, date] as const,
+  /** The overrun flags for one day — see `fetchOverrunFlags`. */
+  overruns: (factoryId: string, date: string) =>
+    ["shift_log_entries", factoryId, date, "overruns"] as const,
 };
+
+/* ── Overproduction ───────────────────────────────────────────────────── */
+
+export interface OverrunFlag {
+  id: string;
+  /** How far past the work order this batch and activity has gone. */
+  overrun_qty: number | null;
+  /** Over the requirement and nobody has said why yet. */
+  needs_overrun_note: boolean;
+  overrun_note: string | null;
+  /** Who explained it, once someone has. */
+  overrun_cleared_by_name: string | null;
+}
+
+/**
+ * The overproduction flags for one day, keyed by entry id.
+ *
+ * A second query rather than more columns on `fetchLogEntries`, because the
+ * two read different things. The feed reads `shift_log_entries` directly —
+ * it needs the nested unit/process/product shape, and the insert returns that
+ * same shape so a new entry can be shown optimistically. The overrun flag
+ * cannot come from there: it compares a batch's *running total* against its
+ * requirement, and that total is a window function living in
+ * `shift_log_entries_expanded`.
+ *
+ * Small, cached per day alongside the feed itself, and merged by id in the
+ * browser — cheaper than reshaping the feed's read around one badge.
+ */
+export async function fetchOverrunFlags(
+  factoryId: string,
+  date: string
+): Promise<Map<string, OverrunFlag>> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("shift_log_entries_expanded")
+    .select(
+      "id, overrun_qty, needs_overrun_note, overrun_note, overrun_cleared_by_name"
+    )
+    .eq("factory_id", factoryId)
+    .eq("log_date", date);
+
+  if (error) throw new Error(error.message);
+  return new Map(
+    ((data ?? []) as unknown as OverrunFlag[]).map((row) => [row.id, row])
+  );
+}
+
+/**
+ * Records why a batch produced more than its work order required, which is
+ * what clears the flag.
+ *
+ * An ordinary update, deliberately. `shift_log_amend_guard` recognises a
+ * write that touches nothing but the overrun columns, and treats it as its own
+ * act: no `amend_note` is demanded and `amended_at` is left alone, because
+ * nothing about what happened on the floor was corrected. The same trigger
+ * refuses it outright unless the caller can manage the factory, and stamps who
+ * explained it — so the manager-only rule is not something this function is
+ * trusted to have checked.
+ */
+export async function explainOverrun(
+  entryId: string,
+  note: string
+): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("shift_log_entries")
+    .update({ overrun_note: note.trim() })
+    .eq("id", entryId);
+
+  if (error) throw new Error(error.message);
+}
 
 export async function fetchLogEntries(
   factoryId: string,

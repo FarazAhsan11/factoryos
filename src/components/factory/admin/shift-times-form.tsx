@@ -269,6 +269,25 @@ function ShiftCard({
             {...register(`${slot}.break2Minutes`, { valueAsNumber: true })}
           />
         </Field>
+
+        {/* Full width, and last: it belongs to the shift but isn't part of the
+            clock. Printed on the shift report — free text, because a
+            supervisor covering at short notice may have no login. */}
+        <div className="sm:col-span-2">
+          <Field
+            label="Supervisor on this shift"
+            error={errors?.supervisorName?.message}
+          >
+            <input
+              type="text"
+              maxLength={80}
+              disabled={disabled}
+              placeholder="Name — printed on the shift report"
+              className={FIELD}
+              {...register(`${slot}.supervisorName`)}
+            />
+          </Field>
+        </div>
       </div>
 
       {(overnight || strayBreak) && (

@@ -216,6 +216,13 @@ const shiftClockSchema = z
     break1Minutes: breakMinutes,
     break2Start: z.union([clockTime, z.literal("")]).optional(),
     break2Minutes: breakMinutes,
+    // Printed on the shift report. Optional — a factory that hasn't filled it
+    // in gets a report with no name on it, not a form it can't save.
+    supervisorName: z
+      .string()
+      .trim()
+      .max(80, "Keep the name under 80 characters.")
+      .optional(),
   })
   .refine((v) => v.startTime !== v.endTime, {
     message: "Start and end can't be the same time.",

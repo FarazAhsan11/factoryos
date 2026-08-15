@@ -128,3 +128,39 @@
     @apply font-sans;
   }
 }
+
+/**
+ * Print — currently for the shift report, which is a handover document before
+ * it is a screen: printed at the end of a shift and handed to the next one.
+ *
+ * Landscape because the report is sixteen columns wide, and exact colour
+ * because the flagged rows and the progress bars are the parts a supervisor
+ * scans for. Without `print-color-adjust` most browsers drop both to white and
+ * the sheet loses the only thing that made it readable at a glance.
+ */
+@media print {
+  @page {
+    size: landscape;
+    margin: 10mm;
+  }
+
+  html,
+  body {
+    background: #fff;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* A row split across a page break is a row nobody can read. */
+  tr,
+  img {
+    break-inside: avoid;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+}

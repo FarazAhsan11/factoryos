@@ -6,6 +6,7 @@ import {
   ChevronsUpDown,
   FileSearch,
   PencilLine,
+  TrendingUp,
 } from "lucide-react";
 
 import { formatMinutes } from "@/lib/factory/shift-log-queries";
@@ -137,6 +138,8 @@ export function ShiftLogTable({
   hasFilters,
   canAmend,
   onAmend,
+  canExplainOverrun,
+  onExplainOverrun,
   showTotals,
   stats,
   statsPending,
@@ -152,6 +155,9 @@ export function ShiftLogTable({
   /** Mirrors the update policy: the author, or a manager. */
   canAmend: (row: LogTableRow) => boolean;
   onAmend: (row: LogTableRow) => void;
+  /** Manager and up only — the trigger refuses everyone else anyway. */
+  canExplainOverrun: boolean;
+  onExplainOverrun: (row: LogTableRow) => void;
   /**
    * Whether the footer exists at all. A separate flag from `stats` being
    * present so the row doesn't blink out of the table on every refetch —
@@ -182,9 +188,13 @@ export function ShiftLogTable({
   }
 
   return (
+    /* Scrolls in both directions inside its own box rather than growing the
+       page. That box is what `sticky` on the header and footer rows resolves
+       against — while the document was the scroller, `sticky top-0` on
+       `<thead>` had nothing to stick to and the header simply scrolled away. */
     <div
       className={cn(
-        "overflow-x-auto rounded-2xl border border-[#E6EAF1] bg-white transition-opacity",
+        "overflow-auto rounded-2xl border border-[#E6EAF1] bg-white transition-opacity lg:min-h-0 lg:flex-1",
         isPending && "opacity-60"
       )}
     >
@@ -249,6 +259,8 @@ export function ShiftLogTable({
               row={row}
               canAmend={canAmend(row)}
               onAmend={() => onAmend(row)}
+              canExplainOverrun={canExplainOverrun}
+              onExplainOverrun={() => onExplainOverrun(row)}
             />
           ))}
         </tbody>
@@ -295,8 +307,12 @@ function TotalsRow({
   // header's. The rows above are sometimes tinted (a flagged entry is pink,
   // a reject amber), so a pale line like the body's #F1F5F9 dividers
   // disappeared against them and the totals read as one more entry.
+  //
+  // Pinned to the bottom of the scroll box, for the same reason the header is
+  // pinned to the top: a total you have to scroll to the end of the page to
+  // read is a total nobody reads.
   const TF =
-    "border-t-2 border-[#94A3B8] bg-[#F1F5F9] px-2.5 py-3 text-[11px] font-semibold text-[#0F1B34]";
+    "sticky bottom-0 z-10 border-t-2 border-[#94A3B8] bg-[#F1F5F9] px-2.5 py-3 text-[11px] font-semibold text-[#0F1B34]";
 
   if (error) {
     return (
@@ -392,10 +408,14 @@ function Row({
   row,
   canAmend,
   onAmend,
+  canExplainOverrun,
+  onExplainOverrun,
 }: {
   row: LogTableRow;
   canAmend: boolean;
   onAmend: () => void;
+  canExplainOverrun: boolean;
+  onExplainOverrun: () => void;
 }) {
   const target = Number(row.target_speed ?? 0);
   const actual = Number(row.actual_speed ?? 0);
@@ -413,7 +433,13 @@ function Row({
         // is the next most interesting. Tint rather than shout — a whole
         // column of red would make neither stand out.
         row.action_flag && "bg-[#FEF2F2]/60",
-        !row.action_flag && rejected > 0 && "bg-[#FFFBEB]/60"
+        !row.action_flag && rejected > 0 && "bg-[#FFFBEB]/60",
+        // An unexplained overrun tints too, but only when nothing louder
+        // already has: a flagged entry is still the more urgent row.
+        !row.action_flag &&
+          rejected === 0 &&
+          row.needs_overrun_note &&
+          "bg-[#FFFBEB]/60"
       )}
     >
       <td className={cn(TD, MONO, "whitespace-nowrap text-[#475569]")}>
@@ -494,11 +520,28 @@ function Row({
         {num(rejected)}
       </td>
 
+      {/* The accumulative total is where an overrun becomes visible — it is
+          the number that went past the requirement — so the comparison is
+          shown right here rather than in a column of its own. */}
       <td
-        className={cn(TD, MONO, "text-right text-[#16A34A]")}
-        title="Everything logged for this batch and activity, up to this entry"
+        className={cn(
+          TD,
+          MONO,
+          "text-right",
+          row.is_overrun ? "font-semibold text-[#B45309]" : "text-[#16A34A]"
+        )}
+        title={
+          row.is_overrun
+            ? `${num(row.accumulative)} of ${num(row.required_qty)} required — over by ${num(row.overrun_qty)}`
+            : "Everything logged for this batch and activity, up to this entry"
+        }
       >
         {num(row.accumulative)}
+        {row.is_overrun && (
+          <span className="block text-[10px] font-semibold text-[#B45309]">
+            +{num(row.overrun_qty)}
+          </span>
+        )}
       </td>
 
       <td className={cn(TD, MONO, "whitespace-nowrap text-right text-[#94A3B8]")}>
@@ -571,9 +614,28 @@ function Row({
           >
             {row.action_flag}
           </span>
-        ) : (
+        ) : !row.is_overrun ? (
           <span className="text-[#94A3B8]">{DASH}</span>
-        )}
+        ) : null}
+
+        {/* Two states, not one. Unexplained is the thing to act on; explained
+            still says the batch ran over, because that is a fact about the
+            batch and not a problem that went away when someone described it. */}
+        {row.needs_overrun_note ? (
+          <span
+            className="ml-1 inline-block rounded-full bg-[#FEF3C7] px-2 py-0.5 text-[10px] font-bold text-[#B45309]"
+            title={`Over the required quantity by ${num(row.overrun_qty)} — needs a manager's explanation`}
+          >
+            Attention
+          </span>
+        ) : row.is_overrun ? (
+          <span
+            className="ml-1 inline-block rounded-full bg-[#F1F5F9] px-2 py-0.5 text-[10px] font-semibold text-[#475569]"
+            title={row.overrun_note ?? undefined}
+          >
+            Overrun explained
+          </span>
+        ) : null}
       </td>
 
       <td
@@ -589,9 +651,44 @@ function Row({
             ↳ Amended
           </span>
         )}
+        {/* The explanation that cleared the flag, shown rather than hidden in
+            a tooltip. A manager-only clearance whose reason and author nobody
+            can read is a control on paper only. */}
+        {row.overrun_note && (
+          <span
+            className="mt-0.5 block truncate text-[10px] text-[#B45309]"
+            title={`${row.overrun_note}${
+              row.overrun_cleared_by_name
+                ? ` — ${row.overrun_cleared_by_name}`
+                : ""
+            }`}
+          >
+            ↳ Overrun: {row.overrun_note}
+            {row.overrun_cleared_by_name && (
+              <span className="text-[#92400E]">
+                {" "}
+                — {row.overrun_cleared_by_name}
+              </span>
+            )}
+          </span>
+        )}
       </td>
 
       <td className={cn(TD, "text-right")}>
+        {/* Offered above Amend when both apply: clearing the flag is the more
+            urgent of the two, and it isn't an amendment — the entry is right,
+            it just needs accounting for. */}
+        {canExplainOverrun && row.needs_overrun_note && (
+          <button
+            type="button"
+            onClick={onExplainOverrun}
+            title="Record why this batch went past its required quantity"
+            className="mb-1 inline-flex h-7 items-center gap-1 rounded-lg border border-[#FDE68A] bg-[#FFFBEB] px-2 text-[11px] font-semibold text-[#B45309] transition hover:border-[#B45309]"
+          >
+            <TrendingUp className="size-3" />
+            Explain
+          </button>
+        )}
         {canAmend ? (
           <button
             type="button"

@@ -28,7 +28,10 @@ export default async function ShiftLogDataPage({
   if (!user) redirect("/login");
 
   return (
-    <div className="mx-auto max-w-[1600px]">
+    /* Fills the workspace frame from `lg` up rather than growing the page:
+       the table then has a bounded box to scroll inside, which is what makes
+       its sticky header actually stick. */
+    <div className="mx-auto w-full max-w-[1600px] lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
       <DataTableWorkspace
         factoryId={factory.id}
         factoryName={factory.name}

@@ -18,6 +18,10 @@ Continues `docs/IMPLEMENTATION_GUIDE.md`, which covers everything up to and incl
 | 8 | Dialog primitive — max height | `src/components/ui/dialog.tsx` |
 | 9 | **Issues & CAPAs — the staged flow** (§6a) | `/factory/[slug]/actions` |
 | 10 | **Shift Report** (§12) | `/factory/[slug]/report` |
+| 11 | **Overproduction flag** (§13) | `/factory/[slug]/log`, `/data` |
+| 12 | **Viewport workspace layout** (§14) | `factory-shell.tsx` |
+| 13 | **Maintenance requests — raising** (§15) | `/factory/[slug]/maintenance` |
+| 14 | **Shared batch summary** (§16) | `batch-summary.tsx` |
 
 ---
 
@@ -33,6 +37,9 @@ Applied by hand via **Supabase Dashboard → SQL Editor**, in order, continuing 
 | `0020_action_stages.sql` | The staged CAPA flow — see §6a. Replaces `action_status` with the four-value `action_stage`, **renames** `resolved_at/_by` → `closed_at/_by`, adds the evidence columns + the `actions_evidence_follows_stage` constraint, `actions_stage_transition()` (drops `actions_log_status_change()`), the `revert_action()` RPC, and rebuilds `actions_expanded` with the second clock. Drops and recreates the view — Postgres will not alter a column type a view depends on |
 | `0021_action_evidence_amend.sql` | `action_amend_note()` + the amendment path in `actions_stage_transition()`: recorded evidence can be corrected in place, the previous text is kept in the thread, and a stage already passed cannot be emptied |
 | `0022_shift_supervisor.sql` | `factory_shift_times.supervisor_name` — the one field the shift report needs that nothing else knew. See §12 |
+| `0025_action_batch.sql` | `actions.batch_no` + `product_id`; `actions_from_log()` now records the batch it already looked up; `actions_expanded` rebuilt with the product joined on. See §16 |
+| `0024_maintenance_requests.sql` | `factory_departments` setup list; `factory_counters` + `next_document_number()`; `maintenance_priority` / `maintenance_status` enums; `maintenance_requests` + RLS + the number-stamping trigger; `maintenance_requests_expanded` view. See §15 |
+| `0023_overrun_flag.sql` | Overproduction: `overrun_note` / `_cleared_by` / `_cleared_at` on `shift_log_entries`, a rewritten `shift_log_amend_guard` that tells a clearance from an amendment, and `shift_log_entries_expanded` rebuilt with `is_overrun` / `overrun_qty` / `needs_overrun_note`. See §13 |
 
 No new npm dependencies.
 
@@ -558,7 +565,180 @@ The report *is* a handover document — printed at the end of a shift and handed
 
 ---
 
-## 13. Related docs
+## 13. Overproduction — flagged on the entry, cleared by a manager
+
+**Files:** migration `0023`, `shift-log-queries.ts`, `shift-log-table-queries.ts`, `shift-log-csv.ts`, `log/schemas.ts`, `explain-overrun-dialog.tsx`, `activity-feed.tsx`, `shift-log-table.tsx`, `data-table-workspace.tsx`.
+
+A batch has a `required_qty`. When the running total for a batch **and activity** goes past it, the entry is still filed — the units exist, and refusing to record them would only make the log wrong — but it carries an **Attention** flag until a manager writes down why there is more product than the work order asked for.
+
+### The flag is computed, not stored
+
+Nothing holds an `is_overrun` boolean. It is `accumulative > required_qty`, evaluated on every read in the view — same call as `is_overdue` on an issue.
+
+A stored flag goes stale the moment someone amends the quantity down: the numbers would read 14,900 of 15,000 and a flag would still sit there claiming an overrun that no longer exists. Computed, **correcting the entry clears the flag by itself**.
+
+What *is* stored is the only part a comparison cannot derive: the explanation. Three columns — `overrun_note`, `overrun_cleared_by`, `overrun_cleared_at` — and the note's presence is what clears the badge.
+
+`required_qty` comes through as `nullif(pr.required_qty, 0)`: the column defaults to 0, and a product with no requirement must never look overrun.
+
+### Clearing is not an amendment
+
+This is the subtle part. Every update to `shift_log_entries` passes through `shift_log_amend_guard`, which demands an `amend_note` and stamps `amended_at`. Explaining an overrun changes none of the logged numbers, so routing it through that path would mark the row as *corrected* when nothing about the shift was corrected.
+
+The guard was rewritten to recognise a **clearance-only** update — one touching nothing but the three overrun columns:
+
+```sql
+probe := new;
+probe.overrun_note := old.overrun_note;        -- …and the other two
+clearance_only := (new is distinct from old) and (probe is not distinct from old);
+```
+
+A clearance needs no `amend_note`, leaves `amended_at` alone, is refused unless `can_manage_factory()`, and has `overrun_cleared_by` / `_at` stamped by the trigger rather than sent by the client.
+
+The manager-only rule **has** to live there, not in the dialog: `shift_log_amend` lets an operator update their own entry, so without it the person who logged the overrun could wave it away themselves — the one thing this feature exists to prevent.
+
+The amendment branch also forces the three overrun columns back to their old values, so a correction cannot smuggle an explanation in alongside the numbers.
+
+### Where the explanation is visible
+
+An audit trail nobody can read is a control on paper only, so the note and the name are surfaced, not buried in a tooltip:
+
+- **Data table** — a second line under Comments: `↳ Overrun: <reason> — <name>`, plus an **Overrun explained** pill where the flag was.
+- **Log feed** — the same line under the entry.
+- **CSV export** — six columns: required qty, over by, status, reason, explained by, explained at.
+
+`overrun_cleared_by_name` is resolved in the view by joining `profiles`; `profiles_factory_read` (migration 0007) lets a member read every profile in their own tenant, and the view is `security_invoker`, so it stays inside the tenant boundary.
+
+### Two badge states, not one
+
+**Attention** (unexplained) is the thing to act on. Once explained it becomes **Overrun explained** rather than disappearing — the batch still ran over, and that is a fact about the batch, not a problem that went away because someone described it.
+
+In the feed the Attention badge is a **button** for a manager: the feed is where a supervisor is actually looking when the overrun lands, and making them walk to the data table to clear it is how a flag gets ignored.
+
+### Why the feed needs a second query
+
+`ActivityFeed` reads `shift_log_entries` directly — it needs the nested unit/process/product shape, and the insert returns that same shape for the optimistic update. The overrun flag can't come from there: it compares a batch's running total against its requirement, and that total is a window function that only exists in `shift_log_entries_expanded`.
+
+So `fetchOverrunFlags(factoryId, date)` is a small second read keyed per day and merged by id in the browser — cheaper than reshaping the feed's read around one badge. Its cache key sits under `logKeys.factory(factoryId)`, so the log form's existing invalidation already covers it.
+
+### Decisions taken
+
+- **Any excess flags.** 15,001 of 15,000 counts. No tolerance setting yet — see §11 if it proves noisy.
+- **Manager and admin only** (`can_manage_factory()`), not supervisors.
+- **No CAPA is raised.** Overproduction is usually explained in a sentence; routing every one through Investigating → Action taken → Closed would bury the board.
+
+---
+
+## 14. The workspace is a frame, not a page
+
+**Files:** `factory-shell.tsx`, `factory-sidebar.tsx`, the `data` and `report` pages and their workspaces, `shift-log-table.tsx`, `shift-report-table.tsx`.
+
+From **`lg` up**, the viewport is the frame and scrolling happens *inside* it:
+
+```
+h-svh flex flex-col overflow-hidden
+├── header                     shrink-0
+└── flex min-h-0 flex-1
+    ├── sidebar wrapper        overflow-y-auto
+    └── <main>                 flex flex-col overflow-y-auto   ← the scroller
+```
+
+### Why it was needed
+
+`<thead>` already carried `sticky top-0` and it did nothing, because **sticky resolves against the nearest scrolling ancestor** — and that was the document. Scrolling a twenty-column table meant losing the header and scrolling back up to find out which column a number was in.
+
+### How a page opts in — no prop, no route-sniffing
+
+`<main>` is the scroll container, so ordinary pages overflow it and scroll exactly as they did; only the scrollbar moved from the document to `<main>`.
+
+A page that wants the viewport instead makes its **own root** `lg:flex lg:min-h-0 lg:flex-1 lg:flex-col` and passes `lg:min-h-0 lg:flex-1` down to the element that should absorb the slack. It then fits `<main>` exactly, never overflows, and the table inside becomes the only scroller. The layout needs no `fullHeight` prop and no `usePathname()` — the page decides by how it sizes itself.
+
+`min-h-0` on every flex ancestor is the load-bearing part. A flex item's default `min-height: auto` refuses to shrink below its content, so one missing `min-h-0` and the table pushes the frame open and the page scrolls again.
+
+### Below `lg`, and on paper
+
+Both are exempt, deliberately:
+
+- **Mobile** keeps document scroll. The rail stacks *above* the content there, so a locked viewport would pin the whole nav on screen and leave a sliver for the page.
+- **Print** unwinds the frame (`print:h-auto`, `print:overflow-visible`, `print:block`, `print:static` on the sticky cells). A fixed-height frame prints exactly one screen — it would have silently truncated the shift report to its first dozen rooms.
+
+### Sticky goes on the cells, never the row
+
+`position: sticky` on a `<tr>` is ignored everywhere except Firefox. Both tables put it on the `<th>` (and the data table's `<td>` totals), each with its own background so body rows don't show through.
+
+The data table's `<tfoot>` is `sticky bottom-0` for the same reason as the header: a total you have to scroll to the end to read is a total nobody reads.
+
+### Filters collapse
+
+The data table's filter bar is seven controls tall, read once; the table under it is read all day. It is now behind a **Filters** button, collapsed by default, carrying a badge of how many filters are active — so a narrowed table can never be mistaken for the whole log.
+
+`activeFilterCount()` counts the date range as **one**, not two: "16 Jul → 15 Aug" is a single decision, and counting both inputs would show `2` on a table nobody has touched.
+
+---
+
+## 15. Maintenance requests — raising one
+
+**Files:** migration `0024`, `maintenance-queries.ts`, `maintenance/schemas.ts`, `new-maintenance-dialog.tsx`, `maintenance-workspace.tsx`, `admin-tabs.ts`, `setup-queries.ts`, `nav.ts`. Ported from the prototype's Maintenance module.
+
+**Scope is the raising half only.** A request is created, numbered and listed; nothing assigns it, works it or verifies it. `maintenance_status` declares the full journey (`reported → assigned → in_progress → completed → verified`) so the states arrive later without a type swap, but only `reported` is reachable and no column that would record the *work* has been invented ahead of knowing what it must hold.
+
+### Two departures from the prototype, both asked for
+
+**Department, not issue type.** The prototype asks what kind of fault it is — mechanical, electrical, pneumatic. What actually needs recording is *who is needed*, and which trades a plant keeps in-house differ: one factory has Electrical and Utilities, the next outsources both. So it is a per-tenant setup list.
+
+`factory_departments` has the same shape as `factory_units`, which means the generic `SetupListManager` drives it with **no new component** — the work was one migration, one entry in the `SetupTable` union, one row in `ADMIN_TABS`, and one `<Panel>`. It carries no flags.
+
+**The batch is typed, not picked.** Same as the shift log, and the same reasoning: the number is on the paperwork in front of whoever found the fault. A dropdown of open batches is slower and stops working the moment the batch isn't on the pipeline board — which, for a machine that broke mid-run, it may not be.
+
+Both `batch_no` (text) and `product_id` are stored. The text is what someone searches for later and survives a batch nobody added to the catalogue; the id is the resolution *when there is one*, never a requirement. A no-match is stated in the form ("saved as typed"), not treated as an error — blocking there would only teach people to leave the field blank. Matching is done in the browser against the already-cached product list, exactly as `log-entry-form.tsx` does it.
+
+### Request numbers
+
+`MR-2026-014`, so a request can be read out on the floor rather than referred to by uuid.
+
+`factory_counters (factory_id, kind, year, next_value)` plus `next_document_number()`, **not** `max(number) + 1` at insert time — that pattern hands the same number to two people submitting at once and then fails one of them on the unique index. The function inserts the counter row if absent, then `update … returning`; the update takes a **row lock**, so a second caller blocks and comes out with the next number.
+
+Keyed by `kind` as well as factory because CAPA numbers will want exactly this and should not grow their own counter. The table has RLS on and **no policy at all** — only the definer function touches it, and nothing in the browser has business reading it.
+
+The number is stamped by a `before insert` trigger, never sent by the client, so it can't be chosen or skipped. Allocating it inside the same transaction as the row also means a failed insert doesn't burn a number and leave a gap people read as "one went missing".
+
+### Optional fields and the zod/RHF gotcha
+
+`unitId`, `departmentId`, `batchNo`, `reportedBy` and `assignedTo` are typed as plain **required strings that may be empty**, not `.optional()`.
+
+`.optional().default("")` gives zod an *input* type that differs from its output, and `zodResolver` then refuses to typecheck against the form's value type. The form always supplies `""` from its defaults, so "optional" here means "may be blank", and `createMaintenanceRequest` turns blank into `null` on the way in. Worth remembering for the next form.
+
+### Access
+
+Nav item is `roles: ALL` — the person who finds a broken machine is whoever was standing next to it, and the insert policy stamps the raiser from the session. Update and delete policies are manager-only and currently unused; they exist so the workflow has something to build on.
+
+---
+
+## 16. The affected batch, and one component for it
+
+**Files:** migration `0025`, `batch-summary.tsx`, `action-queries.ts`, `new-action-dialog.tsx`, `action-list.tsx`, `action-detail-dialog.tsx`, `new-maintenance-dialog.tsx`.
+
+### Issues carry a batch now
+
+An issue raised from the shift log **already knew** which batch it concerned — `actions_from_log()` looks the product up to build the title — and then threw it away, folded into a string. So "Quality flagged — Room 5 · Vitamin D3" could not be traced back to a run without opening the shift log and hunting, and an issue raised by hand had nowhere to record one at all.
+
+`actions.batch_no` + `product_id`, exactly as maintenance carries them (§15): the text survives a batch nobody added to the catalogue and is what someone searches for later; the id is the resolution *when there is one*.
+
+The trigger fills both **straight off the entry**. Asking a supervisor to retype a batch number the operator already typed is how the two drift apart.
+
+In the detail dialog the batch is **read-only**. It was settled when the issue was raised; re-pointing an investigation at a different run halfway through is a new issue, not an edit.
+
+### `BatchSummary` — one component, two forms
+
+The maintenance form had its own inline hint; rather than write a second variant for issues, both now share `BatchSummary`: **product, code and required qty**, and nothing else.
+
+Its whole job is to confirm the number was typed correctly, so it reads the already-cached product catalogue and makes no other query. Actual/produced quantity was built and then removed — on a maintenance request or an issue it answered a question nobody was asking, and it cost two extra reads (batch entries + process names) per keystroke to compute.
+
+The shift log keeps its own `BatchAutofill`, and that is not duplication: there the running total is *for the activity being logged* plus whatever is currently in the quantity field — a live figure that depends on form state this component has no business knowing.
+
+---
+
+## 17. Related docs
 
 - `docs/IMPLEMENTATION_GUIDE.md` — everything up to and including the shift log and data table. **Read first.**
 - `docs/PROGRESS.md` — narrative record of what landed when.

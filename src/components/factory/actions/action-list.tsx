@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, ArrowUpRight, User } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, Package, User } from "lucide-react";
 
 import {
   STAGE_LABELS,
@@ -90,6 +90,26 @@ export function ActionList({
               {action.unit_name ?? "Factory-wide"} · {action.category} ·{" "}
               {action.priority}
             </p>
+
+            {/* The batch, on its own line rather than appended to the one
+                above: it is the detail that ties an issue to a run, and
+                buried at the end of four grey words nobody reads it. */}
+            {action.batch_no && (
+              <p className="mt-1 flex flex-wrap items-baseline gap-x-1.5 text-xs">
+                <Package className="size-3.5 shrink-0 translate-y-0.5 text-[#94A3B8]" />
+                <span className="font-mono font-medium text-[#0F1B34]">
+                  {action.batch_no}
+                </span>
+                {action.product_name && (
+                  <span className="text-[#64748B]">{action.product_name}</span>
+                )}
+                {action.product_code && (
+                  <span className="font-mono text-[11px] text-[#94A3B8]">
+                    {action.product_code}
+                  </span>
+                )}
+              </p>
+            )}
 
             <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
               <span

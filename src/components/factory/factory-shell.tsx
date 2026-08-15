@@ -27,10 +27,20 @@ export function FactoryShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-svh bg-[#F6F8FC]">
+    /* An app layout from `lg` up: the viewport is the frame, and scrolling
+       happens *inside* it rather than to it. That is what lets a page fill the
+       screen and give its table a bounded box to scroll in — a sticky table
+       header only sticks to the element that scrolls, so while the document
+       was the scroller the `sticky top-0` on `<thead>` did nothing.
+
+       Below `lg` the document scrolls as before. Locking a phone viewport
+       whose nav stacks above the content would trap the rail on screen and
+       leave a sliver for the page. Print is exempt for the same reason — a
+       fixed-height frame would print exactly one screen of a report. */
+    <div className="bg-[#F6F8FC] max-lg:min-h-svh lg:flex lg:h-svh lg:flex-col lg:overflow-hidden print:block print:h-auto print:overflow-visible">
       {/* The workspace chrome is navigation, and navigation is meaningless on
           paper. The shift report prints; the rail and the top bar don't. */}
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-[#E6EAF1] bg-white px-6 py-3.5 print:hidden">
+      <header className="sticky top-0 z-30 flex shrink-0 items-center justify-between border-b border-[#E6EAF1] bg-white px-6 py-3.5 print:hidden">
         <div className="flex items-center gap-3">
           {factory.logo_url ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -66,11 +76,16 @@ export function FactoryShell({
         </div>
       </header>
 
-      <div className="lg:flex">
-        <div className="print:hidden">
+      <div className="lg:flex lg:min-h-0 lg:flex-1">
+        <div className="shrink-0 print:hidden lg:overflow-y-auto">
           <FactorySidebar slug={factory.slug ?? ""} role={role} />
         </div>
-        <main className="min-w-0 flex-1 px-6 py-8 print:px-0 print:py-0">
+        {/* `<main>` is the scroll container from `lg` up. Ordinary pages
+            overflow it and scroll exactly as they did; a page that wants the
+            viewport instead makes its own root `lg:min-h-0 lg:flex-1`, fills
+            the space and scrolls internally. No prop, no route-sniffing —
+            the page decides by how it sizes itself. */}
+        <main className="min-w-0 flex-1 px-6 py-8 lg:flex lg:flex-col lg:overflow-y-auto print:overflow-visible print:px-0 print:py-0">
           {children}
         </main>
       </div>

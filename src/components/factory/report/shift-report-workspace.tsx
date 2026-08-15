@@ -126,10 +126,10 @@ export function ShiftReportWorkspace({
   }
 
   return (
-    <>
+    <div className="lg:flex lg:min-h-0 lg:flex-1 lg:flex-col print:block">
       {/* The controls are the one part of the page that has no business on
           paper — you cannot press a button on a printed sheet. */}
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3 print:hidden">
+      <div className="mb-4 flex shrink-0 flex-wrap items-start justify-between gap-3 print:hidden">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">
             Production floor
@@ -183,7 +183,7 @@ export function ShiftReportWorkspace({
       ) : isPending ? (
         <ReportSkeleton />
       ) : (
-        <>
+        <div className="lg:flex lg:min-h-0 lg:flex-1 lg:flex-col print:block">
           <ShiftReportSummary
             totals={totals}
             unitWordPlural={units.plural}
@@ -209,16 +209,16 @@ export function ShiftReportWorkspace({
             <>
               <ShiftReportTable rooms={rooms} unitWord={units.singular} />
               {totals.entries === 0 && (
-                <p className="mt-3 text-center text-xs text-[#94A3B8] print:hidden">
+                <p className="mt-3 shrink-0 text-center text-xs text-[#94A3B8] print:hidden">
                   Nothing was logged on this shift — every{" "}
                   {units.singular.toLowerCase()} shows its board status instead.
                 </p>
               )}
             </>
           )}
-        </>
+        </div>
       )}
-    </>
+    </div>
   );
 }
 

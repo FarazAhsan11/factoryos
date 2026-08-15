@@ -49,6 +49,17 @@ export interface LogTableRow {
   amend_note: string | null;
   /** Who filed it — decides whether this viewer may amend it. */
   logged_by: string | null;
+
+  /* Overproduction. All three are computed on read (migration 0023) — the
+     stored half is `overrun_note`, the explanation that clears the flag. */
+  required_qty: number | null;
+  is_overrun: boolean;
+  overrun_qty: number | null;
+  needs_overrun_note: boolean;
+  overrun_note: string | null;
+  overrun_cleared_at: string | null;
+  /** Who explained it — the point of a manager-only clearance. */
+  overrun_cleared_by_name: string | null;
 }
 
 const COLUMNS = `
@@ -58,7 +69,9 @@ const COLUMNS = `
   target_qty, qty, qty_rejected, accumulative,
   speed_unit, target_speed, actual_speed, slow_reason,
   equipment_no, operators, operators_text, action_flag, comment,
-  amended_at, amend_note, logged_by
+  amended_at, amend_note, logged_by,
+  required_qty, is_overrun, overrun_qty, needs_overrun_note,
+  overrun_note, overrun_cleared_at, overrun_cleared_by_name
 `;
 
 /** "All entries" / "Flagged only" / one specific flag. */
@@ -382,6 +395,25 @@ export const DEFAULT_SORT: LogTableSort = {
   column: "log_date",
   direction: "desc",
 };
+
+/**
+ * How many filters are doing something, for the collapsed filter button.
+ *
+ * The date range counts as **one** even though it is two inputs: "16 Jul →
+ * 15 Aug" is one decision, and counting it twice would make the badge read 2
+ * on a table nobody has touched.
+ */
+export function activeFilterCount(f: LogTableFilters): number {
+  const d = defaultFilters();
+  let count = 0;
+  if (f.from !== d.from || f.to !== d.to) count += 1;
+  if (f.shift !== "all") count += 1;
+  if (f.unitId !== "all") count += 1;
+  if (f.processId !== "all") count += 1;
+  if (f.flag !== "all") count += 1;
+  if (f.search.trim() !== "") count += 1;
+  return count;
+}
 
 /** True when the user has changed anything worth offering to clear. */
 export function filtersAreDefault(f: LogTableFilters): boolean {

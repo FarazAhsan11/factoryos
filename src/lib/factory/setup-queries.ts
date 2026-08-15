@@ -1,13 +1,20 @@
 import { createClient } from "@/lib/supabase/client";
 
 /**
- * Client-side data access for the Admin → setup lists (units, processes).
+ * Client-side data access for the Admin → setup lists (units, processes,
+ * departments).
  * Reads and writes go straight to Supabase from the browser; RLS
  * (`can_manage_factory`) is the trust boundary, so there is no server hop.
  */
 
-/** The two setup lists share a shape, so they share one component + hooks. */
-export type SetupTable = "factory_units" | "factory_processes";
+/** The flat setup lists share a shape, so they share one component + hooks. */
+export type SetupTable =
+  | "factory_units"
+  | "factory_processes"
+  // Which trades a factory has is a property of that factory, not something
+  // this application can guess — so departments are a managed list like the
+  // rest, not a hard-coded dropdown. Carries no flags.
+  | "factory_departments";
 
 export interface SetupItem {
   id: string;

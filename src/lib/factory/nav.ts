@@ -8,6 +8,7 @@ import {
   Sparkles,
   Table2,
   TrendingUp,
+  Wrench,
   Zap,
 } from "lucide-react";
 
@@ -57,6 +58,7 @@ export const FACTORY_NAV: NavSection[] = [
     label: "Accountability",
     items: [
       { href: "/actions", label: "Issues & CAPAs", icon: Zap, roles: SUPERVISOR_UP, ready: true },
+      { href: "/maintenance", label: "Maintenance", icon: Wrench, roles: ALL, ready: true },
     ],
   },
   {

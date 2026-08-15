@@ -122,6 +122,14 @@ export interface FactoryAction {
   shift_log_entry_id: string | null;
   created_at: string;
 
+  /* The affected batch. Both stored — the text survives a batch that was
+     never added to the catalogue, the id is the resolution when there is
+     one. Filled straight off the entry when the shift log raised it. */
+  batch_no: string | null;
+  product_id: string | null;
+  product_name: string | null;
+  product_code: string | null;
+
   /** What each stage produced. Null until the issue has been through it. */
   root_cause: string | null;
   corrective_action: string | null;
@@ -151,6 +159,7 @@ export interface ActionNote {
 const COLUMNS = `
   id, title, unit_id, unit_name, category, priority, status,
   assigned_to, due_at, notes, shift_log_entry_id, created_at,
+  batch_no, product_id, product_name, product_code,
   root_cause, corrective_action, preventive_action, verification,
   investigating_at, action_taken_at, closed_at,
   is_overdue, is_escalated, escalates_at,
@@ -207,6 +216,8 @@ export interface NewActionValues {
   /** `datetime-local` value, or "" to derive one from the priority. */
   dueAt: string;
   notes: string;
+  /** Typed, optional, never validated against the catalogue. */
+  batchNo: string;
 }
 
 /** Now + the priority's window, as an ISO timestamp. */
@@ -217,7 +228,9 @@ export function defaultDueAt(priority: ActionPriority): string {
 export async function createAction(
   factoryId: string,
   values: NewActionValues,
-  createdBy: string
+  createdBy: string,
+  /** Resolved from the typed batch number, or null when it matched nothing. */
+  productId: string | null = null
 ): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase.from("actions").insert({
@@ -234,6 +247,8 @@ export async function createAction(
       ? new Date(values.dueAt).toISOString()
       : defaultDueAt(values.priority),
     notes: values.notes.trim() || null,
+    batch_no: values.batchNo.trim() || null,
+    product_id: productId,
     created_by: createdBy,
   });
 

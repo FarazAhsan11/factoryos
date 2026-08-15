@@ -35,7 +35,11 @@ export function FactorySidebar({
   const currentPath = isPending && pendingHref ? pendingHref : pathname;
 
   return (
-    <nav className="w-full shrink-0 border-b border-[#E6EAF1] bg-white px-3 py-4 lg:sticky lg:top-[57px] lg:h-[calc(100svh-57px)] lg:w-60 lg:overflow-y-auto lg:border-r lg:border-b-0">
+    /* No sticky offset and no `100svh - 57px` guess any more: from `lg` up the
+       rail sits inside a flex row that is already exactly the height left over
+       below the header, and its wrapper does the scrolling. The old calc had
+       to be kept in step with the header's padding by hand. */
+    <nav className="min-h-full w-full border-b border-[#E6EAF1] bg-white px-3 py-4 lg:w-60 lg:border-r lg:border-b-0">
       {navForRole(role).map((section) => (
         <div key={section.label} className="mb-5 last:mb-0">
           <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#94A3B8]">

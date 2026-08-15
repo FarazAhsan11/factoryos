@@ -16,6 +16,8 @@ Continues `docs/IMPLEMENTATION_GUIDE.md`, which covers everything up to and incl
 | 6 | **Actions & escalations** | `/factory/[slug]/actions` |
 | 7 | Shared CSV primitives | `src/lib/factory/csv.ts` |
 | 8 | Dialog primitive — max height | `src/components/ui/dialog.tsx` |
+| 9 | **Issues & CAPAs — the staged flow** (§6a) | `/factory/[slug]/actions` |
+| 10 | **Shift Report** (§12) | `/factory/[slug]/report` |
 
 ---
 
@@ -30,6 +32,7 @@ Applied by hand via **Supabase Dashboard → SQL Editor**, in order, continuing 
 | `0017_actions.sql` | `action_status` / `action_priority` enums; `action_window()`; `actions` + `action_notes` tables + RLS; `actions_from_log()` — a flagged entry raises an action; `actions_log_status_change()` — status changes write themselves into the thread; `actions_expanded` view, **where overdue and escalated are computed** |
 | `0020_action_stages.sql` | The staged CAPA flow — see §6a. Replaces `action_status` with the four-value `action_stage`, **renames** `resolved_at/_by` → `closed_at/_by`, adds the evidence columns + the `actions_evidence_follows_stage` constraint, `actions_stage_transition()` (drops `actions_log_status_change()`), the `revert_action()` RPC, and rebuilds `actions_expanded` with the second clock. Drops and recreates the view — Postgres will not alter a column type a view depends on |
 | `0021_action_evidence_amend.sql` | `action_amend_note()` + the amendment path in `actions_stage_transition()`: recorded evidence can be corrected in place, the previous text is kept in the thread, and a stage already passed cannot be emptied |
+| `0022_shift_supervisor.sql` | `factory_shift_times.supervisor_name` — the one field the shift report needs that nothing else knew. See §12 |
 
 No new npm dependencies.
 
@@ -499,10 +502,63 @@ src/components/factory/data/data-table-stats.tsx   → became a <tfoot>
 - **Nothing escalates a late sign-off to anyone.** `is_verify_overdue` is computed and badged, but no one is notified — same gap the fix clock has.
 - **Priority is fixed once raised.** Nothing re-prioritises an issue that turns out worse than it looked, so the due window it was born with is the one it keeps.
 - **`preventive_action` is never reported on.** It is collected but nothing aggregates it, so the "P" half of CAPA is currently write-only.
+- **No work order anywhere.** The prototype's shift report has a WO column; `shift_log_entries` has no such field, so the column was dropped rather than faked. Adding it means a migration plus the log form, the data table and both CSV exports.
+- **The shift report has no totals row.** The summary strip covers the shift; per-room subtotals stop at `producedQty` in the room header, and there is no factory-wide footer the way the data table has one.
+- **The shift report reads the whole slice into the browser.** Fine at tens of rows per shift; a factory logging several hundred entries in one shift would want the grouping pushed into an RPC.
+- **Nothing links a shift report to a handover.** It prints, but nobody signs it and no record says it was produced — the handover-report module in `ARCHITECTURE_FLOW.md` is still unbuilt.
 
 ---
 
-## 12. Related docs
+## 12. Shift Report — `/factory/[slug]/report`
+
+**Files:** `shift-report-queries.ts`, `shift-report-csv.ts`, `shift-report-workspace.tsx`, `shift-report-table.tsx`, `shift-report-summary.tsx`, `shift-report-header.tsx`, migration `0022`. Ported from the `factoryos_v13.html` prototype's Shift Report view.
+
+One day, one shift, the whole floor on one sheet. Supervisor and up, under Analytics in `nav.ts`.
+
+### Why it isn't a preset on the data table
+
+They answer different questions. The **data table** answers *"find me the entries matching this"* — thousands of rows, so it filters, sorts and pages in Postgres. The **shift report** answers *"what happened on the floor during that shift"* — a fixed, small slice (one date, one shift; tens of rows) always read whole, and read **by room**.
+
+So this one fetches the slice from the same `shift_log_entries_expanded` view and does the grouping, room ordering and totals in the browser, where the same rows have to be laid out anyway. Aggregating it in SQL would mean a view or RPC producing exactly one screen's shape and nothing else.
+
+### Idle rooms are the point
+
+A room that logged nothing is **kept on the sheet**, not filtered out. A report listing only the busy rooms can't answer "was anything running in 7?" — and the blank row is the answer.
+
+Their status comes from `pipeline_jobs` rather than being assumed idle: a room holding a batch is not a room standing ready. `IDLE_FROM_PIPELINE` maps `production`/`hold`/`planned`; a finished job left the room free, so that falls through to `READY`.
+
+Rooms with entries but since deactivated in Admin are also kept — their work still happened.
+
+### Room ordering
+
+`compareRoomNames()` compares the embedded number first. Plain alphabetical puts "Room 10" before "Room 2", which is wrong on a sheet people read by room number.
+
+### Three departures from the prototype
+
+- **16 columns, not 18.** The prototype printed the same figure twice, twice over: *Shift Total* and *Achieved* were both `qty`, *Required* and *Target* were both `target_qty`. A wide sheet that prints one number in two places invites the reader to hunt for a difference that cannot exist. **Rejected** was added in the space freed — it was in the log and missing from the report.
+- **No WO column.** No work order is captured anywhere in FactoryOS; it rendered blank for every row in the prototype too. Noted in §11 rather than faked.
+- **The CSV is built from the data, not scraped from the DOM.** The prototype exported `querySelectorAll('td').textContent`, which ships the truncated product name, the `—` placeholders and the `%` glued to a number — and breaks silently the moment a column is reordered. `toShiftReportCsv()` walks the same room grouping the table renders.
+
+### The supervisor line — migration `0022`
+
+`factory_shift_times.supervisor_name`, edited in Admin → Shift times next to the clock it belongs to. On the shift-time row rather than on `factories` because it is a property of *a* shift: mornings and afternoons have different supervisors, which is the whole reason the report names one.
+
+Free text, same reasoning as the shift log's operators and an issue's assignee — a supervisor covering at short notice may have no login. Optional, and the header omits the line entirely when it's blank: "Supervisor: —" on a handover sheet reads as nobody being in charge, which is worse than silence.
+
+### Printing
+
+The report *is* a handover document — printed at the end of a shift and handed to the next one — so print is a first-class output, not an afterthought.
+
+- A `@media print` block in `globals.css`: landscape (sixteen columns), `print-color-adjust: exact` so flagged rows and progress bars survive, `break-inside: avoid` on rows, and `thead { display: table-header-group }` so the header repeats on page two.
+- `print:hidden` on the shell's top bar and sidebar, and on the report's own controls — you cannot press a button on paper.
+
+### Refetch
+
+`refetchInterval` is 60s **only when the date is today**. A shift in progress is still being written to; a past shift is finished and polling it buys nothing.
+
+---
+
+## 13. Related docs
 
 - `docs/IMPLEMENTATION_GUIDE.md` — everything up to and including the shift log and data table. **Read first.**
 - `docs/PROGRESS.md` — narrative record of what landed when.

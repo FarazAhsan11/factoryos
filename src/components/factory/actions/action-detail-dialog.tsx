@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { ActionStageForm } from "@/components/factory/actions/action-stage-form";
+import { BatchSummary } from "@/components/factory/batch/batch-summary";
 import { ActionStageTimeline } from "@/components/factory/actions/action-stage-timeline";
 import {
   Dialog,
@@ -211,6 +212,32 @@ function Body({
           <Row label="Closed">{formatDue(action.closed_at)}</Row>
         )}
       </dl>
+
+      {/* Read-only here. The batch is a fact about the issue that was settled
+          when it was raised — from the flagged entry, or typed by hand — and
+          re-pointing an investigation at a different run halfway through is a
+          new issue, not an edit. */}
+      {action.batch_no && (
+        <div className="space-y-1.5">
+          <p className="text-[10px] font-bold uppercase tracking-[0.6px] text-[#94A3B8]">
+            Affected batch
+          </p>
+          <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
+            <span className="font-mono font-semibold text-[#0F1B34]">
+              {action.batch_no}
+            </span>
+            {action.product_name && (
+              <span className="text-[#475569]">{action.product_name}</span>
+            )}
+            {action.product_code && (
+              <span className="font-mono text-xs text-[#94A3B8]">
+                {action.product_code}
+              </span>
+            )}
+          </p>
+          <BatchSummary factoryId={factoryId} batchNo={action.batch_no} />
+        </div>
+      )}
 
       {/* Reassignment only, and only once the investigation is under way.
           While an issue is still Open, naming an owner *is* the first stage —

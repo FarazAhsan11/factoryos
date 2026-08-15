@@ -11,6 +11,7 @@ import {
   maintenanceRequestSchema,
   type MaintenanceRequestValues,
 } from "@/app/factory/[slug]/maintenance/schemas";
+import { BatchSummary } from "@/components/factory/batch/batch-summary";
 import {
   Dialog,
   DialogContent,
@@ -248,7 +249,9 @@ export function NewMaintenanceDialog({
                 className={cn(CONTROL, "font-mono")}
                 {...register("batchNo")}
               />
-              <BatchHint query={(batchNo ?? "").trim()} product={matched} />
+              <div className="mt-1.5">
+                <BatchSummary factoryId={factoryId} batchNo={batchNo ?? ""} />
+              </div>
             </Field>
 
             <div className="grid gap-3 sm:grid-cols-2">
@@ -293,46 +296,6 @@ export function NewMaintenanceDialog({
         </DialogContent>
       </Dialog>
     </>
-  );
-}
-
-/**
- * What the typed batch resolved to.
- *
- * A no-match is stated, not treated as an error: the fault is real whether or
- * not the batch was ever added to the catalogue, and the typed text is stored
- * either way. Blocking here would only teach people to leave the field blank.
- */
-function BatchHint({
-  query,
-  product,
-}: {
-  query: string;
-  product: { name: string; code: string | null; batch_no: string } | null;
-}) {
-  if (!query) {
-    return (
-      <p className="mt-1 text-[11px] italic text-[#94A3B8]">
-        Type a batch number to pull in its product.
-      </p>
-    );
-  }
-
-  if (!product) {
-    return (
-      <p className="mt-1 text-[11px] italic text-[#B45309]">
-        No batch “{query}” in the catalogue — it will be saved as typed.
-      </p>
-    );
-  }
-
-  return (
-    <p className="mt-1 flex flex-wrap items-baseline gap-x-1.5 text-[11px] text-[#1D4ED8]">
-      <span className="font-semibold">{product.name}</span>
-      {product.code && (
-        <span className="font-mono text-[#64748B]">{product.code}</span>
-      )}
-    </p>
   );
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 
@@ -19,6 +19,8 @@ import {
   type ActionPriority,
   type NewActionValues,
 } from "@/lib/factory/action-queries";
+import { BatchSummary } from "@/components/factory/batch/batch-summary";
+import { fetchProducts, productKeys } from "@/lib/factory/product-queries";
 import type { SetupItem } from "@/lib/factory/setup-queries";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +35,7 @@ const EMPTY: NewActionValues = {
   assignedTo: "",
   dueAt: "",
   notes: "",
+  batchNo: "",
 };
 
 /**
@@ -66,8 +69,22 @@ export function NewActionDialog({
     setValues((current) => ({ ...current, [key]: value }));
   }
 
+  // The whole catalogue, matched in the browser — same as the shift log and
+  // the maintenance form, and the reason typing a batch resolves instantly.
+  const { data: products = [] } = useQuery({
+    queryKey: productKeys.all(factoryId),
+    queryFn: () => fetchProducts(factoryId),
+  });
+
+  const matched = useMemo(() => {
+    const term = values.batchNo.trim().toLowerCase();
+    if (!term) return null;
+    return products.find((p) => p.batch_no.toLowerCase() === term) ?? null;
+  }, [products, values.batchNo]);
+
   const create = useMutation({
-    mutationFn: () => createAction(factoryId, values, userId),
+    mutationFn: () =>
+      createAction(factoryId, values, userId, matched?.id ?? null),
     onSuccess: () => {
       toast.success("Action created.");
       setValues(EMPTY);
@@ -184,6 +201,23 @@ export function NewActionDialog({
                 />
               </Field>
             </div>
+
+            {/* Optional, and typed rather than picked — the same field the
+                shift log and a maintenance request use. An issue raised from
+                a flagged entry arrives with this already filled in from the
+                entry, so the two can never drift apart. */}
+            <Field label="Affected batch" htmlFor="na-batch" note="(optional)">
+              <input
+                id="na-batch"
+                value={values.batchNo}
+                onChange={(e) => set("batchNo", e.target.value)}
+                placeholder="Type a batch number"
+                className={cn(CONTROL, "font-mono")}
+              />
+              <div className="mt-1.5">
+                <BatchSummary factoryId={factoryId} batchNo={values.batchNo} />
+              </div>
+            </Field>
 
             <Field label="Due by" htmlFor="na-due" note="(optional)">
               <input

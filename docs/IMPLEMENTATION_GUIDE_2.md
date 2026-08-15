@@ -21,6 +21,7 @@ Continues `docs/IMPLEMENTATION_GUIDE.md`, which covers everything up to and incl
 | 11 | **Overproduction flag** (§13) | `/factory/[slug]/log`, `/data` |
 | 12 | **Viewport workspace layout** (§14) | `factory-shell.tsx` |
 | 13 | **Maintenance requests — raising** (§15) | `/factory/[slug]/maintenance` |
+| 14 | **Shared batch summary** (§16) | `batch-summary.tsx` |
 
 ---
 
@@ -36,6 +37,7 @@ Applied by hand via **Supabase Dashboard → SQL Editor**, in order, continuing 
 | `0020_action_stages.sql` | The staged CAPA flow — see §6a. Replaces `action_status` with the four-value `action_stage`, **renames** `resolved_at/_by` → `closed_at/_by`, adds the evidence columns + the `actions_evidence_follows_stage` constraint, `actions_stage_transition()` (drops `actions_log_status_change()`), the `revert_action()` RPC, and rebuilds `actions_expanded` with the second clock. Drops and recreates the view — Postgres will not alter a column type a view depends on |
 | `0021_action_evidence_amend.sql` | `action_amend_note()` + the amendment path in `actions_stage_transition()`: recorded evidence can be corrected in place, the previous text is kept in the thread, and a stage already passed cannot be emptied |
 | `0022_shift_supervisor.sql` | `factory_shift_times.supervisor_name` — the one field the shift report needs that nothing else knew. See §12 |
+| `0025_action_batch.sql` | `actions.batch_no` + `product_id`; `actions_from_log()` now records the batch it already looked up; `actions_expanded` rebuilt with the product joined on. See §16 |
 | `0024_maintenance_requests.sql` | `factory_departments` setup list; `factory_counters` + `next_document_number()`; `maintenance_priority` / `maintenance_status` enums; `maintenance_requests` + RLS + the number-stamping trigger; `maintenance_requests_expanded` view. See §15 |
 | `0023_overrun_flag.sql` | Overproduction: `overrun_note` / `_cleared_by` / `_cleared_at` on `shift_log_entries`, a rewritten `shift_log_amend_guard` that tells a clearance from an amendment, and `shift_log_entries_expanded` rebuilt with `is_overrun` / `overrun_qty` / `needs_overrun_note`. See §13 |
 
@@ -712,7 +714,31 @@ Nav item is `roles: ALL` — the person who finds a broken machine is whoever wa
 
 ---
 
-## 16. Related docs
+## 16. The affected batch, and one component for it
+
+**Files:** migration `0025`, `batch-summary.tsx`, `action-queries.ts`, `new-action-dialog.tsx`, `action-list.tsx`, `action-detail-dialog.tsx`, `new-maintenance-dialog.tsx`.
+
+### Issues carry a batch now
+
+An issue raised from the shift log **already knew** which batch it concerned — `actions_from_log()` looks the product up to build the title — and then threw it away, folded into a string. So "Quality flagged — Room 5 · Vitamin D3" could not be traced back to a run without opening the shift log and hunting, and an issue raised by hand had nowhere to record one at all.
+
+`actions.batch_no` + `product_id`, exactly as maintenance carries them (§15): the text survives a batch nobody added to the catalogue and is what someone searches for later; the id is the resolution *when there is one*.
+
+The trigger fills both **straight off the entry**. Asking a supervisor to retype a batch number the operator already typed is how the two drift apart.
+
+In the detail dialog the batch is **read-only**. It was settled when the issue was raised; re-pointing an investigation at a different run halfway through is a new issue, not an edit.
+
+### `BatchSummary` — one component, two forms
+
+The maintenance form had its own inline hint; rather than write a second variant for issues, both now share `BatchSummary`: **product, code and required qty**, and nothing else.
+
+Its whole job is to confirm the number was typed correctly, so it reads the already-cached product catalogue and makes no other query. Actual/produced quantity was built and then removed — on a maintenance request or an issue it answered a question nobody was asking, and it cost two extra reads (batch entries + process names) per keystroke to compute.
+
+The shift log keeps its own `BatchAutofill`, and that is not duplication: there the running total is *for the activity being logged* plus whatever is currently in the quantity field — a live figure that depends on form state this component has no business knowing.
+
+---
+
+## 17. Related docs
 
 - `docs/IMPLEMENTATION_GUIDE.md` — everything up to and including the shift log and data table. **Read first.**
 - `docs/PROGRESS.md` — narrative record of what landed when.

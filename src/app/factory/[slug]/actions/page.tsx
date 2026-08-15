@@ -15,11 +15,12 @@ export default async function ActionsPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const { factory } = await getFactoryContext(slug);
+  const { factory, role } = await getFactoryContext(slug);
 
-  // No role gate beyond the nav's: an action is collaborative work, and the
+  // No role gate beyond the nav's: an issue is collaborative work, and the
   // person who can fix a thing isn't always a manager. RLS scopes it to the
-  // tenant either way.
+  // tenant either way. The role is passed down for one decision only — who
+  // gets the sign-off form — and `can_review_factory()` enforces it for real.
   const supabase = await createClient();
   const {
     data: { user },
@@ -31,6 +32,7 @@ export default async function ActionsPage({
       <ActionsWorkspace
         factoryId={factory.id}
         userId={user.id}
+        role={role}
         units={unitWords(factory)}
       />
     </div>

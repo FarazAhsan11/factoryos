@@ -28,6 +28,8 @@ Applied by hand via **Supabase Dashboard → SQL Editor**, in order, continuing 
 | `0015_shift_log_stats_target.sql` | Adds `total_target_qty` to `shift_log_stats()`. **Drops and recreates** the function — Postgres will not let `create or replace` change a return type. The signature is unchanged, so the browser sends the same eight arguments either way |
 | `0016_pipeline_jobs.sql` | `factory_processes.is_final_stage` + the partial unique index, the `has_output` check and the demotion trigger; `pipeline_status` enum; `pipeline_jobs` table + RLS; `pipeline_sync_from_log()` — the trigger that moves cards; `pipeline_jobs_expanded` view |
 | `0017_actions.sql` | `action_status` / `action_priority` enums; `action_window()`; `actions` + `action_notes` tables + RLS; `actions_from_log()` — a flagged entry raises an action; `actions_log_status_change()` — status changes write themselves into the thread; `actions_expanded` view, **where overdue and escalated are computed** |
+| `0020_action_stages.sql` | The staged CAPA flow — see §6a. Replaces `action_status` with the four-value `action_stage`, **renames** `resolved_at/_by` → `closed_at/_by`, adds the evidence columns + the `actions_evidence_follows_stage` constraint, `actions_stage_transition()` (drops `actions_log_status_change()`), the `revert_action()` RPC, and rebuilds `actions_expanded` with the second clock. Drops and recreates the view — Postgres will not alter a column type a view depends on |
+| `0021_action_evidence_amend.sql` | `action_amend_note()` + the amendment path in `actions_stage_transition()`: recorded evidence can be corrected in place, the previous text is kept in the thread, and a stage already passed cannot be emptied |
 
 No new npm dependencies.
 
@@ -289,6 +291,101 @@ It cuts across open and in-progress alike. An action someone started and then le
 
 ---
 
+## 6a. The staged CAPA flow — migration `0020`
+
+_Supersedes the three-status model above. Everything in §6 about the clock being computed, the trigger raising actions from the log, and the thread still holds; what changed is the shape of the middle._
+
+### Why
+
+`open → in_progress → resolved` had both buttons live from the first second. You could open an issue and resolve it in one click, and the record would say a thing was fixed without ever saying what was wrong. Three statuses anyone can jump between is a label, not a loop.
+
+```
+open  →  investigating  →  action_taken  →  closed
+```
+
+One stage at a time, forward, and **each move has to be paid for with the thing that stage exists to produce**:
+
+| Move | Costs |
+|---|---|
+| → `investigating` | an owner (`assigned_to`) |
+| → `action_taken` | `root_cause` + `corrective_action` (`preventive_action` optional) |
+| → `closed` | `verification`, and `can_review_factory()` — supervisor and up |
+
+### Where it is enforced
+
+`actions_stage_transition()`, a **single** `before insert or update` trigger. Deliberately one function rather than a guard plus a history trigger: two `before update` triggers fire in *name* order, so the correctness of the gate would rest on nobody ever renaming one.
+
+Two things back it up:
+
+- **`actions_evidence_follows_stage`**, a check constraint — a row carrying `corrective_action` while still `open` does not exist. It holds on insert too, so it can't be dodged by creating an issue pre-filled. It is also why `advanceAction()` sends the evidence and the status in **one** update: writing the text first and the status second is a sequence Postgres will not accept.
+- **Enum declaration order is comparison order**, which is what lets both the constraint and the view say `status >= 'action_taken'` and mean "at or past the stage where a fix exists".
+
+The UI's half is `ActionStageForm`, which renders the form for the *one* move available next and nothing else. While an issue is Open there is no box to type a corrective action into. The trigger refuses the write; this refuses the temptation. Neither is sufficient alone — issues are written browser-direct under RLS, so a gate that lives only in React is a gate anyone with a session can PATCH straight past.
+
+### Going backwards costs a written reason
+
+`action_taken → investigating` (verification failed) and `closed → open` (re-open) are legal. Nothing else backwards is — there is no `investigating → open`, because un-assigning is what that means and it is a field, not a stage.
+
+Both go through the **`revert_action(id, to, reason)` RPC**, and the reason is a required *argument* rather than a note the client is trusted to write first — "please also add a note" is not a rule, it is a hope. The trigger knows the caller came through that door via a transaction-local `set_config('factoryos.revert', 'on', true)`; a direct `update … set status = 'open'` from the browser cannot set it, so a revert without a recorded reason is not expressible.
+
+Reverting **clears** the evidence of the abandoned stage — a re-opened issue must not sit under a root cause already proved wrong — and copies the cleared text into the thread first, so nothing is lost.
+
+### Two clocks
+
+`factories.escalate_hours` (1–48h, added in `0005`, editable in Company settings) had sat unread since it was created. It is now the verification window.
+
+| Clock | Runs while | Columns |
+|---|---|---|
+| Fix | `status < 'action_taken'` | `is_overdue`, `is_escalated`, `escalates_at` |
+| Sign-off | `status = 'action_taken'` | `verify_due_at`, `is_verify_overdue` |
+
+Once the corrective action is in, the urgency is genuinely over — what remains is a signature. Keeping the Critical badge burning through that window is how a factory learns to stop reading badges. `verify_due_at` is null unless the issue is actually waiting on one, so the UI keys off the column rather than off the stage.
+
+### Four-eyes, soft
+
+Closing requires supervisor and up, but is **not** blocked when the closer is the person who recorded the fix — a factory running one supervisor on nights would deadlock until the day shift. It is recorded instead: the trigger's system line reads *"Closed by the same person who took the action."*
+
+### Tabs, and why Escalated isn't one
+
+Four tabs, one per stage. Escalated is a **toggle** (`Needs attention`), not a fifth tab: an escalated issue is already sitting in Open or Investigating, so a tab of its own would show the same row twice and make every count a little bit of a lie. The toggle folds both clocks together — from the floor, "this has been ignored too long" is one idea.
+
+### Correcting what a stage recorded — migration `0021`
+
+Freezing the evidence would leave known-wrong text nobody can fix, which is how people learn to write nothing much in the box. Letting it be silently rewritten would let a signed-off issue be re-authored after the fact. So: **amendable, never silently** — the same bargain `shift_log_amend_guard` strikes.
+
+The amendment path lives in the `status is not distinct from old.status` branch of `actions_stage_transition()`:
+
+- Every changed field writes a system line carrying the **previous text** (`action_amend_note()`, a helper so the four fields can't drift apart in how they're recorded).
+- **A stage already passed cannot be emptied.** You may correct a root cause, not delete one — otherwise the record could be hollowed out field by field, which is reverting minus the reason.
+- Amending a **closed** issue needs `can_review_factory()`: it rewrites something a supervisor signed.
+
+In the UI each recorded block in `ActionStageTimeline` carries an inline **Edit**. `Raised with` and `Owner` deliberately don't: the first is the shift log's own words, the second has its own control.
+
+### One control per question
+
+Reassignment shows only from Investigating onwards. While an issue is Open, naming an owner **is** the first stage — `StartForm` collects it — so rendering the standalone *Assigned to* box there as well put two controls for one column in one dialog, and read as the app asking the same question twice.
+
+Note that a shift-log-raised issue arrives **unassigned by design** (§6, and `actions_from_log()` has never set `assigned_to`): the operator who spots a capping fault is not the person who fixes it. That is not a lost value.
+
+### Backfill
+
+The `using` clause on the `alter column … type` *is* the backfill: `in_progress → investigating`, `resolved → closed`, in place. `resolved_at/_by` are **renamed** to `closed_at/_by` rather than dropped and re-added — they hold who signed off on every issue closed before today, and that is not regenerable. Old rows carry no root cause and never will; the guard applies to transitions made from here on, not retroactively.
+
+### Files
+
+```
+supabase/migrations/0020_action_stages.sql        new
+supabase/migrations/0021_action_evidence_amend.sql new
+src/app/factory/[slug]/actions/schemas.ts         new — one zod schema per boundary
+src/components/factory/actions/action-stage-tabs.tsx      new
+src/components/factory/actions/action-stage-timeline.tsx  new
+src/components/factory/actions/action-stage-form.tsx      new
+src/components/factory/actions/action-detail-dialog.tsx   now a shell composing the three
+src/lib/factory/action-queries.ts                 ActionStatus → ActionStage; advance/revert
+```
+
+---
+
 ## 7. Shared CSV primitives — `src/lib/factory/csv.ts`
 
 Extracted when the product importer needed the same splitter as the employee one. `employee-csv.ts` was refactored onto it rather than keeping a second copy, and gained tab support and delimiter detection as a side effect.
@@ -398,6 +495,10 @@ src/components/factory/data/data-table-stats.tsx   → became a <tfoot>
 - **`fetchBatchEntries` uses `ilike` on `batch_no`** without escaping `%` / `_`, so a batch number containing either would over-match.
 - **The batch progress bar in the log form** is still scoped to the selected activity and shows 0% with no activity chosen. Left as-is by decision; `is_final_stage` now makes a batch-level figure possible if that changes.
 - **Pipeline tabs** — Planning by room, Gantt and Archive exist in the prototype and are not built.
+- **`assigned_to` is still free text** (§6), so the four-eyes note on closure compares `action_taken_by` to `auth.uid()` — the *accounts*, not the typed name. Someone who records a fix under a colleague's name and then closes it will not be flagged.
+- **Nothing escalates a late sign-off to anyone.** `is_verify_overdue` is computed and badged, but no one is notified — same gap the fix clock has.
+- **Priority is fixed once raised.** Nothing re-prioritises an issue that turns out worse than it looked, so the due window it was born with is the one it keeps.
+- **`preventive_action` is never reported on.** It is collected but nothing aggregates it, so the "P" half of CAPA is currently write-only.
 
 ---
 

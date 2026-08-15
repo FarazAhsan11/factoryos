@@ -16,6 +16,7 @@ export const ADMIN_TABS: AdminTab[] = [
   { value: "company", label: "Company", ready: true },
   { value: "units", label: "Units", ready: true },
   { value: "processes", label: "Processes", ready: true },
+  { value: "departments", label: "Departments", ready: true },
   { value: "employees", label: "Employees", ready: true },
   { value: "products", label: "Products", ready: true },
   { value: "shift-times", label: "Shift times", ready: true },
@@ -25,6 +26,7 @@ export const ADMIN_TABS: AdminTab[] = [
 export const TAB_TABLE: Record<string, SetupTable> = {
   units: "factory_units",
   processes: "factory_processes",
+  departments: "factory_departments",
 };
 
 /** Falls back to Company for an unknown, unbuilt, or missing ?tab=. */

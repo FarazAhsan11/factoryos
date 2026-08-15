@@ -109,6 +109,20 @@ export function AdminWorkspace({
         />
       </Panel>
 
+      {/* Who a maintenance request is *for*. A managed list rather than a
+          fixed dropdown because the trades a plant keeps in-house differ —
+          one factory has Electrical and Utilities, the next outsources both. */}
+      <Panel active={tab === "departments"} lazy>
+        <SetupListManager
+          table="factory_departments"
+          factoryId={factory.id}
+          singular="Department"
+          plural="Departments"
+          placeholder="e.g. Electrical, Mechanical, Utilities…"
+          canManage={canManage}
+        />
+      </Panel>
+
       <Panel active={tab === "processes"} lazy>
         <SetupListManager
           table="factory_processes"

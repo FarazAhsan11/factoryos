@@ -20,6 +20,7 @@ Continues `docs/IMPLEMENTATION_GUIDE.md`, which covers everything up to and incl
 | 10 | **Shift Report** (§12) | `/factory/[slug]/report` |
 | 11 | **Overproduction flag** (§13) | `/factory/[slug]/log`, `/data` |
 | 12 | **Viewport workspace layout** (§14) | `factory-shell.tsx` |
+| 13 | **Maintenance requests — raising** (§15) | `/factory/[slug]/maintenance` |
 
 ---
 
@@ -35,6 +36,7 @@ Applied by hand via **Supabase Dashboard → SQL Editor**, in order, continuing 
 | `0020_action_stages.sql` | The staged CAPA flow — see §6a. Replaces `action_status` with the four-value `action_stage`, **renames** `resolved_at/_by` → `closed_at/_by`, adds the evidence columns + the `actions_evidence_follows_stage` constraint, `actions_stage_transition()` (drops `actions_log_status_change()`), the `revert_action()` RPC, and rebuilds `actions_expanded` with the second clock. Drops and recreates the view — Postgres will not alter a column type a view depends on |
 | `0021_action_evidence_amend.sql` | `action_amend_note()` + the amendment path in `actions_stage_transition()`: recorded evidence can be corrected in place, the previous text is kept in the thread, and a stage already passed cannot be emptied |
 | `0022_shift_supervisor.sql` | `factory_shift_times.supervisor_name` — the one field the shift report needs that nothing else knew. See §12 |
+| `0024_maintenance_requests.sql` | `factory_departments` setup list; `factory_counters` + `next_document_number()`; `maintenance_priority` / `maintenance_status` enums; `maintenance_requests` + RLS + the number-stamping trigger; `maintenance_requests_expanded` view. See §15 |
 | `0023_overrun_flag.sql` | Overproduction: `overrun_note` / `_cleared_by` / `_cleared_at` on `shift_log_entries`, a rewritten `shift_log_amend_guard` that tells a clearance from an amendment, and `shift_log_entries_expanded` rebuilt with `is_overrun` / `overrun_qty` / `needs_overrun_note`. See §13 |
 
 No new npm dependencies.
@@ -672,7 +674,45 @@ The data table's filter bar is seven controls tall, read once; the table under i
 
 ---
 
-## 15. Related docs
+## 15. Maintenance requests — raising one
+
+**Files:** migration `0024`, `maintenance-queries.ts`, `maintenance/schemas.ts`, `new-maintenance-dialog.tsx`, `maintenance-workspace.tsx`, `admin-tabs.ts`, `setup-queries.ts`, `nav.ts`. Ported from the prototype's Maintenance module.
+
+**Scope is the raising half only.** A request is created, numbered and listed; nothing assigns it, works it or verifies it. `maintenance_status` declares the full journey (`reported → assigned → in_progress → completed → verified`) so the states arrive later without a type swap, but only `reported` is reachable and no column that would record the *work* has been invented ahead of knowing what it must hold.
+
+### Two departures from the prototype, both asked for
+
+**Department, not issue type.** The prototype asks what kind of fault it is — mechanical, electrical, pneumatic. What actually needs recording is *who is needed*, and which trades a plant keeps in-house differ: one factory has Electrical and Utilities, the next outsources both. So it is a per-tenant setup list.
+
+`factory_departments` has the same shape as `factory_units`, which means the generic `SetupListManager` drives it with **no new component** — the work was one migration, one entry in the `SetupTable` union, one row in `ADMIN_TABS`, and one `<Panel>`. It carries no flags.
+
+**The batch is typed, not picked.** Same as the shift log, and the same reasoning: the number is on the paperwork in front of whoever found the fault. A dropdown of open batches is slower and stops working the moment the batch isn't on the pipeline board — which, for a machine that broke mid-run, it may not be.
+
+Both `batch_no` (text) and `product_id` are stored. The text is what someone searches for later and survives a batch nobody added to the catalogue; the id is the resolution *when there is one*, never a requirement. A no-match is stated in the form ("saved as typed"), not treated as an error — blocking there would only teach people to leave the field blank. Matching is done in the browser against the already-cached product list, exactly as `log-entry-form.tsx` does it.
+
+### Request numbers
+
+`MR-2026-014`, so a request can be read out on the floor rather than referred to by uuid.
+
+`factory_counters (factory_id, kind, year, next_value)` plus `next_document_number()`, **not** `max(number) + 1` at insert time — that pattern hands the same number to two people submitting at once and then fails one of them on the unique index. The function inserts the counter row if absent, then `update … returning`; the update takes a **row lock**, so a second caller blocks and comes out with the next number.
+
+Keyed by `kind` as well as factory because CAPA numbers will want exactly this and should not grow their own counter. The table has RLS on and **no policy at all** — only the definer function touches it, and nothing in the browser has business reading it.
+
+The number is stamped by a `before insert` trigger, never sent by the client, so it can't be chosen or skipped. Allocating it inside the same transaction as the row also means a failed insert doesn't burn a number and leave a gap people read as "one went missing".
+
+### Optional fields and the zod/RHF gotcha
+
+`unitId`, `departmentId`, `batchNo`, `reportedBy` and `assignedTo` are typed as plain **required strings that may be empty**, not `.optional()`.
+
+`.optional().default("")` gives zod an *input* type that differs from its output, and `zodResolver` then refuses to typecheck against the form's value type. The form always supplies `""` from its defaults, so "optional" here means "may be blank", and `createMaintenanceRequest` turns blank into `null` on the way in. Worth remembering for the next form.
+
+### Access
+
+Nav item is `roles: ALL` — the person who finds a broken machine is whoever was standing next to it, and the insert policy stamps the raiser from the session. Update and delete policies are manager-only and currently unused; they exist so the workflow has something to build on.
+
+---
+
+## 16. Related docs
 
 - `docs/IMPLEMENTATION_GUIDE.md` — everything up to and including the shift log and data table. **Read first.**
 - `docs/PROGRESS.md` — narrative record of what landed when.

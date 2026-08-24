@@ -2,12 +2,19 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import {
+  ClipboardList,
+  Loader2,
+  MessageSquare,
+  Package,
+  PlayCircle,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { ActionStageForm } from "@/components/factory/actions/action-stage-form";
-import { BatchSummary } from "@/components/factory/batch/batch-summary";
+import { ActionStageStepper } from "@/components/factory/actions/action-stage-stepper";
 import { ActionStageTimeline } from "@/components/factory/actions/action-stage-timeline";
+import { BatchSummary } from "@/components/factory/batch/batch-summary";
 import {
   Dialog,
   DialogContent,
@@ -38,15 +45,27 @@ const STAGE_PILL: Record<string, string> = {
   closed: "bg-[#DCFCE7] text-[#15803D]",
 };
 
+type Tab = "next" | "record" | "activity";
+
 /**
- * One issue in full: where it has got to, what each stage produced, and the
- * single move it can make next.
+ * One issue in full.
  *
- * The thread and the stages are deliberately separate. Half of what happens to
- * an issue is progress that changes nothing — "waiting on the part", "retest
- * booked for Thursday" — and forcing that through a stage gate would either
- * lose it or produce a fake stage. The gates carry the record; the thread
- * carries the conversation.
+ * Three jobs happen in this box and they used to happen in one column: doing
+ * the next thing, reading what the stages recorded, and following the
+ * conversation. Stacked, each was a grey card of roughly equal weight, and the
+ * dialog read as one long undifferentiated scroll — you could not tell at a
+ * glance where the issue had got to or what you were being asked to do.
+ *
+ * So they are three tabs, and the frame around them never moves: the title and
+ * the badges at the top, the clock in the footer. Whichever tab you are on,
+ * "what is this and is it late?" is answered without scrolling — which is the
+ * question that made people scroll in the first place.
+ *
+ * The stages and the thread stay separate for the same reason they always did.
+ * Half of what happens to an issue is progress that changes nothing — "waiting
+ * on the part", "retest booked Thursday" — and forcing that through a stage
+ * gate would either lose it or produce a fake stage. The gates carry the
+ * record; the thread carries the conversation.
  */
 export function ActionDetailDialog({
   action,
@@ -68,11 +87,15 @@ export function ActionDetailDialog({
         if (!open) onClose();
       }}
     >
-      <DialogContent className="max-h-[88vh] max-w-xl overflow-y-auto">
+      {/* `p-0` and a flex column so the tab panel is the only thing that
+          scrolls. With the dialog's own padding the header and footer would
+          scroll away with it, and the point of putting the clock down there is
+          that it stays put. */}
+      <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col gap-0 overflow-hidden p-0">
         {/* Keyed by the issue, so opening a different one remounts the body
-            with fresh state. The alternative — an effect resetting the note
-            and assignee fields — runs a render late and leaks half-typed text
-            from one issue into the next. */}
+            with fresh state — including which tab you were on. The
+            alternative, an effect resetting the fields, runs a render late and
+            leaks half-typed text from one issue into the next. */}
         {action && (
           <Body
             key={action.id}
@@ -102,6 +125,7 @@ function Body({
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
+  const [tab, setTab] = useState<Tab>("next");
   const [note, setNote] = useState("");
   const [assignee, setAssignee] = useState(action.assigned_to ?? "");
 
@@ -143,218 +167,376 @@ function Body({
 
   return (
     <>
-      <DialogHeader>
-        <DialogTitle className="text-[#0F1B34]">{action.title}</DialogTitle>
-        <DialogDescription>
+      {/* ── Header: what this is ─────────────────────────────────────── */}
+      {/* `pr-12` keeps the title clear of the dialog's own close button. */}
+      <DialogHeader className="shrink-0 gap-2 border-b border-[#EEF1F6] px-5 pt-5 pr-12 pb-4">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {action.is_escalated && (
+            <Badge className="bg-[#EDE9FE] text-[#6D28D9]">Escalated</Badge>
+          )}
+          {action.is_overdue && !action.is_escalated && (
+            <Badge className="bg-[#FEE2E2] text-[#B91C1C]">Overdue</Badge>
+          )}
+          {action.is_verify_overdue && (
+            <Badge className="bg-[#FEF3C7] text-[#B45309]">Sign-off late</Badge>
+          )}
+          {action.resolved_direct && (
+            <Badge className="bg-[#F1F5F9] text-[#64748B]">No CAPA</Badge>
+          )}
+          <Badge className={STAGE_PILL[action.status]}>
+            {STAGE_LABELS[action.status]}
+          </Badge>
+        </div>
+
+        <DialogTitle className="text-base leading-snug text-[#0F1B34]">
+          {action.title}
+        </DialogTitle>
+        <DialogDescription className="text-xs">
           {action.unit_name ?? "Factory-wide"} · {action.category} ·{" "}
           {action.priority} priority
         </DialogDescription>
       </DialogHeader>
 
-      <div className="flex flex-wrap gap-1.5">
-        {action.is_escalated && (
-          <Badge className="bg-[#EDE9FE] text-[#6D28D9]">Escalated</Badge>
-        )}
-        {action.is_overdue && !action.is_escalated && (
-          <Badge className="bg-[#FEE2E2] text-[#B91C1C]">Overdue</Badge>
-        )}
-        {action.is_verify_overdue && (
-          <Badge className="bg-[#FEF3C7] text-[#B45309]">Sign-off late</Badge>
-        )}
-        <Badge className={STAGE_PILL[action.status]}>
-          {STAGE_LABELS[action.status]}
-        </Badge>
+      {/* ── Tabs: which of the three jobs ────────────────────────────── */}
+      <div className="shrink-0 px-5 pt-3">
+        <div
+          role="tablist"
+          aria-label="Issue detail"
+          className="flex gap-1 rounded-xl bg-[#F1F5F9] p-1"
+        >
+          <TabButton
+            active={tab === "next"}
+            onClick={() => setTab("next")}
+            Icon={PlayCircle}
+          >
+            Next step
+          </TabButton>
+          <TabButton
+            active={tab === "record"}
+            onClick={() => setTab("record")}
+            Icon={ClipboardList}
+          >
+            Record
+          </TabButton>
+          <TabButton
+            active={tab === "activity"}
+            onClick={() => setTab("activity")}
+            Icon={MessageSquare}
+            count={notes.length}
+          >
+            Activity
+          </TabButton>
+        </div>
       </div>
 
-      {/* Which clock is running depends on the stage: the fix clock while the
-          problem is live, the slower sign-off clock once the fix is in. Only
-          one of them is ever the answer to "is this late?" */}
-      <dl className="space-y-1.5 rounded-xl border border-[#E6EAF1] bg-[#FBFCFE] p-3.5 text-sm">
-        {!closed && action.status !== "action_taken" && (
-          <>
-            <Row label="Due">
-              {formatDue(action.due_at)}
-              <span
-                className={cn(
-                  "ml-1.5 text-xs font-semibold",
-                  action.is_overdue ? "text-[#B91C1C]" : "text-[#64748B]"
-                )}
-              >
-                {relativeTime(action.due_at)}
-              </span>
-            </Row>
-            {!action.is_escalated && (
-              <Row label="Escalates">
-                {formatDue(action.escalates_at)}
-                <span className="ml-1.5 text-xs text-[#64748B]">
-                  {relativeTime(action.escalates_at)}
-                </span>
-              </Row>
-            )}
-          </>
-        )}
-
-        {action.verify_due_at && (
-          <Row label="Sign-off due">
-            {formatDue(action.verify_due_at)}
-            <span
-              className={cn(
-                "ml-1.5 text-xs font-semibold",
-                action.is_verify_overdue ? "text-[#B45309]" : "text-[#64748B]"
-              )}
-            >
-              {relativeTime(action.verify_due_at)}
-            </span>
-          </Row>
-        )}
-
-        {action.closed_at && (
-          <Row label="Closed">{formatDue(action.closed_at)}</Row>
-        )}
-      </dl>
-
-      {/* Read-only here. The batch is a fact about the issue that was settled
-          when it was raised — from the flagged entry, or typed by hand — and
-          re-pointing an investigation at a different run halfway through is a
-          new issue, not an edit. */}
-      {action.batch_no && (
-        <div className="space-y-1.5">
-          <p className="text-[10px] font-bold uppercase tracking-[0.6px] text-[#94A3B8]">
-            Affected batch
-          </p>
-          <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
-            <span className="font-mono font-semibold text-[#0F1B34]">
-              {action.batch_no}
-            </span>
-            {action.product_name && (
-              <span className="text-[#475569]">{action.product_name}</span>
-            )}
-            {action.product_code && (
-              <span className="font-mono text-xs text-[#94A3B8]">
-                {action.product_code}
-              </span>
-            )}
-          </p>
-          <BatchSummary factoryId={factoryId} batchNo={action.batch_no} />
-        </div>
-      )}
-
-      {/* Reassignment only, and only once the investigation is under way.
-          While an issue is still Open, naming an owner *is* the first stage —
-          the start-investigation form below collects it. Showing this box
-          there too put two controls for one column in one dialog, which read
-          as the app asking the same question twice. Once closed, the owner is
-          part of the record rather than a field. */}
-      {!closed && action.status !== "open" && (
-        <div className="space-y-1.5">
-          <label
-            htmlFor="action-assignee"
-            className="block text-xs font-medium text-[#475569]"
-          >
-            Assigned to
-          </label>
-          <div className="flex gap-2">
-            <input
-              id="action-assignee"
-              value={assignee}
-              onChange={(e) => setAssignee(e.target.value)}
-              placeholder="Name — or leave blank to unassign"
-              className={CONTROL}
-            />
-            <button
-              type="button"
-              onClick={() => reassign.mutate()}
-              disabled={busy || assignee === (action.assigned_to ?? "")}
-              className="h-10 shrink-0 rounded-xl border border-[#E6EAF1] px-3 text-sm font-medium text-[#475569] transition hover:border-[#2563EB] hover:text-[#2563EB] disabled:pointer-events-none disabled:opacity-40"
-            >
-              Save
-            </button>
+      {/* ── The one scrolling region ─────────────────────────────────── */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+        {tab === "next" && (
+          <div className="space-y-4">
+            {/* Position first, and only here: on the working tab it is the
+                context for the form under it. */}
+            <ActionStageStepper action={action} />
+            <ActionStageForm action={action} role={role} onDone={refresh} />
           </div>
-        </div>
-      )}
+        )}
 
-      <div className="space-y-2">
-        <p className="text-[10px] font-bold uppercase tracking-[0.6px] text-[#94A3B8]">
-          Progress
-        </p>
-        <ActionStageTimeline action={action} role={role} onSaved={refresh} />
-      </div>
+        {tab === "record" && (
+          <div className="space-y-5">
+            <Facts action={action} />
 
-      <ActionStageForm action={action} role={role} onDone={refresh} />
+            {action.batch_no && (
+              <section className="space-y-1.5">
+                <SectionLabel>Affected batch</SectionLabel>
+                {/* Read-only: the batch was settled when the issue was
+                    raised — off the flagged entry, or typed by hand — and
+                    re-pointing an investigation at a different run halfway
+                    through is a new issue, not an edit. */}
+                <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
+                  <Package className="size-4 shrink-0 translate-y-0.5 text-[#94A3B8]" />
+                  <span className="font-mono font-semibold text-[#0F1B34]">
+                    {action.batch_no}
+                  </span>
+                  {action.product_name && (
+                    <span className="text-[#475569]">
+                      {action.product_name}
+                    </span>
+                  )}
+                  {action.product_code && (
+                    <span className="font-mono text-xs text-[#94A3B8]">
+                      {action.product_code}
+                    </span>
+                  )}
+                </p>
+                <BatchSummary factoryId={factoryId} batchNo={action.batch_no} />
+              </section>
+            )}
 
-      <div className="space-y-2">
-        <p className="text-[10px] font-bold uppercase tracking-[0.6px] text-[#94A3B8]">
-          Activity &amp; notes {notes.length > 0 && `(${notes.length})`}
-        </p>
+            {/* Reassignment only, and only once the investigation is under
+                way. While an issue is Open, naming an owner *is* the first
+                stage, and the form on the other tab collects it — two controls
+                for one column would read as the app asking twice. Once closed,
+                the owner is part of the record rather than a field. */}
+            {!closed && action.status !== "open" && (
+              <section className="space-y-1.5">
+                <label
+                  htmlFor="action-assignee"
+                  className="block text-xs font-medium text-[#475569]"
+                >
+                  Assigned to
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    id="action-assignee"
+                    value={assignee}
+                    onChange={(e) => setAssignee(e.target.value)}
+                    placeholder="Name — or leave blank to unassign"
+                    className={CONTROL}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => reassign.mutate()}
+                    disabled={busy || assignee === (action.assigned_to ?? "")}
+                    className="h-10 shrink-0 rounded-xl border border-[#E6EAF1] px-3 text-sm font-medium text-[#475569] transition hover:border-[#2563EB] hover:text-[#2563EB] disabled:pointer-events-none disabled:opacity-40"
+                  >
+                    Save
+                  </button>
+                </div>
+              </section>
+            )}
 
-        {notesPending ? (
-          <p className="py-4 text-center text-xs text-[#94A3B8]">Loading…</p>
-        ) : notes.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-[#CBD5E1] px-3.5 py-5 text-center text-xs text-[#94A3B8]">
-            Nothing yet — the first update will show here.
-          </p>
-        ) : (
-          <ul className="max-h-48 space-y-1.5 overflow-y-auto">
-            {notes.map((entry) => (
-              <li
-                key={entry.id}
-                className={cn(
-                  "rounded-xl px-3 py-2 text-[13px]",
-                  entry.is_system
-                    ? "bg-[#F8FAFC] text-[#64748B] italic"
-                    : "border border-[#E6EAF1] text-[#0F1B34]"
-                )}
-              >
-                <span className="whitespace-pre-wrap">{entry.note}</span>
-                <span className="mt-0.5 block text-[10.5px] not-italic text-[#94A3B8]">
-                  {formatDue(entry.created_at)}
-                </span>
-              </li>
-            ))}
-          </ul>
+            <section className="space-y-2">
+              <SectionLabel>What each stage recorded</SectionLabel>
+              <ActionStageTimeline
+                action={action}
+                role={role}
+                onSaved={refresh}
+              />
+            </section>
+          </div>
+        )}
+
+        {tab === "activity" && (
+          <div className="space-y-3">
+            {notesPending ? (
+              <p className="py-8 text-center text-xs text-[#94A3B8]">
+                Loading…
+              </p>
+            ) : notes.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-[#CBD5E1] px-3.5 py-8 text-center text-xs text-[#94A3B8]">
+                Nothing yet — the first update will show here.
+              </p>
+            ) : (
+              <ul className="space-y-1.5">
+                {notes.map((entry) => (
+                  <li
+                    key={entry.id}
+                    className={cn(
+                      "rounded-xl px-3 py-2 text-[13px]",
+                      entry.is_system
+                        ? "bg-[#F8FAFC] text-[#64748B] italic"
+                        : "border border-[#E6EAF1] text-[#0F1B34]"
+                    )}
+                  >
+                    <span className="whitespace-pre-wrap">{entry.note}</span>
+                    <span className="mt-0.5 block text-[10.5px] not-italic text-[#94A3B8]">
+                      {formatDue(entry.created_at)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {!closed && (
+              <div className="space-y-2 rounded-2xl border border-[#E6EAF1] bg-white p-3.5">
+                <label
+                  htmlFor="action-note"
+                  className="block text-[10px] font-bold uppercase tracking-[0.6px] text-[#94A3B8]"
+                >
+                  Add note{" "}
+                  <span className="font-normal normal-case">
+                    (without changing stage)
+                  </span>
+                </label>
+                <textarea
+                  id="action-note"
+                  rows={2}
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="Update, progress, next steps…"
+                  className="w-full rounded-xl border border-[#E6EAF1] bg-[#FBFCFE] px-3.5 py-2.5 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:bg-white"
+                />
+                <button
+                  type="button"
+                  onClick={() => saveNote.mutate()}
+                  disabled={busy || !note.trim()}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#E6EAF1] bg-white px-3 text-xs font-medium text-[#475569] transition hover:border-[#2563EB] hover:text-[#2563EB] disabled:pointer-events-none disabled:opacity-40"
+                >
+                  {saveNote.isPending && (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  )}
+                  Add note
+                </button>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
-      {!closed && (
-        <div className="space-y-2 rounded-xl bg-[#F8FAFC] p-3">
-          <label
-            htmlFor="action-note"
-            className="block text-[10px] font-bold uppercase tracking-[0.6px] text-[#94A3B8]"
-          >
-            Add note{" "}
-            <span className="font-normal normal-case">
-              (without changing stage)
-            </span>
-          </label>
-          <textarea
-            id="action-note"
-            rows={2}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Update, progress, next steps…"
-            className="w-full rounded-xl border border-[#E6EAF1] bg-white px-3.5 py-2.5 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#2563EB]"
-          />
-          <button
-            type="button"
-            onClick={() => saveNote.mutate()}
-            disabled={busy || !note.trim()}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#E6EAF1] bg-white px-3 text-xs font-medium text-[#475569] transition hover:border-[#2563EB] hover:text-[#2563EB] disabled:pointer-events-none disabled:opacity-40"
-          >
-            {saveNote.isPending && <Loader2 className="size-3.5 animate-spin" />}
-            Add note
-          </button>
-        </div>
-      )}
-
-      <button
-        type="button"
-        onClick={onClose}
-        disabled={busy}
-        className="h-10 w-full rounded-xl border border-[#E6EAF1] text-sm font-medium text-[#475569] transition hover:border-[#2563EB] hover:text-[#2563EB] disabled:opacity-60"
-      >
-        Close
-      </button>
+      {/* ── Footer: the clock that is actually running ───────────────── */}
+      <div className="flex shrink-0 items-center justify-between gap-3 border-t border-[#EEF1F6] bg-[#FBFCFE] px-5 py-3">
+        <Clock action={action} />
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={busy}
+          className="h-9 shrink-0 rounded-lg border border-[#E6EAF1] bg-white px-4 text-sm font-medium text-[#475569] transition hover:border-[#2563EB] hover:text-[#2563EB] disabled:opacity-60"
+        >
+          Close
+        </button>
+      </div>
     </>
+  );
+}
+
+/**
+ * Whichever clock is running, in one line, always on screen.
+ *
+ * Only ever one of them: the fix clock while the problem is live, the slower
+ * sign-off clock once the fix is in, and neither once it is closed. Showing
+ * the fix deadline on an issue whose fix is already in answers a question
+ * nobody is asking.
+ */
+function Clock({ action }: { action: FactoryAction }) {
+  if (action.status === "closed") {
+    return (
+      <p className="min-w-0 truncate text-xs text-[#64748B]">
+        {action.resolved_direct ? "Resolved" : "Closed"}
+        {action.closed_at && ` ${formatDue(action.closed_at)}`}
+      </p>
+    );
+  }
+
+  const [label, at, late, tone] = action.verify_due_at
+    ? ["Sign-off due", action.verify_due_at, action.is_verify_overdue, "#B45309"]
+    : ["Due", action.due_at, action.is_overdue, "#B91C1C"];
+
+  return (
+    <p className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 text-xs text-[#64748B]">
+      <span>{label}</span>
+      <span className="font-medium text-[#0F1B34]">
+        {formatDue(at as string)}
+      </span>
+      <span
+        className="font-semibold"
+        style={{ color: late ? (tone as string) : "#64748B" }}
+      >
+        {relativeTime(at as string)}
+      </span>
+      {/* The one number that turns "overdue" into something actionable: how
+          long before this becomes a management problem. */}
+      {action.is_overdue && !action.is_escalated && (
+        <span className="text-[#B45309]">
+          · escalates {relativeTime(action.escalates_at)}
+        </span>
+      )}
+    </p>
+  );
+}
+
+/** The issue's fixed facts — the ones that never change after it is raised. */
+function Facts({ action }: { action: FactoryAction }) {
+  return (
+    <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl border border-[#E6EAF1] bg-[#FBFCFE] p-4 text-sm sm:grid-cols-3">
+      <Fact label="Raised">{formatDue(action.created_at)}</Fact>
+      <Fact label="Owner">
+        {action.assigned_to ?? (
+          <span className="italic text-[#B45309]">Unassigned</span>
+        )}
+      </Fact>
+      <Fact label="Source">
+        {action.shift_log_entry_id ? "Shift log" : "Raised by hand"}
+      </Fact>
+      <Fact label="Due">{formatDue(action.due_at)}</Fact>
+      {!action.resolved_direct && action.status !== "closed" && (
+        <Fact label="Escalates">{formatDue(action.escalates_at)}</Fact>
+      )}
+      {action.verify_due_at && (
+        <Fact label="Sign-off due">{formatDue(action.verify_due_at)}</Fact>
+      )}
+      {action.closed_at && (
+        <Fact label={action.resolved_direct ? "Resolved" : "Closed"}>
+          {formatDue(action.closed_at)}
+        </Fact>
+      )}
+    </dl>
+  );
+}
+
+function Fact({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-[10px] font-bold uppercase tracking-[0.5px] text-[#94A3B8]">
+        {label}
+      </dt>
+      <dd className="mt-0.5 truncate text-[13px] text-[#0F1B34]">{children}</dd>
+    </div>
+  );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[10px] font-bold uppercase tracking-[0.6px] text-[#94A3B8]">
+      {children}
+    </p>
+  );
+}
+
+/** Matches the segmented control the pipeline's batch dialog already uses. */
+function TabButton({
+  active,
+  onClick,
+  Icon,
+  count,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  Icon: React.ComponentType<{ className?: string }>;
+  count?: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={cn(
+        "inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition",
+        active
+          ? "bg-white text-[#2563EB] shadow-[0_1px_2px_rgba(15,27,52,0.08)]"
+          : "text-[#64748B] hover:text-[#0F1B34]"
+      )}
+    >
+      <Icon className="size-4" />
+      {children}
+      {count !== undefined && count > 0 && (
+        <span
+          className={cn(
+            "rounded-full px-1.5 text-[10px] font-bold",
+            active ? "bg-[#EFF6FF] text-[#2563EB]" : "bg-[#E2E8F0] text-[#64748B]"
+          )}
+        >
+          {count}
+        </span>
+      )}
+    </button>
   );
 }
 
@@ -374,20 +556,5 @@ function Badge({
     >
       {children}
     </span>
-  );
-}
-
-function Row({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-baseline justify-between gap-3">
-      <dt className="text-xs text-[#64748B]">{label}</dt>
-      <dd className="text-right text-[13px] text-[#0F1B34]">{children}</dd>
-    </div>
   );
 }

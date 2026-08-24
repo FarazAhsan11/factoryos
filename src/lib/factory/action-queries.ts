@@ -82,6 +82,39 @@ export function nextStage(stage: ActionStage): ActionStage | null {
 }
 
 /**
+ * Was this closed without ever being investigated — the short road?
+ *
+ * Read off the view rather than re-derived here, because the label on the
+ * closed evidence hangs on it: an issue that took the short road recorded a
+ * *resolution*, and calling that a verification says a fix was tested when
+ * nobody tested anything.
+ */
+export function tookShortRoad(action: FactoryAction): boolean {
+  return action.resolved_direct;
+}
+
+/** What to call the text in `verification` for this issue. */
+export function verificationLabel(action: FactoryAction): string {
+  return action.resolved_direct ? "Resolution" : "Verification";
+}
+
+/**
+ * A stage this issue went *past* without entering — only ever the middle two,
+ * and only on an issue resolved straight out of Open.
+ *
+ * Shared by the stepper and the timeline so the two can't disagree about what
+ * happened. A tick under "Action taken" on an issue nobody investigated would
+ * be the UI inventing a CAPA.
+ */
+export function isStageSkipped(
+  action: FactoryAction,
+  stage: ActionStage | undefined
+): boolean {
+  if (!stage || !action.resolved_direct) return false;
+  return stage === "investigating" || stage === "action_taken";
+}
+
+/**
  * The one stage it can go back to — `action_taken → investigating` when
  * verification fails, `closed → open` to re-open. There is deliberately no
  * `investigating → open`: un-assigning is what that means, and it is a field
@@ -147,6 +180,13 @@ export interface FactoryAction {
   verify_due_at: string | null;
   is_verify_overdue: boolean;
   note_count: number;
+
+  /**
+   * Closed without ever being investigated — the short road, for issues that
+   * genuinely needed no CAPA. When true, `verification` holds an account of
+   * what was done rather than a verification of a corrective action.
+   */
+  resolved_direct: boolean;
 }
 
 export interface ActionNote {
@@ -163,7 +203,7 @@ const COLUMNS = `
   root_cause, corrective_action, preventive_action, verification,
   investigating_at, action_taken_at, closed_at,
   is_overdue, is_escalated, escalates_at,
-  verify_due_at, is_verify_overdue, note_count
+  verify_due_at, is_verify_overdue, note_count, resolved_direct
 `;
 
 export const actionKeys = {
@@ -265,12 +305,21 @@ export interface AdvancePayload {
   rootCause?: string;
   correctiveAction?: string;
   preventiveAction?: string;
-  /** → closed. */
+  /**
+   * → closed. Doubles as the account of what was done on the short road,
+   * `open → closed` — same column, same boundary, and `resolved_direct` is
+   * what tells the two apart afterwards.
+   */
   verification?: string;
 }
 
 /**
- * Moves an issue one stage forward, carrying that stage's evidence.
+ * Moves an issue forward, carrying that stage's evidence.
+ *
+ * One stage at a time, with a single exception: an open issue may go straight
+ * to closed when it needs no CAPA. That is the only legal skip, it costs a
+ * written account and supervisor standing, and — like everything else here —
+ * the trigger is what enforces it.
  *
  * Evidence and status go up in a **single** update, and they have to: the
  * `actions_evidence_follows_stage` constraint refuses a row holding a

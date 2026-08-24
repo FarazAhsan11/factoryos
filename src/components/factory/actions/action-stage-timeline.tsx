@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Circle, Dot, Loader2, Pencil } from "lucide-react";
+import { Check, Circle, Dot, Loader2, Minus, Pencil } from "lucide-react";
 import { toast } from "sonner";
 
 import type { FactoryRole } from "@/lib/factory/context";
@@ -11,8 +11,10 @@ import {
   STAGE_LABELS,
   canAmend,
   formatDue,
+  isStageSkipped,
   stageIndex,
   updateEvidence,
+  verificationLabel,
   type ActionStage,
   type EvidenceField,
   type FactoryAction,
@@ -30,6 +32,13 @@ import { cn } from "@/lib/utils";
  *
  * Stages ahead of the current one are shown greyed rather than hidden: the
  * point is partly to tell someone what still has to happen.
+ *
+ * An issue that took the short road — closed with no investigation — is the
+ * one case where a passed stage is not a completed one. Investigating and
+ * Action taken are drawn as *skipped*, greyed and struck through, never
+ * ticked: a green check under "Action taken" on an issue nobody investigated
+ * would be the timeline inventing a CAPA that never happened, and this screen
+ * is the record.
  *
  * Recorded text is editable in place. Freezing it would leave known-wrong
  * entries nobody can fix, which is how people learn to write nothing much in
@@ -51,10 +60,18 @@ export function ActionStageTimeline({
   return (
     <ol className="space-y-0">
       {ACTION_STAGES.map((stage, i) => {
-        const done = i < current;
+        const skipped = isStageSkipped(action, stage);
+        const done = i < current && !skipped;
         const active = i === current;
-        const evidence = evidenceFor(action, stage);
+        // A skipped stage produced nothing, so it shows nothing — an owner
+        // named before the issue was resolved outright is not the output of
+        // an investigation that never ran.
+        const evidence = skipped ? [] : evidenceFor(action, stage);
         const stamp = stampFor(action, stage);
+        // The rail runs green only into a stage that actually happened, so a
+        // skipped stretch reads as the detour it was.
+        const railDone =
+          done && !isStageSkipped(action, ACTION_STAGES[i + 1]);
 
         return (
           <li key={stage} className="flex gap-3">
@@ -73,6 +90,8 @@ export function ActionStageTimeline({
               >
                 {done ? (
                   <Check className="size-3.5" />
+                ) : skipped ? (
+                  <Minus className="size-3.5" />
                 ) : active ? (
                   <Circle className="size-2.5 fill-current" />
                 ) : (
@@ -83,7 +102,7 @@ export function ActionStageTimeline({
                 <span
                   className={cn(
                     "w-0.5 flex-1",
-                    done ? "bg-[#16A34A]" : "bg-[#E6EAF1]"
+                    railDone ? "bg-[#16A34A]" : "bg-[#E6EAF1]"
                   )}
                 />
               )}
@@ -94,11 +113,18 @@ export function ActionStageTimeline({
                 <p
                   className={cn(
                     "text-[13px] font-semibold",
-                    done || active ? "text-[#0F1B34]" : "text-[#94A3B8]"
+                    skipped
+                      ? "text-[#94A3B8] line-through"
+                      : done || active
+                        ? "text-[#0F1B34]"
+                        : "text-[#94A3B8]"
                   )}
                 >
                   {STAGE_LABELS[stage]}
                 </p>
+                {skipped && (
+                  <span className="text-[11px] text-[#94A3B8]">Skipped</span>
+                )}
                 {stamp && (
                   <span className="text-[11px] text-[#94A3B8]">
                     {formatDue(stamp)}
@@ -108,7 +134,7 @@ export function ActionStageTimeline({
 
               {active && (
                 <p className="mt-0.5 text-[11.5px] text-[#64748B]">
-                  {STAGE_BLURBS[stage]}
+                  {blurbFor(action, stage)}
                 </p>
               )}
 
@@ -147,6 +173,14 @@ function stampFor(action: FactoryAction, stage: ActionStage): string | null {
   }
 }
 
+/** What the current stage is for — reworded when the short road was taken. */
+function blurbFor(action: FactoryAction, stage: ActionStage): string {
+  if (stage === "closed" && action.resolved_direct) {
+    return "Dealt with directly — no investigation was needed.";
+  }
+  return STAGE_BLURBS[stage];
+}
+
 interface EvidenceRow {
   label: string;
   value: string;
@@ -159,9 +193,10 @@ interface EvidenceRow {
  * leave it. The root cause is the investigation's output and belongs under
  * Investigating, even though it is collected on the way out of it.
  *
- * `Raised with` and `Owner` carry no `field`: the first is the shift log's own
- * words and is not this screen's to rewrite, the second has its own control in
- * the dialog.
+ * `Raised with` carries no `field`: it is the shift log's own words, and not
+ * this screen's to rewrite. The owner is not here at all — it is a fact about
+ * the issue rather than something a stage produced, so it lives in the record
+ * tab's facts alongside the dates, with its own control.
  */
 function evidenceFor(action: FactoryAction, stage: ActionStage): EvidenceRow[] {
   const rows: EvidenceRow[] = [];
@@ -170,9 +205,6 @@ function evidenceFor(action: FactoryAction, stage: ActionStage): EvidenceRow[] {
     rows.push({ label: "Raised with", value: action.notes });
   }
   if (stage === "investigating") {
-    if (action.assigned_to) {
-      rows.push({ label: "Owner", value: action.assigned_to });
-    }
     if (action.root_cause) {
       rows.push({
         label: "Root cause",
@@ -198,8 +230,10 @@ function evidenceFor(action: FactoryAction, stage: ActionStage): EvidenceRow[] {
     }
   }
   if (stage === "closed" && action.verification) {
+    // "Verification" on an issue nobody investigated would claim a fix was
+    // tested when there was no fix to test. Same column, honest label.
     rows.push({
-      label: "Verification",
+      label: verificationLabel(action),
       value: action.verification,
       field: "verification",
     });

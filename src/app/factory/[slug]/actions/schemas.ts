@@ -34,6 +34,18 @@ export const closeSchema = z.object({
   verification: required(8, "How do you know the fix worked?"),
 });
 
+/**
+ * open → closed — the short road, for issues that need no CAPA.
+ *
+ * Same column as `closeSchema`, deliberately different wording: nothing has
+ * been verified here, because there was no corrective action to verify. What
+ * is being recorded is what was done about it, which for the issues this path
+ * exists for is the entire story.
+ */
+export const resolveDirectSchema = z.object({
+  verification: required(8, "Say what was actually done about it."),
+});
+
 /** Any backward move. The reason is the price of undoing someone's work. */
 export const revertSchema = z.object({
   reason: required(8, "Say why this is going back."),
@@ -47,4 +59,5 @@ export const rootCauseDraftSchema = z.object({
 export type InvestigateValues = z.infer<typeof investigateSchema>;
 export type ActionTakenValues = z.infer<typeof actionTakenSchema>;
 export type CloseValues = z.infer<typeof closeSchema>;
+export type ResolveDirectValues = z.infer<typeof resolveDirectSchema>;
 export type RevertValues = z.infer<typeof revertSchema>;

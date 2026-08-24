@@ -75,6 +75,15 @@ export function ActionList({
                     Sign-off late
                   </span>
                 )}
+                {/* Closed and closed-without-a-CAPA are both "Closed", and
+                    for anyone scanning the tab for what was actually
+                    investigated, the difference is the only thing worth
+                    knowing about the row. */}
+                {action.resolved_direct && (
+                  <span className="rounded-full bg-[#F1F5F9] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#64748B]">
+                    No CAPA
+                  </span>
+                )}
                 <span
                   className={cn(
                     "rounded-full px-2 py-0.5 text-[10px] font-semibold",

@@ -4,13 +4,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Plus, ShieldCheck, Zap } from "lucide-react";
+import { Cog, Loader2, Plus, ShieldCheck, Zap } from "lucide-react";
 import { toast } from "sonner";
 
 import {
   ACTION_FLAGS,
   ACTION_FLAG_LABELS,
   MAX_OPERATORS,
+  PROCESS_CATEGORIES,
+  QTY_UNITS,
   SLOW_REASONS,
   SPEED_TYPES,
   logEntrySchema,
@@ -19,6 +21,7 @@ import {
   targetQtyFromSpeed,
   type LogEntryParsed,
   type LogEntryValues,
+  type ProcessCategory,
 } from "@/app/factory/[slug]/log/schemas";
 import { BatchAutofill } from "@/components/factory/log/batch-autofill";
 import { EquipmentAutofill } from "@/components/factory/log/equipment-autofill";
@@ -61,12 +64,23 @@ import { cn } from "@/lib/utils";
 /**
  * Shift log → New entry.
  *
- * One form, two shapes. The activity the operator picks carries the
- * `has_machine` flag set in Admin → Processes: a machine activity also asks
- * for equipment and speed (and demands a reason when it runs below target,
- * because that's what the OEE Pareto is built from); a manual activity asks
- * for none of it and stores nulls, so "not applicable" stays distinguishable
- * from "stopped".
+ * One form, **three** shapes, chosen by the `category` set on the activity in
+ * Admin & Settings → Processes (migration 0030):
+ *
+ *   Downtime     Room, activity, start, end, batch, comments. Nothing was
+ *                produced and nobody was operating anything, so no
+ *                quantities, no speed, no equipment and no operator pickers
+ *                appear at all — and null, not 0, is stored for every one of
+ *                them, so "not applicable" stays distinguishable from
+ *                "produced nothing".
+ *   Preparatory  Mixing, drying, granulation. One quantity plus the unit the
+ *                room counts in (drums, kg, litres), and who ran it. No speed
+ *                and no derived target: a mixing room has no target RPM to
+ *                run below.
+ *   Production   The full record — equipment and speed when the stage runs on
+ *                a machine, a target derived from speed × duration, actual
+ *                and rejected quantities, and a reason whenever it runs below
+ *                target, because that's what the OEE Pareto is built from.
  */
 export function LogEntryForm({
   factoryId,
@@ -159,8 +173,11 @@ export function LogEntryForm({
       // should read as "nothing chosen yet", which the schema's own message
       // covers, rather than as a missing key that trips zod's type check first.
       operators: [{ name: "" }],
+      // Overwritten the moment an activity is picked. Production is the safe
+      // opening shape: it is the only one that asks for everything, so no
+      // field the operator has already filled disappears on selection.
+      category: "production",
       hasMachine: false,
-      hasOutput: true,
     },
   });
 
@@ -182,8 +199,8 @@ export function LogEntryForm({
     startTime,
     endTime,
     shift,
+    category,
     hasMachine,
-    hasOutput,
     speedType,
     speedRate,
     targetSpeed,
@@ -198,8 +215,8 @@ export function LogEntryForm({
       "startTime",
       "endTime",
       "shift",
+      "category",
       "hasMachine",
-      "hasOutput",
       "speedType",
       "speedRate",
       "targetSpeed",
@@ -208,17 +225,36 @@ export function LogEntryForm({
     ],
   });
 
-  // The activity decides which halves of the form exist, so its flags are
-  // mirrored into the form values — that's what the schema's cross-field rules
-  // read. The two are independent: Sorting produces output with no machine,
-  // Idle does neither.
+  // The activity decides which of the three shapes the form takes, so its
+  // category is mirrored into the form values — that's what the schema's
+  // cross-field rules read, and what decides which fields are rendered at all.
   useEffect(() => {
-    const flags = activeProcesses.find((p) => p.id === processId)?.flags;
-    setValue("hasMachine", Boolean(flags?.machine));
-    // Default to "produces output" for an activity selected before the lists
-    // load, so the quantity fields don't flicker away and back.
-    setValue("hasOutput", flags ? Boolean(flags.output) : true);
+    const process = activeProcesses.find((p) => p.id === processId);
+    // Production for an activity selected before the lists load: it's the
+    // superset, so nothing already on screen flickers away and back.
+    const next = (process?.category as ProcessCategory) ?? "production";
+    setValue("category", next);
+    // Meaningful on production only — the database forces it false for the
+    // other two (migration 0030), and mirroring that here keeps the schema's
+    // speed rules from firing against fields the form isn't showing.
+    setValue(
+      "hasMachine",
+      next === "production" && Boolean(process?.flags.machine)
+    );
   }, [processId, activeProcesses, setValue]);
+
+  const isDowntime = category === "downtime";
+  const isPreparatory = category === "preparatory";
+  const isProduction = category === "production";
+
+  /**
+   * Quick mode trims a production entry down to the fields a hurried operator
+   * can fill in later. On downtime there is nothing left to trim — the whole
+   * form is six fields, and one of them (Comments) lives in the section Quick
+   * collapses. So Quick is switched off rather than obeyed, and its button is
+   * hidden, instead of leaving a control that would remove a required field.
+   */
+  const quickOn = quick && !isDowntime;
 
   // Once the factory's clock arrives, start the entry at the running shift's
   // start time — the operator usually just adjusts it. Strictly once, so a
@@ -265,13 +301,12 @@ export function LogEntryForm({
   const duration =
     startTime && endTime ? durationMinutes(startTime, endTime) : 0;
 
-  // An activity that is both manual and non-producing is waiting time — no
-  // one is operating anything, so no name is demanded. Same predicate the
-  // schema validates with, so the marking on screen and the rule that blocks
-  // submit can't disagree.
+  // Downtime is waiting time — no one is operating anything, so no name is
+  // demanded and the pickers aren't rendered. Same predicate the schema
+  // validates with, so the marking on screen and the rule that blocks submit
+  // can't disagree.
   const needsOperators = operatorsRequired(
-    Boolean(hasMachine),
-    Boolean(hasOutput)
+    (category as ProcessCategory) ?? "production"
   );
 
   /**
@@ -355,8 +390,8 @@ export function LogEntryForm({
         factoryId,
         unitId: keep.unitId,
         processId: keep.processId,
+        category: keep.category,
         hasMachine: keep.hasMachine,
-        hasOutput: keep.hasOutput,
         shift: keep.shift,
         startTime: keep.endTime,
         endTime: "",
@@ -411,20 +446,23 @@ export function LogEntryForm({
             <ShieldCheck className="size-3" />
             Audit-protected
           </span>
-          <button
-            type="button"
-            onClick={() => toggleQuick()}
-            title="Quick mode: fewer fields for routine hourly entries"
-            className={cn(
-              "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition",
-              quick
-                ? "border-[#2563EB] bg-[#EFF6FF] text-[#1D4ED8]"
-                : "border-[#E6EAF1] text-[#64748B] hover:text-[#0F1B34]"
-            )}
-          >
-            <Zap className="size-3" />
-            {quick ? "Quick on" : "Quick"}
-          </button>
+          {/* Nothing left to trim on a downtime entry — see `quickOn`. */}
+          {!isDowntime && (
+            <button
+              type="button"
+              onClick={() => toggleQuick()}
+              title="Quick mode: fewer fields for routine hourly entries"
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition",
+                quick
+                  ? "border-[#2563EB] bg-[#EFF6FF] text-[#1D4ED8]"
+                  : "border-[#E6EAF1] text-[#64748B] hover:text-[#0F1B34]"
+              )}
+            >
+              <Zap className="size-3" />
+              {quick ? "Quick on" : "Quick"}
+            </button>
+          )}
         </div>
       </header>
 
@@ -482,6 +520,11 @@ export function LogEntryForm({
               </output>
             </Field>
           </FieldRow>
+
+          {/* Says out loud which of the three shapes is on screen. Without it
+              the form silently grows and shrinks between activities and the
+              operator is left wondering which fields went missing. */}
+          {processId && <CategoryBadge category={category} />}
         </section>
 
         <FieldRow>
@@ -528,8 +571,9 @@ export function LogEntryForm({
           </Field>
         </FieldRow>
 
-        {/* Equipment belongs to machine activities — a manual stage has none. */}
-        {hasMachine && !quick && (
+        {/* Equipment belongs to machine activities — a manual stage has none,
+            and neither preparatory nor downtime is ever one. */}
+        {hasMachine && !quickOn && (
           <Field
             label="Equipment no."
             optional
@@ -578,8 +622,60 @@ export function LogEntryForm({
           />
         </section>
 
-        {/* ── Output — only for activities that produce something ───── */}
-        {hasOutput ? (
+        {/* ── Output ───────────────────────────────────────────────────
+            Three shapes. Preparatory records one number and the unit the room
+            counts in; production records the full target / actual / rejected
+            set; downtime records nothing and says so. */}
+        {isPreparatory && (
+          <section>
+            <SectionTitle>Output</SectionTitle>
+            <Field
+              label="Qty / batches processed"
+              htmlFor="log-qty-prep"
+              error={errors.qty?.message ?? errors.qtyUnit?.message}
+            >
+              <div className="flex gap-2">
+                <input
+                  id="log-qty-prep"
+                  type="number"
+                  step="any"
+                  min={0}
+                  className={cn(CONTROL, MONO, "flex-1")}
+                  placeholder="e.g. 2 batches, 150 kg"
+                  {...register("qty", { valueAsNumber: true })}
+                />
+                {/* The unit is half the measurement, not a decoration: "3"
+                    with no unit is not something anyone can read back. */}
+                <select
+                  id="log-qty-unit"
+                  aria-label="Unit"
+                  className={cn(CONTROL, "w-36 shrink-0")}
+                  {...register("qtyUnit")}
+                >
+                  <option value="">Unit…</option>
+                  {QTY_UNITS.map((unit) => (
+                    <option key={unit} value={unit}>
+                      {unit}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </Field>
+
+            {product && (
+              <p className="mt-2 text-[11px] text-[#64748B]">
+                Accumulative for this batch &amp; activity:{" "}
+                <span className="font-mono font-semibold text-[#16A34A]">
+                  {runningTotal.toLocaleString(undefined, {
+                    maximumFractionDigits: 2,
+                  })}
+                </span>
+              </p>
+            )}
+          </section>
+        )}
+
+        {isProduction && (
         <section>
           <SectionTitle>Output</SectionTitle>
           <FieldRow>
@@ -661,17 +757,20 @@ export function LogEntryForm({
             </p>
           )}
         </section>
-        ) : (
-          // Not an omission — a stated fact. A break or an idle period stores
-          // null quantities, never 0, so it can't drag an output average.
+        )}
+
+        {isDowntime && (
+          // Not an omission — a stated fact. A break, a breakdown or an idle
+          // period stores null quantities, never 0, so it can't drag an
+          // output average.
           <p className="rounded-xl border border-dashed border-[#CBD5E1] px-3.5 py-2.5 text-xs text-[#94A3B8]">
-            This activity doesn&rsquo;t produce output, so no quantities are
-            recorded — only the time it consumed.
+            Downtime — no quantities, speed or operators are recorded, only
+            the time it consumed.
           </p>
         )}
 
         {/* ── Speed — machine activities only ──────────────────────── */}
-        {hasMachine && !quick && (
+        {hasMachine && !quickOn && (
           <section>
             <SectionTitle hint="→ feeds Performance OEE">Speed</SectionTitle>
             <FieldRow>
@@ -745,14 +844,13 @@ export function LogEntryForm({
             hurried operator can fill in later; it can't trim who did the work,
             because nothing downstream can reconstruct that from the row.
 
-            Waiting time is the one exception, and it comes from the activity
-            rather than from Quick — see `operatorsRequired`. */}
+            Downtime is the one exception, and it comes from the activity
+            rather than from Quick — see `operatorsRequired`. There the
+            section isn't optional, it's absent: nobody was operating
+            anything, so there is no one to name. */}
+        {!isDowntime && (
         <section>
-          <SectionTitle
-            hint={needsOperators ? undefined : "→ waiting time, so optional"}
-          >
-            Operators
-          </SectionTitle>
+          <SectionTitle>Operators</SectionTitle>
           {/* The pickers render even with an empty roster: "Not on the list…"
               opens a free-text name, so a factory mid-setup can still file a
               shift instead of hitting a required field it has no way to fill. */}
@@ -818,9 +916,10 @@ export function LogEntryForm({
             )}
           </FieldRow>
         </section>
+        )}
 
         {/* ── Notes ────────────────────────────────────────────────── */}
-        {!quick && (
+        {!quickOn && (
           <>
             <section className="space-y-3">
               <SectionTitle>Notes</SectionTitle>
@@ -837,25 +936,30 @@ export function LogEntryForm({
                   {...register("comment")}
                 />
               </Field>
-              <Field
-                label="Flag for action?"
-                note="(creates an action item)"
-                htmlFor="log-flag"
-                error={errors.actionFlag?.message}
-              >
-                <select
-                  id="log-flag"
-                  className={CONTROL}
-                  {...register("actionFlag")}
+              {/* Downtime records the time and nothing else — raising an
+                  issue off it is a separate act, done by hand in Issues &
+                  CAPAs. */}
+              {!isDowntime && (
+                <Field
+                  label="Flag for action?"
+                  note="(creates an action item)"
+                  htmlFor="log-flag"
+                  error={errors.actionFlag?.message}
                 >
-                  <option value="">No — routine entry</option>
-                  {ACTION_FLAGS.map((flag) => (
-                    <option key={flag} value={flag}>
-                      {ACTION_FLAG_LABELS[flag]}
-                    </option>
-                  ))}
-                </select>
-              </Field>
+                  <select
+                    id="log-flag"
+                    className={CONTROL}
+                    {...register("actionFlag")}
+                  >
+                    <option value="">No — routine entry</option>
+                    {ACTION_FLAGS.map((flag) => (
+                      <option key={flag} value={flag}>
+                        {ACTION_FLAG_LABELS[flag]}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
             </section>
           </>
         )}
@@ -915,6 +1019,48 @@ function RateToggle({
         </button>
       ))}
     </div>
+  );
+}
+
+/**
+ * Which of the three shapes the form is currently in, and what that shape
+ * asks for. Reads off the selected activity, never chosen here — it's
+ * configuration from Admin → Processes, not a decision at logging time.
+ */
+const CATEGORY_STYLES: Record<
+  ProcessCategory,
+  { summary: string; className: string }
+> = {
+  downtime: {
+    summary: "time only",
+    className: "bg-[#F1F5F9] text-[#475569]",
+  },
+  preparatory: {
+    summary: "batch & output",
+    className: "bg-[#FEF3C7] text-[#92400E]",
+  },
+  production: {
+    summary: "full record",
+    className: "bg-[#DBEAFE] text-[#1D4ED8]",
+  },
+};
+
+function CategoryBadge({ category }: { category?: string }) {
+  const key = (category ?? "production") as ProcessCategory;
+  const style = CATEGORY_STYLES[key];
+  const label = PROCESS_CATEGORIES.find((c) => c.value === key)?.label ?? key;
+  if (!style) return null;
+
+  return (
+    <span
+      className={cn(
+        "mt-2.5 inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide",
+        style.className
+      )}
+    >
+      <Cog className="size-3" aria-hidden />
+      {label} — {style.summary}
+    </span>
   );
 }
 

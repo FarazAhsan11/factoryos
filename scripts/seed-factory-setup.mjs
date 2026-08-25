@@ -56,31 +56,35 @@ const UNITS = [
 // Idle, Break and Set Up do neither. That split is the point of this list —
 // it is what exercises all four shapes of the log form.
 const PROCESSES = [
-  { name: "Manning", machine: false, output: false },
-  { name: "Materials", machine: false, output: false },
-  { name: "Set Up", machine: false, output: false },
-  { name: "Mixing", machine: true, output: true },
-  { name: "Dispensing", machine: true, output: true },
-  { name: "Sieving", machine: true, output: true },
-  { name: "Drying", machine: true, output: true },
-  { name: "Encapsulation", machine: true, output: true },
-  { name: "Compression", machine: true, output: true },
-  { name: "Coating", machine: true, output: true },
-  { name: "Powder Fill", machine: true, output: true },
-  { name: "Powder Pack", machine: true, output: true },
-  { name: "Liquid Filling", machine: true, output: true },
-  { name: "Labelling", machine: true, output: true },
-  { name: "Liquid Packing", machine: true, output: true },
-  { name: "Sorting", machine: false, output: true },
-  { name: "Testing", machine: false, output: true },
-  { name: "Reduced Speed", machine: false, output: true },
-  { name: "Document Recon", machine: false, output: false },
-  { name: "Prov. Clean", machine: false, output: false },
-  { name: "Full Clean", machine: false, output: false },
-  { name: "Maintenance", machine: false, output: false },
-  { name: "Quality Issue", machine: false, output: false },
-  { name: "Idle", machine: false, output: false },
-  { name: "Ready", machine: false, output: false },
+  // `category` (migration 0030) decides which shape the shift-log entry form
+  // takes; `machine` only means anything on a production stage, where it adds
+  // the equipment and speed fields.
+  { name: "Manning", category: "downtime" },
+  { name: "Materials", category: "downtime" },
+  { name: "Set Up", category: "downtime" },
+  { name: "Mixing", category: "preparatory" },
+  { name: "Dispensing", category: "preparatory" },
+  { name: "Sieving", category: "preparatory" },
+  { name: "Drying", category: "preparatory" },
+  { name: "Encapsulation", category: "production", machine: true },
+  { name: "Compression", category: "production", machine: true },
+  { name: "Coating", category: "production", machine: true },
+  { name: "Powder Fill", category: "production", machine: true },
+  { name: "Powder Pack", category: "production", machine: true },
+  { name: "Liquid Filling", category: "production", machine: true },
+  { name: "Labelling", category: "production", machine: true },
+  { name: "Liquid Packing", category: "production", machine: true },
+  // Real production stages that happen to be done by hand.
+  { name: "Sorting", category: "production", machine: false },
+  { name: "Testing", category: "production", machine: false },
+  { name: "Reduced Speed", category: "downtime" },
+  { name: "Document Recon", category: "downtime" },
+  { name: "Prov. Clean", category: "downtime" },
+  { name: "Full Clean", category: "downtime" },
+  { name: "Maintenance", category: "downtime" },
+  { name: "Quality Issue", category: "downtime" },
+  { name: "Idle", category: "downtime" },
+  { name: "Ready", category: "downtime" },
 ];
 
 // The machine register (migration 0028). Numbers are what an operator types
@@ -196,8 +200,10 @@ async function main() {
     rows: PROCESSES.map((p, i) => ({
       factory_id: factory.id,
       name: p.name,
-      has_machine: p.machine,
-      has_output: p.output,
+      category: p.category,
+      // has_output is derived from the category by a trigger, so it is not
+      // sent at all — see migration 0030.
+      has_machine: Boolean(p.machine),
       sort_order: i,
       active: true,
     })),

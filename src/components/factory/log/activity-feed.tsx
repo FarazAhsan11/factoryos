@@ -221,7 +221,10 @@ function FeedRow({
           {Number(entry.qty ?? 0) > 0 && (
             <span className="font-semibold text-[#2563EB]">
               {" "}
-              {fmt(entry.qty)} units
+              {/* A preparatory stage counts in drums or kg, not units —
+                  printing "units" against 3 drums is a wrong number, not a
+                  vague one. Production carries no qty_unit and falls back. */}
+              {fmt(entry.qty)} {entry.qty_unit ?? "units"}
             </span>
           )}
           {entry.action_flag && (

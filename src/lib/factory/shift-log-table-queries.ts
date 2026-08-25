@@ -27,12 +27,16 @@ export interface LogTableRow {
   process_id: string;
   process_name: string | null;
   has_machine: boolean | null;
+  /** downtime | preparatory | production — see migration 0030. */
+  process_category: string | null;
   batch_no: string | null;
   product_name: string | null;
   product_code: string | null;
   /** Null for an activity that produces nothing (Idle, Break, cleaning). */
   target_qty: number | null;
   qty: number | null;
+  /** What `qty` counts in on a preparatory entry (drums, kg…). */
+  qty_unit: string | null;
   qty_rejected: number | null;
   accumulative: number | null;
   speed_unit: string | null;
@@ -64,9 +68,9 @@ export interface LogTableRow {
 
 const COLUMNS = `
   id, log_date, shift, start_time, end_time, duration_minutes,
-  unit_id, unit_name, process_id, process_name, has_machine,
+  unit_id, unit_name, process_id, process_name, has_machine, process_category,
   batch_no, product_name, product_code,
-  target_qty, qty, qty_rejected, accumulative,
+  target_qty, qty, qty_unit, qty_rejected, accumulative,
   speed_unit, target_speed, actual_speed, slow_reason,
   equipment_no, operators, operators_text, action_flag, comment,
   amended_at, amend_note, logged_by,

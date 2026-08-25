@@ -28,6 +28,8 @@ export interface ShiftReportRow {
   batch_no: string | null;
   target_qty: number | null;
   qty: number | null;
+  /** What `qty` counts in on a preparatory entry (drums, kg…). */
+  qty_unit: string | null;
   qty_rejected: number | null;
   accumulative: number | null;
   operators: string[];
@@ -43,7 +45,7 @@ export interface ShiftReportRow {
 const COLUMNS = `
   id, unit_id, unit_name, process_name, equipment_no, duration_minutes,
   product_name, product_code, batch_no,
-  target_qty, qty, qty_rejected, accumulative,
+  target_qty, qty, qty_unit, qty_rejected, accumulative,
   operators, comment, slow_reason,
   speed_unit, target_speed, actual_speed, action_flag, created_at
 `;

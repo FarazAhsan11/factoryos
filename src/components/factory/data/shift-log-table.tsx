@@ -503,6 +503,14 @@ function Row({
         )}
       >
         {num(produced)}
+        {/* Preparatory rows count in drums or kg. Reading the column as one
+            kind of number across every row is exactly the mistake the unit
+            prevents. */}
+        {row.qty_unit && produced > 0 && (
+          <span className="ml-1 text-[10px] font-medium text-[#94A3B8]">
+            {row.qty_unit}
+          </span>
+        )}
       </td>
 
       <td className={cn(TD, MONO, "text-right text-[#94A3B8]")}>

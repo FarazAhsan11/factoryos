@@ -2,8 +2,9 @@
 
 import { useCallback, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Cog, Flag, Package } from "lucide-react";
+import { Cog, Flag } from "lucide-react";
 
+import { PROCESS_CATEGORIES } from "@/app/factory/[slug]/log/schemas";
 import { AdminTabs } from "@/components/factory/admin/admin-tabs";
 import { CompanySettingsForm } from "@/components/factory/admin/company-settings-form";
 import { SetupListManager } from "@/components/factory/admin/setup-list-manager";
@@ -143,28 +144,35 @@ export function AdminWorkspace({
           plural="Process stages"
           placeholder="e.g. Compression, Spray Drying…"
           canManage={canManage}
-          // Two independent facts about a stage. Sorting produces output with
-          // no machine; Idle and Break do neither. Collapsing them into one
-          // flag is what made the log form ask for a quantity on a tea break.
+          categoryLabel="Type of stage"
+          // The one thing that decides what the shift-log form asks for. It
+          // replaces the old "produces output" / "runs on a machine" pair,
+          // which had four combinations for three real kinds of stage and
+          // said nothing about how the output is measured — so a mixing room
+          // reporting 3 drums got the same three quantity boxes as an
+          // encapsulation line reporting 231,453 capsules.
+          categories={PROCESS_CATEGORIES.map((c) => ({
+            value: c.value,
+            label: c.label,
+            example: c.example,
+            hint: c.hint,
+          }))}
+          defaultCategory="production"
           flags={[
             {
               key: "machine",
               label: "This stage runs on a machine",
-              hint: "Machine stages get equipment, speed, downtime and OEE tracking; manual stages don't.",
+              hint: "Machine stages get equipment, speed and OEE tracking; a manual production stage (hand packing against a target) doesn't.",
               on: "Machine",
               off: "Manual",
               icon: Cog,
+              // Production only. A preparatory stage has no target speed to
+              // run below, and downtime has no machine to attribute time to —
+              // the database forces the flag off for both (migration 0030),
+              // so offering the tick there would be a control that snaps back.
+              showFor: ["production"],
             },
-            {
-              key: "output",
-              label: "This stage produces output",
-              hint: "Untick for stages that use shift time but make nothing — Idle, Break, Set Up, cleaning. The log form then stops asking for quantities.",
-              on: "Output",
-              off: "No output",
-              icon: Package,
-              defaultOn: true,
-            },
-            // Unlike the two above, this one is a choice *between* stages: a
+            // Unlike the one above, this is a choice *between* stages: a
             // batch is dispensed, encapsulated, sorted and packed, and each
             // logs roughly the full quantity. Without naming which of them
             // means "the batch is done", completion is unknowable — summing
@@ -177,6 +185,11 @@ export function AdminWorkspace({
               on: "Final",
               off: "Not final",
               icon: Flag,
+              // Not downtime: the final stage is measured by what it
+              // produced, and downtime produces nothing — a job tagged that
+              // way would sit at 0 for ever with nothing explaining why. The
+              // constraint from 0016 refuses it outright.
+              showFor: ["preparatory", "production"],
             },
           ]}
         />

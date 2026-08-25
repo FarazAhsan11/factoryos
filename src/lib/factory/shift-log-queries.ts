@@ -26,6 +26,11 @@ export interface LogEntry {
   /** Null for an activity that produces nothing (Idle, Break, cleaning). */
   target_qty: number | null;
   qty: number | null;
+  /**
+   * What `qty` is counted in — drums, kg, litres. Preparatory stages only;
+   * a production entry measures in whatever `speed_unit` counts.
+   */
+  qty_unit: string | null;
   qty_rejected: number | null;
   speed_unit: string | null;
   target_speed: number | null;
@@ -42,19 +47,24 @@ export interface LogEntry {
   logged_by: string | null;
   /** Joined names, so the feed never has to cross-reference three caches. */
   unit: { name: string } | null;
-  process: { name: string; has_machine: boolean } | null;
+  process: {
+    name: string;
+    has_machine: boolean;
+    /** downtime | preparatory | production — see migration 0030. */
+    category: string;
+  } | null;
   product: { name: string; code: string | null } | null;
 }
 
 const COLUMNS = `
   id, unit_id, process_id, log_date, shift, start_time, end_time,
   duration_minutes, equipment_no, batch_no,
-  target_qty, qty, qty_rejected,
+  target_qty, qty, qty_unit, qty_rejected,
   speed_unit, target_speed, actual_speed, slow_reason,
   operators, comment, action_flag,
   created_at, amended_at, amend_note, logged_by,
   unit:factory_units ( name ),
-  process:factory_processes ( name, has_machine ),
+  process:factory_processes ( name, has_machine, category ),
   product:factory_products ( name, code )
 `;
 
@@ -201,8 +211,20 @@ export async function createLogEntry(
   productId: string | null
 ): Promise<LogEntry> {
   const supabase = createClient();
-  const machine = values.hasMachine;
-  const output = values.hasOutput;
+  /**
+   * The three shapes, decided by the stage's category (migration 0030) and
+   * applied *here* rather than trusted from the form. A field the current
+   * shape doesn't render may still hold a value typed under a previous one —
+   * switch from Encapsulation to a tea break with a quantity already entered
+   * and, without these gates, the break gets filed carrying it.
+   */
+  const production = values.category === "production";
+  const preparatory = values.category === "preparatory";
+  const output = production || preparatory;
+  // Speed and equipment are a production-and-machine pair; the schema and the
+  // 0030 trigger both force hasMachine false elsewhere, so this is belt and
+  // braces on a column that feeds OEE.
+  const machine = production && values.hasMachine;
   // "Caps" + "hr" → "Caps/hr"; RPM and Batches carry no rate.
   const speedUnit = values.speedType
     ? composeSpeedUnit(values.speedType, values.speedRate ?? "hr")
@@ -228,13 +250,20 @@ export async function createLogEntry(
       // Quantities belong to activities that produce something. A break or an
       // idle period stores null, not 0 — otherwise a hundred legitimate zeroes
       // drag every output and quality average computed over them.
-      target_qty: output ? values.targetQty ?? null : null,
+      // A shift target is speed × duration, so only a production stage has
+      // one. A preparatory stage has no target speed to derive it from.
+      target_qty: production ? values.targetQty ?? null : null,
       qty: output ? values.qty ?? null : null,
+      // The unit half of a preparatory measurement — "3" alone is not
+      // something anyone can read back. Production measures in whatever
+      // `speed_unit` counts, so it stores null rather than repeating itself.
+      qty_unit: preparatory ? values.qtyUnit ?? null : null,
       // Rejects are the one quantity left blankable, and blank means zero here
-      // rather than unknown: on a stage that produced something, "none were
-      // rejected" is a real measurement. Null would drop the entry out of the
-      // quality rate's denominator and quietly flatter it.
-      qty_rejected: output ? values.qtyRejected ?? 0 : null,
+      // rather than unknown: on a production stage, "none were rejected" is a
+      // real measurement. Null would drop the entry out of the quality rate's
+      // denominator and quietly flatter it. A preparatory stage isn't asked at
+      // all, so null there is the truth — not "none".
+      qty_rejected: production ? values.qtyRejected ?? 0 : null,
       // Speed belongs to machine processes only — a manual entry stores null
       // rather than zeroes, so OEE can tell "not applicable" from "stopped".
       speed_unit: machine ? speedUnit : null,
@@ -246,7 +275,12 @@ export async function createLogEntry(
       // is a ceiling of 20, never a floor.
       operators: values.operators,
       comment: values.comment || null,
-      action_flag: values.actionFlag ?? null,
+      // Downtime records the time and nothing else — an issue raised off one
+      // is a deliberate act in Issues & CAPAs, not a side effect of the form
+      // still holding a flag picked before the activity changed.
+      action_flag: values.category === "downtime"
+        ? null
+        : values.actionFlag ?? null,
       logged_by: loggedBy,
     })
     .select(COLUMNS)

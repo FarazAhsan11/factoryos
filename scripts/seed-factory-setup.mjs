@@ -1,5 +1,5 @@
 // Seeds one factory's setup lists with the prototype's demo data:
-// 25 rooms, 25 process stages (machine flags set), 16 product batches.
+// 25 rooms, 25 process stages (machine flags set), 24 machines, 16 product batches.
 //
 // Idempotent: it reads what's already there and only inserts what's missing,
 // so re-running after adding a stage by hand is safe and won't duplicate.
@@ -81,6 +81,37 @@ const PROCESSES = [
   { name: "Quality Issue", machine: false, output: false },
   { name: "Idle", machine: false, output: false },
   { name: "Ready", machine: false, output: false },
+];
+
+// The machine register (migration 0028). Numbers are what an operator types
+// in the shift log; names are what the log fills in for them — so these are
+// the machines a solid-dose / powder / liquid supplements plant actually runs,
+// one or more per machine process stage above.
+const EQUIPMENT = [
+  { equipment_no: "EQ101", name: "Diosna P250 High Shear Mixer" },
+  { equipment_no: "EQ102", name: "Servolift 600L Bin Blender" },
+  { equipment_no: "EQ103", name: "Ribbon Blender 1000L" },
+  { equipment_no: "EQ112", name: "Dispensing Booth 1 - Downflow" },
+  { equipment_no: "EQ113", name: "Dispensing Booth 2 - Downflow" },
+  { equipment_no: "EQ121", name: "Russell Finex Sieve 900mm" },
+  { equipment_no: "EQ122", name: "Quadro Comil U20 Mill" },
+  { equipment_no: "EQ131", name: "Glatt GPCG 60 Fluid Bed Dryer" },
+  { equipment_no: "EQ132", name: "Tray Dryer 48-Tray" },
+  { equipment_no: "EQ141", name: "Bosch GKF 1500 Encapsulator" },
+  { equipment_no: "EQ142", name: "IMA Zanasi 40F Encapsulator" },
+  { equipment_no: "EQ151", name: "Fette 2090i Tablet Press" },
+  { equipment_no: "EQ152", name: "Korsch XL400 Tablet Press" },
+  { equipment_no: "EQ161", name: "O'Hara Labcoat Coating Pan" },
+  { equipment_no: "EQ171", name: "Bosch SVE 2520 Sachet Filler" },
+  { equipment_no: "EQ172", name: "Auger Powder Filler AF-2" },
+  { equipment_no: "EQ181", name: "Marchesini Powder Packing Line 1" },
+  { equipment_no: "EQ182", name: "Cartoner CAM CD200" },
+  { equipment_no: "EQ191", name: "Groninger Liquid Filling Line" },
+  { equipment_no: "EQ192", name: "Piston Filler 500ml PF-3" },
+  { equipment_no: "EQ201", name: "Herma 400 Labeller" },
+  { equipment_no: "EQ202", name: "Wrap-Around Labeller WL-2" },
+  { equipment_no: "EQ211", name: "Liquid Packing Line 2 - Shrink Wrap" },
+  { equipment_no: "EQ383", name: "Bottle Unscrambler BU-383" },
 ];
 
 const PRODUCTS = [
@@ -167,6 +198,20 @@ async function main() {
       name: p.name,
       has_machine: p.machine,
       has_output: p.output,
+      sort_order: i,
+      active: true,
+    })),
+  });
+
+  await seedList({
+    table: "factory_equipment",
+    column: "equipment_no",
+    factoryId: factory.id,
+    label: "Equipment",
+    rows: EQUIPMENT.map((e, i) => ({
+      factory_id: factory.id,
+      equipment_no: e.equipment_no,
+      name: e.name,
       sort_order: i,
       active: true,
     })),

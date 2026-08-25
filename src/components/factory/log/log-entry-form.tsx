@@ -21,6 +21,7 @@ import {
   type LogEntryValues,
 } from "@/app/factory/[slug]/log/schemas";
 import { BatchAutofill } from "@/components/factory/log/batch-autofill";
+import { EquipmentAutofill } from "@/components/factory/log/equipment-autofill";
 import {
   CONTROL,
   Field,
@@ -30,6 +31,11 @@ import {
 } from "@/components/factory/log/log-fields";
 import { OperatorPicker } from "@/components/factory/log/operator-picker";
 import { employeeKeys, fetchEmployees } from "@/lib/factory/employee-queries";
+import {
+  equipmentKeys,
+  fetchEquipment,
+  findEquipment,
+} from "@/lib/factory/equipment-queries";
 import { actionKeys } from "@/lib/factory/action-queries";
 import { pipelineKeys } from "@/lib/factory/pipeline-queries";
 import { fetchProducts, productKeys } from "@/lib/factory/product-queries";
@@ -106,6 +112,12 @@ export function LogEntryForm({
     queryKey: productKeys.all(factoryId),
     queryFn: () => fetchProducts(factoryId),
   });
+  // The machine register, resolved against below the same way the catalogue
+  // resolves a batch number.
+  const { data: equipmentList = [] } = useQuery({
+    queryKey: equipmentKeys.all(factoryId),
+    queryFn: () => fetchEquipment(factoryId),
+  });
   const { data: shiftTimes } = useQuery({
     queryKey: shiftTimeKeys.all(factoryId),
     queryFn: () => fetchShiftTimes(factoryId),
@@ -166,6 +178,7 @@ export function LogEntryForm({
   const [
     processId,
     batchNo,
+    equipmentNo,
     startTime,
     endTime,
     shift,
@@ -181,6 +194,7 @@ export function LogEntryForm({
     name: [
       "processId",
       "batchNo",
+      "equipmentNo",
       "startTime",
       "endTime",
       "shift",
@@ -224,6 +238,11 @@ export function LogEntryForm({
     if (!term) return null;
     return products.find((p) => p.batch_no.toLowerCase() === term) ?? null;
   }, [products, batchNo]);
+
+  const equipment = useMemo(
+    () => findEquipment(equipmentList, equipmentNo),
+    [equipmentList, equipmentNo]
+  );
 
   // Accumulative total: everything already logged for this batch + activity,
   // across every shift — not just what's on screen.
@@ -517,12 +536,21 @@ export function LogEntryForm({
             htmlFor="log-equipment"
             error={errors.equipmentNo?.message}
           >
-            <input
-              id="log-equipment"
-              className={cn(CONTROL, MONO)}
-              placeholder="e.g. EQ383, EQ112…"
-              {...register("equipmentNo")}
-            />
+            <div className="space-y-2">
+              <input
+                id="log-equipment"
+                className={cn(CONTROL, MONO)}
+                placeholder="e.g. EQ383, EQ112…"
+                autoComplete="off"
+                {...register("equipmentNo")}
+              />
+              {/* Resolved out of Admin → Equipment: the operator types the
+                  number off the machine, the register supplies the name. */}
+              <EquipmentAutofill
+                query={(equipmentNo ?? "").trim()}
+                equipment={equipment}
+              />
+            </div>
           </Field>
         )}
 

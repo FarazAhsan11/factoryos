@@ -11,23 +11,27 @@ import {
   Loader2,
   Play,
   ShieldCheck,
+  Wrench,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
-  actionTakenSchema,
   closeSchema,
+  correctiveActionSchema,
   investigateSchema,
   resolveDirectSchema,
   revertSchema,
-  type ActionTakenValues,
+  rootCauseSchema,
   type CloseValues,
+  type CorrectiveActionValues,
   type InvestigateValues,
   type ResolveDirectValues,
   type RevertValues,
+  type RootCauseValues,
 } from "@/app/factory/[slug]/actions/schemas";
 import type { FactoryRole } from "@/lib/factory/context";
 import {
+  REVERT_LABELS,
   advanceAction,
   canReview,
   prevStage,
@@ -53,11 +57,17 @@ const GHOST =
 /**
  * The form for the move this issue can make next — and nothing else.
  *
+ * Each card asks for the thing its own stage is named after, which is the
+ * whole of what migration 0027 changed. Investigating asks for a cause and
+ * stops there; Action taken is where "what did you do about it" is finally a
+ * fair question, because by then the answer to "what caused it" is on screen
+ * above it; Verification asks how you know it held.
+ *
  * The rule lives here as much as in the trigger: while an issue is Open there
- * is no box to type a corrective action into, because the corrective-action
- * form is not rendered until the issue is Investigating. The database refuses
- * the write; this refuses the temptation. Between them, a recorded fix stops
- * being something anyone can assert in one click.
+ * is no box to type a corrective action into, because that form is not
+ * rendered until the issue has a recorded root cause. The database refuses the
+ * write; this refuses the temptation. Between them, a recorded fix stops being
+ * something anyone can assert in one click.
  *
  * Open is the one stage with two doors, because not every issue has a root
  * cause worth an hour. See `OpenPanel`.
@@ -79,9 +89,12 @@ export function ActionStageForm({
         <OpenPanel action={action} role={role} onDone={onDone} />
       )}
       {action.status === "investigating" && (
-        <ActionTakenForm action={action} onDone={onDone} />
+        <RootCauseForm action={action} onDone={onDone} />
       )}
       {action.status === "action_taken" && (
+        <CorrectiveActionForm action={action} onDone={onDone} />
+      )}
+      {action.status === "verification" && (
         <ClosePanel action={action} role={role} onDone={onDone} />
       )}
       {action.status === "closed" && (
@@ -333,7 +346,17 @@ function ResolveDirectPanel({
 
 /* ── investigating → action_taken ─────────────────────────────────────── */
 
-function ActionTakenForm({
+/**
+ * The investigation's one output, and nothing else on the card.
+ *
+ * This used to ask for the corrective and preventive actions too, because
+ * filling all three was the price of the next stage. On screen that read as
+ * the stepper saying INVESTIGATING in blue over a box asking what had been
+ * done about a cause the person had not finished typing. One question at a
+ * time is not a smaller form — it is the difference between a root cause
+ * someone thought about and one they wrote to unlock the box below it.
+ */
+function RootCauseForm({
   action,
   onDone,
 }: {
@@ -346,13 +369,9 @@ function ActionTakenForm({
     handleSubmit,
     getValues,
     formState: { errors, isSubmitting },
-  } = useForm<ActionTakenValues>({
-    resolver: zodResolver(actionTakenSchema),
-    defaultValues: {
-      rootCause: action.root_cause ?? "",
-      correctiveAction: "",
-      preventiveAction: "",
-    },
+  } = useForm<RootCauseValues>({
+    resolver: zodResolver(rootCauseSchema),
+    defaultValues: { rootCause: action.root_cause ?? "" },
   });
 
   // Subscribed with `useWatch` rather than `watch()` so the draft button can
@@ -375,11 +394,9 @@ function ActionTakenForm({
     try {
       await advanceAction(action.id, "action_taken", {
         rootCause: values.rootCause,
-        correctiveAction: values.correctiveAction,
-        preventiveAction: values.preventiveAction,
       });
       await onDone();
-      toast.success("Action recorded — waiting on sign-off.");
+      toast.success("Root cause recorded — now the fix.");
     } catch (e) {
       toast.error((e as Error).message);
     }
@@ -393,19 +410,101 @@ function ActionTakenForm({
       className="space-y-3 rounded-2xl border border-[#E6EAF1] bg-white p-4"
     >
       <Legend
-        title="Record the fix"
-        hint="Both boxes are the record of how this problem was actually solved."
+        title="What caused it"
+        hint="One question. What was done about it comes next, once this is on the record."
       />
 
       <Field label="Root cause" error={errors.rootCause?.message}>
         <textarea
           {...register("rootCause")}
-          rows={2}
+          rows={3}
           placeholder="What actually caused it — not just what broke"
           className={FIELD}
           aria-invalid={!!errors.rootCause}
         />
       </Field>
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="submit"
+          disabled={busy}
+          className={cn(
+            PRIMARY,
+            "flex-1 justify-center bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] shadow-[0_8px_20px_-8px_rgba(37,99,235,0.6)]"
+          )}
+        >
+          {isSubmitting ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <Check className="size-4" />
+          )}
+          Record the cause
+        </button>
+        <button
+          type="button"
+          onClick={() => draft.mutate()}
+          disabled={busy || !rootCause?.trim()}
+          className={cn(GHOST, "h-11")}
+        >
+          {draft.isPending && <Loader2 className="size-3.5 animate-spin" />}
+          Save for now
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/* ── action_taken → verification ──────────────────────────────────────── */
+
+/**
+ * The C and the P of CAPA, asked at the stage that bears their name.
+ *
+ * The root cause is deliberately *not* repeated here. It is already on the
+ * record — under Investigating in the timeline, where the stage that produced
+ * it put it — and echoing it into the working card turns a form asking one
+ * question back into a wall of text.
+ */
+function CorrectiveActionForm({
+  action,
+  onDone,
+}: {
+  action: FactoryAction;
+  onDone: () => Promise<void> | void;
+}) {
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<CorrectiveActionValues>({
+    resolver: zodResolver(correctiveActionSchema),
+    defaultValues: {
+      correctiveAction: action.corrective_action ?? "",
+      preventiveAction: action.preventive_action ?? "",
+    },
+  });
+
+  const submit = handleSubmit(async (values) => {
+    try {
+      await advanceAction(action.id, "verification", {
+        correctiveAction: values.correctiveAction,
+        preventiveAction: values.preventiveAction,
+      });
+      await onDone();
+      toast.success("Action recorded — waiting on sign-off.");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  });
+
+  return (
+    <form
+      onSubmit={submit}
+      className="space-y-3 rounded-2xl border border-[#E6EAF1] bg-white p-4"
+    >
+      <Legend
+        title="Record the fix"
+        hint="What was actually done about it — and what stops it recurring."
+      />
 
       <Field label="Corrective action" error={errors.correctiveAction?.message}>
         <textarea
@@ -430,37 +529,27 @@ function ActionTakenForm({
         />
       </Field>
 
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="submit"
-          disabled={busy}
-          className={cn(
-            PRIMARY,
-            "flex-1 justify-center bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] shadow-[0_8px_20px_-8px_rgba(37,99,235,0.6)]"
-          )}
-        >
-          {isSubmitting ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <Check className="size-4" />
-          )}
-          Log action taken
-        </button>
-        <button
-          type="button"
-          onClick={() => draft.mutate()}
-          disabled={busy || !rootCause?.trim()}
-          className={cn(GHOST, "h-11")}
-        >
-          {draft.isPending && <Loader2 className="size-3.5 animate-spin" />}
-          Save cause for now
-        </button>
-      </div>
+      <button
+        type="submit"
+        disabled={isSubmitting}
+        className={cn(
+          PRIMARY,
+          BLOCK,
+          "bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] shadow-[0_8px_20px_-8px_rgba(37,99,235,0.6)]"
+        )}
+      >
+        {isSubmitting ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <Wrench className="size-4" />
+        )}
+        Log action taken
+      </button>
     </form>
   );
 }
 
-/* ── action_taken → closed ────────────────────────────────────────────── */
+/* ── verification → closed ────────────────────────────────────────────── */
 
 function ClosePanel({
   action,
@@ -578,6 +667,35 @@ function ClosedPanel({
 
 /* ── Going back ───────────────────────────────────────────────────────── */
 
+/** The same three moves as `REVERT_LABELS`, said in the past tense. */
+const REVERT_DONE: Record<string, string> = {
+  verification: "Fix sent back.",
+  action_taken: "Sent back to investigating.",
+  closed: "Re-opened.",
+};
+
+/** What each backward move clears, said before it is pressed rather than
+    discovered afterwards. */
+const REVERT_HINTS: Record<string, string> = {
+  verification:
+    "The corrective action is cleared — it's kept in the thread — and the issue goes back for another fix.",
+  action_taken:
+    "The recorded root cause is cleared — it's kept in the thread — and the investigation re-opens.",
+};
+
+/**
+ * Three moves backwards, three different things that went wrong.
+ *
+ * A fix sent back failed a test; a cause sent back was the wrong cause; a
+ * closed issue re-opened came back. Asking all three "what went wrong with the
+ * fix" is how a required reason becomes a box people type "wrong" into.
+ */
+const REVERT_PLACEHOLDERS: Record<string, string> = {
+  verification: "What went wrong with the fix",
+  action_taken: "Why this isn't the real cause",
+  closed: "What brought it back",
+};
+
 /**
  * The only way backwards, and it costs a written reason.
  *
@@ -616,8 +734,7 @@ function RevertPanel({
   const blocked = action.status === "closed" && !canReview(role);
   if (blocked) return null;
 
-  const label =
-    action.status === "closed" ? "Re-open" : "Send back to investigating";
+  const label = REVERT_LABELS[action.status] ?? "Send back";
 
   const submit = handleSubmit(async (values) => {
     try {
@@ -625,9 +742,7 @@ function RevertPanel({
       reset();
       setOpen(false);
       await onDone();
-      toast.success(
-        action.status === "closed" ? "Re-opened." : "Sent back to investigating."
-      );
+      toast.success(REVERT_DONE[action.status] ?? "Sent back.");
     } catch (e) {
       toast.error((e as Error).message);
     }
@@ -650,18 +765,19 @@ function RevertPanel({
       <Legend
         title={label}
         hint={
-          action.status !== "closed"
-            ? "The corrective action is cleared and kept in the thread."
-            : action.resolved_direct
-              ? "The recorded resolution is cleared — it's kept in the thread — and the issue goes back to Open with the full route available."
-              : "The recorded cause and fix are cleared — they're kept in the thread."
+          REVERT_HINTS[action.status] ??
+          (action.resolved_direct
+            ? "The recorded resolution is cleared — it's kept in the thread — and the issue goes back to Open with the full route available."
+            : "The recorded cause and fix are cleared — they're kept in the thread.")
         }
       />
       <Field label="Why?" error={errors.reason?.message}>
         <textarea
           {...register("reason")}
           rows={2}
-          placeholder="What went wrong with the fix"
+          placeholder={
+            REVERT_PLACEHOLDERS[action.status] ?? "Why this is going back"
+          }
           className={FIELD}
           aria-invalid={!!errors.reason}
         />

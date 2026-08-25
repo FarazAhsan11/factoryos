@@ -42,6 +42,7 @@ const STAGE_PILL: Record<string, string> = {
   open: "bg-[#FEF3C7] text-[#B45309]",
   investigating: "bg-[#DBEAFE] text-[#1D4ED8]",
   action_taken: "bg-[#E0E7FF] text-[#4338CA]",
+  verification: "bg-[#CFFAFE] text-[#0E7490]",
   closed: "bg-[#DCFCE7] text-[#15803D]",
 };
 

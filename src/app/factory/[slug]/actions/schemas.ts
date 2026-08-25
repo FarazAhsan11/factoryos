@@ -19,9 +19,19 @@ export const investigateSchema = z.object({
   assignedTo: required(2, "Who is looking into this?"),
 });
 
-/** investigating → action_taken. */
-export const actionTakenSchema = z.object({
+/**
+ * investigating → action_taken. The investigation's one output.
+ *
+ * The corrective action deliberately is not here. Asking for it on this
+ * boundary is what put a "what was done about it" box under a stepper reading
+ * INVESTIGATING — a fix demanded for a cause the person was still typing.
+ */
+export const rootCauseSchema = z.object({
   rootCause: required(8, "Say what actually caused it, not just what broke."),
+});
+
+/** action_taken → verification. The C and the P of CAPA. */
+export const correctiveActionSchema = z.object({
   correctiveAction: required(8, "Describe what was done about it."),
   // The P in CAPA, and the only optional field: not every issue has a
   // generalisable fix, and a mandatory box with nothing to say fills up with
@@ -29,7 +39,7 @@ export const actionTakenSchema = z.object({
   preventiveAction: z.string().trim().optional(),
 });
 
-/** action_taken → closed. Supervisor and up; the trigger enforces the role. */
+/** verification → closed. Supervisor and up; the trigger enforces the role. */
 export const closeSchema = z.object({
   verification: required(8, "How do you know the fix worked?"),
 });
@@ -57,7 +67,8 @@ export const rootCauseDraftSchema = z.object({
 });
 
 export type InvestigateValues = z.infer<typeof investigateSchema>;
-export type ActionTakenValues = z.infer<typeof actionTakenSchema>;
+export type RootCauseValues = z.infer<typeof rootCauseSchema>;
+export type CorrectiveActionValues = z.infer<typeof correctiveActionSchema>;
 export type CloseValues = z.infer<typeof closeSchema>;
 export type ResolveDirectValues = z.infer<typeof resolveDirectSchema>;
 export type RevertValues = z.infer<typeof revertSchema>;

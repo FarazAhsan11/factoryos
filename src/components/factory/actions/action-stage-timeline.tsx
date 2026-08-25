@@ -22,21 +22,22 @@ import {
 import { cn } from "@/lib/utils";
 
 /**
- * The four stages down the side of the dialog, with what each one produced.
+ * The five stages down the side of the dialog, with what each one produced.
  *
  * This is the half of the flow that makes the extra clicks worth anything.
  * Three statuses and a note thread meant the answer to "why did this happen
  * and what did we do?" was somewhere in a scroll of comments, if it was
- * anywhere. Here the root cause sits under Investigating and the fix sits
- * under Action taken, permanently, because that is where the form put them.
+ * anywhere. Here the root cause sits under Investigating, the fix under Action
+ * taken and the sign-off under Verification, permanently, because that is
+ * where the form put them.
  *
  * Stages ahead of the current one are shown greyed rather than hidden: the
  * point is partly to tell someone what still has to happen.
  *
  * An issue that took the short road — closed with no investigation — is the
- * one case where a passed stage is not a completed one. Investigating and
- * Action taken are drawn as *skipped*, greyed and struck through, never
- * ticked: a green check under "Action taken" on an issue nobody investigated
+ * one case where a passed stage is not a completed one. The three middle
+ * stages are drawn as *skipped*, greyed and struck through, never ticked: a
+ * green check under "Action taken" on an issue nobody investigated
  * would be the timeline inventing a CAPA that never happened, and this screen
  * is the record.
  *
@@ -168,6 +169,8 @@ function stampFor(action: FactoryAction, stage: ActionStage): string | null {
       return action.investigating_at;
     case "action_taken":
       return action.action_taken_at;
+    case "verification":
+      return action.verification_at;
     case "closed":
       return action.closed_at;
   }
@@ -229,9 +232,13 @@ function evidenceFor(action: FactoryAction, stage: ActionStage): EvidenceRow[] {
       });
     }
   }
-  if (stage === "closed" && action.verification) {
-    // "Verification" on an issue nobody investigated would claim a fix was
-    // tested when there was no fix to test. Same column, honest label.
+  // The sign-off is typed at Verification and files there — except on the
+  // short road, where that stage never happened. Then the same column holds a
+  // *resolution*, and it belongs under Closed, which is the only stage that
+  // issue actually reached. Calling it a verification would claim a fix was
+  // tested when there was no fix to test.
+  const verifyStage = action.resolved_direct ? "closed" : "verification";
+  if (stage === verifyStage && action.verification) {
     rows.push({
       label: verificationLabel(action),
       value: action.verification,

@@ -15,11 +15,13 @@ export default async function MaintenancePage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const { factory } = await getFactoryContext(slug);
+  const { factory, role } = await getFactoryContext(slug);
 
-  // No role gate beyond the nav's: the person who finds a broken machine is
-  // whoever was standing next to it. RLS scopes the rows to the tenant, and
-  // the insert policy stamps the raiser from the session.
+  // No role gate beyond the nav's on *reaching* the page: the person who
+  // finds a broken machine is whoever was standing next to it. Moving a
+  // request through its three sections is a narrower right — supervisor and
+  // up — and the role is passed down so the forms can say so rather than
+  // letting RLS refuse the write after it was typed.
   const supabase = await createClient();
   const {
     data: { user },
@@ -31,6 +33,7 @@ export default async function MaintenancePage({
       <MaintenanceWorkspace
         factoryId={factory.id}
         userId={user.id}
+        role={role}
         units={unitWords(factory)}
       />
     </div>

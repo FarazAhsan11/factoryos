@@ -34,11 +34,11 @@ const EMPTY: MaintenanceRequestValues = {
   equipmentNo: "",
   unitId: "",
   departmentId: "",
+  initiatingDepartmentId: "",
   priority: "routine",
   description: "",
   batchNo: "",
   reportedBy: "",
-  assignedTo: "",
 };
 
 /**
@@ -146,7 +146,8 @@ export function NewMaintenanceDialog({
               New maintenance request
             </DialogTitle>
             <DialogDescription>
-              Raised and listed. Assignment and progress arrive in a later step.
+              Section 1 of the request. Engineering and QA sign the other two
+              once this one is raised.
             </DialogDescription>
           </DialogHeader>
 
@@ -264,13 +265,31 @@ export function NewMaintenanceDialog({
                 />
               </Field>
 
-              <Field label="Assign to" htmlFor="mr-assigned" note="(optional)">
-                <input
-                  id="mr-assigned"
-                  placeholder="Maintenance technician"
+              {/* "Initiating Department" on the paper form — who is raising
+                  it, as opposed to who is needed. Two different questions that
+                  the same dropdown answers, so they sit apart on the form. */}
+              <Field
+                label="Initiating department"
+                htmlFor="mr-initiating"
+                note="(optional)"
+              >
+                <select
+                  id="mr-initiating"
                   className={CONTROL}
-                  {...register("assignedTo")}
-                />
+                  disabled={activeDepartments.length === 0}
+                  {...register("initiatingDepartmentId")}
+                >
+                  <option value="">
+                    {activeDepartments.length === 0
+                      ? "None set up yet"
+                      : "Select department…"}
+                  </option>
+                  {activeDepartments.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
               </Field>
             </div>
 

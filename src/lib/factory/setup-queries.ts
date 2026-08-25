@@ -25,35 +25,51 @@ export interface SetupItem {
   /**
    * The list's optional boolean attributes, keyed by a neutral name so one
    * component can drive every list without knowing any table's columns.
-   * Processes carry two: `machine` and `output`. Empty for tables with none.
+   * Processes carry two: `machine` and `final`. Empty for tables with none.
    */
   flags: Record<string, boolean>;
+  /**
+   * The one-of-N attribute, for lists that have one. Processes carry
+   * `downtime | preparatory | production` (migration 0030); every other list
+   * leaves this null.
+   *
+   * Separate from `flags` rather than encoded as three booleans, because it
+   * is a choice, not a set: exactly one holds at a time, and the database
+   * derives `has_machine` / `has_output` from it.
+   */
+  category: string | null;
 }
 
 /**
  * Which columns, per table, back `SetupItem.flags` — neutral key → real
- * column. Processes have three booleans. `machine` and `output` are
- * independent: an activity can produce output without running a machine
- * (Sorting, Testing) or run neither (Idle, Break).
+ * column.
  *
- * `final` is different in kind — it is a *choice between* processes, not a
- * property of one. At most one per factory may hold it, enforced by a partial
- * unique index, and setting it demotes the previous holder through a trigger
- * (migration 0016). That is why the client only ever sends "make this one
- * final" and never has to clear the other.
+ * Processes have two left. `has_output` is gone from here on purpose: since
+ * migration 0030 it is *derived* from `category` by a database trigger, and
+ * leaving it writable would let the client set a combination the trigger
+ * immediately overwrites — a toggle that silently snaps back.
+ *
+ * `final` is different in kind from `machine` — it is a *choice between*
+ * processes, not a property of one. At most one per factory may hold it,
+ * enforced by a partial unique index, and setting it demotes the previous
+ * holder through a trigger (migration 0016). That is why the client only ever
+ * sends "make this one final" and never has to clear the other.
  */
 const FLAG_COLUMNS: Partial<Record<SetupTable, Record<string, string>>> = {
   factory_processes: {
     machine: "has_machine",
-    output: "has_output",
     final: "is_final_stage",
   },
 };
+
+/** Which lists carry a one-of-N `category` column. */
+const CATEGORY_TABLES: SetupTable[] = ["factory_processes"];
 
 const BASE_COLUMNS = "id, name, active, sort_order, created_at";
 
 function columns(table: SetupTable): string {
   const extra = Object.values(FLAG_COLUMNS[table] ?? {});
+  if (CATEGORY_TABLES.includes(table)) extra.push("category");
   return extra.length ? `${BASE_COLUMNS}, ${extra.join(", ")}` : BASE_COLUMNS;
 }
 
@@ -69,6 +85,9 @@ function toItem(table: SetupTable, row: Record<string, unknown>): SetupItem {
     sort_order: row.sort_order as number,
     created_at: row.created_at as string,
     flags,
+    category: CATEGORY_TABLES.includes(table)
+      ? ((row.category as string | null) ?? null)
+      : null,
   };
 }
 
@@ -77,7 +96,7 @@ function toRow(
   table: SetupTable,
   patch: SetupPatch
 ): Record<string, unknown> {
-  const { flags, ...rest } = patch;
+  const { flags, category, ...rest } = patch;
   const columnFor = FLAG_COLUMNS[table] ?? {};
   const row: Record<string, unknown> = { ...rest };
   for (const [key, value] of Object.entries(flags ?? {})) {
@@ -86,11 +105,16 @@ function toRow(
     const column = columnFor[key];
     if (column) row[column] = value;
   }
+  // Same tolerance for the category: a caller may pass one without knowing
+  // whether this list has the column.
+  if (category != null && CATEGORY_TABLES.includes(table)) {
+    row.category = category;
+  }
   return row;
 }
 
 export type SetupPatch = Partial<
-  Pick<SetupItem, "name" | "active" | "sort_order" | "flags">
+  Pick<SetupItem, "name" | "active" | "sort_order" | "flags" | "category">
 >;
 
 export const setupKeys = {
@@ -120,7 +144,8 @@ export async function createSetupItem(
   factoryId: string,
   name: string,
   sortOrder: number,
-  flags: Record<string, boolean> = {}
+  flags: Record<string, boolean> = {},
+  category: string | null = null
 ): Promise<SetupItem> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -128,7 +153,7 @@ export async function createSetupItem(
     .insert({
       factory_id: factoryId,
       sort_order: sortOrder,
-      ...toRow(table, { name: name.trim(), flags }),
+      ...toRow(table, { name: name.trim(), flags, category }),
     })
     .select(columns(table))
     .single();

@@ -2,20 +2,28 @@ import type { FactoryRole } from "@/lib/factory/context";
 import { createClient } from "@/lib/supabase/client";
 
 /**
- * Issues & CAPAs. Reads the `actions_expanded` view (migrations 0017, 0020),
- * where both clocks are computed on every read rather than stored — so an
- * issue escalates at 2am whether or not anyone has the app open.
+ * Issues & CAPAs. Reads the `actions_expanded` view (migrations 0017, 0020,
+ * 0027), where both clocks are computed on every read rather than stored — so
+ * an issue escalates at 2am whether or not anyone has the app open.
  *
- * The stage flow is `open → investigating → action_taken → closed`, one step
- * at a time, each move paid for with the evidence that stage exists to
- * produce. Nothing in this file enforces that: the `actions_stage_transition`
+ * The stage flow is `open → investigating → action_taken → verification →
+ * closed`, one step at a time, each move paid for with the evidence that stage
+ * exists to produce — and, since 0027, each stage collecting the thing it is
+ * actually named after: the root cause under Investigating, the corrective
+ * action under Action taken, the sign-off under Verification. Nothing in this
+ * file enforces that: the `actions_stage_transition`
  * trigger does. Issues are written browser-direct under RLS, so a rule that
  * lives only here is a rule anyone with a session can PATCH straight past.
  * What is here is the UI's half — knowing which move is available next so the
  * form for the wrong one is never rendered in the first place.
  */
 
-export type ActionStage = "open" | "investigating" | "action_taken" | "closed";
+export type ActionStage =
+  | "open"
+  | "investigating"
+  | "action_taken"
+  | "verification"
+  | "closed";
 export type ActionPriority = "critical" | "high" | "medium" | "low";
 
 export const ACTION_CATEGORIES = [
@@ -54,6 +62,7 @@ export const ACTION_STAGES: ActionStage[] = [
   "open",
   "investigating",
   "action_taken",
+  "verification",
   "closed",
 ];
 
@@ -61,14 +70,21 @@ export const STAGE_LABELS: Record<ActionStage, string> = {
   open: "Open",
   investigating: "Investigating",
   action_taken: "Action taken",
+  verification: "Verification",
   closed: "Closed",
 };
 
-/** What the stage is *for* — shown under each step of the timeline. */
+/**
+ * What the stage is *for* — shown under each step of the timeline.
+ *
+ * Each one is phrased as the question that stage answers, because that is
+ * what its form asks for and the two should not be able to drift apart again.
+ */
 export const STAGE_BLURBS: Record<ActionStage, string> = {
   open: "Raised and waiting for an owner.",
   investigating: "Someone owns it and is finding the cause.",
-  action_taken: "The fix is in, waiting on sign-off.",
+  action_taken: "The cause is known — now the fix.",
+  verification: "The fix is in, waiting on sign-off.",
   closed: "Verified and signed off.",
 };
 
@@ -99,8 +115,8 @@ export function verificationLabel(action: FactoryAction): string {
 }
 
 /**
- * A stage this issue went *past* without entering — only ever the middle two,
- * and only on an issue resolved straight out of Open.
+ * A stage this issue went *past* without entering — only ever the middle
+ * three, and only on an issue resolved straight out of Open.
  *
  * Shared by the stepper and the timeline so the two can't disagree about what
  * happened. A tick under "Action taken" on an issue nobody investigated would
@@ -111,20 +127,33 @@ export function isStageSkipped(
   stage: ActionStage | undefined
 ): boolean {
   if (!stage || !action.resolved_direct) return false;
-  return stage === "investigating" || stage === "action_taken";
+  return (
+    stage === "investigating" ||
+    stage === "action_taken" ||
+    stage === "verification"
+  );
 }
 
 /**
- * The one stage it can go back to — `action_taken → investigating` when
- * verification fails, `closed → open` to re-open. There is deliberately no
- * `investigating → open`: un-assigning is what that means, and it is a field
- * on the issue, not a stage change.
+ * The one stage it can go back to — `verification → action_taken` when the fix
+ * didn't hold, `action_taken → investigating` when the cause was wrong,
+ * `closed → open` to re-open. There is deliberately no `investigating → open`:
+ * un-assigning is what that means, and it is a field on the issue, not a stage
+ * change.
  */
 export function prevStage(stage: ActionStage): ActionStage | null {
+  if (stage === "verification") return "action_taken";
   if (stage === "action_taken") return "investigating";
   if (stage === "closed") return "open";
   return null;
 }
+
+/** What going back from here is called, in the words of what it undoes. */
+export const REVERT_LABELS: Record<string, string> = {
+  verification: "Send the fix back",
+  action_taken: "Send back to investigating",
+  closed: "Re-open",
+};
 
 const REVIEWER_ROLES: FactoryRole[] = [
   "super_admin",
@@ -169,7 +198,10 @@ export interface FactoryAction {
   preventive_action: string | null;
   verification: string | null;
   investigating_at: string | null;
+  /** When the root cause landed — the issue became somebody's fix to make. */
   action_taken_at: string | null;
+  /** When the corrective action landed — the sign-off clock starts here. */
+  verification_at: string | null;
   closed_at: string | null;
 
   /** Derived in the view, never stored. */
@@ -201,7 +233,7 @@ const COLUMNS = `
   assigned_to, due_at, notes, shift_log_entry_id, created_at,
   batch_no, product_id, product_name, product_code,
   root_cause, corrective_action, preventive_action, verification,
-  investigating_at, action_taken_at, closed_at,
+  investigating_at, action_taken_at, verification_at, closed_at,
   is_overdue, is_escalated, escalates_at,
   verify_due_at, is_verify_overdue, note_count, resolved_direct
 `;
@@ -301,8 +333,9 @@ export async function createAction(
 export interface AdvancePayload {
   /** → investigating. Blank means "keep whoever is already assigned". */
   assignedTo?: string;
-  /** → action_taken. */
+  /** → action_taken. The investigation's one output. */
   rootCause?: string;
+  /** → verification. What was actually done, and what stops a repeat. */
   correctiveAction?: string;
   preventiveAction?: string;
   /**
@@ -341,6 +374,8 @@ export async function advanceAction(
   }
   if (to === "action_taken") {
     patch.root_cause = payload.rootCause?.trim() ?? null;
+  }
+  if (to === "verification") {
     patch.corrective_action = payload.correctiveAction?.trim() ?? null;
     patch.preventive_action = payload.preventiveAction?.trim() || null;
   }
@@ -498,13 +533,19 @@ export function relativeTime(iso: string, now: number = Date.now()): string {
  *
  * Escalated is deliberately *not* a fifth tab. An escalated issue is already
  * sitting in Open or Investigating, so a tab for it would show the same rows
- * twice and make the counts lie. It is a toggle that cuts across the four —
+ * twice and make the counts lie. It is a toggle that cuts across all five —
  * see `escalatedOnly` in the workspace.
  */
 export function stageCounts(
   actions: FactoryAction[]
 ): Record<ActionStage, number> {
-  const counts = { open: 0, investigating: 0, action_taken: 0, closed: 0 };
+  const counts: Record<ActionStage, number> = {
+    open: 0,
+    investigating: 0,
+    action_taken: 0,
+    verification: 0,
+    closed: 0,
+  };
   for (const action of actions) counts[action.status] += 1;
   return counts;
 }

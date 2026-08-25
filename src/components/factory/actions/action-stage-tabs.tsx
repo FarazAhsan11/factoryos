@@ -10,11 +10,11 @@ import {
 import { cn } from "@/lib/utils";
 
 /**
- * Four tabs, one per stage — and a toggle that cuts across all four.
+ * Five tabs, one per stage — and a toggle that cuts across all of them.
  *
- * Escalated is not a fifth tab on purpose. An escalated issue is already
- * sitting in Open or Investigating; giving it a tab of its own would show the
- * same row in two places and make every count a little bit of a lie. As a
+ * Escalated is not a tab of its own on purpose. An escalated issue is already
+ * sitting in one of the unfinished stages; giving it a tab of its own would
+ * show the same row twice and make every count a little bit of a lie. As a
  * toggle it composes with whichever stage you are looking at, which is the
  * question people actually ask: "what in here has been ignored too long?"
  */

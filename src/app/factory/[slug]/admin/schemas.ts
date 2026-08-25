@@ -188,6 +188,28 @@ export const productSchema = z.object({
 
 export type ProductValues = z.infer<typeof productSchema>;
 
+/* ── Admin → Equipment ───────────────────────────────────── */
+
+/**
+ * One machine in the register. Both fields are required: a number with no
+ * name resolves to nothing useful in the shift log, and a name with no number
+ * can never be typed off the machine.
+ */
+export const equipmentSchema = z.object({
+  equipmentNo: z
+    .string()
+    .trim()
+    .min(1, "Enter the equipment number.")
+    .max(40, "Keep the equipment number under 40 characters."),
+  name: z
+    .string()
+    .trim()
+    .min(2, "Enter the machine name.")
+    .max(120, "Keep the name under 120 characters."),
+});
+
+export type EquipmentValues = z.infer<typeof equipmentSchema>;
+
 /* ── Admin → Shift times ───────────────────────────────────────────────── */
 
 /** `<input type="time">` gives "HH:MM"; Postgres `time` gives "HH:MM:SS". */

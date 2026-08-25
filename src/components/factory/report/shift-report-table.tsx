@@ -176,6 +176,14 @@ function EntryRow({
 
       <Td align="right" className="font-mono font-semibold text-[#1D4ED8]">
         {formatQty(entry.qty)}
+        {/* A preparatory room hands over "3 drums", not "3". On a printed
+            handover the bare number is the one thing nobody can go back and
+            ask about. */}
+        {entry.qty_unit && entry.qty !== null && (
+          <span className="ml-1 text-[9px] font-medium text-[#94A3B8]">
+            {entry.qty_unit}
+          </span>
+        )}
       </Td>
       <Td align="right" className="font-mono">
         {formatQty(entry.accumulative)}

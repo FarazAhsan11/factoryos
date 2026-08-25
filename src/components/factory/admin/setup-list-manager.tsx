@@ -25,14 +25,13 @@ const FIELD =
 
 /**
  * A boolean attribute a list can carry. Processes have two — "runs on a
- * machine" and "produces output" — and they are independent: Sorting produces
- * output with no machine, Idle does neither.
+ * machine" and "is the final stage".
  *
  * Purely labels and an icon; the column each key maps to lives in
  * setup-queries, so this component never learns a table's schema.
  */
 export interface SetupFlagConfig {
-  /** Neutral key matching `SetupItem.flags` (e.g. "machine", "output"). */
+  /** Neutral key matching `SetupItem.flags` (e.g. "machine", "final"). */
   key: string;
   /** Checkbox label on the add row. */
   label: string;
@@ -42,8 +41,30 @@ export interface SetupFlagConfig {
   on: string;
   off: string;
   icon?: typeof Cog;
-  /** Ticked by default on the add row — output is the norm, machines aren't. */
+  /** Ticked by default on the add row. */
   defaultOn?: boolean;
+  /**
+   * Categories this flag applies to. Omitted means "all of them".
+   *
+   * Not cosmetic: since migration 0030 the database *derives* the flags a
+   * category implies, so a checkbox offered outside its categories would be
+   * a control that silently snaps back on the next read.
+   */
+  showFor?: string[];
+}
+
+/**
+ * A one-of-N attribute — currently only a process stage's kind. Unlike a
+ * flag it is a choice, so it renders as a radio group rather than a tick, and
+ * the flags above are filtered by whichever member is selected.
+ */
+export interface SetupCategoryConfig {
+  value: string;
+  label: string;
+  /** Two or three real stage names, so the choice is obvious at a glance. */
+  example?: string;
+  /** What picking this one changes about the shift-log entry form. */
+  hint?: string;
 }
 
 /**
@@ -59,6 +80,9 @@ export function SetupListManager({
   placeholder,
   canManage,
   flags,
+  categories,
+  categoryLabel = "Type",
+  defaultCategory,
 }: {
   table: SetupTable;
   factoryId: string;
@@ -67,8 +91,16 @@ export function SetupListManager({
   placeholder: string;
   canManage: boolean;
   flags?: SetupFlagConfig[];
+  categories?: SetupCategoryConfig[];
+  /** Heading above the radio group on the add row. */
+  categoryLabel?: string;
+  /** Which member the add row opens on. Falls back to the first. */
+  defaultCategory?: string;
 }) {
   const flagList = useMemo(() => flags ?? [], [flags]);
+  const categoryList = useMemo(() => categories ?? [], [categories]);
+  const initialCategory =
+    defaultCategory ?? categoryList[0]?.value ?? null;
   const flagDefaults = useMemo(
     () =>
       Object.fromEntries(flagList.map((f) => [f.key, Boolean(f.defaultOn)])),
@@ -79,8 +111,18 @@ export function SetupListManager({
   const [draft, setDraft] = useState("");
   const [draftFlags, setDraftFlags] =
     useState<Record<string, boolean>>(flagDefaults);
+  const [draftCategory, setDraftCategory] = useState<string | null>(
+    initialCategory
+  );
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+
+  /** The flags that apply to one category — see `SetupFlagConfig.showFor`. */
+  function flagsFor(category: string | null): SetupFlagConfig[] {
+    return flagList.filter(
+      (f) => !f.showFor || (category != null && f.showFor.includes(category))
+    );
+  }
 
   const { data: items = [], isPending, isError, error } = useQuery({
     queryKey,
@@ -95,13 +137,24 @@ export function SetupListManager({
     mutationFn: ({
       name,
       withFlags,
+      withCategory,
     }: {
       name: string;
       withFlags: Record<string, boolean>;
-    }) => createSetupItem(table, factoryId, name, items.length, withFlags),
+      withCategory: string | null;
+    }) =>
+      createSetupItem(
+        table,
+        factoryId,
+        name,
+        items.length,
+        withFlags,
+        withCategory
+      ),
     onSuccess: async (created) => {
       setDraft("");
       setDraftFlags(flagDefaults);
+      setDraftCategory(initialCategory);
       await refresh();
       toast.success(`${created.name} added.`);
     },
@@ -173,6 +226,45 @@ export function SetupListManager({
     onSettled: () => refresh(),
   });
 
+  /**
+   * Re-classifying a stage. The optimistic patch also drops the flags the new
+   * category doesn't carry, because the *database* drops them
+   * (`factory_process_category_sync`, migration 0030) — showing a "Machine"
+   * pill on a stage that has just become Downtime would be a lie the next
+   * refetch quietly corrects, which is worse than no pill at all.
+   */
+  const setCategory = useMutation({
+    mutationFn: ({ id, category }: { id: string; category: string }) =>
+      updateSetupItem(table, id, { category }),
+    onMutate: async ({ id, category }) => {
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<SetupItem[]>(queryKey);
+      const kept = new Set(flagsFor(category).map((f) => f.key));
+      queryClient.setQueryData<SetupItem[]>(queryKey, (old) =>
+        (old ?? []).map((i) =>
+          i.id === id
+            ? {
+                ...i,
+                category,
+                flags: Object.fromEntries(
+                  Object.entries(i.flags).map(([key, on]) => [
+                    key,
+                    kept.has(key) && on,
+                  ])
+                ),
+              }
+            : i
+        )
+      );
+      return { previous };
+    },
+    onError: (e: Error, _vars, context) => {
+      queryClient.setQueryData(queryKey, context?.previous);
+      toast.error(e.message);
+    },
+    onSettled: () => refresh(),
+  });
+
   const remove = useMutation({
     mutationFn: (id: string) => deleteSetupItem(table, id),
     onMutate: async (id) => {
@@ -193,7 +285,17 @@ export function SetupListManager({
   function submitDraft() {
     const name = draft.trim();
     if (!name) return;
-    add.mutate({ name, withFlags: draftFlags });
+    // Only the flags this category carries — the rest would be overwritten by
+    // the database trigger anyway, and sending them makes the insert claim
+    // something it isn't going to store.
+    const keys = new Set(flagsFor(draftCategory).map((f) => f.key));
+    add.mutate({
+      name,
+      withFlags: Object.fromEntries(
+        Object.entries(draftFlags).filter(([key]) => keys.has(key))
+      ),
+      withCategory: draftCategory,
+    });
   }
 
   return (
@@ -233,7 +335,62 @@ export function SetupListManager({
             </button>
           </div>
 
-          {flagList.map((f) => (
+          {/* The kind of stage, first — it decides which ticks below even
+              exist, and which shape the shift-log form takes. */}
+          {categoryList.length > 0 && (
+            <fieldset className="mt-3.5">
+              <legend className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#64748B]">
+                {categoryLabel}
+              </legend>
+              <div className="grid gap-2 sm:grid-cols-3">
+                {categoryList.map((c) => {
+                  const on = draftCategory === c.value;
+                  return (
+                    <label
+                      key={c.value}
+                      className={cn(
+                        "cursor-pointer rounded-xl border p-3 transition",
+                        on
+                          ? "border-[#2563EB] bg-[#EFF6FF] ring-4 ring-[#2563EB]/10"
+                          : "border-[#E6EAF1] bg-white hover:border-[#CBD5E1]"
+                      )}
+                    >
+                      <span className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name={`${table}-category`}
+                          value={c.value}
+                          checked={on}
+                          onChange={() => setDraftCategory(c.value)}
+                          className="size-4 shrink-0 cursor-pointer accent-[#2563EB]"
+                        />
+                        <span
+                          className={cn(
+                            "text-sm font-semibold",
+                            on ? "text-[#1D4ED8]" : "text-[#0F1B34]"
+                          )}
+                        >
+                          {c.label}
+                        </span>
+                      </span>
+                      {c.example && (
+                        <span className="mt-1 block text-xs text-[#64748B]">
+                          {c.example}
+                        </span>
+                      )}
+                      {c.hint && (
+                        <span className="mt-1 block text-[11px] leading-snug text-[#94A3B8]">
+                          {c.hint}
+                        </span>
+                      )}
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
+          )}
+
+          {flagsFor(draftCategory).map((f) => (
             <label
               key={f.key}
               className="mt-3 flex cursor-pointer items-start gap-2.5 text-sm text-[#0F1B34]"
@@ -278,8 +435,11 @@ export function SetupListManager({
         <ul
           className={cn(
             "grid gap-2.5 sm:grid-cols-2",
-            // The flag pills need the extra width, so stay at two columns.
-            flagList.length === 0 && "lg:grid-cols-3"
+            // The category control and flag pills need the extra width, so a
+            // list carrying either stays at two columns.
+            flagList.length === 0 &&
+              categoryList.length === 0 &&
+              "lg:grid-cols-3"
           )}
         >
           {items.map((item) => {
@@ -335,7 +495,36 @@ export function SetupListManager({
                       {item.name}
                     </span>
 
-                    {flagList.map((f) => {
+                    {/* Compact on the row, unlike the radio cards on the add
+                        form: here it is a correction, not a decision being
+                        made for the first time. */}
+                    {categoryList.length > 0 &&
+                      (canManage ? (
+                        <select
+                          value={item.category ?? ""}
+                          onChange={(e) =>
+                            setCategory.mutate({
+                              id: item.id,
+                              category: e.target.value,
+                            })
+                          }
+                          aria-label={`${categoryLabel} of ${item.name}`}
+                          className="h-7 shrink-0 rounded-full border border-[#E6EAF1] bg-[#F8FAFC] px-2 text-[11px] font-medium text-[#475569] outline-none transition hover:border-[#CBD5E1] focus:border-[#2563EB]"
+                        >
+                          {categoryList.map((c) => (
+                            <option key={c.value} value={c.value}>
+                              {c.label}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="shrink-0 rounded-full bg-[#F1F5F9] px-2 py-0.5 text-[11px] font-medium text-[#475569]">
+                          {categoryList.find((c) => c.value === item.category)
+                            ?.label ?? item.category}
+                        </span>
+                      ))}
+
+                    {flagsFor(item.category).map((f) => {
                       const on = Boolean(item.flags[f.key]);
                       const Icon = f.icon ?? Cog;
                       if (!canManage) {

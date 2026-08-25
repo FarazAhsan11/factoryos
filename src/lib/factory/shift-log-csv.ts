@@ -18,10 +18,17 @@ const HEADERS = [
   "Duration (min)",
   "Room / Unit",
   "Activity / Stage",
+  // Which of the three shapes the row was filed in. Without it a null qty is
+  // ambiguous in the export: a downtime row records none by design, whereas a
+  // blank on a production row is an omission worth chasing.
+  "Stage type",
   "Batch",
   "Product",
   "Product code",
   "Qty produced",
+  // The unit half of a preparatory measurement. Blank on production rows,
+  // which count in whatever "Speed unit" says.
+  "Qty unit",
   "Shift target",
   "Rejected",
   "Accumulative",
@@ -64,10 +71,12 @@ function cells(row: LogTableRow): (string | number | null)[] {
     row.duration_minutes,
     row.unit_name ?? "",
     row.process_name ?? "",
+    row.process_category ?? "",
     row.batch_no ?? "",
     row.product_name ?? "",
     row.product_code ?? "",
     row.qty,
+    row.qty_unit ?? "",
     row.target_qty,
     row.qty_rejected,
     row.accumulative ?? "",

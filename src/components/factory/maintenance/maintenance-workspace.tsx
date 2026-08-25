@@ -2,41 +2,54 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { User, Wrench } from "lucide-react";
+import { AlertTriangle, ChevronRight, User, Wrench } from "lucide-react";
 
+import { MaintenanceDetailDialog } from "@/components/factory/maintenance/maintenance-detail-dialog";
 import { NewMaintenanceDialog } from "@/components/factory/maintenance/new-maintenance-dialog";
+import type { FactoryRole } from "@/lib/factory/context";
 import {
-  MAINTENANCE_PRIORITIES,
+  MAINTENANCE_FILTERS,
+  STATUS_LABELS,
+  STATUS_PILL,
   fetchMaintenanceRequests,
+  formatMinutes,
   formatRaised,
   maintenanceKeys,
+  minutesSince,
   priorityMeta,
-  type MaintenancePriority,
+  type MaintenanceRequest,
 } from "@/lib/factory/maintenance-queries";
 import { cn } from "@/lib/utils";
 
-type Filter = "all" | MaintenancePriority;
+type FilterKey = "all" | string;
 
 /**
- * Maintenance — raising a request, and the list of what has been raised.
+ * Maintenance — the whole Breakdown Maintenance Request, not just its first
+ * page.
  *
- * Deliberately only that. There is no assignment, no progress and no
- * verification yet, so the list makes no promise about what happens next: it
- * is a record that the fault was reported and by whom. The status vocabulary
- * exists in the database ready for the workflow, and nothing here moves a
- * request past `reported`.
+ * The list is the tray the paper forms used to sit in, so it is filtered the
+ * way that tray is searched: by which section is waiting on someone, and by
+ * how loudly. Opening a row opens the document itself, three tabs deep.
+ *
+ * Nothing here decides what a request is allowed to do next — that lives in
+ * `maintenance_stage_transition`, and the forms in the dialog only ask for
+ * what it will demand anyway.
  */
 export function MaintenanceWorkspace({
   factoryId,
   userId,
+  role,
   units,
 }: {
   factoryId: string;
   userId: string;
+  role: FactoryRole;
   units: { singular: string; plural: string };
 }) {
   const queryClient = useQueryClient();
-  const [filter, setFilter] = useState<Filter>("all");
+  const [filter, setFilter] = useState<FilterKey>("all");
+  const [urgent, setUrgent] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null);
 
   const {
     data: requests = [],
@@ -57,23 +70,30 @@ export function MaintenanceWorkspace({
   );
 
   const counts = useMemo(() => {
-    const map: Record<Filter, number> = {
-      all: requests.length,
-      urgent: 0,
-      routine: 0,
-      planned: 0,
-    };
-    for (const r of requests) map[r.priority] += 1;
+    const map: Record<string, number> = { all: requests.length };
+    for (const f of MAINTENANCE_FILTERS) {
+      map[f.key] = requests.filter((r) => f.match(r.status)).length;
+    }
     return map;
   }, [requests]);
 
-  const visible = useMemo(
-    () =>
-      filter === "all"
-        ? requests
-        : requests.filter((r) => r.priority === filter),
-    [requests, filter]
+  const urgentCount = useMemo(
+    () => requests.filter((r) => r.priority === "urgent").length,
+    [requests]
   );
+
+  const visible = useMemo(() => {
+    const chip = MAINTENANCE_FILTERS.find((f) => f.key === filter);
+    return requests.filter(
+      (r) =>
+        (!chip || chip.match(r.status)) && (!urgent || r.priority === "urgent")
+    );
+  }, [requests, filter, urgent]);
+
+  // Read out of the freshly fetched list rather than held in state, so the
+  // open dialog re-renders with the new record the moment a section is signed
+  // — a snapshot taken on click would show the stage you just left.
+  const open = requests.find((r) => r.id === openId) ?? null;
 
   return (
     <>
@@ -86,8 +106,8 @@ export function MaintenanceWorkspace({
             Maintenance requests
           </h1>
           <p className="mt-1 text-sm text-[#64748B]">
-            Report a fault and say which department is needed. Assignment and
-            progress tracking arrive in a later step.
+            Report a fault, assign it, record the work, and have QA review it —
+            the three sections of the request, in order.
           </p>
         </div>
 
@@ -99,17 +119,31 @@ export function MaintenanceWorkspace({
         />
       </div>
 
-      <div className="mb-4 flex flex-wrap gap-1.5">
-        {(["all", ...MAINTENANCE_PRIORITIES.map((p) => p.value)] as Filter[]).map(
-          (key) => {
+      {/* Who is holding it — the question the tray gets asked. Four chips
+          rather than the three sections, because Section 3 holds both the
+          request QA has not looked at and every request QA ever finished, and
+          one chip for both is a chip nobody can use. The toggle beside them
+          cuts across all four rather than joining them: "urgent" is not a
+          place a request can be. */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <div
+          role="tablist"
+          aria-label="Request section"
+          className="flex flex-wrap gap-1.5"
+        >
+          {[
+            { key: "all", label: "All", hint: "Every request ever raised" },
+            ...MAINTENANCE_FILTERS,
+          ].map(({ key, label, hint }) => {
             const active = filter === key;
-            const meta = key === "all" ? null : priorityMeta(key);
             return (
               <button
                 key={key}
                 type="button"
+                role="tab"
+                aria-selected={active}
+                title={hint}
                 onClick={() => setFilter(key)}
-                aria-pressed={active}
                 className={cn(
                   "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition",
                   active
@@ -117,14 +151,7 @@ export function MaintenanceWorkspace({
                     : "border-[#E6EAF1] bg-white text-[#475569] hover:border-[#CBD5E1]"
                 )}
               >
-                {meta && (
-                  <span
-                    className="size-2 rounded-full"
-                    style={{ background: meta.dot }}
-                    aria-hidden
-                  />
-                )}
-                {meta ? meta.label : "All"}
+                {label}
                 <span
                   className={cn(
                     "rounded-full px-1.5 text-[10px] font-bold",
@@ -135,8 +162,34 @@ export function MaintenanceWorkspace({
                 </span>
               </button>
             );
-          }
-        )}
+          })}
+        </div>
+
+        <button
+          type="button"
+          aria-pressed={urgent}
+          onClick={() => setUrgent(!urgent)}
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition",
+            urgent
+              ? "border-[#B91C1C] bg-[#FEE2E2] text-[#B91C1C]"
+              : "border-[#E6EAF1] bg-white text-[#475569] hover:border-[#CBD5E1]",
+            // Nothing is urgent: the toggle stays put so its absence reads as
+            // "all quiet" rather than as a control that went missing.
+            urgentCount === 0 && !urgent && "opacity-60"
+          )}
+        >
+          <AlertTriangle className="size-3.5" />
+          Urgent only
+          <span
+            className={cn(
+              "rounded-full px-1.5 text-[10px] font-bold",
+              urgent ? "bg-white/60" : "bg-[#F1F5F9] text-[#64748B]"
+            )}
+          >
+            {urgentCount}
+          </span>
+        </button>
       </div>
 
       {isPending ? (
@@ -151,92 +204,158 @@ export function MaintenanceWorkspace({
           <p className="text-sm text-[#64748B]">
             {requests.length === 0
               ? "No maintenance requests yet."
-              : `Nothing ${priorityMeta(filter as MaintenancePriority).label.toLowerCase()}.`}
+              : "Nothing matches that filter."}
           </p>
           <p className="mt-1 text-xs text-[#94A3B8]">
             {requests.length === 0
               ? "Raise one when a machine needs attention."
-              : "Try another priority."}
+              : urgent
+                ? "Nothing urgent in that section."
+                : "Try another section."}
           </p>
         </div>
       ) : (
         <ul className="space-y-2.5">
-          {visible.map((request) => {
-            const meta = priorityMeta(request.priority);
-            return (
-              <li
-                key={request.id}
-                className="rounded-2xl border border-[#E6EAF1] bg-white p-4"
-                style={{ borderLeft: `4px solid ${meta.dot}` }}
-              >
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="flex flex-wrap items-baseline gap-x-2">
-                      <span className="font-mono text-[11px] font-bold text-[#94A3B8]">
-                        {request.request_no}
-                      </span>
-                      <span className="font-mono text-sm font-semibold text-[#0F1B34]">
-                        {request.equipment_no}
-                      </span>
-                    </p>
-                    <p className="mt-0.5 text-xs text-[#94A3B8]">
-                      {request.unit_name ?? `Not ${units.singular.toLowerCase()}-specific`}
-                      {request.department_name && ` · ${request.department_name}`}
-                      {request.batch_no && (
-                        <>
-                          {" · Batch "}
-                          <span className="font-mono">{request.batch_no}</span>
-                          {request.product_name && ` (${request.product_name})`}
-                        </>
-                      )}
-                    </p>
-                  </div>
-
-                  <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-                    <span
-                      className={cn(
-                        "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
-                        meta.pill
-                      )}
-                    >
-                      {meta.label}
-                    </span>
-                    {/* Only one status is reachable today, and saying so is
-                        more honest than a pill implying a workflow. */}
-                    <span className="rounded-full bg-[#F1F5F9] px-2 py-0.5 text-[10px] font-semibold text-[#475569]">
-                      Reported
-                    </span>
-                  </div>
-                </div>
-
-                <p className="mt-2 whitespace-pre-wrap text-[13px] text-[#334155]">
-                  {request.description}
-                </p>
-
-                <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
-                  <span
-                    className={cn(
-                      "inline-flex items-center gap-1.5",
-                      request.assigned_to
-                        ? "font-medium text-[#0F1B34]"
-                        : "italic text-[#94A3B8]"
-                    )}
-                  >
-                    <User className="size-3.5 shrink-0 text-[#94A3B8]" />
-                    {request.assigned_to ?? "Unassigned"}
-                  </span>
-                  <span className="font-mono text-[11px] text-[#94A3B8]">
-                    {request.reported_by && `${request.reported_by} · `}
-                    {formatRaised(request.created_at)}
-                  </span>
-                </div>
-              </li>
-            );
-          })}
+          {visible.map((request) => (
+            <RequestRow
+              key={request.id}
+              request={request}
+              unitWord={units.singular}
+              onOpen={() => setOpenId(request.id)}
+            />
+          ))}
         </ul>
       )}
+
+      <MaintenanceDetailDialog
+        request={open}
+        factoryId={factoryId}
+        role={role}
+        unitWord={units.singular}
+        onClose={() => setOpenId(null)}
+      />
     </>
   );
+}
+
+function RequestRow({
+  request,
+  unitWord,
+  onOpen,
+}: {
+  request: MaintenanceRequest;
+  unitWord: string;
+  onOpen: () => void;
+}) {
+  const meta = priorityMeta(request.priority);
+
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="w-full rounded-2xl border border-[#E6EAF1] bg-white p-4 text-left transition hover:border-[#CBD5E1] hover:shadow-[0_6px_18px_-12px_rgba(15,27,52,0.35)]"
+        style={{ borderLeft: `4px solid ${meta.dot}` }}
+      >
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="flex flex-wrap items-baseline gap-x-2">
+              <span className="font-mono text-[11px] font-bold text-[#94A3B8]">
+                {request.request_no}
+              </span>
+              <span className="font-mono text-sm font-semibold text-[#0F1B34]">
+                {request.equipment_no}
+              </span>
+              {request.equipment_name && (
+                <span className="truncate text-xs text-[#475569]">
+                  {request.equipment_name}
+                </span>
+              )}
+            </p>
+            <p className="mt-0.5 text-xs text-[#94A3B8]">
+              {request.unit_name ?? `Not ${unitWord.toLowerCase()}-specific`}
+              {request.department_name && ` · ${request.department_name}`}
+              {request.batch_no && (
+                <>
+                  {" · Batch "}
+                  <span className="font-mono">{request.batch_no}</span>
+                  {request.product_name && ` (${request.product_name})`}
+                </>
+              )}
+            </p>
+          </div>
+
+          <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+            <span
+              className={cn(
+                "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+                meta.pill
+              )}
+            >
+              {meta.label}
+            </span>
+            <span
+              className={cn(
+                "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+                STATUS_PILL[request.status]
+              )}
+            >
+              {STATUS_LABELS[request.status]}
+            </span>
+            <ChevronRight className="size-4 text-[#CBD5E1]" />
+          </div>
+        </div>
+
+        <p className="mt-2 line-clamp-2 whitespace-pre-wrap text-[13px] text-[#334155]">
+          {request.description}
+        </p>
+
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <span
+            className={cn(
+              "inline-flex items-center gap-1.5",
+              request.assigned_to
+                ? "font-medium text-[#0F1B34]"
+                : "italic text-[#94A3B8]"
+            )}
+          >
+            <User className="size-3.5 shrink-0 text-[#94A3B8]" />
+            {request.assigned_to ?? "Unassigned"}
+          </span>
+          <span className="font-mono text-[11px] text-[#94A3B8]">
+            <Downtime request={request} />
+            {request.reported_by && `${request.reported_by} · `}
+            {formatRaised(request.created_at)}
+          </span>
+        </div>
+      </button>
+    </li>
+  );
+}
+
+/**
+ * The downtime figure, and only when it means something.
+ *
+ * While the tools are down it counts up and is the most urgent thing on the
+ * row; once the work is signed it is a fact; before work starts there is
+ * nothing to say, and a "0m" there would read as a machine that never broke.
+ */
+function Downtime({ request }: { request: MaintenanceRequest }) {
+  if (request.downtime_minutes !== null) {
+    return (
+      <span className="text-[#475569]">
+        Down {formatMinutes(request.downtime_minutes)} ·{" "}
+      </span>
+    );
+  }
+  if (request.work_started_at) {
+    return (
+      <span className="font-semibold text-[#B45309]">
+        Down {formatMinutes(minutesSince(request.work_started_at))} ·{" "}
+      </span>
+    );
+  }
+  return null;
 }
 
 function ListSkeleton() {

@@ -36,7 +36,7 @@ function pageWindow(current: number, total: number): (number | null)[] {
 }
 
 const BUTTON =
-  "inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-line px-2 text-xs font-medium text-ink-3 transition hover:border-brand hover:text-brand disabled:pointer-events-none disabled:opacity-40";
+  "inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-line bg-surface px-2 text-xs font-semibold tabular-nums text-ink-3 transition hover:border-brand hover:bg-brand-soft hover:text-brand disabled:pointer-events-none disabled:opacity-40";
 
 export function TablePagination({
   page,
@@ -57,14 +57,14 @@ export function TablePagination({
   const last = Math.min(total, (page + 1) * pageSize);
 
   return (
-    <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+    <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex items-center gap-2 text-xs text-ink-4">
         <label htmlFor="dt-page-size" className="sr-only">
           Rows per page
         </label>
         <select
           id="dt-page-size"
-          className="h-8 rounded-lg border border-line bg-sunken px-2 text-xs text-ink outline-none focus:border-brand"
+          className="select-chevron h-8 rounded-lg border border-line bg-surface px-2 text-xs font-medium text-ink outline-none transition hover:border-line-strong focus:border-brand focus:ring-4 focus:ring-brand/12"
           value={pageSize}
           onChange={(e) => onPageSizeChange(Number(e.target.value))}
         >
@@ -74,7 +74,7 @@ export function TablePagination({
             </option>
           ))}
         </select>
-        <span aria-live="polite">
+        <span aria-live="polite" className="tabular-nums">
           {total === 0
             ? "No rows"
             : `${first}–${last} of ${total.toLocaleString()}`}
@@ -111,7 +111,7 @@ export function TablePagination({
                 className={cn(
                   BUTTON,
                   entry === page &&
-                    "border-brand bg-brand-soft font-bold text-brand-deep",
+                    "border-brand bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] font-bold text-white shadow-brand-sm hover:bg-brand hover:text-white",
                 )}
               >
                 {entry + 1}

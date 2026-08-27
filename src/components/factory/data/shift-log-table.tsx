@@ -64,6 +64,13 @@ interface Column {
   label: string;
   numeric?: boolean;
   className?: string;
+  /**
+   * Starts a new band of related columns. Twenty-one columns of identical
+   * weight is a wall; a hairline every few columns gives the eye somewhere
+   * to land when it scrolls sideways. Purely visual — the order and the
+   * sorting are unchanged.
+   */
+  group?: boolean;
 }
 
 const COLUMNS: Column[] = [
@@ -71,28 +78,31 @@ const COLUMNS: Column[] = [
   { key: "shift", label: "Shift" },
   { key: "start_time", label: "Start → End" },
   { key: "duration_minutes", label: "Duration", numeric: true },
-  { key: "unit_name", label: "Room" },
+  { key: "unit_name", label: "Room", group: true },
   { key: "process_name", label: "Activity / Stage" },
   { key: "batch_no", label: "Batch" },
   { key: "product_name", label: "Product" },
   { key: "product_code", label: "Code" },
-  { key: "qty", label: "Qty produced", numeric: true },
+  { key: "qty", label: "Qty produced", numeric: true, group: true },
   { key: "target_qty", label: "Shift target", numeric: true },
   { key: "qty_rejected", label: "Rejected", numeric: true },
   { key: "accumulative", label: "Accum.", numeric: true },
-  { key: "target_speed", label: "Target speed", numeric: true },
+  { key: "target_speed", label: "Target speed", numeric: true, group: true },
   { key: "actual_speed", label: "Actual speed" },
   { key: "slow_reason", label: "Slow reason" },
-  { key: "equipment_no", label: "EQ No." },
+  { key: "equipment_no", label: "EQ No.", group: true },
   { key: "operators_text", label: "Operators" },
-  { key: "action_flag", label: "Flag" },
+  { key: "action_flag", label: "Flag", group: true },
   { key: "comment", label: "Comments" },
 ];
 
 const TH =
-  "sticky top-0 z-10 whitespace-nowrap border-b-2 border-line bg-sunken px-2.5 py-2.5 text-left text-[10px] font-bold uppercase tracking-[0.5px] text-ink-4";
-const TD = "px-2.5 py-2 align-middle";
+  "sticky top-0 z-20 whitespace-nowrap border-b border-line bg-sunken-2 px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-[0.07em] text-ink-3";
+const TD = "px-3 py-2.5 align-middle";
 const MONO = "font-mono text-[11.5px]";
+
+/** A hairline opening a column band. See `Column.group`. */
+const BAND = "border-l border-line";
 
 /* ── Footer totals ───────────────────────────────────────────────────────
    Which columns a total is a truthful answer for. Deliberately short:
@@ -167,20 +177,30 @@ export function ShiftLogTable({
   statsPending?: boolean;
   statsError?: Error | null;
 }) {
-  if (!isPending && rows.length === 0) {
+  const empty = !isPending && rows.length === 0;
+  // First load has no rows *and* no answer yet — neither the table nor the
+  // empty state is true, so it gets ghost rows in the shape of the real ones
+  // rather than an empty grid that looks like a table with nothing in it.
+  const skeleton = isPending && rows.length === 0;
+
+  if (empty) {
     return (
-      <div className="rounded-2xl border border-dashed border-ink-6 bg-surface px-4 py-16 text-center">
-        <FileSearch className="mx-auto mb-3 size-7 text-ink-6" />
-        <p className="text-sm text-ink-4">
-          {hasFilters
-            ? "No entries match the current filters."
-            : "Nothing has been logged yet."}
-        </p>
-        <p className="mt-1 text-xs text-ink-5">
-          {hasFilters
-            ? "Try clearing the filters or widening the date range."
-            : "Entries logged in the Shift log tab appear here."}
-        </p>
+      <div className="grid min-h-0 flex-1 place-items-center px-4 py-16 text-center">
+        <div>
+          <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-sunken text-ink-6">
+            <FileSearch className="size-6" />
+          </span>
+          <p className="mt-3 text-sm font-medium text-ink-3">
+            {hasFilters
+              ? "No entries match the current filters."
+              : "Nothing has been logged yet."}
+          </p>
+          <p className="mt-1 text-xs text-ink-5">
+            {hasFilters
+              ? "Try clearing the filters or widening the date range."
+              : "Entries logged in the Shift log tab appear here."}
+          </p>
+        </div>
       </div>
     );
   }
@@ -192,8 +212,11 @@ export function ShiftLogTable({
        `<thead>` had nothing to stick to and the header simply scrolled away. */
     <div
       className={cn(
-        "overflow-auto rounded-2xl border border-line bg-surface transition-opacity lg:min-h-0 lg:flex-1",
-        isPending && "opacity-60",
+        "scrollbar-slim overflow-auto transition-opacity lg:min-h-0 lg:flex-1",
+        // Dimming only once there is something to dim: on a refetch the
+        // previous page is still on screen and should fade, but ghost rows
+        // fading in and out would read as a fault.
+        isPending && rows.length > 0 && "opacity-60",
       )}
     >
       <table className="w-full border-collapse text-xs">
@@ -222,39 +245,48 @@ export function ShiftLogTable({
                         : "descending"
                       : "none"
                   }
-                  className={cn(TH, column.numeric && "text-right")}
+                  className={cn(
+                    TH,
+                    column.numeric && "text-right",
+                    column.group && BAND,
+                    active && "bg-brand-soft text-brand-deep",
+                  )}
                 >
                   <button
                     type="button"
                     onClick={() => onSort(column.key)}
                     className={cn(
-                      "inline-flex items-center gap-1 uppercase transition hover:text-brand",
+                      "group/sort inline-flex items-center gap-1 uppercase transition hover:text-brand",
                       column.numeric && "flex-row-reverse",
-                      active && "text-brand",
+                      active && "text-brand-deep",
                     )}
                   >
                     {column.key === "unit_name" ? unitWord : column.label}
                     <Icon
                       className={cn(
-                        "size-3 shrink-0",
-                        active ? "opacity-100" : "opacity-30",
+                        "size-3 shrink-0 transition-opacity",
+                        active
+                          ? "opacity-100"
+                          : "opacity-0 group-hover/sort:opacity-60",
                       )}
                     />
                   </button>
                 </th>
               );
             })}
-            <th scope="col" className={cn(TH, "text-right")}>
+            <th scope="col" className={cn(TH, BAND, "text-right")}>
               Amend
             </th>
           </tr>
         </thead>
 
         <tbody>
-          {rows.map((row) => (
+          {skeleton && <SkeletonRows />}
+          {rows.map((row, i) => (
             <Row
               key={row.id}
               row={row}
+              zebra={i % 2 === 1}
               canAmend={canAmend(row)}
               onAmend={() => onAmend(row)}
               canExplainOverrun={canExplainOverrun}
@@ -407,12 +439,15 @@ function TotalsRow({
 
 function Row({
   row,
+  zebra,
   canAmend,
   onAmend,
   canExplainOverrun,
   onExplainOverrun,
 }: {
   row: LogTableRow;
+  /** Odd rows sit a shade darker — twenty-one columns is a long way to track. */
+  zebra: boolean;
   canAmend: boolean;
   onAmend: () => void;
   canExplainOverrun: boolean;
@@ -429,26 +464,41 @@ function Row({
   return (
     <tr
       className={cn(
-        "border-b border-sunken-2 last:border-b-0 hover:bg-sunken",
+        "border-b border-line-soft last:border-b-0 hover:bg-brand-soft/45",
         // A flagged entry is the one a supervisor is scanning for; a reject
         // is the next most interesting. Tint rather than shout — a whole
         // column of red would make neither stand out.
-        row.action_flag && "bg-danger-soft/60",
-        !row.action_flag && rejected > 0 && "bg-warn-tint/60",
-        // An unexplained overrun tints too, but only when nothing louder
-        // already has: a flagged entry is still the more urgent row.
-        !row.action_flag &&
-          rejected === 0 &&
-          row.needs_overrun_note &&
-          "bg-warn-tint/60",
+        row.action_flag
+          ? "bg-danger-soft"
+          : rejected > 0
+            ? "bg-warn-tint"
+            : // An unexplained overrun tints too, but only when nothing louder
+              // already has: a flagged entry is still the more urgent row.
+              row.needs_overrun_note
+              ? "bg-warn-tint"
+              : zebra
+                ? "bg-sunken/60"
+                : "bg-surface",
       )}
     >
-      <td className={cn(TD, MONO, "whitespace-nowrap text-ink-3")}>
+      <td className={cn(TD, MONO, "whitespace-nowrap font-medium text-ink-2")}>
         <time dateTime={row.log_date}>{formatDate(row.log_date)}</time>
       </td>
 
-      <td className={cn(TD, "whitespace-nowrap text-[11px]")}>
-        {row.shift === "morning" ? "☀ AM" : "🌙 PM"}
+      <td className={cn(TD, "whitespace-nowrap")}>
+        {/* A pill rather than an emoji: it reads at a glance in a dense grid,
+            it carries the shift's own colour, and it survives a font that
+            has no glyph for ☀. */}
+        <span
+          className={cn(
+            "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide ring-1",
+            row.shift === "morning"
+              ? "bg-warn-soft text-warn-deep ring-warn-line"
+              : "bg-brand-soft text-brand-deep ring-brand-line",
+          )}
+        >
+          {row.shift === "morning" ? "AM" : "PM"}
+        </span>
       </td>
 
       <td className={cn(TD, MONO, "whitespace-nowrap text-ink-3")}>
@@ -472,7 +522,7 @@ function Row({
         {row.duration_minutes > 0 ? formatMinutes(row.duration_minutes) : DASH}
       </td>
 
-      <td className={cn(TD, "whitespace-nowrap font-semibold text-ink")}>
+      <td className={cn(TD, BAND, "whitespace-nowrap font-semibold text-ink")}>
         {row.unit_name ?? DASH}
       </td>
 
@@ -499,6 +549,7 @@ function Row({
         className={cn(
           TD,
           MONO,
+          BAND,
           "text-right font-semibold",
           produced > 0 ? "text-brand" : "text-ink-5",
         )}
@@ -553,7 +604,14 @@ function Row({
         )}
       </td>
 
-      <td className={cn(TD, MONO, "whitespace-nowrap text-right text-ink-5")}>
+      <td
+        className={cn(
+          TD,
+          MONO,
+          BAND,
+          "whitespace-nowrap text-right text-ink-5",
+        )}
+      >
         {target > 0 ? `${num(target)} ${row.speed_unit ?? ""}`.trim() : DASH}
       </td>
 
@@ -588,7 +646,7 @@ function Row({
         {row.slow_reason ?? DASH}
       </td>
 
-      <td className={cn(TD, MONO, "whitespace-nowrap text-ink-3")}>
+      <td className={cn(TD, MONO, BAND, "whitespace-nowrap text-ink-3")}>
         {row.equipment_no || DASH}
       </td>
 
@@ -613,7 +671,7 @@ function Row({
         )}
       </td>
 
-      <td className={cn(TD, "whitespace-nowrap")}>
+      <td className={cn(TD, BAND, "whitespace-nowrap")}>
         {row.action_flag ? (
           <span
             className={cn(
@@ -683,7 +741,7 @@ function Row({
         )}
       </td>
 
-      <td className={cn(TD, "text-right")}>
+      <td className={cn(TD, BAND, "text-right")}>
         {/* Offered above Amend when both apply: clearing the flag is the more
             urgent of the two, and it isn't an amendment — the entry is right,
             it just needs accounting for. */}
@@ -692,7 +750,7 @@ function Row({
             type="button"
             onClick={onExplainOverrun}
             title="Record why this batch went past its required quantity"
-            className="mb-1 inline-flex h-7 items-center gap-1 rounded-lg border border-warn-line bg-warn-tint px-2 text-[11px] font-semibold text-warn-deep transition hover:border-warn-deep"
+            className="mb-1 inline-flex h-7 items-center gap-1 rounded-lg border border-warn-line bg-warn-soft px-2 text-[11px] font-semibold text-warn-deep transition hover:border-warn-deep hover:bg-warn-line"
           >
             <TrendingUp className="size-3" />
             Explain
@@ -703,7 +761,7 @@ function Row({
             type="button"
             onClick={onAmend}
             title="Attach a correction note — the original entry is preserved"
-            className="inline-flex h-7 items-center gap-1 rounded-lg border border-line px-2 text-[11px] font-medium text-ink-4 transition hover:border-warn-deep hover:text-warn-deep"
+            className="inline-flex h-7 items-center gap-1 rounded-lg border border-line bg-surface px-2 text-[11px] font-medium text-ink-4 transition hover:border-warn-deep hover:bg-warn-tint hover:text-warn-deep"
           >
             <PencilLine className="size-3" />
             Amend
@@ -718,5 +776,25 @@ function Row({
         )}
       </td>
     </tr>
+  );
+}
+
+/** Ghost rows in the shape of the real ones, for the first load only. */
+function SkeletonRows() {
+  return (
+    <>
+      {Array.from({ length: 8 }).map((_, row) => (
+        <tr key={row} className="border-b border-line-soft bg-surface">
+          {COLUMNS.map((column) => (
+            <td key={column.key} className={cn(TD, column.group && BAND)}>
+              <span className="block h-3 animate-pulse rounded bg-sunken-2" />
+            </td>
+          ))}
+          <td className={cn(TD, BAND)}>
+            <span className="block h-3 animate-pulse rounded bg-sunken-2" />
+          </td>
+        </tr>
+      ))}
+    </>
   );
 }

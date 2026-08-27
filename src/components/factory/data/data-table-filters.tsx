@@ -9,10 +9,13 @@ import type { LogTableFilters } from "@/lib/factory/shift-log-table-queries";
 import { cn } from "@/lib/utils";
 
 const FILTER_CONTROL =
-  "h-9 w-full rounded-lg border border-line bg-sunken px-2.5 text-xs text-ink outline-none transition focus:border-brand focus:bg-surface focus:ring-2 focus:ring-brand/12";
+  "h-9 w-full rounded-lg border border-line bg-surface px-2.5 text-xs font-medium text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)] outline-none transition placeholder:font-normal placeholder:text-placeholder hover:border-line-strong focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12";
+
+/** Same control, plus our own chevron — see `.select-chevron`. */
+const FILTER_SELECT = FILTER_CONTROL + " select-chevron";
 
 const FILTER_LABEL =
-  "block text-[10px] font-bold uppercase tracking-[0.6px] text-ink-5";
+  "block text-[10px] font-bold uppercase tracking-[0.07em] text-ink-4";
 
 function Group({
   label,
@@ -91,7 +94,7 @@ export function DataTableFilters({
   }
 
   return (
-    <div className="mb-3.5 grid gap-3 rounded-2xl border border-line bg-surface p-3.5 sm:grid-cols-2 lg:grid-cols-[repeat(6,minmax(0,1fr))_minmax(200px,2fr)]">
+    <div className="mb-3.5 grid gap-3 rounded-2xl border border-line bg-surface p-3.5 shadow-card sm:grid-cols-2 lg:grid-cols-[repeat(6,minmax(0,1fr))_minmax(200px,2fr)]">
       <Group label="Date from" htmlFor="dt-from">
         <input
           id="dt-from"
@@ -117,7 +120,7 @@ export function DataTableFilters({
       <Group label="Shift" htmlFor="dt-shift">
         <select
           id="dt-shift"
-          className={FILTER_CONTROL}
+          className={FILTER_SELECT}
           value={filters.shift}
           onChange={(e) =>
             onChange({ shift: e.target.value as LogTableFilters["shift"] })
@@ -132,7 +135,7 @@ export function DataTableFilters({
       <Group label={`${unitWord} / Unit`} htmlFor="dt-unit">
         <select
           id="dt-unit"
-          className={FILTER_CONTROL}
+          className={FILTER_SELECT}
           value={filters.unitId}
           onChange={(e) => onChange({ unitId: e.target.value })}
         >
@@ -149,7 +152,7 @@ export function DataTableFilters({
       <Group label="Activity / Stage" htmlFor="dt-process">
         <select
           id="dt-process"
-          className={FILTER_CONTROL}
+          className={FILTER_SELECT}
           value={filters.processId}
           onChange={(e) => onChange({ processId: e.target.value })}
         >
@@ -166,7 +169,7 @@ export function DataTableFilters({
       <Group label="Flag" htmlFor="dt-flag">
         <select
           id="dt-flag"
-          className={FILTER_CONTROL}
+          className={FILTER_SELECT}
           value={filters.flag}
           onChange={(e) => onChange({ flag: e.target.value })}
         >
@@ -188,7 +191,7 @@ export function DataTableFilters({
         className="sm:col-span-2 lg:col-span-1"
       >
         <div className="relative">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-ink-5" />
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-ink-5" />
           <input
             id="dt-search"
             type="search"

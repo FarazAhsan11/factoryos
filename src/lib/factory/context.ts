@@ -4,11 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
 export type FactoryRole =
-  | "super_admin"
-  | "admin"
-  | "manager"
-  | "supervisor"
-  | "operator";
+  "super_admin" | "admin" | "manager" | "supervisor" | "operator";
 
 export interface FactoryContext {
   factory: {
@@ -27,6 +23,12 @@ export interface FactoryContext {
   /** The signed-in viewer's role, and whether they may edit factory setup. */
   role: FactoryRole;
   canManage: boolean;
+  /** Who is looking — for the account menu in the workspace chrome. */
+  viewer: {
+    id: string;
+    email: string;
+    fullName: string | null;
+  };
 }
 
 /**
@@ -49,13 +51,13 @@ export const getFactoryContext = cache(
     const [{ data: profile }, { data: factory }] = await Promise.all([
       supabase
         .from("profiles")
-        .select("role, factory_id")
+        .select("role, factory_id, full_name, email")
         .eq("id", user.id)
         .single(),
       supabase
         .from("factories")
         .select(
-          "id, name, slug, description, logo_url, created_at, unit_label, unit_label_plural, onboarded_at, oee_target, escalate_hours"
+          "id, name, slug, description, logo_url, created_at, unit_label, unit_label_plural, onboarded_at, oee_target, escalate_hours",
         )
         .eq("slug", slug)
         .single(),
@@ -65,7 +67,8 @@ export const getFactoryContext = cache(
 
     // Super admins can view any factory; everyone else only their own tenant.
     const role = (profile?.role ?? "operator") as FactoryRole;
-    const allowed = role === "super_admin" || profile?.factory_id === factory.id;
+    const allowed =
+      role === "super_admin" || profile?.factory_id === factory.id;
     if (!allowed) redirect("/login");
 
     return {
@@ -73,8 +76,13 @@ export const getFactoryContext = cache(
       role,
       canManage:
         role === "super_admin" || role === "admin" || role === "manager",
+      viewer: {
+        id: user.id,
+        email: profile?.email ?? user.email ?? "",
+        fullName: profile?.full_name ?? null,
+      },
     };
-  }
+  },
 );
 
 /** Singular/plural unit vocabulary with sensible fallbacks. */

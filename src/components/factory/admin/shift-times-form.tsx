@@ -25,9 +25,8 @@ import {
 } from "@/lib/factory/shift-time-queries";
 
 const FIELD =
-  "h-10 w-full rounded-xl border border-[#E6EAF1] bg-white px-3.5 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:ring-4 focus:ring-[#2563EB]/12 disabled:bg-[#F8FAFC] disabled:text-[#94A3B8]";
-const LABEL =
-  "text-[11px] font-semibold uppercase tracking-wide text-[#94A3B8]";
+  "h-10 w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-brand focus:ring-4 focus:ring-brand/12 disabled:bg-sunken disabled:text-ink-5";
+const LABEL = "text-[11px] font-semibold uppercase tracking-wide text-ink-5";
 
 /**
  * Admin → Shift times. Both shifts are edited together and saved in one go,
@@ -43,7 +42,12 @@ export function ShiftTimesForm({
 }) {
   const [error, setError] = useState<string | null>(null);
 
-  const { data, isPending, isError, error: loadError } = useQuery({
+  const {
+    data,
+    isPending,
+    isError,
+    error: loadError,
+  } = useQuery({
     queryKey: shiftTimeKeys.all(factoryId),
     queryFn: () => fetchShiftTimes(factoryId),
   });
@@ -79,7 +83,7 @@ export function ShiftTimesForm({
       setError(null);
       reset(values);
       toast.success(
-        `Shift times saved — morning ${values.morning.startTime}–${values.morning.endTime}.`
+        `Shift times saved — morning ${values.morning.startTime}–${values.morning.endTime}.`,
       );
     },
     onError: (e: Error) => setError(e.message),
@@ -88,7 +92,7 @@ export function ShiftTimesForm({
   if (isPending) return <FormSkeleton />;
   if (isError) {
     return (
-      <p className="rounded-xl bg-[#FEF2F2] px-4 py-3 text-sm text-[#B91C1C]">
+      <p className="rounded-xl bg-danger-soft px-4 py-3 text-sm text-danger-deep">
         Could not load shift times: {(loadError as Error).message}
       </p>
     );
@@ -108,7 +112,7 @@ export function ShiftTimesForm({
         <ShiftCard
           slot="morning"
           title="Morning shift"
-          icon={<Sun className="size-4 text-[#F59E0B]" />}
+          icon={<Sun className="size-4 text-warn" />}
           register={register}
           control={control}
           errors={errors.morning}
@@ -117,7 +121,7 @@ export function ShiftTimesForm({
         <ShiftCard
           slot="afternoon"
           title="Afternoon shift"
-          icon={<Moon className="size-4 text-[#6366F1]" />}
+          icon={<Moon className="size-4 text-brand-bright" />}
           register={register}
           control={control}
           errors={errors.afternoon}
@@ -128,7 +132,7 @@ export function ShiftTimesForm({
       {error && (
         <p
           role="alert"
-          className="rounded-lg bg-[#FEF2F2] px-3 py-2 text-sm text-[#B91C1C]"
+          className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger-deep"
         >
           {error}
         </p>
@@ -139,14 +143,14 @@ export function ShiftTimesForm({
           <button
             type="submit"
             disabled={save.isPending || !isDirty}
-            className="inline-flex h-10 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] px-4 text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(37,99,235,0.55)] transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-60"
+            className="inline-flex h-10 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-4 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-60"
           >
             {save.isPending && <Loader2 className="size-4 animate-spin" />}
             {save.isPending ? "Saving…" : "Save shift times"}
           </button>
-          <p className="text-xs text-[#94A3B8]">
+          <p className="text-xs text-ink-5">
             {isDirty && !save.isPending ? (
-              <span className="font-medium text-[#B45309]">
+              <span className="font-medium text-warn-deep">
                 Unsaved changes ·{" "}
               </span>
             ) : null}
@@ -192,14 +196,14 @@ function ShiftCard({
     (shift.break2Start && !breakIsInsideShift(shift, shift.break2Start));
 
   return (
-    <div className="rounded-2xl border border-[#E6EAF1] bg-white">
-      <div className="flex items-center justify-between gap-3 border-b border-[#EEF1F6] px-5 py-3.5">
-        <div className="flex items-center gap-2 text-sm font-semibold text-[#0F1B34]">
+    <div className="rounded-2xl border border-line bg-surface">
+      <div className="flex items-center justify-between gap-3 border-b border-line-soft px-5 py-3.5">
+        <div className="flex items-center gap-2 text-sm font-semibold text-ink">
           {icon}
           {title}
         </div>
-        <div className="text-right text-xs text-[#64748B]">
-          <span className="font-semibold text-[#0F1B34]">
+        <div className="text-right text-xs text-ink-4">
+          <span className="font-semibold text-ink">
             {formatDuration(length)}
           </span>{" "}
           · {formatDuration(productive)} productive
@@ -291,7 +295,7 @@ function ShiftCard({
       </div>
 
       {(overnight || strayBreak) && (
-        <div className="flex items-start gap-2 border-t border-[#EEF1F6] px-5 py-3 text-xs text-[#92400E]">
+        <div className="flex items-start gap-2 border-t border-line-soft px-5 py-3 text-xs text-warn-ink">
           <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
           <span>
             {strayBreak
@@ -317,7 +321,7 @@ function Field({
     <div className="space-y-1.5">
       <span className={LABEL}>{label}</span>
       {children}
-      {error && <p className="text-xs text-[#B91C1C]">{error}</p>}
+      {error && <p className="text-xs text-danger-deep">{error}</p>}
     </div>
   );
 }
@@ -328,7 +332,7 @@ function FormSkeleton() {
       {[0, 1].map((i) => (
         <div
           key={i}
-          className="h-[340px] animate-pulse rounded-2xl border border-[#EEF1F6] bg-[#F8FAFC]"
+          className="h-[340px] animate-pulse rounded-2xl border border-line-soft bg-sunken"
         />
       ))}
     </div>

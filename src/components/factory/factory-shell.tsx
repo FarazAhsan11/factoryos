@@ -44,7 +44,7 @@ export function FactoryShell({
        same reason — a fixed-height frame would print exactly one screen of a
        report. */
     <SidebarProvider>
-      <div className="bg-[#F6F8FC] max-lg:min-h-svh lg:flex lg:h-svh lg:overflow-hidden print:block print:h-auto print:overflow-visible">
+      <div className="bg-canvas max-lg:min-h-svh lg:flex lg:h-svh lg:overflow-hidden print:block print:h-auto print:overflow-visible">
         <FactorySidebar
           slug={factory.slug ?? ""}
           role={role}
@@ -55,12 +55,12 @@ export function FactoryShell({
         <div className="flex min-w-0 flex-1 flex-col lg:min-h-0">
           {/* The workspace chrome is navigation, and navigation is meaningless
               on paper. The shift report prints; the rail and the bar don't. */}
-          <header className="sticky top-0 z-30 flex h-[3.75rem] shrink-0 items-center justify-between gap-3 border-b border-[#E6EAF1] bg-white/85 px-4 backdrop-blur-sm sm:px-6 print:hidden">
+          <header className="sticky top-0 z-30 flex h-[3.75rem] shrink-0 items-center justify-between gap-3 border-b border-line bg-surface/85 px-4 backdrop-blur-sm sm:px-6 print:hidden">
             <div className="flex min-w-0 items-center gap-3">
               <SidebarMenuButton />
               {/* Identity below `lg` only: from there up the rail carries it,
                   and two copies of one logo in a corner is just noise. */}
-              <p className="truncate text-sm font-semibold text-[#0F1B34] lg:hidden">
+              <p className="truncate text-sm font-semibold text-ink lg:hidden">
                 {factory.name}
               </p>
               {/* Workspace-wide context, so it lives in the workspace chrome:

@@ -91,7 +91,7 @@ export function parseEmployeeCsv(text: string): ParsedCsv {
 
   for (const { line, raw } of body) {
     const cells = splitLine(raw, delimiter);
-    const pick = (index: number) => (index >= 0 ? cells[index] ?? "" : "");
+    const pick = (index: number) => (index >= 0 ? (cells[index] ?? "") : "");
 
     const name = pick(columns.name);
     const email = pick(columns.email);

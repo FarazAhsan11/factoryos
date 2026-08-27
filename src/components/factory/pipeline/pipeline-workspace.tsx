@@ -58,7 +58,7 @@ export function PipelineWorkspace({
       const promoted = await promoteScheduledJobs(factoryId).catch(() => 0);
       if (promoted > 0) {
         toast.success(
-          `${promoted} scheduled batch${promoted === 1 ? "" : "es"} added to Planned.`
+          `${promoted} scheduled batch${promoted === 1 ? "" : "es"} added to Planned.`,
         );
       }
       return fetchPipelineJobs(factoryId);
@@ -79,7 +79,7 @@ export function PipelineWorkspace({
   const refresh = useCallback(
     () =>
       queryClient.invalidateQueries({ queryKey: pipelineKeys.all(factoryId) }),
-    [queryClient, factoryId]
+    [queryClient, factoryId],
   );
 
   /** Active batches with no job yet — exactly what the New Job modal offers. */
@@ -93,7 +93,7 @@ export function PipelineWorkspace({
   // quietly stops working — the fix is one click in Admin.
   const hasFinalStage = useMemo(
     () => processList.some((p) => p.flags.final),
-    [processList]
+    [processList],
   );
 
   const remove = useMutation({
@@ -109,13 +109,13 @@ export function PipelineWorkspace({
     <>
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">
+          <p className="text-xs font-semibold uppercase tracking-wide text-ink-5">
             Production pipeline
           </p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#0F1B34]">
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">
             Batch tracker
           </h1>
-          <p className="mt-1 text-sm text-[#64748B]">
+          <p className="mt-1 text-sm text-ink-4">
             Cards move themselves: first entry → In production · issue flagged →
             On hold · final stage complete → Finished.
           </p>
@@ -132,7 +132,7 @@ export function PipelineWorkspace({
       </div>
 
       {!isPending && !hasFinalStage && jobs.length > 0 && (
-        <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-[#FDE68A] bg-[#FFFBEB] px-4 py-3 text-sm text-[#92400E]">
+        <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-warn-line bg-warn-tint px-4 py-3 text-sm text-warn-ink">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
           <p>
             <strong className="font-semibold">No final stage set.</strong> Jobs
@@ -146,13 +146,13 @@ export function PipelineWorkspace({
       {isPending ? (
         <BoardSkeleton />
       ) : isError ? (
-        <p className="rounded-2xl border border-[#FECACA] bg-[#FEF2F2] px-4 py-6 text-center text-sm text-[#B91C1C]">
+        <p className="rounded-2xl border border-danger-line bg-danger-soft px-4 py-6 text-center text-sm text-danger-deep">
           Could not load the pipeline: {(error as Error).message}
         </p>
       ) : jobs.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[#CBD5E1] bg-white px-4 py-16 text-center">
-          <p className="text-sm text-[#64748B]">Nothing on the board yet.</p>
-          <p className="mt-1 text-xs text-[#94A3B8]">
+        <div className="rounded-2xl border border-dashed border-ink-6 bg-surface px-4 py-16 text-center">
+          <p className="text-sm text-ink-4">Nothing on the board yet.</p>
+          <p className="mt-1 text-xs text-ink-5">
             {canManage
               ? "Use New job to start tracking batches from the catalogue."
               : "A manager adds batches from the product catalogue."}
@@ -183,11 +183,11 @@ function BoardSkeleton() {
       {Array.from({ length: 4 }).map((_, i) => (
         <div
           key={i}
-          className="space-y-2.5 rounded-2xl border border-[#EEF1F6] bg-white p-3"
+          className="space-y-2.5 rounded-2xl border border-line-soft bg-surface p-3"
         >
-          <div className="h-8 animate-pulse rounded-lg bg-[#F8FAFC]" />
-          <div className="h-24 animate-pulse rounded-xl bg-[#F8FAFC]" />
-          <div className="h-24 animate-pulse rounded-xl bg-[#F8FAFC]" />
+          <div className="h-8 animate-pulse rounded-lg bg-sunken" />
+          <div className="h-24 animate-pulse rounded-xl bg-sunken" />
+          <div className="h-24 animate-pulse rounded-xl bg-sunken" />
         </div>
       ))}
     </div>

@@ -53,23 +53,26 @@ export function MaintenancePhaseStepper({
         const active = !finished && i === current;
 
         return (
-          <li key={phase.key} className="flex min-w-0 flex-1 items-center gap-1">
+          <li
+            key={phase.key}
+            className="flex min-w-0 flex-1 items-center gap-1"
+          >
             <div
               className={cn(
                 "flex min-w-0 flex-1 items-center gap-1.5 rounded-lg px-2 py-1.5",
-                active && "bg-[#EFF6FF]",
-                done && "bg-[#F0FDF4]",
-                !active && !done && "bg-[#F8FAFC]"
+                active && "bg-brand-soft",
+                done && "bg-teal-soft",
+                !active && !done && "bg-sunken",
               )}
             >
               <span
                 className={cn(
                   "flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold",
                   done
-                    ? "bg-[#16A34A] text-white"
+                    ? "bg-teal text-white"
                     : active
-                      ? "bg-[#2563EB] text-white"
-                      : "bg-[#E2E8F0] text-[#94A3B8]"
+                      ? "bg-brand text-white"
+                      : "bg-line text-ink-5",
                 )}
               >
                 {done ? <Check className="size-3" strokeWidth={3} /> : phase.n}
@@ -78,10 +81,10 @@ export function MaintenancePhaseStepper({
                 className={cn(
                   "truncate text-[11px] font-semibold",
                   done
-                    ? "text-[#15803D]"
+                    ? "text-teal-deep"
                     : active
-                      ? "text-[#1D4ED8]"
-                      : "text-[#94A3B8]"
+                      ? "text-brand-deep"
+                      : "text-ink-5",
                 )}
               >
                 {phase.label}

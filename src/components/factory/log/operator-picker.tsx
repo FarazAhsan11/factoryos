@@ -71,7 +71,7 @@ export function OperatorPicker({
   // A value that isn't on the roster means it was typed — keep the free-text
   // box open so it stays editable instead of silently resetting.
   const [freeText, setFreeText] = useState(
-    () => Boolean(value) && !roster.includes(value)
+    () => Boolean(value) && !roster.includes(value),
   );
 
   const selectValue = freeText ? OTHER : roster.includes(value) ? value : "";
@@ -105,11 +105,13 @@ export function OperatorPicker({
         <option value="">Select…</option>
         {onShift.length > 0 && (
           <optgroup label={`On ${shift} shift`}>
-            {[...onShift].sort((a, b) => a.localeCompare(b)).map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
+            {[...onShift]
+              .sort((a, b) => a.localeCompare(b))
+              .map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
           </optgroup>
         )}
         {others.length > 0 && (

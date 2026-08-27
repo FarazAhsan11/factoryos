@@ -98,7 +98,7 @@ export function EmployeeImportDialog({
 
     const batches = chunkRows(
       rows,
-      sendInvites ? BATCH_WITH_INVITES : BATCH_SILENT
+      sendInvites ? BATCH_WITH_INVITES : BATCH_SILENT,
     );
     const collected: ImportRowResult[] = [];
 
@@ -113,7 +113,7 @@ export function EmployeeImportDialog({
         setFatal(
           e instanceof Error
             ? `Import stopped: ${e.message}`
-            : "Import stopped unexpectedly."
+            : "Import stopped unexpectedly.",
         );
         break;
       }
@@ -135,7 +135,7 @@ export function EmployeeImportDialog({
 
   function downloadTemplate() {
     const url = URL.createObjectURL(
-      new Blob([CSV_TEMPLATE], { type: "text/csv" })
+      new Blob([CSV_TEMPLATE], { type: "text/csv" }),
     );
     const a = document.createElement("a");
     a.href = url;
@@ -160,7 +160,7 @@ export function EmployeeImportDialog({
           resetAll();
           setOpen(true);
         }}
-        className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border border-[#E6EAF1] bg-white px-3 text-sm font-medium text-[#475569] transition hover:bg-[#F8FAFC]"
+        className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border border-line bg-surface px-3 text-sm font-medium text-ink-3 transition hover:bg-sunken"
       >
         <Upload className="size-4" />
         Import CSV
@@ -176,9 +176,7 @@ export function EmployeeImportDialog({
       >
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-[#0F1B34]">
-              Import employees
-            </DialogTitle>
+            <DialogTitle className="text-ink">Import employees</DialogTitle>
             <DialogDescription>
               Upload a CSV of names, emails and roles. Each person gets an
               account, and an invite if you want one sent.
@@ -189,13 +187,13 @@ export function EmployeeImportDialog({
             <div className="space-y-3">
               <label
                 htmlFor="emp-csv"
-                className="flex cursor-pointer flex-col items-center gap-2 rounded-2xl border border-dashed border-[#CBD5E1] bg-[#FBFCFE] px-4 py-10 text-center transition hover:border-[#2563EB] hover:bg-[#F5F8FF]"
+                className="flex cursor-pointer flex-col items-center gap-2 rounded-2xl border border-dashed border-ink-6 bg-sunken px-4 py-10 text-center transition hover:border-brand hover:bg-brand-tint"
               >
-                <FileUp className="size-6 text-[#94A3B8]" />
-                <span className="text-sm font-medium text-[#0F1B34]">
+                <FileUp className="size-6 text-ink-5" />
+                <span className="text-sm font-medium text-ink">
                   Choose a CSV file
                 </span>
-                <span className="text-xs text-[#94A3B8]">
+                <span className="text-xs text-ink-5">
                   Columns: name, email, role (admin or operator), shift
                   (morning, afternoon or both)
                 </span>
@@ -214,7 +212,7 @@ export function EmployeeImportDialog({
               <button
                 type="button"
                 onClick={downloadTemplate}
-                className="inline-flex items-center gap-1.5 text-xs font-medium text-[#2563EB] transition hover:underline"
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-brand transition hover:underline"
               >
                 <Download className="size-3.5" />
                 Download a template
@@ -224,10 +222,10 @@ export function EmployeeImportDialog({
 
           {stage === "review" && (
             <div className="space-y-3">
-              <div className="rounded-xl border border-[#E6EAF1] bg-[#FBFCFE] px-4 py-3 text-sm">
-                <p className="font-medium text-[#0F1B34]">{fileName}</p>
-                <p className="mt-0.5 text-[#64748B]">
-                  <strong className="text-[#0F1B34]">{rows.length}</strong> row
+              <div className="rounded-xl border border-line bg-sunken px-4 py-3 text-sm">
+                <p className="font-medium text-ink">{fileName}</p>
+                <p className="mt-0.5 text-ink-4">
+                  <strong className="text-ink">{rows.length}</strong> row
                   {rows.length === 1 ? "" : "s"} ready to import
                   {parseErrors.length > 0 &&
                     ` · ${parseErrors.length} will be skipped`}
@@ -249,22 +247,22 @@ export function EmployeeImportDialog({
               )}
 
               {rows.length > 0 && (
-                <ul className="max-h-36 overflow-y-auto rounded-xl border border-[#E6EAF1] text-sm">
+                <ul className="max-h-36 overflow-y-auto rounded-xl border border-line text-sm">
                   {rows.slice(0, 50).map((r) => (
                     <li
                       key={r.email}
-                      className="flex items-center justify-between gap-3 border-b border-[#F1F5F9] px-3.5 py-2 last:border-0"
+                      className="flex items-center justify-between gap-3 border-b border-sunken-2 px-3.5 py-2 last:border-0"
                     >
-                      <span className="min-w-0 flex-1 truncate text-[#0F1B34]">
+                      <span className="min-w-0 flex-1 truncate text-ink">
                         {r.fullName}
                       </span>
-                      <span className="min-w-0 flex-1 truncate text-xs text-[#64748B]">
+                      <span className="min-w-0 flex-1 truncate text-xs text-ink-4">
                         {r.email}
                       </span>
-                      <span className="shrink-0 rounded-full bg-[#F1F5F9] px-2 py-0.5 text-[11px] text-[#475569]">
+                      <span className="shrink-0 rounded-full bg-sunken-2 px-2 py-0.5 text-[11px] text-ink-3">
                         {r.role}
                       </span>
-                      <span className="shrink-0 rounded-full bg-[#EFF4FF] px-2 py-0.5 text-[11px] text-[#2563EB]">
+                      <span className="shrink-0 rounded-full bg-brand-soft px-2 py-0.5 text-[11px] text-brand">
                         {SHIFT_LABELS[r.defaultShift]}
                       </span>
                     </li>
@@ -272,16 +270,16 @@ export function EmployeeImportDialog({
                 </ul>
               )}
 
-              <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-[#E6EAF1] bg-[#FBFCFE] p-3 text-sm text-[#0F1B34]">
+              <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-line bg-sunken p-3 text-sm text-ink">
                 <input
                   type="checkbox"
                   checked={sendInvites}
                   onChange={(e) => setSendInvites(e.target.checked)}
-                  className="mt-0.5 size-4 shrink-0 cursor-pointer rounded border-[#CBD5E1] accent-[#2563EB]"
+                  className="mt-0.5 size-4 shrink-0 cursor-pointer rounded border-ink-6 accent-brand"
                 />
                 <span>
                   Email everyone their invite as they&rsquo;re added
-                  <span className="mt-0.5 block text-xs text-[#94A3B8]">
+                  <span className="mt-0.5 block text-xs text-ink-5">
                     Roughly a second per person — {rows.length} row
                     {rows.length === 1 ? "" : "s"} will take a moment. Untick to
                     create the accounts now and invite people from the list
@@ -291,9 +289,12 @@ export function EmployeeImportDialog({
               </label>
 
               <div className="flex justify-end gap-2 pt-1">
-                <GhostButton onClick={resetAll}>Choose another file</GhostButton>
+                <GhostButton onClick={resetAll}>
+                  Choose another file
+                </GhostButton>
                 <PrimaryButton onClick={run} disabled={rows.length === 0}>
-                  {sendInvites ? "Import & invite" : "Import"} {rows.length || ""}
+                  {sendInvites ? "Import & invite" : "Import"}{" "}
+                  {rows.length || ""}
                 </PrimaryButton>
               </div>
             </div>
@@ -301,9 +302,9 @@ export function EmployeeImportDialog({
 
           {stage === "running" && (
             <div className="space-y-3">
-              <div className="rounded-2xl border border-[#E6EAF1] bg-[#FBFCFE] p-4">
-                <div className="flex items-center gap-2 text-sm font-medium text-[#0F1B34]">
-                  <Loader2 className="size-4 animate-spin text-[#2563EB]" />
+              <div className="rounded-2xl border border-line bg-sunken p-4">
+                <div className="flex items-center gap-2 text-sm font-medium text-ink">
+                  <Loader2 className="size-4 animate-spin text-brand" />
                   {sendInvites
                     ? "Creating accounts and sending invites…"
                     : "Creating accounts…"}
@@ -315,15 +316,15 @@ export function EmployeeImportDialog({
                   aria-valuemin={0}
                   aria-valuemax={100}
                   aria-label="Import progress"
-                  className="mt-3 h-2 overflow-hidden rounded-full bg-[#E6EAF1]"
+                  className="mt-3 h-2 overflow-hidden rounded-full bg-line"
                 >
                   <div
-                    className="h-full rounded-full bg-[linear-gradient(90deg,#3B82F6_0%,#2563EB_100%)] transition-[width] duration-300"
+                    className="h-full rounded-full bg-[linear-gradient(90deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] transition-[width] duration-300"
                     style={{ width: `${percent}%` }}
                   />
                 </div>
 
-                <div className="mt-2 flex items-center justify-between text-xs text-[#64748B]">
+                <div className="mt-2 flex items-center justify-between text-xs text-ink-4">
                   <span>
                     {done} of {rows.length} processed
                   </span>
@@ -335,7 +336,7 @@ export function EmployeeImportDialog({
                 </div>
 
                 {current && (
-                  <p className="mt-2 truncate text-xs text-[#94A3B8]">
+                  <p className="mt-2 truncate text-xs text-ink-5">
                     Working on {current.email}…
                   </p>
                 )}
@@ -343,7 +344,7 @@ export function EmployeeImportDialog({
 
               {/* Live log — newest first, so the latest row is always visible. */}
               {results.length > 0 && (
-                <ul className="max-h-40 overflow-y-auto rounded-xl border border-[#E6EAF1] text-sm">
+                <ul className="max-h-40 overflow-y-auto rounded-xl border border-line text-sm">
                   {[...results].reverse().map((r) => (
                     <ResultRow key={r.email} result={r} />
                   ))}
@@ -351,7 +352,7 @@ export function EmployeeImportDialog({
               )}
 
               <div className="flex items-center justify-between">
-                <p className="text-xs text-[#94A3B8]">
+                <p className="text-xs text-ink-5">
                   Keep this window open until it finishes.
                 </p>
                 <GhostButton
@@ -367,16 +368,15 @@ export function EmployeeImportDialog({
 
           {stage === "done" && (
             <div className="space-y-3">
-              <div className="flex items-start gap-3 rounded-2xl border border-[#BBF7D0] bg-[#F0FDF4] p-4">
-                <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-[#16A34A]" />
+              <div className="flex items-start gap-3 rounded-2xl border border-teal-line bg-teal-soft p-4">
+                <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-teal" />
                 <div className="text-sm">
-                  <p className="font-semibold text-[#0F1B34]">
+                  <p className="font-semibold text-ink">
                     {created} account{created === 1 ? "" : "s"} created
-                    {sendInvites && ` · ${invited} invite${
-                      invited === 1 ? "" : "s"
-                    } sent`}
+                    {sendInvites &&
+                      ` · ${invited} invite${invited === 1 ? "" : "s"} sent`}
                   </p>
-                  <p className="mt-0.5 text-[#475569]">
+                  <p className="mt-0.5 text-ink-3">
                     {noEmail.length > 0
                       ? `${noEmail.length} still need an invite — use Send invite on their row.`
                       : sendInvites
@@ -387,13 +387,13 @@ export function EmployeeImportDialog({
               </div>
 
               {fatal && (
-                <p className="rounded-xl bg-[#FEF2F2] px-4 py-3 text-sm text-[#B91C1C]">
+                <p className="rounded-xl bg-danger-soft px-4 py-3 text-sm text-danger-deep">
                   {fatal}
                 </p>
               )}
 
               {(failed.length > 0 || noEmail.length > 0) && (
-                <ul className="max-h-44 overflow-y-auto rounded-xl border border-[#E6EAF1] text-sm">
+                <ul className="max-h-44 overflow-y-auto rounded-xl border border-line text-sm">
                   {[...noEmail, ...failed].map((r) => (
                     <ResultRow key={r.email} result={r} />
                   ))}
@@ -401,8 +401,12 @@ export function EmployeeImportDialog({
               )}
 
               <div className="flex justify-end gap-2 pt-1">
-                <GhostButton onClick={resetAll}>Import another file</GhostButton>
-                <PrimaryButton onClick={() => setOpen(false)}>Done</PrimaryButton>
+                <GhostButton onClick={resetAll}>
+                  Import another file
+                </GhostButton>
+                <PrimaryButton onClick={() => setOpen(false)}>
+                  Done
+                </PrimaryButton>
               </div>
             </div>
           )}
@@ -417,23 +421,21 @@ function ResultRow({ result }: { result: ImportRowResult }) {
   const tone = !result.ok
     ? {
         Icon: XCircle,
-        color: "text-[#B91C1C]",
+        color: "text-danger-deep",
         label: result.error ?? "Skipped",
       }
     : result.invited
-      ? { Icon: Mail, color: "text-[#16A34A]", label: "Invited" }
+      ? { Icon: Mail, color: "text-teal", label: "Invited" }
       : {
           Icon: result.error ? MailWarning : CheckCircle2,
-          color: result.error ? "text-[#B45309]" : "text-[#16A34A]",
+          color: result.error ? "text-warn-deep" : "text-teal",
           label: result.error ?? "Created",
         };
 
   return (
-    <li className="flex items-start gap-2 border-b border-[#F1F5F9] px-3.5 py-2 last:border-0">
+    <li className="flex items-start gap-2 border-b border-sunken-2 px-3.5 py-2 last:border-0">
       <tone.Icon className={`mt-0.5 size-3.5 shrink-0 ${tone.color}`} />
-      <span className="min-w-0 flex-1 truncate text-[#0F1B34]">
-        {result.email}
-      </span>
+      <span className="min-w-0 flex-1 truncate text-ink">{result.email}</span>
       <span className={`shrink-0 text-xs ${tone.color}`}>{tone.label}</span>
     </li>
   );
@@ -447,7 +449,7 @@ function ProblemList({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-[#FDE68A] bg-[#FFFBEB] p-3 text-xs text-[#92400E]">
+    <div className="rounded-xl border border-warn-line bg-warn-tint p-3 text-xs text-warn-ink">
       <p className="mb-1.5 flex items-center gap-1.5 font-semibold">
         <AlertTriangle className="size-3.5" />
         {title}
@@ -471,7 +473,7 @@ function PrimaryButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex h-10 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] px-4 text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(37,99,235,0.55)] transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-60"
+      className="inline-flex h-10 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-4 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-60"
     >
       {children}
     </button>
@@ -489,7 +491,7 @@ function GhostButton({
     <button
       type="button"
       onClick={onClick}
-      className="h-10 rounded-xl px-4 text-sm font-medium text-[#475569] transition hover:bg-[#F1F5F9]"
+      className="h-10 rounded-xl px-4 text-sm font-medium text-ink-3 transition hover:bg-sunken-2"
     >
       {children}
     </button>

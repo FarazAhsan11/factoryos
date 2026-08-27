@@ -78,7 +78,9 @@ export function ExplainOverrunDialog({
       // Both readers of the flag: the data table pages, and the log feed's
       // separate per-day overrun query.
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: logTableKeys.all(factoryId) }),
+        queryClient.invalidateQueries({
+          queryKey: logTableKeys.all(factoryId),
+        }),
         queryClient.invalidateQueries({ queryKey: logKeys.factory(factoryId) }),
       ]);
       reset();
@@ -103,8 +105,8 @@ export function ExplainOverrunDialog({
     >
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-[#0F1B34]">
-            <TrendingUp className="size-4 text-[#B45309]" />
+          <DialogTitle className="flex items-center gap-2 text-ink">
+            <TrendingUp className="size-4 text-warn-deep" />
             Explain the overproduction
           </DialogTitle>
           <DialogDescription>
@@ -114,11 +116,11 @@ export function ExplainOverrunDialog({
         </DialogHeader>
 
         {entry && (
-          <dl className="space-y-1.5 rounded-xl border border-[#FDE68A] bg-[#FFFBEB] p-3.5 text-sm">
+          <dl className="space-y-1.5 rounded-xl border border-warn-line bg-warn-tint p-3.5 text-sm">
             <Row label="Batch">
               {entry.batch_no ?? "—"}
               {entry.product_name && (
-                <span className="ml-1.5 text-[#64748B]">
+                <span className="ml-1.5 text-ink-4">
                   · {entry.product_name}
                 </span>
               )}
@@ -128,11 +130,11 @@ export function ExplainOverrunDialog({
             </Row>
             <Row label="Produced">
               <span className="font-mono">{fmt(entry.accumulative)}</span>
-              <span className="mx-1 text-[#94A3B8]">of</span>
+              <span className="mx-1 text-ink-5">of</span>
               <span className="font-mono">{fmt(entry.required_qty)}</span>
             </Row>
             <Row label="Over by">
-              <span className="font-mono font-semibold text-[#B45309]">
+              <span className="font-mono font-semibold text-warn-deep">
                 {fmt(entry.overrun_qty)}
               </span>
             </Row>
@@ -146,7 +148,7 @@ export function ExplainOverrunDialog({
           <div className="space-y-1.5">
             <label
               htmlFor="overrun-note"
-              className="block text-xs font-medium text-[#475569]"
+              className="block text-xs font-medium text-ink-3"
             >
               Reason for the extra quantity
             </label>
@@ -157,13 +159,13 @@ export function ExplainOverrunDialog({
               aria-invalid={Boolean(errors.note)}
               placeholder="e.g. Overfill allowance on the filler; 100 units held as retention samples."
               className={cn(
-                "w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#2563EB]",
-                errors.note ? "border-[#FCA5A5]" : "border-[#E6EAF1]"
+                "w-full rounded-xl border bg-surface px-3.5 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-brand",
+                errors.note ? "border-danger-line" : "border-line",
               )}
               {...register("note")}
             />
             {errors.note && (
-              <p role="alert" className="text-xs text-[#DC2626]">
+              <p role="alert" className="text-xs text-danger">
                 {errors.note.message}
               </p>
             )}
@@ -177,14 +179,14 @@ export function ExplainOverrunDialog({
                 onClose();
               }}
               disabled={isSubmitting}
-              className="h-10 rounded-xl px-4 text-sm font-medium text-[#475569] transition hover:bg-[#F1F5F9] disabled:opacity-60"
+              className="h-10 rounded-xl px-4 text-sm font-medium text-ink-3 transition hover:bg-sunken-2 disabled:opacity-60"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#B45309] px-4 text-sm font-semibold text-white transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-60"
+              className="inline-flex h-10 items-center gap-2 rounded-xl bg-warn-deep px-4 text-sm font-semibold text-white transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-60"
             >
               {isSubmitting && <Loader2 className="size-4 animate-spin" />}
               Save &amp; clear flag
@@ -205,8 +207,8 @@ function Row({
 }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
-      <dt className="text-xs text-[#92400E]">{label}</dt>
-      <dd className="text-right text-[13px] text-[#0F1B34]">{children}</dd>
+      <dt className="text-xs text-warn-ink">{label}</dt>
+      <dd className="text-right text-[13px] text-ink">{children}</dd>
     </div>
   );
 }

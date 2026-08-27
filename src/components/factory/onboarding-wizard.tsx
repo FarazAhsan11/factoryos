@@ -16,9 +16,8 @@ import {
 import { cn } from "@/lib/utils";
 
 const FIELD =
-  "w-full rounded-xl border border-[#E6EAF1] bg-[#FBFCFE] px-3.5 py-3 text-[15px] text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:bg-white focus:ring-4 focus:ring-[#2563EB]/12";
-const LABEL =
-  "text-xs font-semibold uppercase tracking-wide text-[#94A3B8]";
+  "w-full rounded-xl border border-line bg-sunken px-3.5 py-3 text-[15px] text-ink outline-none transition placeholder:text-ink-5 focus:border-brand focus:bg-surface focus:ring-4 focus:ring-brand/12";
+const LABEL = "text-xs font-semibold uppercase tracking-wide text-ink-5";
 
 /**
  * First-run setup for a factory, shown over its dashboard until
@@ -64,12 +63,12 @@ export function OnboardingWizard({
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-[#0F1B34]/60 p-4 backdrop-blur-sm">
-      <div className="mx-auto my-6 w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-[0_30px_80px_-20px_rgba(15,27,52,0.5)]">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-ink/60 p-4 backdrop-blur-sm">
+      <div className="mx-auto my-6 w-full max-w-2xl overflow-hidden rounded-2xl bg-surface shadow-[0_30px_80px_-20px_rgba(20,22,43,0.5)]">
         {/* header */}
-        <div className="bg-[#0F1B34] px-9 py-8 text-white">
+        <div className="bg-ink px-9 py-8 text-white">
           <div className="flex items-center gap-3">
-            <div className="flex size-9 items-center justify-center rounded-lg bg-[#2563EB] text-lg font-bold">
+            <div className="flex size-9 items-center justify-center rounded-lg bg-brand text-lg font-bold">
               F
             </div>
             <span className="text-lg font-bold tracking-tight">FactoryOS</span>
@@ -77,7 +76,7 @@ export function OnboardingWizard({
           <h1 className="mt-6 text-[28px] font-bold leading-tight">
             Welcome to FactoryOS
           </h1>
-          <p className="mt-1.5 text-sm text-[#A9B6CE]">
+          <p className="mt-1.5 text-sm text-placeholder">
             Production intelligence for shift teams. Set up in 30 seconds.
           </p>
         </div>
@@ -97,7 +96,7 @@ export function OnboardingWizard({
                 {...register("companyName")}
               />
               {errors.companyName && (
-                <p className="text-xs text-[#B91C1C]">
+                <p className="text-xs text-danger-deep">
                   {errors.companyName.message}
                 </p>
               )}
@@ -113,63 +112,63 @@ export function OnboardingWizard({
                 name="unitPreset"
                 render={({ field }) => (
                   <>
-                  <div
-                    role="radiogroup"
-                    aria-label="Production unit type"
-                    className="grid grid-cols-1 gap-3 sm:grid-cols-3"
-                  >
-                    {UNIT_PRESETS.map((preset) => {
-                      const selected = field.value === preset.value;
-                      return (
-                        <button
-                          key={preset.value}
-                          type="button"
-                          role="radio"
-                          aria-checked={selected}
-                          onClick={() => field.onChange(preset.value)}
-                          className={cn(
-                            "rounded-xl border px-3 py-4 text-center transition",
-                            selected
-                              ? "border-[#2563EB] bg-[#EFF4FF]"
-                              : "border-[#E6EAF1] bg-white hover:border-[#CBD5E1]"
-                          )}
-                        >
-                          <span className="text-xl">{preset.icon}</span>
-                          <span className="mt-1.5 block text-sm font-semibold text-[#0F1B34]">
-                            {preset.value === "Custom"
-                              ? "Custom"
-                              : preset.plural}
-                          </span>
-                          <span className="mt-0.5 block text-xs text-[#94A3B8]">
-                            {preset.hint}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {field.value === "Custom" && (
-                    <div className="space-y-1.5 pt-3">
-                      <input
-                        aria-label="What you call one production unit"
-                        placeholder="What do you call one of them? e.g. Cell, Bay, Vessel"
-                        aria-invalid={Boolean(errors.customUnitLabel)}
-                        className={FIELD}
-                        {...register("customUnitLabel")}
-                      />
-                      {errors.customUnitLabel && (
-                        <p className="text-xs text-[#B91C1C]">
-                          {errors.customUnitLabel.message}
-                        </p>
-                      )}
+                    <div
+                      role="radiogroup"
+                      aria-label="Production unit type"
+                      className="grid grid-cols-1 gap-3 sm:grid-cols-3"
+                    >
+                      {UNIT_PRESETS.map((preset) => {
+                        const selected = field.value === preset.value;
+                        return (
+                          <button
+                            key={preset.value}
+                            type="button"
+                            role="radio"
+                            aria-checked={selected}
+                            onClick={() => field.onChange(preset.value)}
+                            className={cn(
+                              "rounded-xl border px-3 py-4 text-center transition",
+                              selected
+                                ? "border-brand bg-brand-soft"
+                                : "border-line bg-surface hover:border-ink-6",
+                            )}
+                          >
+                            <span className="text-xl">{preset.icon}</span>
+                            <span className="mt-1.5 block text-sm font-semibold text-ink">
+                              {preset.value === "Custom"
+                                ? "Custom"
+                                : preset.plural}
+                            </span>
+                            <span className="mt-0.5 block text-xs text-ink-5">
+                              {preset.hint}
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
-                  )}
+
+                    {field.value === "Custom" && (
+                      <div className="space-y-1.5 pt-3">
+                        <input
+                          aria-label="What you call one production unit"
+                          placeholder="What do you call one of them? e.g. Cell, Bay, Vessel"
+                          aria-invalid={Boolean(errors.customUnitLabel)}
+                          className={FIELD}
+                          {...register("customUnitLabel")}
+                        />
+                        {errors.customUnitLabel && (
+                          <p className="text-xs text-danger-deep">
+                            {errors.customUnitLabel.message}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </>
                 )}
               />
 
               {errors.unitPreset && (
-                <p className="text-xs text-[#B91C1C]">
+                <p className="text-xs text-danger-deep">
                   {errors.unitPreset.message}
                 </p>
               )}
@@ -178,7 +177,7 @@ export function OnboardingWizard({
             {error && (
               <p
                 role="alert"
-                className="rounded-lg bg-[#FEF2F2] px-3 py-2 text-sm text-[#B91C1C]"
+                className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger-deep"
               >
                 {error}
               </p>
@@ -186,11 +185,11 @@ export function OnboardingWizard({
           </div>
 
           {/* footer */}
-          <div className="flex justify-end border-t border-[#EEF1F6] px-9 py-5">
+          <div className="flex justify-end border-t border-line-soft px-9 py-5">
             <button
               type="submit"
               disabled={isSubmitting}
-              className="inline-flex items-center gap-2 rounded-xl bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] px-7 py-3 text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(37,99,235,0.55)] transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-70"
+              className="inline-flex items-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-7 py-3 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-70"
             >
               {isSubmitting ? (
                 <Loader2 className="size-4 animate-spin" />

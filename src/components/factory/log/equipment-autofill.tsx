@@ -25,7 +25,7 @@ export function EquipmentAutofill({
       <p
         className={cn(
           "text-xs italic",
-          query ? "text-[#B91C1C]" : "text-[#94A3B8]"
+          query ? "text-danger-deep" : "text-ink-5",
         )}
       >
         {query
@@ -36,15 +36,15 @@ export function EquipmentAutofill({
   }
 
   return (
-    <div className="flex items-baseline justify-between gap-3 rounded-xl border border-[#DBEAFE] bg-[#F5F9FF] px-3.5 py-2.5 text-xs">
-      <span className="text-[#64748B]">Machine</span>
-      <span className="truncate font-medium text-[#0F1B34]">
+    <div className="flex items-baseline justify-between gap-3 rounded-xl border border-brand-soft bg-brand-tint px-3.5 py-2.5 text-xs">
+      <span className="text-ink-4">Machine</span>
+      <span className="truncate font-medium text-ink">
         {equipment.name}
         {!equipment.active && (
           // Retired, not missing. The entry is still allowed — a machine can
           // be logged against on the day it is taken out of service — but the
           // supervisor reading it should know it is off the register.
-          <span className="ml-2 rounded-full bg-[#F1F5F9] px-1.5 py-0.5 text-[10px] font-semibold text-[#64748B]">
+          <span className="ml-2 rounded-full bg-sunken-2 px-1.5 py-0.5 text-[10px] font-semibold text-ink-4">
             Retired
           </span>
         )}

@@ -59,13 +59,13 @@ export default async function ShiftLogPage({
        to scroll inside, instead of one page scrollbar dragging both. */
     <div className="mx-auto flex w-full max-w-7xl flex-col lg:min-h-0 lg:flex-1">
       <div className="mb-5 shrink-0">
-        <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-[#94A3B8]">
+        <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-5">
           Shift log
         </p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#0F1B34]">
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">
           Log production entry
         </h1>
-        <p className="mt-1 text-sm text-[#64748B]">
+        <p className="mt-1 text-sm text-ink-4">
           Entries are audit-protected — correct a mistake with an amendment,
           never a delete.
         </p>

@@ -48,32 +48,30 @@ export function UserMenu({
     <DropdownMenu>
       <DropdownMenuTrigger
         aria-label="Account menu"
-        className="flex items-center gap-2.5 rounded-full border border-transparent py-1 pr-1.5 pl-1 transition hover:border-[#E6EAF1] hover:bg-white hover:shadow-[0_2px_10px_-6px_rgba(15,27,52,0.4)] data-popup-open:border-[#E6EAF1] data-popup-open:bg-white sm:pr-2"
+        className="flex items-center gap-2.5 rounded-full border border-transparent py-1 pr-1.5 pl-1 transition hover:border-line hover:bg-surface hover:shadow-soft data-popup-open:border-line data-popup-open:bg-surface sm:pr-2"
       >
         <Avatar label={display} />
         <span className="hidden min-w-0 text-left sm:block">
-          <span className="block max-w-[10rem] truncate text-sm leading-tight font-semibold text-[#0F1B34]">
+          <span className="block max-w-[10rem] truncate text-sm leading-tight font-semibold text-ink">
             {display}
           </span>
-          <span className="block text-[11px] leading-tight text-[#94A3B8]">
+          <span className="block text-[11px] leading-tight text-ink-5">
             {roleLabel}
           </span>
         </span>
-        <MoreVertical className="size-4 shrink-0 text-[#94A3B8]" />
+        <MoreVertical className="size-4 shrink-0 text-ink-5" />
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" sideOffset={8} className="w-60">
         <div className="flex items-center gap-2.5 px-2 py-2">
           <Avatar label={display} />
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-[#0F1B34]">
-              {display}
-            </p>
-            <p className="truncate text-xs text-[#94A3B8]">{email}</p>
+            <p className="truncate text-sm font-semibold text-ink">{display}</p>
+            <p className="truncate text-xs text-ink-5">{email}</p>
           </div>
         </div>
         <div className="px-2 pb-2">
-          <span className="inline-flex items-center rounded-full bg-[#EFF4FF] px-2 py-0.5 text-[11px] font-semibold text-[#2563EB]">
+          <span className="inline-flex items-center rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-semibold text-brand">
             {roleLabel}
           </span>
         </div>
@@ -112,7 +110,7 @@ function Avatar({ label, className }: { label: string; className?: string }) {
     <span
       aria-hidden
       className={cn(
-        "grid size-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#2563EB] to-[#4F86F7] text-xs font-bold tracking-wide text-white shadow-[0_4px_12px_-4px_rgba(37,99,235,0.8)]",
+        "grid size-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand to-brand-bright text-xs font-bold tracking-wide text-white shadow-brand-sm",
         className,
       )}
     >

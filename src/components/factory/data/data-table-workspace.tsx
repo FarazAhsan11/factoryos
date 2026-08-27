@@ -133,7 +133,7 @@ export function DataTableWorkspace({
           {
             column,
             direction: NUMERIC_FIRST_DESC.has(column) ? "desc" : "asc",
-          }
+          },
     );
     setPage(0);
   }, []);
@@ -149,7 +149,7 @@ export function DataTableWorkspace({
         toast.info("Nothing to export — no entries match these filters.");
       } else if (count >= EXPORT_LIMIT) {
         toast.warning(
-          `Exported the first ${EXPORT_LIMIT.toLocaleString()} entries. Narrow the date range to export the rest.`
+          `Exported the first ${EXPORT_LIMIT.toLocaleString()} entries. Narrow the date range to export the rest.`,
         );
       } else {
         toast.success(`Exported ${count.toLocaleString()} entries.`);
@@ -167,20 +167,20 @@ export function DataTableWorkspace({
    */
   const canAmend = useCallback(
     (row: LogTableRow) => canManage || row.logged_by === userId,
-    [canManage, userId]
+    [canManage, userId],
   );
 
   return (
     <div className="lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
       <div className="mb-4 flex shrink-0 flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">
+          <p className="text-xs font-semibold uppercase tracking-wide text-ink-5">
             Shift log
           </p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#0F1B34]">
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">
             Data table
           </h1>
-          <p className="mt-1 text-sm text-[#64748B]">
+          <p className="mt-1 text-sm text-ink-4">
             Every entry ever logged, filterable and sortable. Read-only —
             entries are audit-protected.
           </p>
@@ -195,21 +195,21 @@ export function DataTableWorkspace({
             className={cn(
               "inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition",
               filtersOpen || activeCount > 0
-                ? "border-[#2563EB] bg-[#EFF4FF] text-[#1D4ED8]"
-                : "border-[#E6EAF1] text-[#475569] hover:border-[#2563EB] hover:text-[#2563EB]"
+                ? "border-brand bg-brand-soft text-brand-deep"
+                : "border-line text-ink-3 hover:border-brand hover:text-brand",
             )}
           >
             <SlidersHorizontal className="size-3.5" />
             Filters
             {activeCount > 0 && (
-              <span className="rounded-full bg-[#2563EB] px-1.5 text-[10px] font-bold text-white">
+              <span className="rounded-full bg-brand px-1.5 text-[10px] font-bold text-white">
                 {activeCount}
               </span>
             )}
             <ChevronDown
               className={cn(
                 "size-3.5 transition-transform",
-                filtersOpen && "rotate-180"
+                filtersOpen && "rotate-180",
               )}
             />
           </button>
@@ -217,7 +217,7 @@ export function DataTableWorkspace({
             type="button"
             onClick={clearFilters}
             disabled={isDefault}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#E6EAF1] px-3 text-xs font-medium text-[#475569] transition hover:border-[#2563EB] hover:text-[#2563EB] disabled:pointer-events-none disabled:opacity-40"
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line px-3 text-xs font-medium text-ink-3 transition hover:border-brand hover:text-brand disabled:pointer-events-none disabled:opacity-40"
           >
             <X className="size-3.5" />
             Clear filters
@@ -226,7 +226,7 @@ export function DataTableWorkspace({
             type="button"
             onClick={() => exportCsv.mutate()}
             disabled={exportCsv.isPending}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#E6EAF1] px-3 text-xs font-medium text-[#475569] transition hover:border-[#2563EB] hover:text-[#2563EB] disabled:pointer-events-none disabled:opacity-60"
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line px-3 text-xs font-medium text-ink-3 transition hover:border-brand hover:text-brand disabled:pointer-events-none disabled:opacity-60"
           >
             {exportCsv.isPending ? (
               <Loader2 className="size-3.5 animate-spin" />
@@ -252,7 +252,7 @@ export function DataTableWorkspace({
       )}
 
       {pageQuery.isError ? (
-        <p className="rounded-2xl border border-[#FECACA] bg-[#FEF2F2] px-4 py-6 text-center text-sm text-[#B91C1C]">
+        <p className="rounded-2xl border border-danger-line bg-danger-soft px-4 py-6 text-center text-sm text-danger-deep">
           Could not load the shift log: {(pageQuery.error as Error).message}
         </p>
       ) : (

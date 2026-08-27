@@ -16,8 +16,8 @@ import {
 import type { FactoryContext } from "@/lib/factory/context";
 
 const FIELD =
-  "h-10 w-full rounded-xl border border-[#E6EAF1] bg-white px-3.5 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:ring-4 focus:ring-[#2563EB]/12 disabled:bg-[#F8FAFC] disabled:text-[#94A3B8]";
-const LABEL = "text-xs font-medium text-[#475569]";
+  "h-10 w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-brand focus:ring-4 focus:ring-brand/12 disabled:bg-sunken disabled:text-ink-5";
+const LABEL = "text-xs font-medium text-ink-3";
 
 export function CompanySettingsForm({
   factory,
@@ -69,7 +69,7 @@ export function CompanySettingsForm({
         setError(null);
         save.mutate(values);
       })}
-      className="max-w-xl space-y-5 rounded-2xl border border-[#E6EAF1] bg-white p-6"
+      className="max-w-xl space-y-5 rounded-2xl border border-line bg-surface p-6"
     >
       <input type="hidden" {...register("factoryId")} />
 
@@ -148,7 +148,7 @@ export function CompanySettingsForm({
       {error && (
         <p
           role="alert"
-          className="rounded-lg bg-[#FEF2F2] px-3 py-2 text-sm text-[#B91C1C]"
+          className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger-deep"
         >
           {error}
         </p>
@@ -159,13 +159,13 @@ export function CompanySettingsForm({
           <button
             type="submit"
             disabled={save.isPending || !isDirty}
-            className="inline-flex h-10 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] px-4 text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(37,99,235,0.55)] transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-60"
+            className="inline-flex h-10 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-4 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-60"
           >
             {save.isPending && <Loader2 className="size-4 animate-spin" />}
             {save.isPending ? "Saving…" : "Save changes"}
           </button>
           {isDirty && !save.isPending && (
-            <span className="text-xs text-[#94A3B8]">Unsaved changes</span>
+            <span className="text-xs text-ink-5">Unsaved changes</span>
           )}
         </div>
       )}
@@ -188,10 +188,10 @@ function Field({
     <div className="space-y-1.5">
       <span className={LABEL}>
         {label}
-        {optional && <span className="text-[#94A3B8]"> (optional)</span>}
+        {optional && <span className="text-ink-5"> (optional)</span>}
       </span>
       {children}
-      {error && <p className="text-xs text-[#B91C1C]">{error}</p>}
+      {error && <p className="text-xs text-danger-deep">{error}</p>}
     </div>
   );
 }

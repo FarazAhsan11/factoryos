@@ -30,7 +30,7 @@ export const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
  */
 export async function downscaleImage(
   file: File,
-  { maxEdge = 512, quality = 0.9 }: DownscaleOptions = {}
+  { maxEdge = 512, quality = 0.9 }: DownscaleOptions = {},
 ): Promise<File> {
   if (file.type === "image/svg+xml") return file;
 
@@ -61,7 +61,7 @@ export async function downscaleImage(
 
     // WebP keeps the alpha channel, which matters for logos on white cards.
     const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, "image/webp", quality)
+      canvas.toBlob(resolve, "image/webp", quality),
     );
     if (!blob) return file;
 

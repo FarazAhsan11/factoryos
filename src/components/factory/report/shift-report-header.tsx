@@ -33,17 +33,17 @@ export function ShiftReportHeader({
   const supervisor = clock?.supervisorName?.trim();
 
   return (
-    <div className="mb-4 flex shrink-0 flex-wrap items-start justify-between gap-3 rounded-2xl border border-[#E6EAF1] bg-white px-4 py-3.5 print:rounded-none print:px-0">
+    <div className="mb-4 flex shrink-0 flex-wrap items-start justify-between gap-3 rounded-2xl border border-line bg-surface px-4 py-3.5 print:rounded-none print:px-0">
       <div>
-        <p className="flex items-center gap-1.5 text-sm font-bold text-[#0F1B34]">
+        <p className="flex items-center gap-1.5 text-sm font-bold text-ink">
           {morning ? (
-            <Sun className="size-4 text-[#F59E0B]" />
+            <Sun className="size-4 text-warn" />
           ) : (
-            <Moon className="size-4 text-[#6366F1]" />
+            <Moon className="size-4 text-brand-bright" />
           )}
           {morning ? "Morning" : "Afternoon"} shift · {formatReportDate(date)}
         </p>
-        <p className="mt-0.5 text-[12px] text-[#64748B]">
+        <p className="mt-0.5 text-[12px] text-ink-4">
           {factoryName} · {unitWord} summary
           {/* Only when there is one. "Supervisor: —" on a handover sheet
               reads as nobody was in charge, which is worse than silence. */}
@@ -51,20 +51,18 @@ export function ShiftReportHeader({
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-x-5 gap-y-1 text-[12px] text-[#64748B]">
+      <div className="flex flex-wrap gap-x-5 gap-y-1 text-[12px] text-ink-4">
         {clock?.startTime && clock?.endTime && (
           <span>
             Shift:{" "}
-            <strong className="font-semibold text-[#0F1B34]">
+            <strong className="font-semibold text-ink">
               {clock.startTime}–{clock.endTime}
             </strong>
           </span>
         )}
         <span>
           Location:{" "}
-          <strong className="font-semibold text-[#0F1B34]">
-            {factoryName}
-          </strong>
+          <strong className="font-semibold text-ink">{factoryName}</strong>
         </span>
       </div>
     </div>

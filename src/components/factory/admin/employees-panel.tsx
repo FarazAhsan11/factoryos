@@ -28,13 +28,10 @@ import {
 } from "@/lib/factory/employee-queries";
 import { cn } from "@/lib/utils";
 
-const STATUS: Record<
-  EmployeeStatus,
-  { label: string; className: string }
-> = {
-  active: { label: "Active", className: "bg-[#DCFCE7] text-[#15803D]" },
-  invited: { label: "Invited", className: "bg-[#DBEAFE] text-[#1D4ED8]" },
-  pending: { label: "Not invited", className: "bg-[#F1F5F9] text-[#64748B]" },
+const STATUS: Record<EmployeeStatus, { label: string; className: string }> = {
+  active: { label: "Active", className: "bg-teal-soft text-teal-deep" },
+  invited: { label: "Invited", className: "bg-brand-soft text-brand-deep" },
+  pending: { label: "Not invited", className: "bg-sunken-2 text-ink-4" },
 };
 
 /**
@@ -55,7 +52,12 @@ export function EmployeesPanel({
   const queryClient = useQueryClient();
   const queryKey = employeeKeys.all(factoryId);
 
-  const { data: employees = [], isPending, isError, error } = useQuery({
+  const {
+    data: employees = [],
+    isPending,
+    isError,
+    error,
+  } = useQuery({
     queryKey,
     queryFn: () => fetchEmployees(factoryId),
   });
@@ -99,8 +101,8 @@ export function EmployeesPanel({
                 ...(role ? { role } : {}),
                 ...(defaultShift ? { default_shift: defaultShift } : {}),
               }
-            : e
-        )
+            : e,
+        ),
       );
       return { previous };
     },
@@ -120,7 +122,7 @@ export function EmployeesPanel({
       await queryClient.cancelQueries({ queryKey });
       const previous = queryClient.getQueryData<Employee[]>(queryKey);
       queryClient.setQueryData<Employee[]>(queryKey, (old) =>
-        (old ?? []).filter((e) => e.id !== id)
+        (old ?? []).filter((e) => e.id !== id),
       );
       return { previous };
     },
@@ -132,7 +134,7 @@ export function EmployeesPanel({
   });
 
   const notInvited = employees.filter(
-    (e) => employeeStatus(e) === "pending"
+    (e) => employeeStatus(e) === "pending",
   ).length;
 
   return (
@@ -140,7 +142,7 @@ export function EmployeesPanel({
       {isAdmin && (
         <>
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm text-[#64748B]">
+            <p className="text-sm text-ink-4">
               {employees.length} {employees.length === 1 ? "person" : "people"}
               {notInvited > 0 && ` · ${notInvited} not invited yet`}
             </p>
@@ -154,19 +156,19 @@ export function EmployeesPanel({
       {isPending ? (
         <TableSkeleton />
       ) : isError ? (
-        <p className="rounded-xl bg-[#FEF2F2] px-4 py-3 text-sm text-[#B91C1C]">
+        <p className="rounded-xl bg-danger-soft px-4 py-3 text-sm text-danger-deep">
           Could not load the team: {(error as Error).message}
         </p>
       ) : employees.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-[#CBD5E1] px-4 py-10 text-center text-sm text-[#94A3B8]">
+        <p className="rounded-2xl border border-dashed border-ink-6 px-4 py-10 text-center text-sm text-ink-5">
           Nobody here yet
           {isAdmin ? " — add your first teammate above." : "."}
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-[#E6EAF1] bg-white">
+        <div className="overflow-x-auto rounded-2xl border border-line bg-surface">
           <table className="w-full min-w-[640px] text-sm">
             <thead>
-              <tr className="border-b border-[#EEF1F6] text-left text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">
+              <tr className="border-b border-line-soft text-left text-xs font-semibold uppercase tracking-wide text-ink-5">
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Email</th>
                 <th className="px-4 py-3">Role</th>
@@ -179,7 +181,7 @@ export function EmployeesPanel({
               {employees.map((person) => {
                 const status = employeeStatus(person);
                 const assignable = ASSIGNABLE_ROLES.includes(
-                  person.role as AssignableRole
+                  person.role as AssignableRole,
                 );
                 const busy =
                   (invite.isPending && invite.variables === person.id) ||
@@ -188,12 +190,12 @@ export function EmployeesPanel({
                 return (
                   <tr
                     key={person.id}
-                    className="border-b border-[#F5F7FA] last:border-0"
+                    className="border-b border-sunken last:border-0"
                   >
-                    <td className="px-4 py-3 font-medium text-[#0F1B34]">
+                    <td className="px-4 py-3 font-medium text-ink">
                       {person.full_name ?? "—"}
                     </td>
-                    <td className="px-4 py-3 text-[#64748B]">{person.email}</td>
+                    <td className="px-4 py-3 text-ink-4">{person.email}</td>
                     <td className="px-4 py-3">
                       {isAdmin && assignable ? (
                         <select
@@ -205,7 +207,7 @@ export function EmployeesPanel({
                               role: e.target.value as AssignableRole,
                             })
                           }
-                          className="h-8 rounded-lg border border-[#E6EAF1] bg-white px-2 text-sm text-[#0F1B34] outline-none transition focus:border-[#2563EB]"
+                          className="h-8 rounded-lg border border-line bg-surface px-2 text-sm text-ink outline-none transition focus:border-brand"
                         >
                           {ASSIGNABLE_ROLES.map((role) => (
                             <option key={role} value={role}>
@@ -214,7 +216,7 @@ export function EmployeesPanel({
                           ))}
                         </select>
                       ) : (
-                        <span className="text-[#475569]">
+                        <span className="text-ink-3">
                           {ROLE_LABELS[person.role] ?? person.role}
                         </span>
                       )}
@@ -230,7 +232,7 @@ export function EmployeesPanel({
                               defaultShift: e.target.value as ShiftSlot,
                             })
                           }
-                          className="h-8 rounded-lg border border-[#E6EAF1] bg-white px-2 text-sm text-[#0F1B34] outline-none transition focus:border-[#2563EB]"
+                          className="h-8 rounded-lg border border-line bg-surface px-2 text-sm text-ink outline-none transition focus:border-brand"
                         >
                           {SHIFT_SLOTS.map((shift) => (
                             <option key={shift} value={shift}>
@@ -239,7 +241,7 @@ export function EmployeesPanel({
                           ))}
                         </select>
                       ) : (
-                        <span className="text-[#475569]">
+                        <span className="text-ink-3">
                           {SHIFT_LABELS[person.default_shift] ??
                             person.default_shift}
                         </span>
@@ -249,7 +251,7 @@ export function EmployeesPanel({
                       <span
                         className={cn(
                           "inline-block rounded-full px-2 py-0.5 text-[11px] font-medium",
-                          STATUS[status].className
+                          STATUS[status].className,
                         )}
                       >
                         {STATUS[status].label}
@@ -263,7 +265,7 @@ export function EmployeesPanel({
                               type="button"
                               disabled={busy}
                               onClick={() => invite.mutate(person.id)}
-                              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#E6EAF1] px-2.5 text-xs font-medium text-[#475569] transition hover:bg-[#F8FAFC] disabled:opacity-60"
+                              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line px-2.5 text-xs font-medium text-ink-3 transition hover:bg-sunken disabled:opacity-60"
                             >
                               {busy ? (
                                 <Loader2 className="size-3.5 animate-spin" />
@@ -281,7 +283,7 @@ export function EmployeesPanel({
                             onClick={() => remove.mutate(person.id)}
                             aria-label={`Remove ${person.email}`}
                             title={`Remove ${person.email}`}
-                            className="rounded-md p-1.5 text-[#94A3B8] transition hover:bg-[#FEF2F2] hover:text-[#B91C1C] disabled:opacity-60"
+                            className="rounded-md p-1.5 text-ink-5 transition hover:bg-danger-soft hover:text-danger-deep disabled:opacity-60"
                           >
                             <Trash2 className="size-3.5" />
                           </button>
@@ -297,7 +299,7 @@ export function EmployeesPanel({
       )}
 
       {isAdmin && employees.length > 0 && (
-        <p className="text-xs text-[#94A3B8]">
+        <p className="text-xs text-ink-5">
           Removing someone deletes their account and sign-in access. Anyone
           whose invite didn&rsquo;t go out shows as <strong>Not invited</strong>
           &mdash; send it from their row.
@@ -309,9 +311,9 @@ export function EmployeesPanel({
 
 function TableSkeleton() {
   return (
-    <div className="space-y-2 rounded-2xl border border-[#EEF1F6] p-4">
+    <div className="space-y-2 rounded-2xl border border-line-soft p-4">
       {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="h-9 animate-pulse rounded-lg bg-[#F8FAFC]" />
+        <div key={i} className="h-9 animate-pulse rounded-lg bg-sunken" />
       ))}
     </div>
   );

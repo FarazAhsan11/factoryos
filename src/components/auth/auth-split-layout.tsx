@@ -10,14 +10,14 @@ import { Logo } from "@/components/brand/logo";
  */
 export function AuthSplitLayout({ children }: { children: ReactNode }) {
   return (
-    <main className="relative flex min-h-svh w-full overflow-hidden bg-white lg:h-svh">
+    <main className="relative flex min-h-svh w-full overflow-hidden bg-surface lg:h-svh">
       <AuthHero />
 
       <section className="relative flex w-full flex-col justify-center overflow-y-auto px-6 py-8 sm:px-12 lg:w-[43%] lg:px-16 lg:py-8 xl:px-24">
         {/* diagonal white wedge that bites into the hero */}
         <div
           aria-hidden
-          className="absolute inset-y-0 -left-24 hidden w-24 bg-white lg:block"
+          className="absolute inset-y-0 -left-24 hidden w-24 bg-surface lg:block"
           style={{ clipPath: "polygon(55% 0,100% 0,100% 100%,0 100%)" }}
         />
 

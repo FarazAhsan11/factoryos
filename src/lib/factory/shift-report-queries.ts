@@ -58,7 +58,7 @@ export const shiftReportKeys = {
 export async function fetchShiftReportEntries(
   factoryId: string,
   date: string,
-  shift: RunningShift
+  shift: RunningShift,
 ): Promise<ShiftReportRow[]> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -115,7 +115,7 @@ export function compareRoomNames(a: string, b: string): number {
 export function groupByRoom(
   units: { id: string; name: string }[],
   entries: ShiftReportRow[],
-  pipelineByUnit: Map<string, IdleStatus>
+  pipelineByUnit: Map<string, IdleStatus>,
 ): ShiftReportRoom[] {
   const byUnit = new Map<string, ShiftReportRow[]>();
   for (const entry of entries) {
@@ -197,9 +197,7 @@ export function formatRunTime(minutes: number): string {
 
 /** Thousands separators, and an em-dash for "doesn't apply". */
 export function formatQty(value: number | null | undefined): string {
-  return value === null || value === undefined
-    ? "—"
-    : value.toLocaleString();
+  return value === null || value === undefined ? "—" : value.toLocaleString();
 }
 
 /**

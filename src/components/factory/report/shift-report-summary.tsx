@@ -19,22 +19,32 @@ export function ShiftReportSummary({
   unitWordPlural: string;
 }) {
   const cards = [
-    { value: totals.entries, label: "Total entries", tone: "#1D4ED8" },
+    {
+      value: totals.entries,
+      label: "Total entries",
+      tone: "var(--color-brand-deep)",
+    },
     {
       value: totals.roomsActive,
       label: `${unitWordPlural} active`,
-      tone: "#16A34A",
+      tone: "var(--color-teal)",
     },
-    { value: totals.produced, label: "Total produced", tone: "#1D4ED8" },
+    {
+      value: totals.produced,
+      label: "Total produced",
+      tone: "var(--color-brand-deep)",
+    },
     {
       value: totals.rejected,
       label: "Total rejected",
-      tone: totals.rejected > 0 ? "#B91C1C" : "#94A3B8",
+      tone:
+        totals.rejected > 0 ? "var(--color-danger-deep)" : "var(--color-ink-5)",
     },
     {
       value: totals.flagged,
       label: "Issues flagged",
-      tone: totals.flagged > 0 ? "#B45309" : "#94A3B8",
+      tone:
+        totals.flagged > 0 ? "var(--color-warn-deep)" : "var(--color-ink-5)",
     },
   ];
 
@@ -44,8 +54,8 @@ export function ShiftReportSummary({
         <div
           key={card.label}
           className={cn(
-            "rounded-2xl border border-[#E6EAF1] bg-white px-4 py-3.5",
-            "print:rounded-none print:border-[#CBD5E1] print:px-2 print:py-2"
+            "rounded-2xl border border-line bg-surface px-4 py-3.5",
+            "print:rounded-none print:border-ink-6 print:px-2 print:py-2",
           )}
         >
           <p
@@ -54,7 +64,7 @@ export function ShiftReportSummary({
           >
             {card.value.toLocaleString()}
           </p>
-          <p className="mt-0.5 text-[11.5px] text-[#64748B]">{card.label}</p>
+          <p className="mt-0.5 text-[11.5px] text-ink-4">{card.label}</p>
         </div>
       ))}
     </div>

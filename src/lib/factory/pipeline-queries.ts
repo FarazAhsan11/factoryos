@@ -55,15 +55,30 @@ export const PIPELINE_COLUMNS: {
   accent: string;
   tint: string;
 }[] = [
-  { status: "planned", label: "Planned", accent: "#7C3AED", tint: "#F5F3FF" },
+  {
+    status: "planned",
+    label: "Planned",
+    accent: "var(--color-violet)",
+    tint: "var(--color-violet-soft)",
+  },
   {
     status: "production",
     label: "In production",
-    accent: "#2563EB",
-    tint: "#EFF6FF",
+    accent: "var(--color-brand)",
+    tint: "var(--color-brand-soft)",
   },
-  { status: "hold", label: "On hold", accent: "#D97706", tint: "#FFFBEB" },
-  { status: "finished", label: "Finished", accent: "#16A34A", tint: "#F0FDF4" },
+  {
+    status: "hold",
+    label: "On hold",
+    accent: "var(--color-warn-deep)",
+    tint: "var(--color-warn-tint)",
+  },
+  {
+    status: "finished",
+    label: "Finished",
+    accent: "var(--color-teal)",
+    tint: "var(--color-teal-soft)",
+  },
 ];
 
 /**
@@ -79,9 +94,7 @@ export const PIPELINE_COLUMNS: {
  * Idempotent, so calling it on every page load is not a mistake: the insert
  * skips any batch that already has a job.
  */
-export async function promoteScheduledJobs(
-  factoryId: string
-): Promise<number> {
+export async function promoteScheduledJobs(factoryId: string): Promise<number> {
   const supabase = createClient();
   const { data, error } = await supabase.rpc("promote_scheduled_jobs", {
     p_factory_id: factoryId,
@@ -91,7 +104,7 @@ export async function promoteScheduledJobs(
 }
 
 export async function fetchPipelineJobs(
-  factoryId: string
+  factoryId: string,
 ): Promise<PipelineJob[]> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -116,7 +129,7 @@ export async function fetchPipelineJobs(
 export async function createPipelineJobs(
   factoryId: string,
   productIds: string[],
-  createdBy: string
+  createdBy: string,
 ): Promise<number> {
   if (productIds.length === 0) return 0;
 
@@ -128,7 +141,7 @@ export async function createPipelineJobs(
         factory_id: factoryId,
         product_id,
         created_by: createdBy,
-      }))
+      })),
     )
     .select("id");
 
@@ -137,7 +150,7 @@ export async function createPipelineJobs(
       // 23505 = the one-job-per-batch unique index.
       error.code === "23505"
         ? "One of those batches already has a job on the board. Close and reopen this window to refresh the list."
-        : error.message
+        : error.message,
     );
   }
   return data?.length ?? 0;
@@ -179,13 +192,15 @@ export interface JobEntry {
   comment: string | null;
   amend_note: string | null;
   operators: string[];
-  process: { name: string; has_output: boolean; is_final_stage: boolean } | null;
+  process: {
+    name: string;
+    has_output: boolean;
+    is_final_stage: boolean;
+  } | null;
   unit: { name: string } | null;
 }
 
-export async function fetchJobEntries(
-  productId: string
-): Promise<JobEntry[]> {
+export async function fetchJobEntries(productId: string): Promise<JobEntry[]> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("shift_log_entries")
@@ -193,7 +208,7 @@ export async function fetchJobEntries(
       `id, log_date, shift, start_time, end_time, duration_minutes,
        qty, qty_rejected, action_flag, comment, amend_note, operators,
        process:factory_processes ( name, has_output, is_final_stage ),
-       unit:factory_units ( name )`
+       unit:factory_units ( name )`,
     )
     .eq("product_id", productId)
     .order("log_date", { ascending: false })
@@ -279,6 +294,6 @@ export function jobProgress(job: PipelineJob): number | null {
   if (!required) return null;
   return Math.min(
     100,
-    Math.round((Number(job.produced_qty ?? 0) / required) * 100)
+    Math.round((Number(job.produced_qty ?? 0) / required) * 100),
   );
 }

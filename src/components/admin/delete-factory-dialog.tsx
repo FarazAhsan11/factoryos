@@ -22,8 +22,8 @@ import {
 import { cn } from "@/lib/utils";
 
 const FIELD =
-  "h-11 w-full rounded-xl border border-[#E6EAF1] bg-[#FBFCFE] px-3.5 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#DC2626] focus:bg-white focus:ring-4 focus:ring-[#DC2626]/12";
-const LABEL = "text-xs font-medium text-[#475569]";
+  "h-11 w-full rounded-xl border border-line bg-sunken px-3.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-danger focus:bg-surface focus:ring-4 focus:ring-danger/12";
+const LABEL = "text-xs font-medium text-ink-3";
 
 export function DeleteFactoryDialog({
   factoryId,
@@ -62,7 +62,7 @@ export function DeleteFactoryDialog({
     if (result.warning) toast.warning(result.warning);
     else
       toast.success(
-        `${factoryName} deleted — ${result.deletedUsers} user account(s) removed.`
+        `${factoryName} deleted — ${result.deletedUsers} user account(s) removed.`,
       );
 
     setOpen(false);
@@ -81,8 +81,8 @@ export function DeleteFactoryDialog({
           setOpen(true);
         }}
         className={cn(
-          "inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border border-[#FECACA] bg-white px-3 text-sm font-medium text-[#B91C1C] transition hover:bg-[#FEF2F2]",
-          className
+          "inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border border-danger-line bg-surface px-3 text-sm font-medium text-danger-deep transition hover:bg-danger-soft",
+          className,
         )}
       >
         <Trash2 className="size-4" />
@@ -92,7 +92,7 @@ export function DeleteFactoryDialog({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-[#0F1B34]">
+            <DialogTitle className="text-ink">
               Delete {factoryName}?
             </DialogTitle>
             <DialogDescription>
@@ -101,7 +101,7 @@ export function DeleteFactoryDialog({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex gap-2.5 rounded-xl border border-[#FECACA] bg-[#FEF2F2] p-3 text-sm text-[#991B1B]">
+          <div className="flex gap-2.5 rounded-xl border border-danger-line bg-danger-soft p-3 text-sm text-danger-deep">
             <AlertTriangle className="mt-0.5 size-4 shrink-0" />
             <ul className="list-disc space-y-0.5 pl-4">
               <li>All user accounts belonging to this factory</li>
@@ -116,10 +116,8 @@ export function DeleteFactoryDialog({
             <div className="space-y-1.5">
               <label htmlFor="df-confirm" className={LABEL}>
                 Type{" "}
-                <span className="font-semibold text-[#0F1B34]">
-                  {factoryName}
-                </span>{" "}
-                to confirm
+                <span className="font-semibold text-ink">{factoryName}</span> to
+                confirm
               </label>
               <input
                 id="df-confirm"
@@ -130,7 +128,7 @@ export function DeleteFactoryDialog({
                 {...register("confirmName")}
               />
               {errors.confirmName && (
-                <p className="text-xs text-[#B91C1C]">
+                <p className="text-xs text-danger-deep">
                   {errors.confirmName.message}
                 </p>
               )}
@@ -139,7 +137,7 @@ export function DeleteFactoryDialog({
             {error && (
               <p
                 role="alert"
-                className="rounded-lg bg-[#FEF2F2] px-3 py-2 text-sm text-[#B91C1C]"
+                className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger-deep"
               >
                 {error}
               </p>
@@ -149,14 +147,14 @@ export function DeleteFactoryDialog({
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="h-10 rounded-xl px-4 text-sm font-medium text-[#475569] transition hover:bg-[#F1F5F9]"
+                className="h-10 rounded-xl px-4 text-sm font-medium text-ink-3 transition hover:bg-sunken-2"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="inline-flex h-10 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,#EF4444_0%,#DC2626_100%)] px-4 text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(220,38,38,0.55)] transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-70"
+                className="inline-flex h-10 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-danger)_0%,var(--color-danger)_100%)] px-4 text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(220,38,38,0.55)] transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-70"
               >
                 {isSubmitting && <Loader2 className="size-4 animate-spin" />}
                 {isSubmitting ? "Deleting…" : "Delete factory"}

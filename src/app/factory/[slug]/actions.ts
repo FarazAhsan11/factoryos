@@ -19,7 +19,7 @@ export type CompleteOnboardingResult = { ok: true } | { error: string };
  * Only the factory's own admin (or a platform super admin) may run it.
  */
 export async function completeOnboarding(
-  values: OnboardingValues
+  values: OnboardingValues,
 ): Promise<CompleteOnboardingResult> {
   const supabase = await createClient();
 

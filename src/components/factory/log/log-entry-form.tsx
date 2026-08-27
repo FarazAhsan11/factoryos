@@ -423,7 +423,7 @@ export function LogEntryForm({
 
   if (setupMissing) {
     return (
-      <div className="rounded-2xl border border-dashed border-[#CBD5E1] bg-white px-4 py-12 text-center text-sm text-[#94A3B8]">
+      <div className="rounded-2xl border border-dashed border-ink-6 bg-surface px-4 py-12 text-center text-sm text-ink-5">
         {activeUnits.length === 0
           ? `No ${units.plural.toLowerCase()} set up yet.`
           : "No process stages set up yet."}
@@ -454,17 +454,17 @@ export function LogEntryForm({
          scrolls, and the submit button is pinned where it can always be
          reached. A form eleven fields tall whose button is only findable by
          scrolling past everything is how half-filled entries happen. */
-      className="flex flex-col overflow-hidden rounded-2xl border border-[#E6EAF1] bg-white shadow-[0_1px_2px_rgba(15,27,52,0.04),0_12px_32px_-24px_rgba(15,27,52,0.5)] lg:h-full"
+      className="flex flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-card lg:h-full"
     >
-      <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-[#EEF1F6] bg-white px-5 py-3.5">
-        <h2 className="flex items-center gap-2 text-[15px] font-semibold text-[#0F1B34]">
-          <span className="grid size-7 place-items-center rounded-lg bg-gradient-to-br from-[#EFF4FF] to-[#DCE7FF] text-[#2563EB]">
+      <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-line-soft bg-surface px-5 py-3.5">
+        <h2 className="flex items-center gap-2 text-[15px] font-semibold text-ink">
+          <span className="grid size-7 place-items-center rounded-lg bg-gradient-to-br from-brand-soft to-brand-line text-brand">
             <Plus className="size-4" />
           </span>
           New entry
         </h2>
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1 rounded-full bg-[#ECFDF5] px-2.5 py-1 text-[10px] font-semibold text-[#047857] ring-1 ring-[#A7F3D0]/70">
+          <span className="inline-flex items-center gap-1 rounded-full bg-teal-soft px-2.5 py-1 text-[10px] font-semibold text-teal-deep ring-1 ring-teal-line/70">
             <ShieldCheck className="size-3" />
             Audit-protected
           </span>
@@ -477,8 +477,8 @@ export function LogEntryForm({
               className={cn(
                 "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition",
                 quick
-                  ? "border-[#2563EB] bg-[#EFF6FF] text-[#1D4ED8] shadow-[0_0_0_3px_rgba(37,99,235,0.10)]"
-                  : "border-[#E6EAF1] bg-white text-[#64748B] hover:border-[#CBD5E1] hover:text-[#0F1B34]",
+                  ? "border-brand bg-brand-soft text-brand-deep shadow-[0_0_0_3px_rgba(79,70,229,0.10)]"
+                  : "border-line bg-surface text-ink-4 hover:border-ink-6 hover:text-ink",
               )}
             >
               <Zap className="size-3" />
@@ -535,7 +535,7 @@ export function LogEntryForm({
               <output
                 className={cn(
                   CONTROL,
-                  "flex items-center font-medium capitalize text-[#0F1B34]",
+                  "flex items-center font-medium capitalize text-ink",
                 )}
               >
                 {shift ?? "—"}
@@ -584,7 +584,7 @@ export function LogEntryForm({
                 className={cn(
                   CONTROL,
                   MONO,
-                  "flex items-center border-[#DCE7FF] bg-[#F5F8FF] font-semibold text-[#2563EB]",
+                  "flex items-center border-brand-line bg-brand-tint font-semibold text-brand",
                 )}
               >
                 {duration ? formatMinutes(duration) : "—"}
@@ -690,9 +690,9 @@ export function LogEntryForm({
             </Field>
 
             {product && (
-              <p className="mt-2 text-[11px] text-[#64748B]">
+              <p className="mt-2 text-[11px] text-ink-4">
                 Accumulative for this batch &amp; activity:{" "}
-                <span className="font-mono font-semibold text-[#16A34A]">
+                <span className="font-mono font-semibold text-teal">
                   {runningTotal.toLocaleString(undefined, {
                     maximumFractionDigits: 2,
                   })}
@@ -725,7 +725,7 @@ export function LogEntryForm({
                   className={cn(
                     CONTROL,
                     MONO,
-                    "cursor-default border-[#DCE7FF] bg-[#F5F8FF] font-semibold text-[#2563EB] shadow-none focus:border-[#DCE7FF] focus:bg-[#F5F8FF] focus:ring-0",
+                    "cursor-default border-brand-line bg-brand-tint font-semibold text-brand shadow-none focus:border-brand-line focus:bg-brand-tint focus:ring-0",
                   )}
                   placeholder="Set a target speed"
                   {...register("targetQty", { valueAsNumber: true })}
@@ -765,9 +765,9 @@ export function LogEntryForm({
             </FieldRow>
 
             {product && (
-              <p className="mt-2 text-[11px] text-[#64748B]">
+              <p className="mt-2 text-[11px] text-ink-4">
                 Accumulative for this batch &amp; activity:{" "}
-                <span className="font-mono font-semibold text-[#16A34A]">
+                <span className="font-mono font-semibold text-teal">
                   {runningTotal.toLocaleString(undefined, {
                     maximumFractionDigits: 2,
                   })}
@@ -790,14 +790,11 @@ export function LogEntryForm({
           // Not an omission — a stated fact. A break, a breakdown or an idle
           // period stores null quantities, never 0, so it can't drag an
           // output average.
-          <p className="flex items-start gap-2 rounded-2xl border border-dashed border-[#CBD5E1] bg-[#FBFCFE] px-4 py-3 text-xs text-[#64748B]">
-            <Cog
-              className="mt-px size-3.5 shrink-0 text-[#94A3B8]"
-              aria-hidden
-            />
+          <p className="flex items-start gap-2 rounded-2xl border border-dashed border-ink-6 bg-sunken px-4 py-3 text-xs text-ink-4">
+            <Cog className="mt-px size-3.5 shrink-0 text-ink-5" aria-hidden />
             <span>
-              <strong className="font-semibold text-[#334155]">Downtime</strong>{" "}
-              — no quantities, speed or operators are recorded, only the time it
+              <strong className="font-semibold text-ink-2">Downtime</strong> —
+              no quantities, speed or operators are recorded, only the time it
               consumed.
             </span>
           </p>
@@ -891,7 +888,7 @@ export function LogEntryForm({
               opens a free-text name, so a factory mid-setup can still file a
               shift instead of hitting a required field it has no way to fill. */}
             {employees.length === 0 && needsOperators && (
-              <p className="mb-2.5 rounded-xl border border-dashed border-[#CBD5E1] bg-white px-3.5 py-3 text-xs text-[#64748B]">
+              <p className="mb-2.5 rounded-xl border border-dashed border-ink-6 bg-surface px-3.5 py-3 text-xs text-ink-4">
                 No one on the roster yet — add people in Admin &amp; Settings →
                 Employees and they&rsquo;ll appear here. Until then, use
                 &ldquo;Not on the list…&rdquo; to type a name.
@@ -923,7 +920,7 @@ export function LogEntryForm({
                       <button
                         type="button"
                         onClick={() => removeOperator(i)}
-                        className="text-[11px] font-semibold text-[#94A3B8] transition hover:text-[#B91C1C]"
+                        className="text-[11px] font-semibold text-ink-5 transition hover:text-danger-deep"
                       >
                         Remove
                       </button>
@@ -943,7 +940,7 @@ export function LogEntryForm({
                   <button
                     type="button"
                     onClick={() => addOperator({ name: "" })}
-                    className="flex h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-[#CBD5E1] bg-white text-sm font-medium text-[#64748B] transition hover:border-[#2563EB] hover:bg-[#F5F8FF] hover:text-[#2563EB]"
+                    className="flex h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-ink-6 bg-surface text-sm font-medium text-ink-4 transition hover:border-brand hover:bg-brand-tint hover:text-brand"
                   >
                     <Plus className="size-4" aria-hidden />
                     Add operator
@@ -1004,16 +1001,16 @@ export function LogEntryForm({
       {/* Pinned: the button belongs to the form, not to the bottom of the
           scroll. The note sits beside it rather than under it so the footer
           costs one row of height instead of two. */}
-      <footer className="shrink-0 border-t border-[#EEF1F6] bg-gradient-to-b from-white to-[#F8FAFC] p-4 sm:px-5">
+      <footer className="shrink-0 border-t border-line-soft bg-gradient-to-b from-surface to-sunken p-4 sm:px-5">
         <button
           type="submit"
           disabled={isSubmitting}
-          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(37,99,235,0.55)] transition hover:brightness-[1.06] active:scale-[0.995] disabled:pointer-events-none disabled:opacity-70"
+          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] active:scale-[0.995] disabled:pointer-events-none disabled:opacity-70"
         >
           {isSubmitting && <Loader2 className="size-4 animate-spin" />}
           {isSubmitting ? "Logging…" : "Log entry"}
         </button>
-        <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-[11px] text-[#94A3B8]">
+        <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-[11px] text-ink-5">
           <ShieldCheck className="size-3 shrink-0" aria-hidden />
           Corrections are amendments, not deletes.
         </p>
@@ -1044,7 +1041,7 @@ function RateToggle({
     <div
       role="group"
       aria-label="Speed rate"
-      className="flex shrink-0 overflow-hidden rounded-xl border border-[#E2E8F0] bg-white"
+      className="flex shrink-0 overflow-hidden rounded-xl border border-line bg-surface"
     >
       {(["min", "hr"] as const).map((option) => (
         <button
@@ -1055,8 +1052,8 @@ function RateToggle({
           className={cn(
             "px-2.5 text-xs font-semibold transition",
             rate === option
-              ? "bg-[#2563EB] text-white"
-              : "text-[#94A3B8] hover:bg-[#F8FAFC] hover:text-[#0F1B34]",
+              ? "bg-brand text-white"
+              : "text-ink-5 hover:bg-sunken hover:text-ink",
           )}
         >
           /{option}
@@ -1077,15 +1074,15 @@ const CATEGORY_STYLES: Record<
 > = {
   downtime: {
     summary: "time only",
-    className: "bg-[#F1F5F9] text-[#475569] ring-[#E2E8F0]",
+    className: "bg-sunken-2 text-ink-3 ring-line",
   },
   preparatory: {
     summary: "batch & output",
-    className: "bg-[#FEF3C7] text-[#92400E] ring-[#FDE68A]",
+    className: "bg-warn-soft text-warn-ink ring-warn-line",
   },
   production: {
     summary: "full record",
-    className: "bg-[#DBEAFE] text-[#1D4ED8] ring-[#BFDBFE]",
+    className: "bg-brand-soft text-brand-deep ring-brand-line",
   },
 };
 
@@ -1114,7 +1111,7 @@ function NowButton({ onClick }: { onClick: () => void }) {
       type="button"
       onClick={onClick}
       title="Set to now"
-      className="h-11 shrink-0 rounded-xl border border-[#DCE7FF] bg-[#F5F8FF] px-3 text-xs font-semibold text-[#2563EB] transition hover:border-[#2563EB] hover:bg-[#EFF4FF] active:scale-95"
+      className="h-11 shrink-0 rounded-xl border border-brand-line bg-brand-tint px-3 text-xs font-semibold text-brand transition hover:border-brand hover:bg-brand-soft active:scale-95"
     >
       Now
     </button>
@@ -1151,7 +1148,7 @@ function SlowReason({
   if (!isSlow) return null;
 
   return (
-    <div className="mt-3 space-y-2 rounded-xl border border-[#FDE68A] bg-[#FFFBEB] p-3.5 shadow-[0_1px_2px_rgba(180,83,9,0.06)]">
+    <div className="mt-3 space-y-2 rounded-xl border border-warn-line bg-warn-tint p-3.5 shadow-[0_1px_2px_rgba(180,83,9,0.06)]">
       <Field
         label="⚠ Reason for running below target speed"
         note="(required)"
@@ -1159,7 +1156,7 @@ function SlowReason({
       >
         {children}
       </Field>
-      <p className="text-[11px] text-[#92400E]">
+      <p className="text-[11px] text-warn-ink">
         This is what the Pareto chart in OEE &amp; Downtime is built from — an
         unexplained slow run is a gap in the analysis later.
       </p>

@@ -23,8 +23,18 @@ export interface Factory {
 }
 
 const MONTHS = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
 ];
 
 // Locale-independent so server and client render identically (no hydration
@@ -36,7 +46,7 @@ function formatDate(iso: string) {
 
 export function FactoriesConsole({ factories }: { factories: Factory[] }) {
   const [selectedId, setSelectedId] = useState<string | null>(
-    factories[0]?.id ?? null
+    factories[0]?.id ?? null,
   );
   // Fall back to the first factory so a deleted selection resolves cleanly.
   const selected =
@@ -47,10 +57,10 @@ export function FactoriesConsole({ factories }: { factories: Factory[] }) {
       {/* header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight text-[#0F1B34]">
+          <h1 className="text-2xl font-semibold tracking-tight text-ink">
             Factories
           </h1>
-          <p className="mt-1 text-sm text-[#64748B]">
+          <p className="mt-1 text-sm text-ink-4">
             Every tenant on the platform. Select one to see its details.
           </p>
         </div>
@@ -60,13 +70,14 @@ export function FactoriesConsole({ factories }: { factories: Factory[] }) {
       {/* master–detail */}
       <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-[300px_1fr]">
         {/* left: factory list */}
-        <aside className="overflow-hidden rounded-2xl border border-[#E6EAF1] bg-white">
-          <div className="border-b border-[#EEF1F6] px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">
-            {factories.length} {factories.length === 1 ? "factory" : "factories"}
+        <aside className="overflow-hidden rounded-2xl border border-line bg-surface">
+          <div className="border-b border-line-soft px-4 py-3 text-xs font-semibold uppercase tracking-wide text-ink-5">
+            {factories.length}{" "}
+            {factories.length === 1 ? "factory" : "factories"}
           </div>
 
           {factories.length === 0 ? (
-            <p className="px-4 py-10 text-center text-sm text-[#94A3B8]">
+            <p className="px-4 py-10 text-center text-sm text-ink-5">
               No factories yet
             </p>
           ) : (
@@ -81,16 +92,16 @@ export function FactoriesConsole({ factories }: { factories: Factory[] }) {
                       className={cn(
                         "flex w-full items-center gap-3 border-l-2 border-transparent px-4 py-3 text-left transition",
                         active
-                          ? "border-[#2563EB] bg-[#F5F8FF]"
-                          : "hover:bg-[#F8FAFC]"
+                          ? "border-brand bg-brand-tint"
+                          : "hover:bg-sunken",
                       )}
                     >
                       <div
                         className={cn(
                           "flex size-9 shrink-0 items-center justify-center rounded-lg",
                           active
-                            ? "bg-[#2563EB] text-white"
-                            : "bg-[#EFF4FF] text-[#2563EB]"
+                            ? "bg-brand text-white"
+                            : "bg-brand-soft text-brand",
                         )}
                       >
                         <Building2 className="size-4.5" />
@@ -99,12 +110,12 @@ export function FactoriesConsole({ factories }: { factories: Factory[] }) {
                         <p
                           className={cn(
                             "truncate text-sm font-medium",
-                            active ? "text-[#1D4ED8]" : "text-[#0F1B34]"
+                            active ? "text-brand-deep" : "text-ink",
                           )}
                         >
                           {factory.name}
                         </p>
-                        <p className="truncate text-xs text-[#94A3B8]">
+                        <p className="truncate text-xs text-ink-5">
                           {factory.slug ?? "no slug"}
                         </p>
                       </div>
@@ -117,7 +128,7 @@ export function FactoriesConsole({ factories }: { factories: Factory[] }) {
         </aside>
 
         {/* right: detail */}
-        <section className="min-h-[420px] rounded-2xl border border-[#E6EAF1] bg-white">
+        <section className="min-h-[420px] rounded-2xl border border-line bg-surface">
           {selected ? (
             <FactoryDetail
               factory={selected}
@@ -145,16 +156,16 @@ function FactoryDetail({
           delete button */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
         <div className="flex min-w-0 flex-1 items-start gap-4">
-          <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-[#EFF4FF] text-[#2563EB]">
+          <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand">
             <Building2 className="size-6" />
           </div>
           <div className="min-w-0 flex-1">
-            <h2 className="text-xl font-semibold tracking-tight break-words text-[#0F1B34]">
+            <h2 className="text-xl font-semibold tracking-tight break-words text-ink">
               {factory.name}
             </h2>
-            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-[#94A3B8]">
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-ink-5">
               {factory.slug && (
-                <span className="max-w-full truncate rounded-full bg-[#F1F5F9] px-2 py-0.5 font-medium text-[#475569]">
+                <span className="max-w-full truncate rounded-full bg-sunken-2 px-2 py-0.5 font-medium text-ink-3">
                   {factory.slug}
                 </span>
               )}
@@ -165,7 +176,7 @@ function FactoryDetail({
               {factory.slug && (
                 <a
                   href={`/factory/${factory.slug}`}
-                  className="font-medium whitespace-nowrap text-[#2563EB] hover:underline"
+                  className="font-medium whitespace-nowrap text-brand hover:underline"
                 >
                   Open dashboard →
                 </a>
@@ -185,13 +196,13 @@ function FactoryDetail({
       {/* info tiles */}
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
         <InfoTile icon={Hash} label="Factory ID">
-          <span className="font-mono text-xs break-all text-[#334155]">
+          <span className="font-mono text-xs break-all text-ink-2">
             {factory.id}
           </span>
         </InfoTile>
 
         <InfoTile icon={CalendarDays} label="Created">
-          <span className="text-sm text-[#334155]">
+          <span className="text-sm text-ink-2">
             {formatDate(factory.created_at)}
           </span>
         </InfoTile>
@@ -199,7 +210,7 @@ function FactoryDetail({
         <InfoTile icon={UserPlus} label="First admin">
           {factory.admin ? (
             <div className="flex flex-col items-start gap-1.5">
-              <span className="max-w-full truncate text-sm text-[#334155]">
+              <span className="max-w-full truncate text-sm text-ink-2">
                 {factory.admin.email}
               </span>
               {factory.admin.status === "active" ? (
@@ -220,7 +231,7 @@ function FactoryDetail({
                 Completed {formatDate(factory.onboarded_at)}
               </StatusPill>
               {factory.unit_label_plural && (
-                <span className="text-xs text-[#64748B]">
+                <span className="text-xs text-ink-4">
                   Production units: {factory.unit_label_plural}
                 </span>
               )}
@@ -231,7 +242,7 @@ function FactoryDetail({
         </InfoTile>
       </div>
 
-      <p className="mt-6 text-xs text-[#94A3B8]">
+      <p className="mt-6 text-xs text-ink-5">
         Per-factory user management arrives in the next build steps.
       </p>
     </div>
@@ -248,8 +259,8 @@ function InfoTile({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-[#EEF1F6] bg-[#FBFCFE] p-4">
-      <div className="flex items-center gap-1.5 text-xs font-medium text-[#94A3B8]">
+    <div className="rounded-xl border border-line-soft bg-sunken p-4">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-ink-5">
         <Icon className="size-3.5" />
         {label}
       </div>
@@ -266,15 +277,15 @@ function StatusPill({
   children: React.ReactNode;
 }) {
   const tones = {
-    amber: "bg-[#FEF3C7] text-[#92400E]",
-    gray: "bg-[#F1F5F9] text-[#475569]",
-    green: "bg-[#DCFCE7] text-[#166534]",
+    amber: "bg-warn-soft text-warn-ink",
+    gray: "bg-sunken-2 text-ink-3",
+    green: "bg-teal-soft text-teal-deep",
   } as const;
   return (
     <span
       className={cn(
         "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
-        tones[tone]
+        tones[tone],
       )}
     >
       {children}
@@ -285,13 +296,13 @@ function StatusPill({
 function EmptyDetail() {
   return (
     <div className="flex h-full min-h-[420px] flex-col items-center justify-center px-6 text-center">
-      <div className="flex size-12 items-center justify-center rounded-xl bg-[#EFF4FF] text-[#2563EB]">
+      <div className="flex size-12 items-center justify-center rounded-xl bg-brand-soft text-brand">
         <Building2 className="size-6" />
       </div>
-      <h2 className="mt-4 text-base font-semibold text-[#0F1B34]">
+      <h2 className="mt-4 text-base font-semibold text-ink">
         No factories yet
       </h2>
-      <p className="mt-1 max-w-sm text-sm text-[#64748B]">
+      <p className="mt-1 max-w-sm text-sm text-ink-4">
         When you create a factory, it appears in the list on the left with its
         admin and onboarding status.
       </p>

@@ -22,8 +22,8 @@ import {
 import { downscaleImage, MAX_UPLOAD_BYTES } from "@/lib/images/downscale-image";
 
 const FIELD =
-  "h-11 w-full rounded-xl border border-[#E6EAF1] bg-[#FBFCFE] px-3.5 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:bg-white focus:ring-4 focus:ring-[#2563EB]/12";
-const LABEL = "text-xs font-medium text-[#475569]";
+  "h-11 w-full rounded-xl border border-line bg-sunken px-3.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-brand focus:bg-surface focus:ring-4 focus:ring-brand/12";
+const LABEL = "text-xs font-medium text-ink-3";
 
 const EMPTY: CreateFactoryValues = {
   name: "",
@@ -104,7 +104,7 @@ export function CreateFactoryDialog() {
       setError(
         e instanceof Error && /body exceeded/i.test(e.message)
           ? "That logo is too large to upload. Try a smaller image."
-          : "Could not reach the server. Check your connection and try again."
+          : "Could not reach the server. Check your connection and try again.",
       );
       return;
     }
@@ -130,7 +130,7 @@ export function CreateFactoryDialog() {
           reset();
           setOpen(true);
         }}
-        className="inline-flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] px-4 text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(37,99,235,0.55)] transition hover:brightness-[1.06] sm:w-auto"
+        className="inline-flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-4 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] sm:w-auto"
       >
         <Plus className="size-4" />
         Create factory
@@ -139,9 +139,7 @@ export function CreateFactoryDialog() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-[#0F1B34]">
-              Create a factory
-            </DialogTitle>
+            <DialogTitle className="text-ink">Create a factory</DialogTitle>
             <DialogDescription>
               Add a new tenant and invite its first admin by email.
             </DialogDescription>
@@ -197,7 +195,7 @@ export function CreateFactoryDialog() {
 
             <div className="space-y-1.5">
               <span className={LABEL}>
-                Logo <span className="text-[#94A3B8]">(optional)</span>
+                Logo <span className="text-ink-5">(optional)</span>
               </span>
               <input
                 ref={fileInputRef}
@@ -207,14 +205,14 @@ export function CreateFactoryDialog() {
                 onChange={(e) => void onPickLogo(e.target.files?.[0] ?? null)}
               />
               {logoPreview ? (
-                <div className="flex items-center gap-3 rounded-xl border border-[#E6EAF1] bg-[#FBFCFE] p-2.5">
+                <div className="flex items-center gap-3 rounded-xl border border-line bg-sunken p-2.5">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={logoPreview}
                     alt=""
                     className="size-11 rounded-lg object-cover"
                   />
-                  <span className="min-w-0 flex-1 truncate text-sm text-[#475569]">
+                  <span className="min-w-0 flex-1 truncate text-sm text-ink-3">
                     {logoFile?.name}
                   </span>
                   <button
@@ -224,7 +222,7 @@ export function CreateFactoryDialog() {
                       setLogoPreview(null);
                       if (fileInputRef.current) fileInputRef.current.value = "";
                     }}
-                    className="rounded-md p-1 text-[#94A3B8] transition hover:text-[#475569]"
+                    className="rounded-md p-1 text-ink-5 transition hover:text-ink-3"
                     aria-label="Remove logo"
                   >
                     <X className="size-4" />
@@ -235,7 +233,7 @@ export function CreateFactoryDialog() {
                   type="button"
                   disabled={preparing}
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex w-full items-center gap-2 rounded-xl border border-dashed border-[#CBD5E1] bg-[#FBFCFE] px-3.5 py-3 text-sm text-[#64748B] transition hover:border-[#2563EB] hover:text-[#2563EB] disabled:pointer-events-none disabled:opacity-70"
+                  className="flex w-full items-center gap-2 rounded-xl border border-dashed border-ink-6 bg-sunken px-3.5 py-3 text-sm text-ink-4 transition hover:border-brand hover:text-brand disabled:pointer-events-none disabled:opacity-70"
                 >
                   {preparing ? (
                     <Loader2 className="size-4 animate-spin" />
@@ -250,7 +248,7 @@ export function CreateFactoryDialog() {
             {error && (
               <p
                 role="alert"
-                className="rounded-lg bg-[#FEF2F2] px-3 py-2 text-sm text-[#B91C1C]"
+                className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger-deep"
               >
                 {error}
               </p>
@@ -260,14 +258,14 @@ export function CreateFactoryDialog() {
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="h-10 rounded-xl px-4 text-sm font-medium text-[#475569] transition hover:bg-[#F1F5F9]"
+                className="h-10 rounded-xl px-4 text-sm font-medium text-ink-3 transition hover:bg-sunken-2"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting || preparing}
-                className="inline-flex h-10 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] px-4 text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(37,99,235,0.55)] transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-70"
+                className="inline-flex h-10 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-4 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-70"
               >
                 {isSubmitting && <Loader2 className="size-4 animate-spin" />}
                 {isSubmitting ? "Creating…" : "Create factory"}
@@ -295,10 +293,10 @@ function Field({
     <div className="space-y-1.5">
       <span className={LABEL}>
         {label}
-        {optional && <span className="text-[#94A3B8]"> (optional)</span>}
+        {optional && <span className="text-ink-5"> (optional)</span>}
       </span>
       {children}
-      {error && <p className="text-xs text-[#B91C1C]">{error}</p>}
+      {error && <p className="text-xs text-danger-deep">{error}</p>}
     </div>
   );
 }

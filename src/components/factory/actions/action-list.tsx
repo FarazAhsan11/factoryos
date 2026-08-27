@@ -17,18 +17,18 @@ import { cn } from "@/lib/utils";
  * what decides which row your eye lands on first.
  */
 const PRIORITY_BAR: Record<ActionPriority, string> = {
-  critical: "#DC2626",
-  high: "#F59E0B",
-  medium: "#2563EB",
-  low: "#94A3B8",
+  critical: "var(--color-danger)",
+  high: "var(--color-warn)",
+  medium: "var(--color-brand)",
+  low: "var(--color-ink-5)",
 };
 
 const STAGE_PILL: Record<string, string> = {
-  open: "bg-[#FEF3C7] text-[#B45309]",
-  investigating: "bg-[#DBEAFE] text-[#1D4ED8]",
-  action_taken: "bg-[#E0E7FF] text-[#4338CA]",
-  verification: "bg-[#CFFAFE] text-[#0E7490]",
-  closed: "bg-[#DCFCE7] text-[#15803D]",
+  open: "bg-warn-soft text-warn-deep",
+  investigating: "bg-brand-soft text-brand-deep",
+  action_taken: "bg-brand-soft text-brand-deep",
+  verification: "bg-teal-soft text-teal-deep",
+  closed: "bg-teal-soft text-teal-deep",
 };
 
 export function ActionList({
@@ -45,18 +45,16 @@ export function ActionList({
           <button
             type="button"
             onClick={() => onOpen(action)}
-            className="block w-full rounded-2xl border border-[#E6EAF1] bg-white p-4 text-left transition hover:border-[#CBD5E1] focus-visible:border-[#2563EB] focus-visible:outline-none"
+            className="block w-full rounded-2xl border border-line bg-surface p-4 text-left transition hover:border-ink-6 focus-visible:border-brand focus-visible:outline-none"
             style={{ borderLeft: `4px solid ${PRIORITY_BAR[action.priority]}` }}
           >
             <div className="flex flex-wrap items-start justify-between gap-2">
-              <h3 className="text-sm font-semibold text-[#0F1B34]">
-                {action.title}
-              </h3>
+              <h3 className="text-sm font-semibold text-ink">{action.title}</h3>
 
               <div className="flex shrink-0 flex-wrap items-center gap-1.5">
                 {/* Escalated first — it is the reason this row is being read. */}
                 {action.is_escalated && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-[#EDE9FE] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#6D28D9]">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-violet-line px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-violet-deep">
                     <ArrowUpRight className="size-3" />
                     Escalated
                   </span>
@@ -64,7 +62,7 @@ export function ActionList({
                 {/* Only when it isn't already escalated: an escalated action is
                     overdue by definition, and saying both is noise. */}
                 {action.is_overdue && !action.is_escalated && (
-                  <span className="rounded-full bg-[#FEE2E2] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#B91C1C]">
+                  <span className="rounded-full bg-danger-soft px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-danger-deep">
                     Overdue
                   </span>
                 )}
@@ -72,7 +70,7 @@ export function ActionList({
                     urgent, but it isn't done either — and this is the state
                     an issue quietly dies in. */}
                 {action.is_verify_overdue && (
-                  <span className="rounded-full bg-[#FEF3C7] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#B45309]">
+                  <span className="rounded-full bg-warn-soft px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-warn-deep">
                     Sign-off late
                   </span>
                 )}
@@ -81,14 +79,14 @@ export function ActionList({
                     investigated, the difference is the only thing worth
                     knowing about the row. */}
                 {action.resolved_direct && (
-                  <span className="rounded-full bg-[#F1F5F9] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#64748B]">
+                  <span className="rounded-full bg-sunken-2 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-4">
                     No CAPA
                   </span>
                 )}
                 <span
                   className={cn(
                     "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                    STAGE_PILL[action.status]
+                    STAGE_PILL[action.status],
                   )}
                 >
                   {STAGE_LABELS[action.status]}
@@ -96,7 +94,7 @@ export function ActionList({
               </div>
             </div>
 
-            <p className="mt-1 text-xs text-[#94A3B8]">
+            <p className="mt-1 text-xs text-ink-5">
               {action.unit_name ?? "Factory-wide"} · {action.category} ·{" "}
               {action.priority}
             </p>
@@ -106,15 +104,15 @@ export function ActionList({
                 buried at the end of four grey words nobody reads it. */}
             {action.batch_no && (
               <p className="mt-1 flex flex-wrap items-baseline gap-x-1.5 text-xs">
-                <Package className="size-3.5 shrink-0 translate-y-0.5 text-[#94A3B8]" />
-                <span className="font-mono font-medium text-[#0F1B34]">
+                <Package className="size-3.5 shrink-0 translate-y-0.5 text-ink-5" />
+                <span className="font-mono font-medium text-ink">
                   {action.batch_no}
                 </span>
                 {action.product_name && (
-                  <span className="text-[#64748B]">{action.product_name}</span>
+                  <span className="text-ink-4">{action.product_name}</span>
                 )}
                 {action.product_code && (
-                  <span className="font-mono text-[11px] text-[#94A3B8]">
+                  <span className="font-mono text-[11px] text-ink-5">
                     {action.product_code}
                   </span>
                 )}
@@ -126,11 +124,11 @@ export function ActionList({
                 className={cn(
                   "inline-flex items-center gap-1.5 text-xs",
                   action.assigned_to
-                    ? "font-medium text-[#0F1B34]"
-                    : "italic text-[#B45309]"
+                    ? "font-medium text-ink"
+                    : "italic text-warn-deep",
                 )}
               >
-                <User className="size-3.5 shrink-0 text-[#94A3B8]" />
+                <User className="size-3.5 shrink-0 text-ink-5" />
                 {/* Unassigned is a problem, not a blank — nobody has picked
                     this up, which is precisely what should stand out. */}
                 {action.assigned_to ?? "Unassigned"}
@@ -139,9 +137,11 @@ export function ActionList({
               {/* Whichever clock is actually running. Showing the fix
                   deadline on an issue whose fix is already in would be
                   answering a question nobody is asking. */}
-              <span className="font-mono text-[11px] text-[#94A3B8]">
+              <span className="font-mono text-[11px] text-ink-5">
                 {action.status === "closed" ? (
-                  <>Closed {action.closed_at && relativeTime(action.closed_at)}</>
+                  <>
+                    Closed {action.closed_at && relativeTime(action.closed_at)}
+                  </>
                 ) : action.verify_due_at ? (
                   <>
                     Sign-off: {formatDue(action.verify_due_at)}
@@ -149,8 +149,8 @@ export function ActionList({
                       className={cn(
                         "ml-1.5 font-semibold",
                         action.is_verify_overdue
-                          ? "text-[#B45309]"
-                          : "text-[#64748B]"
+                          ? "text-warn-deep"
+                          : "text-ink-4",
                       )}
                     >
                       {relativeTime(action.verify_due_at)}
@@ -162,7 +162,7 @@ export function ActionList({
                     <span
                       className={cn(
                         "ml-1.5 font-semibold",
-                        action.is_overdue ? "text-[#B91C1C]" : "text-[#64748B]"
+                        action.is_overdue ? "text-danger-deep" : "text-ink-4",
                       )}
                     >
                       {relativeTime(action.due_at)}
@@ -175,7 +175,7 @@ export function ActionList({
             {/* The one number that turns "overdue" into something actionable:
                 how long before this becomes a management problem. */}
             {action.is_overdue && !action.is_escalated && (
-              <p className="mt-1.5 flex items-center gap-1 text-[11px] text-[#B45309]">
+              <p className="mt-1.5 flex items-center gap-1 text-[11px] text-warn-deep">
                 <AlertTriangle className="size-3" />
                 Escalates {relativeTime(action.escalates_at)}
               </p>

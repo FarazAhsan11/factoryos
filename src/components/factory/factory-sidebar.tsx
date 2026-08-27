@@ -58,14 +58,14 @@ export function FactorySidebar({
         onClick={() => setMobileOpen(false)}
         aria-hidden
         className={cn(
-          "fixed inset-0 z-40 bg-[#0F1B34]/40 backdrop-blur-[2px] transition-opacity duration-300 lg:hidden print:hidden",
+          "fixed inset-0 z-40 bg-ink/40 backdrop-blur-[2px] transition-opacity duration-300 lg:hidden print:hidden",
           mobileOpen ? "opacity-100" : "pointer-events-none opacity-0",
         )}
       />
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-[17rem] flex-col border-r border-[#E6EAF1] bg-gradient-to-b from-white to-[#F7F9FE] shadow-2xl shadow-[#0F1B34]/10",
+          "fixed inset-y-0 left-0 z-50 flex w-[17rem] flex-col border-r border-line bg-gradient-to-b from-surface to-sunken shadow-2xl shadow-ink/10",
           "transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
           mobileOpen ? "translate-x-0" : "-translate-x-full",
           // From lg up it stops floating: it is part of the flex row, drops the
@@ -85,7 +85,7 @@ export function FactorySidebar({
             one thing you can want from a 72px strip. */}
         <div
           className={cn(
-            "flex h-[3.75rem] shrink-0 items-center gap-2.5 border-b border-[#E6EAF1] px-3",
+            "flex h-[3.75rem] shrink-0 items-center gap-2.5 border-b border-line px-3",
             icons && "lg:justify-center lg:px-0",
           )}
         >
@@ -97,10 +97,10 @@ export function FactorySidebar({
           >
             <FactoryMark logoUrl={logoUrl} />
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-[#0F1B34]">
+              <p className="truncate text-sm font-semibold text-ink">
                 {factoryName}
               </p>
-              <p className="truncate text-[11px] text-[#94A3B8]">
+              <p className="truncate text-[11px] text-ink-5">
                 {slug || "factory"} · workspace
               </p>
             </div>
@@ -110,7 +110,7 @@ export function FactorySidebar({
             type="button"
             onClick={() => setMobileOpen(false)}
             aria-label="Close navigation"
-            className="grid size-9 shrink-0 place-items-center rounded-lg text-[#64748B] transition hover:bg-[#EFF4FF] hover:text-[#2563EB] lg:hidden"
+            className="grid size-9 shrink-0 place-items-center rounded-lg text-ink-4 transition hover:bg-brand-soft hover:text-brand lg:hidden"
           >
             <X className="size-4" />
           </button>
@@ -125,7 +125,7 @@ export function FactorySidebar({
               "group relative hidden shrink-0 place-items-center rounded-lg transition lg:grid",
               icons
                 ? "size-9"
-                : "size-9 text-[#94A3B8] hover:bg-[#EFF4FF] hover:text-[#2563EB]",
+                : "size-9 text-ink-5 hover:bg-brand-soft hover:text-brand",
             )}
           >
             {icons ? (
@@ -151,14 +151,14 @@ export function FactorySidebar({
                   keeps the grouping without pretending to be a word. */}
               <p
                 className={cn(
-                  "px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#94A3B8]",
+                  "px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-5",
                   icons && "lg:hidden",
                 )}
               >
                 {section.label}
               </p>
               {icons && (
-                <div className="mx-auto mb-2.5 hidden h-px w-7 rounded-full bg-[#E2E8F0] lg:block" />
+                <div className="mx-auto mb-2.5 hidden h-px w-7 rounded-full bg-line lg:block" />
               )}
 
               <ul className="space-y-1">
@@ -184,14 +184,14 @@ export function FactorySidebar({
                           title="Arrives in a later build step"
                           className={cn(
                             shared,
-                            "cursor-not-allowed text-[#C3CDDD]",
+                            "cursor-not-allowed text-ink-6",
                           )}
                         >
                           <item.icon className="size-[18px] shrink-0" />
                           <Label hidden={icons}>{item.label}</Label>
                           <span
                             className={cn(
-                              "rounded-full bg-[#F1F5F9] px-1.5 py-0.5 text-[10px] font-medium text-[#94A3B8]",
+                              "rounded-full bg-sunken-2 px-1.5 py-0.5 text-[10px] font-medium text-ink-5",
                               icons && "lg:hidden",
                             )}
                           >
@@ -228,8 +228,8 @@ export function FactorySidebar({
                         className={cn(
                           shared,
                           active
-                            ? "bg-gradient-to-r from-[#2563EB] to-[#4F86F7] font-semibold text-white shadow-[0_8px_18px_-8px_rgba(37,99,235,0.85)]"
-                            : "text-[#54617A] hover:bg-white hover:text-[#0F1B34] hover:shadow-[0_2px_8px_-4px_rgba(15,27,52,0.25)]",
+                            ? "bg-gradient-to-r from-brand to-brand-bright font-semibold text-white shadow-brand"
+                            : "text-ink-3 hover:bg-surface hover:text-ink hover:shadow-soft",
                         )}
                       >
                         <item.icon
@@ -243,7 +243,7 @@ export function FactorySidebar({
                           <Loader2
                             className={cn(
                               "size-3.5 shrink-0 animate-spin",
-                              active ? "text-white" : "text-[#2563EB]",
+                              active ? "text-white" : "text-brand",
                               icons && "lg:absolute lg:right-1 lg:top-1",
                             )}
                           />
@@ -277,7 +277,7 @@ function FactoryMark({ logoUrl }: { logoUrl: string | null }) {
   return (
     <span
       aria-hidden
-      className="grid size-9 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-[#EFF4FF] to-[#DCE7FF] text-[#2563EB]"
+      className="grid size-9 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-brand-soft to-brand-line text-brand"
     >
       <Building2 className="size-[18px]" />
     </span>
@@ -304,7 +304,7 @@ function Tip({ children }: { children: React.ReactNode }) {
   return (
     <span
       role="tooltip"
-      className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 hidden -translate-y-1/2 -translate-x-1.5 whitespace-nowrap rounded-lg bg-[#0F1B34] px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-100 lg:block"
+      className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 hidden -translate-y-1/2 -translate-x-1.5 whitespace-nowrap rounded-lg bg-ink px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-100 lg:block"
     >
       {children}
     </span>

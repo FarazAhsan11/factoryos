@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
  */
 
 export const CONTROL =
-  "h-11 w-full rounded-xl border border-[#E2E8F0] bg-white px-3.5 text-sm text-[#0F1B34] shadow-[0_1px_2px_rgba(15,27,52,0.04)] outline-none transition placeholder:text-[#A9B4C6] hover:border-[#CBD5E1] focus:border-[#2563EB] focus:shadow-none focus:ring-4 focus:ring-[#2563EB]/12 disabled:cursor-not-allowed disabled:opacity-60";
+  "h-11 w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-ink shadow-[0_1px_2px_rgba(20,22,43,0.04)] outline-none transition placeholder:text-placeholder hover:border-ink-6 focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12 disabled:cursor-not-allowed disabled:opacity-60";
 
 /** A select is a control plus our own chevron — see `.select-chevron`. */
 export const SELECT = `${CONTROL} select-chevron`;
@@ -23,7 +23,7 @@ export const MONO = "font-mono text-[13px]";
  * "Output" without reading.
  */
 export const SECTION =
-  "rounded-2xl border border-[#EDF1F7] bg-[#FBFCFE] p-4 sm:p-[1.125rem]";
+  "rounded-2xl border border-line-soft bg-sunken p-4 sm:p-[1.125rem]";
 
 export function SectionTitle({
   children,
@@ -42,16 +42,16 @@ export function SectionTitle({
       {Icon && (
         <span
           aria-hidden
-          className="grid size-6 shrink-0 place-items-center rounded-lg bg-white text-[#2563EB] ring-1 ring-[#E6EAF1]"
+          className="grid size-6 shrink-0 place-items-center rounded-lg bg-surface text-brand ring-1 ring-line"
         >
           <Icon className="size-3.5" />
         </span>
       )}
-      <span className="text-[11px] font-bold uppercase tracking-[0.09em] text-[#334155]">
+      <span className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-2">
         {children}
       </span>
       {hint && (
-        <span className="truncate text-[10px] font-semibold text-[#2563EB]">
+        <span className="truncate text-[10px] font-semibold text-brand">
           {hint}
         </span>
       )}
@@ -104,16 +104,16 @@ export function Field({
       <div className="flex items-baseline justify-between gap-2">
         <label
           htmlFor={htmlFor}
-          className="block min-w-0 truncate text-xs font-semibold text-[#334155]"
+          className="block min-w-0 truncate text-xs font-semibold text-ink-2"
         >
           {label}
           {note && (
-            <span className="ml-1 text-[10px] font-normal text-[#94A3B8]">
+            <span className="ml-1 text-[10px] font-normal text-ink-5">
               {note}
             </span>
           )}
           {optional && (
-            <span className="ml-1 text-[10px] font-normal text-[#94A3B8]">
+            <span className="ml-1 text-[10px] font-normal text-ink-5">
               (optional)
             </span>
           )}
@@ -124,7 +124,7 @@ export function Field({
       <div className="space-y-1.5">
         {children}
         {error && (
-          <p className="flex items-start gap-1 text-xs font-medium text-[#B91C1C]">
+          <p className="flex items-start gap-1 text-xs font-medium text-danger-deep">
             {error}
           </p>
         )}
@@ -148,7 +148,7 @@ export function FieldRow({
       className={cn(
         "grid gap-3",
         cols === 2 ? "sm:grid-cols-2" : "sm:grid-cols-3",
-        className
+        className,
       )}
     >
       {children}

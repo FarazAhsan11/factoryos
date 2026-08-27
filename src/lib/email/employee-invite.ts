@@ -1,8 +1,8 @@
 import { getTransport, fromAddress } from "./transport";
 
-const BRAND = "#2563EB";
-const INK = "#0F1B34";
-const MUTED = "#64748B";
+const BRAND = "#4F46E5";
+const INK = "#14162B";
+const MUTED = "#6B7189";
 
 interface EmployeeInviteInput {
   to: string;
@@ -34,19 +34,19 @@ export function renderEmployeeInviteEmail({
 
   const factoryLogo = logoUrl
     ? `<img src="${logoUrl}" alt="" width="40" height="40" style="display:block;border-radius:10px;object-fit:cover;" />`
-    : `<span style="display:inline-block;width:40px;height:40px;line-height:40px;text-align:center;background:#EFF4FF;color:${BRAND};border-radius:10px;font-weight:700;">${escapeHtml(
-        factoryName.charAt(0).toUpperCase()
+    : `<span style="display:inline-block;width:40px;height:40px;line-height:40px;text-align:center;background:#EDEEFE;color:${BRAND};border-radius:10px;font-weight:700;">${escapeHtml(
+        factoryName.charAt(0).toUpperCase(),
       )}</span>`;
 
   const greeting = fullName ? `Hi ${escapeHtml(fullName)},` : "Hi,";
 
   return `<!doctype html>
 <html>
-  <body style="margin:0;padding:0;background:#F6F8FC;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F6F8FC;padding:32px 12px;">
+  <body style="margin:0;padding:0;background:#EAEDF5;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#EAEDF5;padding:32px 12px;">
       <tr>
         <td align="center">
-          <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="width:480px;max-width:100%;background:#ffffff;border:1px solid #E6EAF1;border-radius:16px;overflow:hidden;">
+          <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="width:480px;max-width:100%;background:#ffffff;border:1px solid #DCDFEC;border-radius:16px;overflow:hidden;">
             <tr>
               <td style="padding:24px 28px;border-bottom:1px solid #EEF1F6;">${brandTile}</td>
             </tr>
@@ -58,7 +58,7 @@ export function renderEmployeeInviteEmail({
                     <td>
                       <div style="font-size:13px;color:${MUTED};">You've been added to</div>
                       <div style="font-size:20px;font-weight:700;color:${INK};">${escapeHtml(
-                        factoryName
+                        factoryName,
                       )}</div>
                     </td>
                   </tr>
@@ -89,9 +89,9 @@ export function renderEmployeeInviteEmail({
               </td>
             </tr>
             <tr>
-              <td style="padding:18px 28px;border-top:1px solid #EEF1F6;font-size:12px;color:#94A3B8;">
+              <td style="padding:18px 28px;border-top:1px solid #EEF1F6;font-size:12px;color:#9297AE;">
                 This invite was sent by an administrator at ${escapeHtml(
-                  factoryName
+                  factoryName,
                 )}. If you weren't expecting it, you can ignore this email.
               </td>
             </tr>

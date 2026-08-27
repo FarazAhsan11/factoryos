@@ -9,10 +9,10 @@ import type { LogTableFilters } from "@/lib/factory/shift-log-table-queries";
 import { cn } from "@/lib/utils";
 
 const FILTER_CONTROL =
-  "h-9 w-full rounded-lg border border-[#E6EAF1] bg-[#FBFCFE] px-2.5 text-xs text-[#0F1B34] outline-none transition focus:border-[#2563EB] focus:bg-white focus:ring-2 focus:ring-[#2563EB]/12";
+  "h-9 w-full rounded-lg border border-line bg-sunken px-2.5 text-xs text-ink outline-none transition focus:border-brand focus:bg-surface focus:ring-2 focus:ring-brand/12";
 
 const FILTER_LABEL =
-  "block text-[10px] font-bold uppercase tracking-[0.6px] text-[#94A3B8]";
+  "block text-[10px] font-bold uppercase tracking-[0.6px] text-ink-5";
 
 function Group({
   label,
@@ -28,7 +28,12 @@ function Group({
   return (
     // Bottom-aligned: a label that wraps to two lines would otherwise push its
     // control below the rest of the row instead of growing upward.
-    <div className={cn("flex h-full min-w-0 flex-col justify-end gap-1", className)}>
+    <div
+      className={cn(
+        "flex h-full min-w-0 flex-col justify-end gap-1",
+        className,
+      )}
+    >
       <label
         htmlFor={htmlFor}
         className={cn(FILTER_LABEL, "truncate")}
@@ -72,7 +77,12 @@ export function DataTableFilters({
   const [search, setSearch] = useState(filters.search);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
 
   function handleSearch(value: string) {
     setSearch(value);
@@ -81,7 +91,7 @@ export function DataTableFilters({
   }
 
   return (
-    <div className="mb-3.5 grid gap-3 rounded-2xl border border-[#E6EAF1] bg-white p-3.5 sm:grid-cols-2 lg:grid-cols-[repeat(6,minmax(0,1fr))_minmax(200px,2fr)]">
+    <div className="mb-3.5 grid gap-3 rounded-2xl border border-line bg-surface p-3.5 sm:grid-cols-2 lg:grid-cols-[repeat(6,minmax(0,1fr))_minmax(200px,2fr)]">
       <Group label="Date from" htmlFor="dt-from">
         <input
           id="dt-from"
@@ -178,7 +188,7 @@ export function DataTableFilters({
         className="sm:col-span-2 lg:col-span-1"
       >
         <div className="relative">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[#94A3B8]" />
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-ink-5" />
           <input
             id="dt-search"
             type="search"

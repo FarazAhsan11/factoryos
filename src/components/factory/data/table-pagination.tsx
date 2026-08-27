@@ -21,7 +21,9 @@ function pageWindow(current: number, total: number): (number | null)[] {
   if (current >= total - 3)
     [total - 4, total - 3, total - 2].forEach((p) => pages.add(p));
 
-  const sorted = [...pages].filter((p) => p >= 0 && p < total).sort((a, b) => a - b);
+  const sorted = [...pages]
+    .filter((p) => p >= 0 && p < total)
+    .sort((a, b) => a - b);
 
   const out: (number | null)[] = [];
   let previous: number | null = null;
@@ -34,7 +36,7 @@ function pageWindow(current: number, total: number): (number | null)[] {
 }
 
 const BUTTON =
-  "inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-[#E6EAF1] px-2 text-xs font-medium text-[#475569] transition hover:border-[#2563EB] hover:text-[#2563EB] disabled:pointer-events-none disabled:opacity-40";
+  "inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-line px-2 text-xs font-medium text-ink-3 transition hover:border-brand hover:text-brand disabled:pointer-events-none disabled:opacity-40";
 
 export function TablePagination({
   page,
@@ -56,13 +58,13 @@ export function TablePagination({
 
   return (
     <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-      <div className="flex items-center gap-2 text-xs text-[#64748B]">
+      <div className="flex items-center gap-2 text-xs text-ink-4">
         <label htmlFor="dt-page-size" className="sr-only">
           Rows per page
         </label>
         <select
           id="dt-page-size"
-          className="h-8 rounded-lg border border-[#E6EAF1] bg-[#FBFCFE] px-2 text-xs text-[#0F1B34] outline-none focus:border-[#2563EB]"
+          className="h-8 rounded-lg border border-line bg-sunken px-2 text-xs text-ink outline-none focus:border-brand"
           value={pageSize}
           onChange={(e) => onPageSizeChange(Number(e.target.value))}
         >
@@ -73,7 +75,9 @@ export function TablePagination({
           ))}
         </select>
         <span aria-live="polite">
-          {total === 0 ? "No rows" : `${first}–${last} of ${total.toLocaleString()}`}
+          {total === 0
+            ? "No rows"
+            : `${first}–${last} of ${total.toLocaleString()}`}
         </span>
       </div>
 
@@ -93,7 +97,7 @@ export function TablePagination({
             entry === null ? (
               <span
                 key={`gap-${i}`}
-                className="px-1 text-xs text-[#94A3B8]"
+                className="px-1 text-xs text-ink-5"
                 aria-hidden
               >
                 …
@@ -107,12 +111,12 @@ export function TablePagination({
                 className={cn(
                   BUTTON,
                   entry === page &&
-                    "border-[#2563EB] bg-[#EFF6FF] font-bold text-[#1D4ED8]"
+                    "border-brand bg-brand-soft font-bold text-brand-deep",
                 )}
               >
                 {entry + 1}
               </button>
-            )
+            ),
           )}
 
           <button

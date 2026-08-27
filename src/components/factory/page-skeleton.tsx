@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 /** Shared shimmer block for route-level loading states. */
 export function Shimmer({ className }: { className?: string }) {
   return (
-    <div className={cn("animate-pulse rounded-xl bg-[#EAEEF5]", className)} />
+    <div className={cn("animate-pulse rounded-xl bg-sunken-2", className)} />
   );
 }
 

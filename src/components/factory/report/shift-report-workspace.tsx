@@ -104,11 +104,13 @@ export function ShiftReportWorkspace({
   const rooms = useMemo(
     () =>
       groupByRoom(
-        unitList.filter((u) => u.active).map((u) => ({ id: u.id, name: u.name })),
+        unitList
+          .filter((u) => u.active)
+          .map((u) => ({ id: u.id, name: u.name })),
         entries,
-        pipelineByUnit
+        pipelineByUnit,
       ),
-    [unitList, entries, pipelineByUnit]
+    [unitList, entries, pipelineByUnit],
   );
 
   const totals = useMemo(() => summarise(entries), [entries]);
@@ -120,7 +122,7 @@ export function ShiftReportWorkspace({
     }
     downloadCsv(
       toShiftReportCsv(rooms),
-      shiftReportFilename(factoryName, date, shift)
+      shiftReportFilename(factoryName, date, shift),
     );
     toast.success("Shift report exported.");
   }
@@ -131,10 +133,10 @@ export function ShiftReportWorkspace({
           paper — you cannot press a button on a printed sheet. */}
       <div className="mb-4 flex shrink-0 flex-wrap items-start justify-between gap-3 print:hidden">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">
+          <p className="text-xs font-semibold uppercase tracking-wide text-ink-5">
             Production floor
           </p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#0F1B34]">
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">
             Shift report
           </h1>
         </div>
@@ -146,10 +148,10 @@ export function ShiftReportWorkspace({
             max={todayISO()}
             onChange={(e) => setDate(e.target.value || todayISO())}
             aria-label="Report date"
-            className="h-9 rounded-xl border border-[#E6EAF1] bg-white px-3 text-sm text-[#0F1B34] outline-none transition focus:border-[#2563EB]"
+            className="h-9 rounded-xl border border-line bg-surface px-3 text-sm text-ink outline-none transition focus:border-brand"
           />
 
-          <div className="flex overflow-hidden rounded-xl border border-[#E6EAF1]">
+          <div className="flex overflow-hidden rounded-xl border border-line">
             <ShiftButton
               active={shift === "morning"}
               onClick={() => setShift("morning")}
@@ -177,17 +179,14 @@ export function ShiftReportWorkspace({
       </div>
 
       {isError ? (
-        <p className="rounded-2xl border border-[#FECACA] bg-[#FEF2F2] px-4 py-6 text-center text-sm text-[#B91C1C]">
+        <p className="rounded-2xl border border-danger-line bg-danger-soft px-4 py-6 text-center text-sm text-danger-deep">
           Could not load the shift report: {(error as Error).message}
         </p>
       ) : isPending ? (
         <ReportSkeleton />
       ) : (
         <div className="lg:flex lg:min-h-0 lg:flex-1 lg:flex-col print:block">
-          <ShiftReportSummary
-            totals={totals}
-            unitWordPlural={units.plural}
-          />
+          <ShiftReportSummary totals={totals} unitWordPlural={units.plural} />
           <ShiftReportHeader
             factoryName={factoryName}
             date={date}
@@ -197,11 +196,11 @@ export function ShiftReportWorkspace({
           />
 
           {rooms.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-[#CBD5E1] bg-white px-4 py-16 text-center">
-              <p className="text-sm text-[#64748B]">
+            <div className="rounded-2xl border border-dashed border-ink-6 bg-surface px-4 py-16 text-center">
+              <p className="text-sm text-ink-4">
                 No {units.plural.toLowerCase()} set up yet.
               </p>
-              <p className="mt-1 text-xs text-[#94A3B8]">
+              <p className="mt-1 text-xs text-ink-5">
                 Add them in Admin &amp; Settings and the report fills itself in.
               </p>
             </div>
@@ -209,7 +208,7 @@ export function ShiftReportWorkspace({
             <>
               <ShiftReportTable rooms={rooms} unitWord={units.singular} />
               {totals.entries === 0 && (
-                <p className="mt-3 shrink-0 text-center text-xs text-[#94A3B8] print:hidden">
+                <p className="mt-3 shrink-0 text-center text-xs text-ink-5 print:hidden">
                   Nothing was logged on this shift — every{" "}
                   {units.singular.toLowerCase()} shows its board status instead.
                 </p>
@@ -241,8 +240,8 @@ function ShiftButton({
       className={cn(
         "inline-flex h-9 items-center gap-1.5 px-3 text-xs font-semibold transition",
         active
-          ? "bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] text-white"
-          : "bg-white text-[#475569] hover:bg-[#F8FAFC]"
+          ? "bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] text-white"
+          : "bg-surface text-ink-3 hover:bg-sunken",
       )}
     >
       {icon}
@@ -264,7 +263,7 @@ function Ghost({
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-[#E6EAF1] bg-white px-3 text-xs font-semibold text-[#475569] transition hover:border-[#2563EB] hover:text-[#2563EB]"
+      className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-line bg-surface px-3 text-xs font-semibold text-ink-3 transition hover:border-brand hover:text-brand"
     >
       {icon}
       {children}
@@ -279,11 +278,11 @@ function ReportSkeleton() {
         {Array.from({ length: 5 }).map((_, i) => (
           <div
             key={i}
-            className="h-[74px] animate-pulse rounded-2xl border border-[#EEF1F6] bg-white"
+            className="h-[74px] animate-pulse rounded-2xl border border-line-soft bg-surface"
           />
         ))}
       </div>
-      <div className="h-[420px] animate-pulse rounded-2xl border border-[#EEF1F6] bg-white" />
+      <div className="h-[420px] animate-pulse rounded-2xl border border-line-soft bg-surface" />
     </div>
   );
 }

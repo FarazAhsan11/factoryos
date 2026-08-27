@@ -58,10 +58,10 @@ export function ActionStageStepper({
               className={cn(
                 "grid size-6 shrink-0 place-items-center rounded-full border-2 transition",
                 done
-                  ? "border-[#16A34A] bg-[#16A34A] text-white"
+                  ? "border-teal bg-teal text-white"
                   : active
-                    ? "border-[#2563EB] bg-white text-[#2563EB] ring-4 ring-[#2563EB]/12"
-                    : "border-[#E2E8F0] bg-white text-[#CBD5E1]"
+                    ? "border-brand bg-surface text-brand ring-4 ring-brand/12"
+                    : "border-line bg-surface text-ink-6",
               )}
             >
               {done ? (
@@ -79,7 +79,7 @@ export function ActionStageStepper({
               <span
                 className={cn(
                   "mx-1.5 h-0.5 flex-1 rounded-full",
-                  railDone ? "bg-[#16A34A]" : "bg-[#E2E8F0]"
+                  railDone ? "bg-teal" : "bg-line",
                 )}
               />
             )}
@@ -93,12 +93,12 @@ export function ActionStageStepper({
                     ? "right-0"
                     : "left-3 -translate-x-1/2",
                 skipped
-                  ? "text-[#CBD5E1] line-through"
+                  ? "text-ink-6 line-through"
                   : active
-                    ? "text-[#2563EB]"
+                    ? "text-brand"
                     : done
-                      ? "text-[#15803D]"
-                      : "text-[#94A3B8]"
+                      ? "text-teal-deep"
+                      : "text-ink-5",
               )}
             >
               {STAGE_LABELS[stage]}

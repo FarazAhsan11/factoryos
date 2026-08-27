@@ -28,7 +28,7 @@ import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
 import { cn } from "@/lib/utils";
 
 const CONTROL =
-  "h-10 w-full rounded-xl border border-[#E6EAF1] bg-[#FBFCFE] px-3.5 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:bg-white";
+  "h-10 w-full rounded-xl border border-line bg-sunken px-3.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-brand focus:bg-surface";
 
 const EMPTY: MaintenanceRequestValues = {
   equipmentNo: "",
@@ -126,7 +126,7 @@ export function NewMaintenanceDialog({
           reset(EMPTY);
           setOpen(true);
         }}
-        className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] px-3.5 text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(37,99,235,0.55)] transition hover:brightness-[1.06]"
+        className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-3.5 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06]"
       >
         <Plus className="size-4" />
         New request
@@ -141,8 +141,8 @@ export function NewMaintenanceDialog({
       >
         <DialogContent className="max-h-[88vh] max-w-lg overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-[#0F1B34]">
-              <Wrench className="size-4 text-[#2563EB]" />
+            <DialogTitle className="flex items-center gap-2 text-ink">
+              <Wrench className="size-4 text-brand" />
               New maintenance request
             </DialogTitle>
             <DialogDescription>
@@ -172,9 +172,19 @@ export function NewMaintenanceDialog({
                 />
               </Field>
 
-              <Field label={`${unitWord} / line`} htmlFor="mr-unit" note="(optional)">
-                <select id="mr-unit" className={CONTROL} {...register("unitId")}>
-                  <option value="">Not {unitWord.toLowerCase()}-specific</option>
+              <Field
+                label={`${unitWord} / line`}
+                htmlFor="mr-unit"
+                note="(optional)"
+              >
+                <select
+                  id="mr-unit"
+                  className={CONTROL}
+                  {...register("unitId")}
+                >
+                  <option value="">
+                    Not {unitWord.toLowerCase()}-specific
+                  </option>
                   {activeUnits.map((u) => (
                     <option key={u.id} value={u.id}>
                       {u.name}
@@ -206,7 +216,7 @@ export function NewMaintenanceDialog({
                 {/* Says where the list comes from rather than silently
                     offering an empty dropdown — the fix is one tab away. */}
                 {activeDepartments.length === 0 && (
-                  <p className="mt-1 text-[11px] text-[#94A3B8]">
+                  <p className="mt-1 text-[11px] text-ink-5">
                     Add them in Admin &amp; Settings → Departments.
                   </p>
                 )}
@@ -238,7 +248,7 @@ export function NewMaintenanceDialog({
                 rows={3}
                 placeholder="Describe the fault, what was happening, when it started…"
                 aria-invalid={Boolean(errors.description)}
-                className="w-full rounded-xl border border-[#E6EAF1] bg-[#FBFCFE] px-3.5 py-2.5 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:bg-white"
+                className="w-full rounded-xl border border-line bg-sunken px-3.5 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-brand focus:bg-surface"
                 {...register("description")}
               />
             </Field>
@@ -256,7 +266,11 @@ export function NewMaintenanceDialog({
             </Field>
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Reported by" htmlFor="mr-reported" note="(optional)">
+              <Field
+                label="Reported by"
+                htmlFor="mr-reported"
+                note="(optional)"
+              >
                 <input
                   id="mr-reported"
                   placeholder="Your name"
@@ -298,14 +312,14 @@ export function NewMaintenanceDialog({
                 type="button"
                 onClick={() => setOpen(false)}
                 disabled={isSubmitting}
-                className="h-10 rounded-xl px-4 text-sm font-medium text-[#475569] transition hover:bg-[#F1F5F9] disabled:opacity-60"
+                className="h-10 rounded-xl px-4 text-sm font-medium text-ink-3 transition hover:bg-sunken-2 disabled:opacity-60"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="inline-flex h-10 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] px-4 text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(37,99,235,0.55)] transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-60"
+                className="inline-flex h-10 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-4 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-60"
               >
                 {isSubmitting && <Loader2 className="size-4 animate-spin" />}
                 Submit request
@@ -335,17 +349,14 @@ function Field({
 }) {
   return (
     <div className="space-y-1.5">
-      <label
-        htmlFor={htmlFor}
-        className="block text-xs font-medium text-[#475569]"
-      >
+      <label htmlFor={htmlFor} className="block text-xs font-medium text-ink-3">
         {label}
-        {required && <span className="ml-0.5 text-[#DC2626]">*</span>}
-        {note && <span className="ml-1 text-[10px] text-[#94A3B8]">{note}</span>}
+        {required && <span className="ml-0.5 text-danger">*</span>}
+        {note && <span className="ml-1 text-[10px] text-ink-5">{note}</span>}
       </label>
       {children}
       {error && (
-        <p role="alert" className="text-[11.5px] text-[#DC2626]">
+        <p role="alert" className="text-[11.5px] text-danger">
           {error}
         </p>
       )}

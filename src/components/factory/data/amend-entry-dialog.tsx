@@ -77,9 +77,13 @@ export function AmendEntryDialog({
       // the pipeline board — an amendment re-runs the status trigger, so a
       // corrected flag can release a hold.
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: logTableKeys.all(factoryId) }),
+        queryClient.invalidateQueries({
+          queryKey: logTableKeys.all(factoryId),
+        }),
         queryClient.invalidateQueries({ queryKey: logKeys.factory(factoryId) }),
-        queryClient.invalidateQueries({ queryKey: pipelineKeys.all(factoryId) }),
+        queryClient.invalidateQueries({
+          queryKey: pipelineKeys.all(factoryId),
+        }),
       ]);
       toast.success("Amendment recorded — the original entry is unchanged.");
       reset({ note: "" });
@@ -100,7 +104,7 @@ export function AmendEntryDialog({
     >
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-[#0F1B34]">Amend log entry</DialogTitle>
+          <DialogTitle className="text-ink">Amend log entry</DialogTitle>
           <DialogDescription>
             {entry && (
               <>
@@ -112,7 +116,7 @@ export function AmendEntryDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex items-start gap-2 rounded-xl bg-[#FFFBEB] p-3 text-xs text-[#92400E]">
+        <div className="flex items-start gap-2 rounded-xl bg-warn-tint p-3 text-xs text-warn-ink">
           <ShieldAlert className="mt-0.5 size-4 shrink-0" />
           <p>
             The original entry is preserved for audit. You are adding a
@@ -121,11 +125,11 @@ export function AmendEntryDialog({
         </div>
 
         {entry?.amend_note && (
-          <div className="rounded-xl border border-[#E6EAF1] bg-[#F8FAFC] p-3">
-            <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.6px] text-[#94A3B8]">
+          <div className="rounded-xl border border-line bg-sunken p-3">
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.6px] text-ink-5">
               Existing amendments
             </p>
-            <p className="whitespace-pre-line text-xs text-[#475569]">
+            <p className="whitespace-pre-line text-xs text-ink-3">
               {entry.amend_note}
             </p>
           </div>
@@ -138,7 +142,7 @@ export function AmendEntryDialog({
           <div className="space-y-1.5">
             <label
               htmlFor="amend-note"
-              className="block text-xs font-medium text-[#475569]"
+              className="block text-xs font-medium text-ink-3"
             >
               Reason for amendment
             </label>
@@ -148,16 +152,16 @@ export function AmendEntryDialog({
               autoFocus
               aria-invalid={Boolean(errors.note)}
               className={cn(
-                "w-full rounded-xl border bg-[#FBFCFE] px-3.5 py-2.5 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:bg-white focus:ring-4 focus:ring-[#2563EB]/12",
+                "w-full rounded-xl border bg-sunken px-3.5 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:bg-surface focus:ring-4 focus:ring-brand/12",
                 errors.note
-                  ? "border-[#FCA5A5] focus:border-[#DC2626]"
-                  : "border-[#E6EAF1] focus:border-[#2563EB]"
+                  ? "border-danger-line focus:border-danger"
+                  : "border-line focus:border-brand",
               )}
               placeholder="What was incorrect and what the correct information is…"
               {...register("note")}
             />
             {errors.note && (
-              <p className="text-xs text-[#B91C1C]">{errors.note.message}</p>
+              <p className="text-xs text-danger-deep">{errors.note.message}</p>
             )}
           </div>
 
@@ -169,14 +173,14 @@ export function AmendEntryDialog({
                 onClose();
               }}
               disabled={isSubmitting}
-              className="h-10 flex-1 rounded-xl border border-[#E6EAF1] text-sm font-medium text-[#475569] transition hover:border-[#2563EB] hover:text-[#2563EB] disabled:opacity-60"
+              className="h-10 flex-1 rounded-xl border border-line text-sm font-medium text-ink-3 transition hover:border-brand hover:text-brand disabled:opacity-60"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(37,99,235,0.55)] transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-70"
+              className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-70"
             >
               {isSubmitting && <Loader2 className="size-4 animate-spin" />}
               {isSubmitting ? "Saving…" : "Save amendment"}

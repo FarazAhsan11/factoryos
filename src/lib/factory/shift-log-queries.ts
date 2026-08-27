@@ -108,20 +108,20 @@ export interface OverrunFlag {
  */
 export async function fetchOverrunFlags(
   factoryId: string,
-  date: string
+  date: string,
 ): Promise<Map<string, OverrunFlag>> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("shift_log_entries_expanded")
     .select(
-      "id, overrun_qty, needs_overrun_note, overrun_note, overrun_cleared_by_name"
+      "id, overrun_qty, needs_overrun_note, overrun_note, overrun_cleared_by_name",
     )
     .eq("factory_id", factoryId)
     .eq("log_date", date);
 
   if (error) throw new Error(error.message);
   return new Map(
-    ((data ?? []) as unknown as OverrunFlag[]).map((row) => [row.id, row])
+    ((data ?? []) as unknown as OverrunFlag[]).map((row) => [row.id, row]),
   );
 }
 
@@ -139,7 +139,7 @@ export async function fetchOverrunFlags(
  */
 export async function explainOverrun(
   entryId: string,
-  note: string
+  note: string,
 ): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase
@@ -152,7 +152,7 @@ export async function explainOverrun(
 
 export async function fetchLogEntries(
   factoryId: string,
-  date: string
+  date: string,
 ): Promise<LogEntry[]> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -172,7 +172,7 @@ export async function fetchLogEntries(
  */
 export async function fetchBatchEntries(
   factoryId: string,
-  batchNo: string
+  batchNo: string,
 ): Promise<Pick<LogEntry, "id" | "process_id" | "qty" | "log_date">[]> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -208,7 +208,7 @@ export async function createLogEntry(
   values: LogEntryParsed,
   loggedBy: string,
   logDate: string,
-  productId: string | null
+  productId: string | null,
 ): Promise<LogEntry> {
   const supabase = createClient();
   /**
@@ -252,23 +252,23 @@ export async function createLogEntry(
       // drag every output and quality average computed over them.
       // A shift target is speed × duration, so only a production stage has
       // one. A preparatory stage has no target speed to derive it from.
-      target_qty: production ? values.targetQty ?? null : null,
-      qty: output ? values.qty ?? null : null,
+      target_qty: production ? (values.targetQty ?? null) : null,
+      qty: output ? (values.qty ?? null) : null,
       // The unit half of a preparatory measurement — "3" alone is not
       // something anyone can read back. Production measures in whatever
       // `speed_unit` counts, so it stores null rather than repeating itself.
-      qty_unit: preparatory ? values.qtyUnit ?? null : null,
+      qty_unit: preparatory ? (values.qtyUnit ?? null) : null,
       // Rejects are the one quantity left blankable, and blank means zero here
       // rather than unknown: on a production stage, "none were rejected" is a
       // real measurement. Null would drop the entry out of the quality rate's
       // denominator and quietly flatter it. A preparatory stage isn't asked at
       // all, so null there is the truth — not "none".
-      qty_rejected: production ? values.qtyRejected ?? 0 : null,
+      qty_rejected: production ? (values.qtyRejected ?? 0) : null,
       // Speed belongs to machine processes only — a manual entry stores null
       // rather than zeroes, so OEE can tell "not applicable" from "stopped".
       speed_unit: machine ? speedUnit : null,
-      target_speed: machine ? values.targetSpeed ?? null : null,
-      actual_speed: machine ? values.actualSpeed ?? null : null,
+      target_speed: machine ? (values.targetSpeed ?? null) : null,
+      actual_speed: machine ? (values.actualSpeed ?? null) : null,
       slow_reason: machine ? values.slowReason || null : null,
       // Trimmed, de-duplicated and stripped of blanks by the schema. Empty on
       // a waiting-time activity, which the column allows — its only constraint
@@ -278,9 +278,8 @@ export async function createLogEntry(
       // Downtime records the time and nothing else — an issue raised off one
       // is a deliberate act in Issues & CAPAs, not a side effect of the form
       // still holding a flag picked before the activity changed.
-      action_flag: values.category === "downtime"
-        ? null
-        : values.actionFlag ?? null,
+      action_flag:
+        values.category === "downtime" ? null : (values.actionFlag ?? null),
       logged_by: loggedBy,
     })
     .select(COLUMNS)
@@ -311,7 +310,7 @@ export async function createLogEntry(
 export async function amendLogEntry(
   entryId: string,
   note: string,
-  existingNote: string | null
+  existingNote: string | null,
 ): Promise<void> {
   const supabase = createClient();
   const stamp = new Date().toISOString().slice(0, 10);
@@ -328,7 +327,7 @@ export async function amendLogEntry(
     throw new Error(
       error.code === "42501"
         ? "You can only amend your own entries, unless you're a manager."
-        : error.message
+        : error.message,
     );
   }
 }

@@ -15,10 +15,7 @@ import { ShiftTimesForm } from "@/components/factory/admin/shift-times-form";
 import { ADMIN_TABS, TAB_TABLE } from "@/lib/factory/admin-tabs";
 import type { FactoryContext } from "@/lib/factory/context";
 import { employeeKeys, fetchEmployees } from "@/lib/factory/employee-queries";
-import {
-  equipmentKeys,
-  fetchEquipment,
-} from "@/lib/factory/equipment-queries";
+import { equipmentKeys, fetchEquipment } from "@/lib/factory/equipment-queries";
 import { fetchProducts, productKeys } from "@/lib/factory/product-queries";
 import {
   fetchShiftTimes,
@@ -86,7 +83,7 @@ export function AdminWorkspace({
         queryFn: () => fetchSetupItems(table, factory.id),
       });
     },
-    [queryClient, factory.id]
+    [queryClient, factory.id],
   );
 
   const select = useCallback((value: string) => {

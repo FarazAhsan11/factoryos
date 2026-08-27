@@ -66,7 +66,7 @@ export function MaintenanceWorkspace({
       queryClient.invalidateQueries({
         queryKey: maintenanceKeys.all(factoryId),
       }),
-    [queryClient, factoryId]
+    [queryClient, factoryId],
   );
 
   const counts = useMemo(() => {
@@ -79,14 +79,14 @@ export function MaintenanceWorkspace({
 
   const urgentCount = useMemo(
     () => requests.filter((r) => r.priority === "urgent").length,
-    [requests]
+    [requests],
   );
 
   const visible = useMemo(() => {
     const chip = MAINTENANCE_FILTERS.find((f) => f.key === filter);
     return requests.filter(
       (r) =>
-        (!chip || chip.match(r.status)) && (!urgent || r.priority === "urgent")
+        (!chip || chip.match(r.status)) && (!urgent || r.priority === "urgent"),
     );
   }, [requests, filter, urgent]);
 
@@ -99,13 +99,13 @@ export function MaintenanceWorkspace({
     <>
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">
+          <p className="text-xs font-semibold uppercase tracking-wide text-ink-5">
             Equipment &amp; facility
           </p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#0F1B34]">
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">
             Maintenance requests
           </h1>
-          <p className="mt-1 text-sm text-[#64748B]">
+          <p className="mt-1 text-sm text-ink-4">
             Report a fault, assign it, record the work, and have QA review it —
             the three sections of the request, in order.
           </p>
@@ -147,15 +147,15 @@ export function MaintenanceWorkspace({
                 className={cn(
                   "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition",
                   active
-                    ? "border-[#0F1B34] bg-[#0F1B34] text-white"
-                    : "border-[#E6EAF1] bg-white text-[#475569] hover:border-[#CBD5E1]"
+                    ? "border-ink bg-ink text-white"
+                    : "border-line bg-surface text-ink-3 hover:border-ink-6",
                 )}
               >
                 {label}
                 <span
                   className={cn(
                     "rounded-full px-1.5 text-[10px] font-bold",
-                    active ? "bg-white/20" : "bg-[#F1F5F9] text-[#64748B]"
+                    active ? "bg-surface/20" : "bg-sunken-2 text-ink-4",
                   )}
                 >
                   {counts[key]}
@@ -172,11 +172,11 @@ export function MaintenanceWorkspace({
           className={cn(
             "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition",
             urgent
-              ? "border-[#B91C1C] bg-[#FEE2E2] text-[#B91C1C]"
-              : "border-[#E6EAF1] bg-white text-[#475569] hover:border-[#CBD5E1]",
+              ? "border-danger-deep bg-danger-soft text-danger-deep"
+              : "border-line bg-surface text-ink-3 hover:border-ink-6",
             // Nothing is urgent: the toggle stays put so its absence reads as
             // "all quiet" rather than as a control that went missing.
-            urgentCount === 0 && !urgent && "opacity-60"
+            urgentCount === 0 && !urgent && "opacity-60",
           )}
         >
           <AlertTriangle className="size-3.5" />
@@ -184,7 +184,7 @@ export function MaintenanceWorkspace({
           <span
             className={cn(
               "rounded-full px-1.5 text-[10px] font-bold",
-              urgent ? "bg-white/60" : "bg-[#F1F5F9] text-[#64748B]"
+              urgent ? "bg-surface/60" : "bg-sunken-2 text-ink-4",
             )}
           >
             {urgentCount}
@@ -195,18 +195,18 @@ export function MaintenanceWorkspace({
       {isPending ? (
         <ListSkeleton />
       ) : isError ? (
-        <p className="rounded-2xl border border-[#FECACA] bg-[#FEF2F2] px-4 py-6 text-center text-sm text-[#B91C1C]">
+        <p className="rounded-2xl border border-danger-line bg-danger-soft px-4 py-6 text-center text-sm text-danger-deep">
           Could not load maintenance requests: {(error as Error).message}
         </p>
       ) : visible.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[#CBD5E1] bg-white px-4 py-16 text-center">
-          <Wrench className="mx-auto mb-3 size-7 text-[#CBD5E1]" />
-          <p className="text-sm text-[#64748B]">
+        <div className="rounded-2xl border border-dashed border-ink-6 bg-surface px-4 py-16 text-center">
+          <Wrench className="mx-auto mb-3 size-7 text-ink-6" />
+          <p className="text-sm text-ink-4">
             {requests.length === 0
               ? "No maintenance requests yet."
               : "Nothing matches that filter."}
           </p>
-          <p className="mt-1 text-xs text-[#94A3B8]">
+          <p className="mt-1 text-xs text-ink-5">
             {requests.length === 0
               ? "Raise one when a machine needs attention."
               : urgent
@@ -254,25 +254,25 @@ function RequestRow({
       <button
         type="button"
         onClick={onOpen}
-        className="w-full rounded-2xl border border-[#E6EAF1] bg-white p-4 text-left transition hover:border-[#CBD5E1] hover:shadow-[0_6px_18px_-12px_rgba(15,27,52,0.35)]"
+        className="w-full rounded-2xl border border-line bg-surface p-4 text-left transition hover:border-ink-6 hover:shadow-lift"
         style={{ borderLeft: `4px solid ${meta.dot}` }}
       >
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="flex flex-wrap items-baseline gap-x-2">
-              <span className="font-mono text-[11px] font-bold text-[#94A3B8]">
+              <span className="font-mono text-[11px] font-bold text-ink-5">
                 {request.request_no}
               </span>
-              <span className="font-mono text-sm font-semibold text-[#0F1B34]">
+              <span className="font-mono text-sm font-semibold text-ink">
                 {request.equipment_no}
               </span>
               {request.equipment_name && (
-                <span className="truncate text-xs text-[#475569]">
+                <span className="truncate text-xs text-ink-3">
                   {request.equipment_name}
                 </span>
               )}
             </p>
-            <p className="mt-0.5 text-xs text-[#94A3B8]">
+            <p className="mt-0.5 text-xs text-ink-5">
               {request.unit_name ?? `Not ${unitWord.toLowerCase()}-specific`}
               {request.department_name && ` · ${request.department_name}`}
               {request.batch_no && (
@@ -289,7 +289,7 @@ function RequestRow({
             <span
               className={cn(
                 "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
-                meta.pill
+                meta.pill,
               )}
             >
               {meta.label}
@@ -297,16 +297,16 @@ function RequestRow({
             <span
               className={cn(
                 "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
-                STATUS_PILL[request.status]
+                STATUS_PILL[request.status],
               )}
             >
               {STATUS_LABELS[request.status]}
             </span>
-            <ChevronRight className="size-4 text-[#CBD5E1]" />
+            <ChevronRight className="size-4 text-ink-6" />
           </div>
         </div>
 
-        <p className="mt-2 line-clamp-2 whitespace-pre-wrap text-[13px] text-[#334155]">
+        <p className="mt-2 line-clamp-2 whitespace-pre-wrap text-[13px] text-ink-2">
           {request.description}
         </p>
 
@@ -315,14 +315,14 @@ function RequestRow({
             className={cn(
               "inline-flex items-center gap-1.5",
               request.assigned_to
-                ? "font-medium text-[#0F1B34]"
-                : "italic text-[#94A3B8]"
+                ? "font-medium text-ink"
+                : "italic text-ink-5",
             )}
           >
-            <User className="size-3.5 shrink-0 text-[#94A3B8]" />
+            <User className="size-3.5 shrink-0 text-ink-5" />
             {request.assigned_to ?? "Unassigned"}
           </span>
-          <span className="font-mono text-[11px] text-[#94A3B8]">
+          <span className="font-mono text-[11px] text-ink-5">
             <Downtime request={request} />
             {request.reported_by && `${request.reported_by} · `}
             {formatRaised(request.created_at)}
@@ -343,14 +343,14 @@ function RequestRow({
 function Downtime({ request }: { request: MaintenanceRequest }) {
   if (request.downtime_minutes !== null) {
     return (
-      <span className="text-[#475569]">
+      <span className="text-ink-3">
         Down {formatMinutes(request.downtime_minutes)} ·{" "}
       </span>
     );
   }
   if (request.work_started_at) {
     return (
-      <span className="font-semibold text-[#B45309]">
+      <span className="font-semibold text-warn-deep">
         Down {formatMinutes(minutesSince(request.work_started_at))} ·{" "}
       </span>
     );
@@ -364,7 +364,7 @@ function ListSkeleton() {
       {Array.from({ length: 3 }).map((_, i) => (
         <div
           key={i}
-          className="h-[132px] animate-pulse rounded-2xl border border-[#EEF1F6] bg-white"
+          className="h-[132px] animate-pulse rounded-2xl border border-line-soft bg-surface"
         />
       ))}
     </div>

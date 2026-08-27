@@ -22,10 +22,7 @@ export default async function Home() {
 
   // The embedded relation can come back as an object or a single-item array.
   const rel = profile?.factories as
-    | { slug: string | null }
-    | { slug: string | null }[]
-    | null
-    | undefined;
+    { slug: string | null } | { slug: string | null }[] | null | undefined;
   const factory = Array.isArray(rel) ? rel[0] : rel;
   if (profile?.factory_id && factory?.slug) {
     redirect(`/factory/${factory.slug}`);

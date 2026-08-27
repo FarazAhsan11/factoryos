@@ -53,7 +53,7 @@ export function NewJobDialog({
     return available.filter((p) =>
       [p.batch_no, p.code, p.name]
         .filter(Boolean)
-        .some((field) => field!.toLowerCase().includes(term))
+        .some((field) => field!.toLowerCase().includes(term)),
     );
   }, [available, search]);
 
@@ -89,9 +89,7 @@ export function NewJobDialog({
   const create = useMutation({
     mutationFn: () => createPipelineJobs(factoryId, [...picked], userId),
     onSuccess: (count) => {
-      toast.success(
-        `${count} job${count === 1 ? "" : "s"} added to Planned.`
-      );
+      toast.success(`${count} job${count === 1 ? "" : "s"} added to Planned.`);
       reset();
       setOpen(false);
       onCreated();
@@ -107,7 +105,7 @@ export function NewJobDialog({
           reset();
           setOpen(true);
         }}
-        className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] px-3.5 text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(37,99,235,0.55)] transition hover:brightness-[1.06]"
+        className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-3.5 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06]"
       >
         <Plus className="size-4" />
         New job
@@ -122,7 +120,7 @@ export function NewJobDialog({
       >
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-[#0F1B34]">
+            <DialogTitle className="text-ink">
               Add jobs to the pipeline
             </DialogTitle>
             <DialogDescription>
@@ -132,7 +130,7 @@ export function NewJobDialog({
           </DialogHeader>
 
           {available.length === 0 ? (
-            <p className="rounded-2xl border border-dashed border-[#CBD5E1] px-4 py-10 text-center text-sm text-[#94A3B8]">
+            <p className="rounded-2xl border border-dashed border-ink-6 px-4 py-10 text-center text-sm text-ink-5">
               Every batch in the catalogue is already on the board.
               <br />
               Add more in Admin &amp; Settings → Products.
@@ -141,41 +139,41 @@ export function NewJobDialog({
             <div className="space-y-3">
               {available.length > 8 && (
                 <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#94A3B8]" />
+                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-5" />
                   <input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search by batch, code or product…"
                     aria-label="Search batches"
-                    className="h-9 w-full rounded-xl border border-[#E6EAF1] bg-[#FBFCFE] pl-9 pr-3 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#2563EB]"
+                    className="h-9 w-full rounded-xl border border-line bg-sunken pl-9 pr-3 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-brand"
                   />
                 </div>
               )}
 
               <div className="flex items-center justify-between gap-2 px-0.5">
-                <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-[#0F1B34]">
+                <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-ink">
                   <input
                     type="checkbox"
                     checked={allVisiblePicked}
                     onChange={toggleAllVisible}
                     disabled={visible.length === 0}
-                    className="size-4 cursor-pointer rounded border-[#CBD5E1] accent-[#2563EB]"
+                    className="size-4 cursor-pointer rounded border-ink-6 accent-brand"
                   />
                   Select all
                   {search && visible.length !== available.length && (
-                    <span className="text-xs font-normal text-[#94A3B8]">
+                    <span className="text-xs font-normal text-ink-5">
                       ({visible.length} shown)
                     </span>
                   )}
                 </label>
-                <span className="text-xs text-[#64748B]">
+                <span className="text-xs text-ink-4">
                   {picked.size} selected
                 </span>
               </div>
 
-              <ul className="max-h-72 overflow-y-auto rounded-xl border border-[#E6EAF1]">
+              <ul className="max-h-72 overflow-y-auto rounded-xl border border-line">
                 {visible.length === 0 ? (
-                  <li className="px-3.5 py-8 text-center text-xs text-[#94A3B8]">
+                  <li className="px-3.5 py-8 text-center text-xs text-ink-5">
                     Nothing matches “{search}”.
                   </li>
                 ) : (
@@ -185,20 +183,20 @@ export function NewJobDialog({
                       <li key={product.id}>
                         <label
                           className={cn(
-                            "flex cursor-pointer items-center gap-3 border-b border-[#F1F5F9] px-3.5 py-2.5 transition last:border-0",
-                            on ? "bg-[#EFF6FF]" : "hover:bg-[#F8FAFC]"
+                            "flex cursor-pointer items-center gap-3 border-b border-sunken-2 px-3.5 py-2.5 transition last:border-0",
+                            on ? "bg-brand-soft" : "hover:bg-sunken",
                           )}
                         >
                           <input
                             type="checkbox"
                             checked={on}
                             onChange={() => toggle(product.id)}
-                            className="size-4 shrink-0 cursor-pointer rounded border-[#CBD5E1] accent-[#2563EB]"
+                            className="size-4 shrink-0 cursor-pointer rounded border-ink-6 accent-brand"
                           />
-                          <span className="shrink-0 font-mono text-[12px] font-medium text-[#0F1B34]">
+                          <span className="shrink-0 font-mono text-[12px] font-medium text-ink">
                             {product.batch_no}
                           </span>
-                          <span className="min-w-0 flex-1 truncate text-sm text-[#334155]">
+                          <span className="min-w-0 flex-1 truncate text-sm text-ink-2">
                             {product.name}
                           </span>
                           {/* Already scheduled, and shown rather than hidden:
@@ -208,12 +206,12 @@ export function NewJobDialog({
                           {product.planned_for && (
                             <span
                               title={`Scheduled to join Planned on ${product.planned_for}`}
-                              className="shrink-0 rounded-full bg-[#F5F3FF] px-1.5 py-0.5 text-[10px] font-semibold text-[#7C3AED]"
+                              className="shrink-0 rounded-full bg-violet-soft px-1.5 py-0.5 text-[10px] font-semibold text-violet"
                             >
                               {formatDay(product.planned_for)}
                             </span>
                           )}
-                          <span className="shrink-0 font-mono text-[11px] text-[#64748B]">
+                          <span className="shrink-0 font-mono text-[11px] text-ink-4">
                             {fmt(product.required_qty)}
                           </span>
                         </label>
@@ -228,7 +226,7 @@ export function NewJobDialog({
                   type="button"
                   onClick={() => setOpen(false)}
                   disabled={create.isPending}
-                  className="h-10 rounded-xl px-4 text-sm font-medium text-[#475569] transition hover:bg-[#F1F5F9] disabled:opacity-60"
+                  className="h-10 rounded-xl px-4 text-sm font-medium text-ink-3 transition hover:bg-sunken-2 disabled:opacity-60"
                 >
                   Cancel
                 </button>
@@ -236,7 +234,7 @@ export function NewJobDialog({
                   type="button"
                   onClick={() => create.mutate()}
                   disabled={picked.size === 0 || create.isPending}
-                  className="inline-flex h-10 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] px-4 text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(37,99,235,0.55)] transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-60"
+                  className="inline-flex h-10 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-4 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-60"
                 >
                   {create.isPending && (
                     <Loader2 className="size-4 animate-spin" />

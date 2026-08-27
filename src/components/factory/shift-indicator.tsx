@@ -67,23 +67,23 @@ export function ShiftIndicator({
   return (
     <div
       className={cn(
-        "flex items-center gap-2 rounded-full border border-[#E6EAF1] bg-[#FBFCFE] px-3 py-1 text-xs",
-        className
+        "flex items-center gap-2 rounded-full border border-line bg-sunken px-3 py-1 text-xs",
+        className,
       )}
     >
       {shift === "morning" ? (
-        <Sun className="size-3.5 shrink-0 text-[#F59E0B]" />
+        <Sun className="size-3.5 shrink-0 text-warn" />
       ) : (
-        <Moon className="size-3.5 shrink-0 text-[#6366F1]" />
+        <Moon className="size-3.5 shrink-0 text-brand-bright" />
       )}
-      <span className="text-[#64748B]">
-        <span className="font-medium capitalize text-[#0F1B34]">{shift}</span>{" "}
+      <span className="text-ink-4">
+        <span className="font-medium capitalize text-ink">{shift}</span>{" "}
         {clock.startTime} → {clock.endTime}
       </span>
       <span
         className={cn(
           "font-mono font-semibold",
-          running ? "text-[#2563EB]" : "text-[#94A3B8]"
+          running ? "text-brand" : "text-ink-5",
         )}
       >
         {status}

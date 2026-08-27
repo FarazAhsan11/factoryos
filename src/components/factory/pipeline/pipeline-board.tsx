@@ -51,10 +51,10 @@ export function PipelineBoard({
           <section
             key={column.status}
             aria-label={column.label}
-            className="rounded-2xl border border-[#E6EAF1] bg-white"
+            className="rounded-2xl border border-line bg-surface"
           >
             <header
-              className="flex items-center justify-between gap-2 rounded-t-2xl border-b border-[#EEF1F6] px-4 py-3"
+              className="flex items-center justify-between gap-2 rounded-t-2xl border-b border-line-soft px-4 py-3"
               style={{ background: column.tint }}
             >
               <h2
@@ -64,7 +64,7 @@ export function PipelineBoard({
                 {column.label}
               </h2>
               <span
-                className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-bold"
+                className="rounded-full bg-surface/70 px-2 py-0.5 text-[11px] font-bold"
                 style={{ color: column.accent }}
               >
                 {items.length}
@@ -73,7 +73,7 @@ export function PipelineBoard({
 
             <div className="space-y-2.5 p-3">
               {items.length === 0 ? (
-                <p className="py-8 text-center text-xs text-[#94A3B8]">
+                <p className="py-8 text-center text-xs text-ink-5">
                   Nothing here.
                 </p>
               ) : (
@@ -120,7 +120,7 @@ function JobCard({
 
   return (
     <article
-      className="group relative rounded-xl border border-[#E6EAF1] bg-white transition focus-within:border-[#2563EB] hover:border-[#CBD5E1]"
+      className="group relative rounded-xl border border-line bg-surface transition focus-within:border-brand hover:border-ink-6"
       style={{ borderLeft: `3px solid ${accent}` }}
     >
       {/* Delete sits outside the card's own button — nesting one button inside
@@ -132,7 +132,7 @@ function JobCard({
           onClick={onDelete}
           title="Remove this job — nothing has been logged against it yet"
           aria-label={`Remove job for batch ${job.batch_no}`}
-          className="absolute right-2 top-2 z-10 rounded p-0.5 text-[#CBD5E1] opacity-0 transition hover:text-[#B91C1C] focus-visible:opacity-100 group-hover:opacity-100"
+          className="absolute right-2 top-2 z-10 rounded p-0.5 text-ink-6 opacity-0 transition hover:text-danger-deep focus-visible:opacity-100 group-hover:opacity-100"
         >
           <Trash2 className="size-3.5" />
         </button>
@@ -147,23 +147,23 @@ function JobCard({
         aria-label={`Open details for batch ${job.batch_no}, ${job.product_name}`}
         className="block w-full cursor-pointer rounded-xl p-3 text-left outline-none"
       >
-        <p className="font-mono text-[11px] font-medium text-[#64748B]">
+        <p className="font-mono text-[11px] font-medium text-ink-4">
           {job.product_code ? `${job.product_code} · ` : ""}
           {job.batch_no}
         </p>
 
-        <h3 className="mt-1 pr-5 text-[13px] font-semibold leading-snug text-[#0F1B34]">
+        <h3 className="mt-1 pr-5 text-[13px] font-semibold leading-snug text-ink">
           {job.product_name}
         </h3>
 
-        <p className="mt-0.5 text-[11px] text-[#94A3B8]">
+        <p className="mt-0.5 text-[11px] text-ink-5">
           {job.unit_name ? (
             job.unit_name
           ) : (
             <span className="italic">No {unitWord.toLowerCase()} yet</span>
           )}
           {job.flagged_count > 0 && (
-            <span className="ml-1.5 inline-flex items-center gap-0.5 text-[#B45309]">
+            <span className="ml-1.5 inline-flex items-center gap-0.5 text-warn-deep">
               <AlertTriangle className="size-3" />
               {job.flagged_count}
             </span>
@@ -173,20 +173,20 @@ function JobCard({
         {/* The hold's cause, not just its existence — "On hold" alone sends
             someone to the shift log to find out why. */}
         {job.status === "hold" && job.hold_reason && (
-          <p className="mt-2 rounded-lg bg-[#FFFBEB] px-2 py-1 text-[11px] font-medium text-[#92400E]">
+          <p className="mt-2 rounded-lg bg-warn-tint px-2 py-1 text-[11px] font-medium text-warn-ink">
             Held — {job.hold_reason.toLowerCase()} issue flagged
           </p>
         )}
 
         {percent !== null && (
           <div className="mt-2.5 space-y-1">
-            <div className="h-1.5 overflow-hidden rounded-full bg-[#F1F5F9]">
+            <div className="h-1.5 overflow-hidden rounded-full bg-sunken-2">
               <div
                 className="h-full rounded-full transition-[width]"
                 style={{ width: `${percent}%`, background: accent }}
               />
             </div>
-            <p className="font-mono text-[10.5px] text-[#64748B]">
+            <p className="font-mono text-[10.5px] text-ink-4">
               {fmt(job.produced_qty)} / {fmt(job.required_qty)}
               <span className="ml-1 font-semibold" style={{ color: accent }}>
                 {percent}%

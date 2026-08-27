@@ -16,7 +16,7 @@ export function SidebarMenuButton() {
       type="button"
       onClick={() => setMobileOpen(true)}
       aria-label="Open navigation"
-      className="-ml-1 grid size-9 place-items-center rounded-lg text-[#475569] transition hover:bg-[#EFF4FF] hover:text-[#2563EB] lg:hidden"
+      className="-ml-1 grid size-9 place-items-center rounded-lg text-ink-3 transition hover:bg-brand-soft hover:text-brand lg:hidden"
     >
       <Menu className="size-5" />
     </button>

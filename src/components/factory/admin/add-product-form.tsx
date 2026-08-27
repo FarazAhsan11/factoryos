@@ -11,9 +11,9 @@ import {
 import { todayKey } from "@/lib/factory/dates";
 
 const FIELD =
-  "h-10 w-full rounded-xl border border-[#E6EAF1] bg-white px-3.5 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:ring-4 focus:ring-[#2563EB]/12";
+  "h-10 w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-brand focus:ring-4 focus:ring-brand/12";
 const MONO = "font-mono tracking-tight";
-const LABEL = "text-xs font-medium text-[#475569]";
+const LABEL = "text-xs font-medium text-ink-3";
 
 const EMPTY: ProductValues = {
   batchNo: "",
@@ -63,11 +63,11 @@ export function AddProductForm({
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
-      className="rounded-2xl border border-[#E6EAF1] bg-[#FBFCFE] p-4"
+      className="rounded-2xl border border-line bg-sunken p-4"
     >
-      <p className="mb-3 text-[13px] font-semibold text-[#0F1B34]">
+      <p className="mb-3 text-[13px] font-semibold text-ink">
         Add product{" "}
-        <span className="font-normal text-[#94A3B8]">
+        <span className="font-normal text-ink-5">
           — the batch number links it in the shift log
         </span>
       </p>
@@ -146,8 +146,7 @@ export function AddProductForm({
             typed straight into the field. */}
         <div className="space-y-1.5">
           <label htmlFor="p-planned" className={LABEL}>
-            Plan for{" "}
-            <span className="text-[10px] text-[#94A3B8]">(optional)</span>
+            Plan for <span className="text-[10px] text-ink-5">(optional)</span>
           </label>
           <input
             id="p-planned"
@@ -163,7 +162,7 @@ export function AddProductForm({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] px-4 text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(37,99,235,0.55)] transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-60"
+          className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-4 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-60"
         >
           {isSubmitting ? (
             <Loader2 className="size-4 animate-spin" />
@@ -175,7 +174,7 @@ export function AddProductForm({
       </div>
 
       {firstError && (
-        <p role="alert" className="mt-2.5 text-xs text-[#B91C1C]">
+        <p role="alert" className="mt-2.5 text-xs text-danger-deep">
           {firstError}
         </p>
       )}

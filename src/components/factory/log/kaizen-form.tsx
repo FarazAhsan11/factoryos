@@ -19,9 +19,9 @@ import {
 import { cn } from "@/lib/utils";
 
 const FIELD =
-  "select-chevron h-11 w-full rounded-xl border border-[#E2E8F0] bg-white px-3.5 text-sm text-[#0F1B34] shadow-[0_1px_2px_rgba(15,27,52,0.04)] outline-none transition placeholder:text-[#A9B4C6] hover:border-[#CBD5E1] focus:border-[#2563EB] focus:shadow-none focus:ring-4 focus:ring-[#2563EB]/12";
+  "select-chevron h-11 w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-ink shadow-[0_1px_2px_rgba(20,22,43,0.04)] outline-none transition placeholder:text-placeholder hover:border-ink-6 focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12";
 const LABEL =
-  "block text-[11px] font-bold uppercase tracking-[0.06em] text-[#334155]";
+  "block text-[11px] font-bold uppercase tracking-[0.06em] text-ink-2";
 
 const EMPTY: KaizenIdeaValues = {
   idea: "",
@@ -83,16 +83,16 @@ export function KaizenForm({
   return (
     <form
       onSubmit={handleSubmit((values) => submit.mutateAsync(values))}
-      className="flex flex-col overflow-hidden rounded-2xl border border-[#E6EAF1] bg-white shadow-[0_1px_2px_rgba(15,27,52,0.04),0_12px_32px_-24px_rgba(15,27,52,0.5)] lg:h-full"
+      className="flex flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-card lg:h-full"
     >
-      <header className="shrink-0 border-b border-[#EEF1F6] bg-gradient-to-b from-[#FFFDF2] to-white px-5 py-4">
-        <h2 className="flex items-center gap-2 text-[15px] font-semibold text-[#0F1B34]">
-          <span className="grid size-7 place-items-center rounded-lg bg-[#FEF9C3]">
-            <Lightbulb className="size-4 text-[#CA8A04]" />
+      <header className="shrink-0 border-b border-line-soft bg-gradient-to-b from-warn-tint to-surface px-5 py-4">
+        <h2 className="flex items-center gap-2 text-[15px] font-semibold text-ink">
+          <span className="grid size-7 place-items-center rounded-lg bg-warn-soft">
+            <Lightbulb className="size-4 text-warn-deep" />
           </span>
           Kaizen — continuous improvement
         </h2>
-        <p className="mt-1 text-[13px] text-[#64748B]">
+        <p className="mt-1 text-[13px] text-ink-4">
           Spotted something that would make the job easier, safer or faster? Say
           it here — a supervisor reviews every one.
         </p>
@@ -102,7 +102,7 @@ export function KaizenForm({
         <div className="space-y-1.5">
           <label htmlFor="k-idea" className={LABEL}>
             What&rsquo;s your idea?{" "}
-            <span className="font-medium normal-case tracking-normal text-[#64748B]">
+            <span className="font-medium normal-case tracking-normal text-ink-4">
               Be specific — what problem does it solve?
             </span>
           </label>
@@ -112,8 +112,8 @@ export function KaizenForm({
             placeholder="e.g. If we move the tablet press closer to the coating pan, we'd save about 15 minutes of transfer time per batch…"
             aria-invalid={Boolean(errors.idea)}
             className={cn(
-              "w-full rounded-xl border border-[#E2E8F0] bg-white px-3.5 py-3 text-sm leading-relaxed text-[#0F1B34] shadow-[0_1px_2px_rgba(15,27,52,0.04)] outline-none transition placeholder:text-[#A9B4C6] hover:border-[#CBD5E1] focus:border-[#2563EB] focus:shadow-none focus:ring-4 focus:ring-[#2563EB]/12",
-              errors.idea && "border-[#FCA5A5]",
+              "w-full rounded-xl border border-line bg-surface px-3.5 py-3 text-sm leading-relaxed text-ink shadow-[0_1px_2px_rgba(20,22,43,0.04)] outline-none transition placeholder:text-placeholder hover:border-ink-6 focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12",
+              errors.idea && "border-danger-line",
             )}
             {...register("idea")}
           />
@@ -122,7 +122,7 @@ export function KaizenForm({
               role={errors.idea ? "alert" : undefined}
               className={cn(
                 "text-[11px]",
-                errors.idea ? "text-[#B91C1C]" : "text-[#94A3B8]",
+                errors.idea ? "text-danger-deep" : "text-ink-5",
               )}
             >
               {errors.idea?.message ??
@@ -134,7 +134,7 @@ export function KaizenForm({
               <span
                 className={cn(
                   "shrink-0 font-mono text-[11px]",
-                  remaining < 0 ? "text-[#B91C1C]" : "text-[#94A3B8]",
+                  remaining < 0 ? "text-danger-deep" : "text-ink-5",
                 )}
               >
                 {remaining}
@@ -175,25 +175,25 @@ export function KaizenForm({
             asked: the name is already known, and a field you can leave blank
             makes the attribution optional — which is exactly the part that
             makes anyone submit a second idea. */}
-        <div className="flex items-center gap-2.5 rounded-xl border border-[#EDF1F7] bg-[#FBFCFE] px-3.5 py-2.5">
-          <span className="grid size-7 shrink-0 place-items-center rounded-full bg-white text-[#64748B] ring-1 ring-[#E6EAF1]">
+        <div className="flex items-center gap-2.5 rounded-xl border border-line-soft bg-sunken px-3.5 py-2.5">
+          <span className="grid size-7 shrink-0 place-items-center rounded-full bg-surface text-ink-4 ring-1 ring-line">
             <UserRound className="size-4" />
           </span>
-          <p className="text-[13px] text-[#475569]">
+          <p className="text-[13px] text-ink-3">
             Submitted as{" "}
-            <strong className="font-semibold text-[#0F1B34]">{userName}</strong>
-            <span className="ml-1 text-[#94A3B8]">
+            <strong className="font-semibold text-ink">{userName}</strong>
+            <span className="ml-1 text-ink-5">
               — your name goes on it, so you get the credit.
             </span>
           </p>
         </div>
       </div>
 
-      <footer className="shrink-0 border-t border-[#EEF1F6] bg-gradient-to-b from-white to-[#F8FAFC] p-4 sm:px-5">
+      <footer className="shrink-0 border-t border-line-soft bg-gradient-to-b from-surface to-sunken p-4 sm:px-5">
         <button
           type="submit"
           disabled={isSubmitting}
-          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] text-sm font-semibold text-white shadow-[0_10px_24px_-8px_rgba(37,99,235,0.6)] transition hover:brightness-[1.06] active:scale-[0.995] disabled:pointer-events-none disabled:opacity-60"
+          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] active:scale-[0.995] disabled:pointer-events-none disabled:opacity-60"
         >
           {isSubmitting ? (
             <Loader2 className="size-4 animate-spin" />

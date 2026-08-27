@@ -25,7 +25,7 @@ import type { SetupItem } from "@/lib/factory/setup-queries";
 import { cn } from "@/lib/utils";
 
 const CONTROL =
-  "h-10 w-full rounded-xl border border-[#E6EAF1] bg-[#FBFCFE] px-3.5 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:bg-white";
+  "h-10 w-full rounded-xl border border-line bg-sunken px-3.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-brand focus:bg-surface";
 
 const EMPTY: NewActionValues = {
   title: "",
@@ -64,7 +64,7 @@ export function NewActionDialog({
 
   function set<K extends keyof NewActionValues>(
     key: K,
-    value: NewActionValues[K]
+    value: NewActionValues[K],
   ) {
     setValues((current) => ({ ...current, [key]: value }));
   }
@@ -104,7 +104,7 @@ export function NewActionDialog({
           setValues(EMPTY);
           setOpen(true);
         }}
-        className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] px-3.5 text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(37,99,235,0.55)] transition hover:brightness-[1.06]"
+        className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-3.5 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06]"
       >
         <Plus className="size-4" />
         New action
@@ -119,7 +119,7 @@ export function NewActionDialog({
       >
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-[#0F1B34]">New action</DialogTitle>
+            <DialogTitle className="text-ink">New action</DialogTitle>
             <DialogDescription>
               Issues flagged in the shift log create these automatically — this
               is for everything else.
@@ -227,10 +227,10 @@ export function NewActionDialog({
                 onChange={(e) => set("dueAt", e.target.value)}
                 className={CONTROL}
               />
-              <p className="mt-1 text-[11px] text-[#94A3B8]">
+              <p className="mt-1 text-[11px] text-ink-5">
                 Leave blank and it&rsquo;s due in {window?.within} — the{" "}
-                {window?.label.toLowerCase()} window — escalating {window?.within}{" "}
-                after that.
+                {window?.label.toLowerCase()} window — escalating{" "}
+                {window?.within} after that.
               </p>
             </Field>
 
@@ -241,7 +241,7 @@ export function NewActionDialog({
                 value={values.notes}
                 onChange={(e) => set("notes", e.target.value)}
                 placeholder="Context, root cause, what needs to happen…"
-                className="w-full rounded-xl border border-[#E6EAF1] bg-[#FBFCFE] px-3.5 py-2.5 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:bg-white"
+                className="w-full rounded-xl border border-line bg-sunken px-3.5 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-brand focus:bg-surface"
               />
             </Field>
 
@@ -250,7 +250,7 @@ export function NewActionDialog({
                 type="button"
                 onClick={() => setOpen(false)}
                 disabled={create.isPending}
-                className="h-10 rounded-xl px-4 text-sm font-medium text-[#475569] transition hover:bg-[#F1F5F9] disabled:opacity-60"
+                className="h-10 rounded-xl px-4 text-sm font-medium text-ink-3 transition hover:bg-sunken-2 disabled:opacity-60"
               >
                 Cancel
               </button>
@@ -258,9 +258,11 @@ export function NewActionDialog({
                 type="button"
                 onClick={() => create.mutate()}
                 disabled={create.isPending || !values.title.trim()}
-                className="inline-flex h-10 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] px-4 text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(37,99,235,0.55)] transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-60"
+                className="inline-flex h-10 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-4 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-60"
               >
-                {create.isPending && <Loader2 className="size-4 animate-spin" />}
+                {create.isPending && (
+                  <Loader2 className="size-4 animate-spin" />
+                )}
                 Create action
               </button>
             </div>
@@ -286,12 +288,9 @@ function Field({
 }) {
   return (
     <div className={cn("space-y-1.5", className)}>
-      <label
-        htmlFor={htmlFor}
-        className="block text-xs font-medium text-[#475569]"
-      >
+      <label htmlFor={htmlFor} className="block text-xs font-medium text-ink-3">
         {label}
-        {note && <span className="ml-1 text-[10px] text-[#94A3B8]">{note}</span>}
+        {note && <span className="ml-1 text-[10px] text-ink-5">{note}</span>}
       </label>
       {children}
     </div>

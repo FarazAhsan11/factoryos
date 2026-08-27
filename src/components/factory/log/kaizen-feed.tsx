@@ -85,10 +85,10 @@ export function KaizenFeed({
   return (
     /* Same shell as the shift feed, deliberately — it sits in the same place
        and is read the same way, so it scrolls the same way too. */
-    <aside className="flex flex-col overflow-hidden rounded-2xl border border-[#E6EAF1] bg-white shadow-[0_1px_2px_rgba(15,27,52,0.04),0_12px_32px_-24px_rgba(15,27,52,0.5)] lg:h-full">
-      <header className="flex shrink-0 items-center justify-between gap-2 border-b border-[#EEF1F6] px-4 py-3.5">
-        <h2 className="flex items-center gap-2 text-[15px] font-semibold text-[#0F1B34]">
-          <span className="grid size-7 place-items-center rounded-lg bg-[#FEF9C3] text-[#CA8A04]">
+    <aside className="flex flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-card lg:h-full">
+      <header className="flex shrink-0 items-center justify-between gap-2 border-b border-line-soft px-4 py-3.5">
+        <h2 className="flex items-center gap-2 text-[15px] font-semibold text-ink">
+          <span className="grid size-7 place-items-center rounded-lg bg-warn-soft text-warn-deep">
             <Lightbulb className="size-4" />
           </span>
           Improvement ideas
@@ -99,8 +99,8 @@ export function KaizenFeed({
           className={cn(
             "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold",
             waiting > 0
-              ? "bg-[#FEF9C3] text-[#A16207] ring-1 ring-[#FDE68A]"
-              : "bg-[#ECFDF5] text-[#047857] ring-1 ring-[#A7F3D0]/70",
+              ? "bg-warn-soft text-warn-deep ring-1 ring-warn-line"
+              : "bg-teal-soft text-teal-deep ring-1 ring-teal-line/70",
           )}
         >
           {waiting > 0 ? `${waiting} awaiting review` : "All reviewed"}
@@ -108,7 +108,7 @@ export function KaizenFeed({
       </header>
 
       {ideas.length > 0 && (
-        <div className="scrollbar-slim flex shrink-0 gap-1 overflow-x-auto border-b border-[#EEF1F6] bg-[#FBFCFE] px-4 py-2.5">
+        <div className="scrollbar-slim flex shrink-0 gap-1 overflow-x-auto border-b border-line-soft bg-sunken px-4 py-2.5">
           {KAIZEN_FILTERS.filter(
             // An empty status is a chip that can only ever show "0" — kept
             // only for the filter that is currently on, so the row doesn't
@@ -123,15 +123,15 @@ export function KaizenFeed({
               className={cn(
                 "shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition",
                 filter === key
-                  ? "border-[#2563EB] bg-[#2563EB] text-white shadow-[0_4px_12px_-6px_rgba(37,99,235,0.9)]"
-                  : "border-[#E2E8F0] bg-white text-[#475569] hover:border-[#CBD5E1] hover:text-[#0F1B34]",
+                  ? "border-brand bg-brand text-white shadow-brand-sm"
+                  : "border-line bg-surface text-ink-3 hover:border-ink-6 hover:text-ink",
               )}
             >
               {FILTER_LABELS[key]}
               <span
                 className={cn(
                   "ml-1 font-bold",
-                  filter === key ? "text-white/70" : "text-[#94A3B8]",
+                  filter === key ? "text-white/70" : "text-ink-5",
                 )}
               >
                 {counts[key]}
@@ -147,20 +147,20 @@ export function KaizenFeed({
             {Array.from({ length: 4 }).map((_, i) => (
               <div
                 key={i}
-                className="h-20 animate-pulse rounded-xl bg-[#F4F7FB]"
+                className="h-20 animate-pulse rounded-xl bg-sunken"
               />
             ))}
           </div>
         ) : isError ? (
-          <p className="rounded-xl border border-[#FECACA] bg-[#FEF2F2] px-3 py-2.5 text-xs font-medium text-[#B91C1C]">
+          <p className="rounded-xl border border-danger-line bg-danger-soft px-3 py-2.5 text-xs font-medium text-danger-deep">
             Could not load ideas: {(error as Error).message}
           </p>
         ) : visible.length === 0 ? (
           <div className="py-12 text-center">
-            <span className="mx-auto grid size-10 place-items-center rounded-full bg-[#FEF9C3] text-[#CA8A04]">
+            <span className="mx-auto grid size-10 place-items-center rounded-full bg-warn-soft text-warn-deep">
               <Lightbulb className="size-5" />
             </span>
-            <p className="mt-2.5 text-xs text-[#94A3B8]">
+            <p className="mt-2.5 text-xs text-ink-5">
               {ideas.length === 0
                 ? "No ideas yet — be the first."
                 : `Nothing ${FILTER_LABELS[filter].toLowerCase()}.`}
@@ -214,7 +214,7 @@ function IdeaRow({
       <div className="min-w-0 flex-1 space-y-1.5">
         <p
           title={idea.idea}
-          className="line-clamp-4 text-[13px] leading-snug break-words text-[#0F1B34]"
+          className="line-clamp-4 text-[13px] leading-snug break-words text-ink"
         >
           {idea.idea}
         </p>
@@ -223,7 +223,7 @@ function IdeaRow({
           <Chip tint={status.tint} ink={status.ink}>
             {status.label}
           </Chip>
-          <Chip tint="#F1F5F9" ink="#475569">
+          <Chip tint="var(--color-sunken-2)" ink="var(--color-ink-3)">
             {idea.category}
           </Chip>
           {impact && (
@@ -233,7 +233,7 @@ function IdeaRow({
           )}
         </div>
 
-        <p className="text-[11px] break-words text-[#94A3B8]">
+        <p className="text-[11px] break-words text-ink-5">
           {idea.submitted_by_name ?? "Unknown"} · {timeAgo(idea.created_at)}
           {idea.reviewed_by_name && ` · reviewed by ${idea.reviewed_by_name}`}
         </p>
@@ -242,7 +242,7 @@ function IdeaRow({
             lives only inside a dialog is a reason the person who submitted it
             never reads. */}
         {idea.review_note && (
-          <p className="line-clamp-3 text-[11px] break-words whitespace-pre-line italic text-[#64748B]">
+          <p className="line-clamp-3 text-[11px] break-words whitespace-pre-line italic text-ink-4">
             ↳ {idea.review_note}
           </p>
         )}
@@ -251,7 +251,7 @@ function IdeaRow({
   );
 
   const CARD =
-    "relative flex overflow-hidden rounded-xl border border-[#EDF1F7] bg-white py-2.5 pr-3 pl-4";
+    "relative flex overflow-hidden rounded-xl border border-line-soft bg-surface py-2.5 pr-3 pl-4";
 
   if (!canOpen) {
     return <li className={CARD}>{body}</li>;
@@ -264,7 +264,7 @@ function IdeaRow({
         onClick={onOpen}
         className={cn(
           CARD,
-          "w-full text-left transition hover:border-[#DBE3EF] hover:shadow-[0_6px_18px_-12px_rgba(15,27,52,0.55)] focus-visible:border-[#2563EB] focus-visible:outline-none",
+          "w-full text-left transition hover:border-line-strong hover:shadow-lift focus-visible:border-brand focus-visible:outline-none",
         )}
       >
         {body}

@@ -30,7 +30,7 @@ export function BatchAutofill({
       <p
         className={cn(
           "text-xs italic",
-          query ? "text-[#B91C1C]" : "text-[#94A3B8]"
+          query ? "text-danger-deep" : "text-ink-5",
         )}
       >
         {query
@@ -45,25 +45,29 @@ export function BatchAutofill({
   const capped = pct === null ? 0 : Math.min(100, pct);
   const tone =
     pct === null
-      ? "#94A3B8"
+      ? "var(--color-ink-5)"
       : pct >= 100
-        ? "#16A34A"
+        ? "var(--color-teal)"
         : pct >= 70
-          ? "#2563EB"
-          : "#F59E0B";
+          ? "var(--color-brand)"
+          : "var(--color-warn)";
 
   return (
-    <div className="space-y-2.5 rounded-xl border border-[#DBEAFE] bg-[#F5F9FF] p-3.5">
+    <div className="space-y-2.5 rounded-xl border border-brand-soft bg-brand-tint p-3.5">
       <dl className="grid gap-1.5 text-xs">
         <Row label="Product" value={product.name} />
         <Row label="Code" value={product.code || "—"} mono />
-        <Row label="Work order" value={product.work_order || product.batch_no} mono />
+        <Row
+          label="Work order"
+          value={product.work_order || product.batch_no}
+          mono
+        />
         <Row label="Required qty" value={fmt(required)} mono />
       </dl>
 
       {pct !== null && (
         <div className="space-y-1">
-          <div className="h-1.5 overflow-hidden rounded-full bg-[#E2E8F0]">
+          <div className="h-1.5 overflow-hidden rounded-full bg-line">
             <div
               className="h-full rounded-full transition-[width]"
               style={{ width: `${capped}%`, background: tone }}
@@ -89,11 +93,11 @@ function Row({
 }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
-      <dt className="text-[#64748B]">{label}</dt>
+      <dt className="text-ink-4">{label}</dt>
       <dd
         className={cn(
-          "truncate font-medium text-[#0F1B34]",
-          mono && "font-mono text-[12px]"
+          "truncate font-medium text-ink",
+          mono && "font-mono text-[12px]",
         )}
       >
         {value}

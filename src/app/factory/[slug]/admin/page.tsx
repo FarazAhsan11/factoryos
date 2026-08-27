@@ -28,13 +28,13 @@ export default async function FactoryAdminPage({
   return (
     <div className="mx-auto max-w-5xl">
       <div className="mb-6">
-        <p className="text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">
+        <p className="text-xs font-semibold uppercase tracking-wide text-ink-5">
           Setup
         </p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#0F1B34]">
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">
           Admin &amp; configuration
         </h1>
-        <p className="mt-1 text-sm text-[#64748B]">
+        <p className="mt-1 text-sm text-ink-4">
           The vocabulary and targets every other module reads.
         </p>
       </div>

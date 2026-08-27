@@ -19,10 +19,10 @@ import { cn } from "@/lib/utils";
 
 /** Colour-codes a row the way the prototype's feed dots do. */
 function tone(entry: LogEntry): string {
-  if (entry.action_flag) return "#DC2626";
-  if (Number(entry.qty_rejected ?? 0) > 0) return "#F59E0B";
-  if (Number(entry.qty ?? 0) > 0) return "#16A34A";
-  return "#93B4F5";
+  if (entry.action_flag) return "var(--color-danger)";
+  if (Number(entry.qty_rejected ?? 0) > 0) return "var(--color-warn)";
+  if (Number(entry.qty ?? 0) > 0) return "var(--color-teal)";
+  return "var(--color-brand-line)";
 }
 
 function fmt(n: number | null) {
@@ -97,37 +97,35 @@ export function ActivityFeed({
        feed and the form are two views of the same shift and are read against
        each other — tying them to one scrollbar meant reaching the bottom of
        the form pushed the feed off the top of the screen. */
-    <aside className="flex flex-col overflow-hidden rounded-2xl border border-[#E6EAF1] bg-white shadow-[0_1px_2px_rgba(15,27,52,0.04),0_12px_32px_-24px_rgba(15,27,52,0.5)] lg:h-full">
-      <header className="flex shrink-0 items-center justify-between gap-2 border-b border-[#EEF1F6] px-4 py-3.5">
+    <aside className="flex flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-card lg:h-full">
+      <header className="flex shrink-0 items-center justify-between gap-2 border-b border-line-soft px-4 py-3.5">
         <div className="flex items-baseline gap-2">
-          <h2 className="text-[15px] font-semibold text-[#0F1B34]">
-            Shift activity
-          </h2>
+          <h2 className="text-[15px] font-semibold text-ink">Shift activity</h2>
           {entries.length > 0 && (
-            <span className="text-[11px] font-medium text-[#94A3B8]">
+            <span className="text-[11px] font-medium text-ink-5">
               {entries.length} today
             </span>
           )}
         </div>
         <span
           title="Entries appear here the moment they are filed, and are never edited in place"
-          className="inline-flex items-center gap-1.5 rounded-full bg-[#ECFDF5] px-2 py-0.5 text-[10px] font-semibold text-[#047857] ring-1 ring-[#A7F3D0]/70"
+          className="inline-flex items-center gap-1.5 rounded-full bg-teal-soft px-2 py-0.5 text-[10px] font-semibold text-teal-deep ring-1 ring-teal-line/70"
         >
           <span className="relative flex size-1.5">
-            <span className="absolute inline-flex size-full animate-ping rounded-full bg-[#10B981] opacity-75" />
-            <span className="relative inline-flex size-1.5 rounded-full bg-[#059669]" />
+            <span className="absolute inline-flex size-full animate-ping rounded-full bg-teal opacity-75" />
+            <span className="relative inline-flex size-1.5 rounded-full bg-teal-deep" />
           </span>
           Live · immutable
         </span>
       </header>
 
       {unitNames.length > 1 && (
-        <div className="shrink-0 border-b border-[#EEF1F6] bg-[#FBFCFE] px-4 py-2.5">
+        <div className="shrink-0 border-b border-line-soft bg-sunken px-4 py-2.5">
           <select
             value={unitFilter}
             onChange={(e) => setUnitFilter(e.target.value)}
             aria-label={`Filter by ${units.singular.toLowerCase()}`}
-            className="select-chevron h-9 w-full rounded-lg border border-[#E2E8F0] bg-white px-2.5 text-xs font-medium text-[#0F1B34] outline-none transition hover:border-[#CBD5E1] focus:border-[#2563EB] focus:ring-4 focus:ring-[#2563EB]/12"
+            className="select-chevron h-9 w-full rounded-lg border border-line bg-surface px-2.5 text-xs font-medium text-ink outline-none transition hover:border-ink-6 focus:border-brand focus:ring-4 focus:ring-brand/12"
           >
             <option value="all">All {units.plural.toLowerCase()}</option>
             {unitNames.map((name) => (
@@ -145,20 +143,20 @@ export function ActivityFeed({
             {Array.from({ length: 4 }).map((_, i) => (
               <div
                 key={i}
-                className="h-16 animate-pulse rounded-xl bg-[#F4F7FB]"
+                className="h-16 animate-pulse rounded-xl bg-sunken"
               />
             ))}
           </div>
         ) : isError ? (
-          <p className="rounded-xl border border-[#FECACA] bg-[#FEF2F2] px-3 py-2.5 text-xs font-medium text-[#B91C1C]">
+          <p className="rounded-xl border border-danger-line bg-danger-soft px-3 py-2.5 text-xs font-medium text-danger-deep">
             Could not load the feed: {(error as Error).message}
           </p>
         ) : visible.length === 0 ? (
           <div className="py-12 text-center">
-            <span className="mx-auto grid size-10 place-items-center rounded-full bg-[#F4F7FB] text-[#CBD5E1]">
+            <span className="mx-auto grid size-10 place-items-center rounded-full bg-sunken text-ink-6">
               <ClipboardList className="size-5" />
             </span>
-            <p className="mt-2.5 text-xs text-[#94A3B8]">
+            <p className="mt-2.5 text-xs text-ink-5">
               {entries.length === 0
                 ? "Nothing logged yet today."
                 : `No entries for ${unitFilter}.`}
@@ -243,7 +241,7 @@ function FeedRow({
     /* A card with a coloured spine rather than a dot in a list. The dot was
        two pixels of the only thing that says at a glance whether an entry is
        routine, rejected or flagged; the spine says it from across the room. */
-    <li className="group relative overflow-hidden rounded-xl border border-[#EDF1F7] bg-white py-2.5 pr-2.5 pl-4 transition hover:border-[#DBE3EF] hover:shadow-[0_6px_18px_-12px_rgba(15,27,52,0.55)]">
+    <li className="group relative overflow-hidden rounded-xl border border-line-soft bg-surface py-2.5 pr-2.5 pl-4 transition hover:border-line-strong hover:shadow-lift">
       <span
         className="absolute inset-y-0 left-0 w-1"
         style={{ background: tone(entry) }}
@@ -251,15 +249,15 @@ function FeedRow({
       />
       <div className="flex gap-2">
         <div className="min-w-0 flex-1 space-y-0.5">
-          <p className="text-[13px] leading-snug break-words text-[#0F1B34]">
+          <p className="text-[13px] leading-snug break-words text-ink">
             <strong className="font-semibold">{entry.unit?.name ?? "—"}</strong>
             {" — "}
             {entry.process?.name ?? "—"}
             {entry.product && (
-              <span className="text-[#64748B]"> · {entry.product.name}</span>
+              <span className="text-ink-4"> · {entry.product.name}</span>
             )}
             {Number(entry.qty ?? 0) > 0 && (
-              <span className="font-semibold text-[#2563EB]">
+              <span className="font-semibold text-brand">
                 {" "}
                 {/* A preparatory stage counts in drums or kg, not units —
                   printing "units" against 3 drums is a wrong number, not a
@@ -268,7 +266,7 @@ function FeedRow({
               </span>
             )}
             {entry.action_flag && (
-              <span className="ml-1.5 rounded-full bg-[#FEF2F2] px-1.5 py-0.5 text-[9.5px] font-semibold text-[#B91C1C]">
+              <span className="ml-1.5 rounded-full bg-danger-soft px-1.5 py-0.5 text-[9.5px] font-semibold text-danger-deep">
                 {entry.action_flag}
               </span>
             )}
@@ -281,20 +279,20 @@ function FeedRow({
                   type="button"
                   onClick={onExplainOverrun}
                   title={`Over the required quantity by ${fmt(overrun.overrun_qty)} — tap to explain`}
-                  className="ml-1.5 rounded-full bg-[#FEF3C7] px-1.5 py-0.5 text-[9.5px] font-bold text-[#B45309] transition hover:bg-[#FDE68A]"
+                  className="ml-1.5 rounded-full bg-warn-soft px-1.5 py-0.5 text-[9.5px] font-bold text-warn-deep transition hover:bg-warn-line"
                 >
                   Attention · +{fmt(overrun.overrun_qty)}
                 </button>
               ) : (
                 <span
                   title={`Over the required quantity by ${fmt(overrun.overrun_qty)} — a manager has to explain it`}
-                  className="ml-1.5 rounded-full bg-[#FEF3C7] px-1.5 py-0.5 text-[9.5px] font-bold text-[#B45309]"
+                  className="ml-1.5 rounded-full bg-warn-soft px-1.5 py-0.5 text-[9.5px] font-bold text-warn-deep"
                 >
                   Attention · +{fmt(overrun.overrun_qty)}
                 </span>
               ))}
             {entry.amended_at && (
-              <span className="ml-1.5 rounded-full bg-[#F1F5F9] px-1.5 py-0.5 text-[9.5px] font-semibold text-[#475569]">
+              <span className="ml-1.5 rounded-full bg-sunken-2 px-1.5 py-0.5 text-[9.5px] font-semibold text-ink-3">
                 Amended
               </span>
             )}
@@ -303,10 +301,10 @@ function FeedRow({
           {/* Once explained, the reason and the name stay on the entry. The
             flag is gone; the record of why is not. */}
           {overrun?.overrun_note && (
-            <p className="text-[11px] leading-snug break-words text-[#B45309]">
+            <p className="text-[11px] leading-snug break-words text-warn-deep">
               ↳ Overrun: {overrun.overrun_note}
               {overrun.overrun_cleared_by_name && (
-                <span className="text-[#92400E]">
+                <span className="text-warn-ink">
                   {" "}
                   — {overrun.overrun_cleared_by_name}
                 </span>
@@ -314,7 +312,7 @@ function FeedRow({
             </p>
           )}
 
-          <p className="text-[11px] text-[#94A3B8]">
+          <p className="text-[11px] text-ink-5">
             {entry.start_time?.slice(0, 5) ?? "—"}
             {entry.end_time && ` → ${entry.end_time.slice(0, 5)}`}
             {entry.duration_minutes > 0 &&
@@ -324,7 +322,7 @@ function FeedRow({
           </p>
 
           {entry.target_speed ? (
-            <p className="text-[11px] text-[#64748B]">
+            <p className="text-[11px] text-ink-4">
               Speed: {entry.actual_speed ?? "—"} / {entry.target_speed}{" "}
               {entry.speed_unit ?? ""}
               {perf !== null && (
@@ -332,10 +330,10 @@ function FeedRow({
                   className={cn(
                     "font-semibold",
                     perf >= 90
-                      ? "text-[#16A34A]"
+                      ? "text-teal"
                       : perf >= 70
-                        ? "text-[#F59E0B]"
-                        : "text-[#DC2626]",
+                        ? "text-warn"
+                        : "text-danger",
                   )}
                 >
                   {" "}
@@ -343,25 +341,25 @@ function FeedRow({
                 </span>
               )}
               {entry.slow_reason && (
-                <em className="text-[#94A3B8]"> · {entry.slow_reason}</em>
+                <em className="text-ink-5"> · {entry.slow_reason}</em>
               )}
             </p>
           ) : null}
 
           {Number(entry.qty_rejected ?? 0) > 0 && (
-            <p className="text-[11px] font-medium text-[#B91C1C]">
+            <p className="text-[11px] font-medium text-danger-deep">
               ⚠ {fmt(entry.qty_rejected)} rejected / rework
             </p>
           )}
 
           {entry.comment && (
-            <p className="line-clamp-3 text-[11px] break-words italic text-[#64748B]">
+            <p className="line-clamp-3 text-[11px] break-words italic text-ink-4">
               {entry.comment}
             </p>
           )}
 
           {entry.amend_note && (
-            <p className="line-clamp-3 text-[11px] break-words whitespace-pre-line text-[#7C3AED]">
+            <p className="line-clamp-3 text-[11px] break-words whitespace-pre-line text-violet">
               ↳ {entry.amend_note}
             </p>
           )}
@@ -372,7 +370,7 @@ function FeedRow({
             type="button"
             onClick={onAmend}
             title="Attach a correction note — the original entry is preserved"
-            className="h-6 shrink-0 self-start rounded-md border border-[#E6EAF1] bg-white px-1.5 text-[10px] font-semibold text-[#94A3B8] opacity-0 transition hover:border-[#B45309] hover:bg-[#FFFBEB] hover:text-[#B45309] focus-visible:opacity-100 group-hover:opacity-100"
+            className="h-6 shrink-0 self-start rounded-md border border-line bg-surface px-1.5 text-[10px] font-semibold text-ink-5 opacity-0 transition hover:border-warn-deep hover:bg-warn-tint hover:text-warn-deep focus-visible:opacity-100 group-hover:opacity-100"
           >
             Amend
           </button>

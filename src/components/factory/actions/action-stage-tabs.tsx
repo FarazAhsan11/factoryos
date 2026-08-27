@@ -52,15 +52,15 @@ export function ActionStageTabs({
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition",
                 active
-                  ? "border-[#0F1B34] bg-[#0F1B34] text-white"
-                  : "border-[#E6EAF1] bg-white text-[#475569] hover:border-[#CBD5E1]"
+                  ? "border-ink bg-ink text-white"
+                  : "border-line bg-surface text-ink-3 hover:border-ink-6",
               )}
             >
               {STAGE_LABELS[key]}
               <span
                 className={cn(
                   "rounded-full px-1.5 text-[10px] font-bold",
-                  active ? "bg-white/20" : "bg-[#F1F5F9] text-[#64748B]"
+                  active ? "bg-surface/20" : "bg-sunken-2 text-ink-4",
                 )}
               >
                 {counts[key]}
@@ -77,11 +77,11 @@ export function ActionStageTabs({
         className={cn(
           "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition",
           attention
-            ? "border-[#B45309] bg-[#FEF3C7] text-[#B45309]"
-            : "border-[#E6EAF1] bg-white text-[#475569] hover:border-[#CBD5E1]",
+            ? "border-warn-deep bg-warn-soft text-warn-deep"
+            : "border-line bg-surface text-ink-3 hover:border-ink-6",
           // Nothing is late: the toggle stays visible so its absence is
           // readable as "all clear" rather than as a missing control.
-          attentionCount === 0 && !attention && "opacity-60"
+          attentionCount === 0 && !attention && "opacity-60",
         )}
       >
         <AlertTriangle className="size-3.5" />
@@ -89,7 +89,7 @@ export function ActionStageTabs({
         <span
           className={cn(
             "rounded-full px-1.5 text-[10px] font-bold",
-            attention ? "bg-white/60" : "bg-[#F1F5F9] text-[#64748B]"
+            attention ? "bg-surface/60" : "bg-sunken-2 text-ink-4",
           )}
         >
           {attentionCount}

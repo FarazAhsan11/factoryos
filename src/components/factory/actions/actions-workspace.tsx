@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ClipboardCheck } from "lucide-react";
 
 import { ActionDetailDialog } from "@/components/factory/actions/action-detail-dialog";
 import { ActionList } from "@/components/factory/actions/action-list";
@@ -66,43 +67,44 @@ export function ActionsWorkspace({
   });
 
   const refresh = useCallback(
-    () => queryClient.invalidateQueries({ queryKey: actionKeys.all(factoryId) }),
-    [queryClient, factoryId]
+    () =>
+      queryClient.invalidateQueries({ queryKey: actionKeys.all(factoryId) }),
+    [queryClient, factoryId],
   );
 
   const counts = useMemo(() => stageCounts(actions), [actions]);
 
   const attentionCount = useMemo(
     () => actions.filter(needsAttention).length,
-    [actions]
+    [actions],
   );
 
   const visible = useMemo(
     () =>
       actions.filter(
-        (a) => a.status === stage && (!attention || needsAttention(a))
+        (a) => a.status === stage && (!attention || needsAttention(a)),
       ),
-    [actions, stage, attention]
+    [actions, stage, attention],
   );
 
   // The dialog holds a snapshot, so it has to be re-read from the refetched
   // list — otherwise advancing an issue leaves its own dialog a stage behind.
   const selectedLive = useMemo(
     () => actions.find((a) => a.id === selected?.id) ?? selected,
-    [actions, selected]
+    [actions, selected],
   );
 
   return (
-    <>
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+    <div className="flex flex-col lg:min-h-0 lg:flex-1">
+      <div className="mb-5 flex shrink-0 flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">
+          <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-5">
             Accountability loop
           </p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#0F1B34]">
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">
             Issues &amp; CAPAs
           </h1>
-          <p className="mt-1 text-sm text-[#64748B]">
+          <p className="mt-1 text-sm text-ink-4">
             Issues flagged in the shift log land here automatically, then work
             through investigation, a recorded fix, and sign-off.
           </p>
@@ -126,22 +128,29 @@ export function ActionsWorkspace({
         onAttention={setAttention}
       />
 
-      {isPending ? (
-        <ListSkeleton />
-      ) : isError ? (
-        <p className="rounded-2xl border border-[#FECACA] bg-[#FEF2F2] px-4 py-6 text-center text-sm text-[#B91C1C]">
-          Could not load issues: {(error as Error).message}
-        </p>
-      ) : visible.length === 0 ? (
-        <EmptyState
-          stage={stage}
-          attention={attention}
-          total={actions.length}
-          inStage={counts[stage]}
-        />
-      ) : (
-        <ActionList actions={visible} onOpen={setSelected} />
-      )}
+      {/* The queue is the only thing that scrolls. A page-length scroll took
+          the stage tabs and their counts off screen, which is exactly the
+          context you need while reading down a list of issues. The negative
+          margin and matching padding let a card's focus ring and hover shadow
+          breathe without being clipped by the scroll box. */}
+      <div className="scrollbar-slim -mx-1 min-h-0 flex-1 px-1 pb-1 lg:overflow-y-auto">
+        {isPending ? (
+          <ListSkeleton />
+        ) : isError ? (
+          <p className="rounded-2xl border border-danger-line bg-danger-soft px-4 py-6 text-center text-sm font-medium text-danger-deep">
+            Could not load issues: {(error as Error).message}
+          </p>
+        ) : visible.length === 0 ? (
+          <EmptyState
+            stage={stage}
+            attention={attention}
+            total={actions.length}
+            inStage={counts[stage]}
+          />
+        ) : (
+          <ActionList actions={visible} onOpen={setSelected} />
+        )}
+      </div>
 
       <ActionDetailDialog
         action={selectedLive}
@@ -150,7 +159,7 @@ export function ActionsWorkspace({
         role={role}
         onClose={() => setSelected(null)}
       />
-    </>
+    </div>
   );
 }
 
@@ -185,9 +194,12 @@ function EmptyState({
           ];
 
   return (
-    <div className="rounded-2xl border border-dashed border-[#CBD5E1] bg-white px-4 py-16 text-center">
-      <p className="text-sm text-[#64748B]">{title}</p>
-      <p className="mt-1 text-xs text-[#94A3B8]">{hint}</p>
+    <div className="rounded-2xl border border-dashed border-line-strong bg-surface px-4 py-16 text-center">
+      <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-sunken text-ink-6">
+        <ClipboardCheck className="size-6" />
+      </span>
+      <p className="mt-3 text-sm font-medium text-ink-3">{title}</p>
+      <p className="mt-1 text-xs text-ink-5">{hint}</p>
     </div>
   );
 }
@@ -195,11 +207,15 @@ function EmptyState({
 function ListSkeleton() {
   return (
     <div className="space-y-2.5">
-      {Array.from({ length: 4 }).map((_, i) => (
+      {Array.from({ length: 5 }).map((_, i) => (
         <div
           key={i}
-          className="h-[104px] animate-pulse rounded-2xl border border-[#EEF1F6] bg-white"
-        />
+          className="overflow-hidden rounded-2xl border border-line bg-surface p-4"
+        >
+          <span className="block h-3.5 w-1/3 animate-pulse rounded bg-sunken-2" />
+          <span className="mt-2.5 block h-2.5 w-1/2 animate-pulse rounded bg-sunken-2" />
+          <span className="mt-4 block h-2.5 w-1/4 animate-pulse rounded bg-sunken-2" />
+        </div>
       ))}
     </div>
   );

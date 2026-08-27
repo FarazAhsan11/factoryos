@@ -13,7 +13,7 @@ export type ResetResult = { ok: true } | { error: string };
  * can't be used to probe which emails are registered.
  */
 export async function requestPasswordReset(
-  email: string
+  email: string,
 ): Promise<RequestResetResult> {
   const clean = email.trim().toLowerCase();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(clean)) {
@@ -32,7 +32,10 @@ export async function requestPasswordReset(
   }
 
   try {
-    await sendPasswordResetEmail({ to: clean, code: data.properties.email_otp });
+    await sendPasswordResetEmail({
+      to: clean,
+      code: data.properties.email_otp,
+    });
   } catch {
     return { error: "Couldn't send the code. Please try again in a moment." };
   }
@@ -48,7 +51,7 @@ export async function requestPasswordReset(
 export async function resetPasswordWithCode(
   email: string,
   code: string,
-  password: string
+  password: string,
 ): Promise<ResetResult> {
   const clean = email.trim().toLowerCase();
   if (!/^\d{6,8}$/.test(code)) {

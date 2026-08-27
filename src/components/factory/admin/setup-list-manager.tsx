@@ -1,12 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
-import { Check, Cog, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+  Check,
+  Cog,
+  ListPlus,
+  Loader2,
+  Pencil,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -20,8 +25,11 @@ import {
 } from "@/lib/factory/setup-queries";
 import { cn } from "@/lib/utils";
 
-const FIELD =
-  "h-10 w-full rounded-xl border border-[#E6EAF1] bg-white px-3.5 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:ring-4 focus:ring-[#2563EB]/12";
+import {
+  Composer,
+  EmptyState,
+  FIELD,
+} from "@/components/factory/admin/settings-ui";
 
 /**
  * A boolean attribute a list can carry. Processes have two — "runs on a
@@ -99,12 +107,11 @@ export function SetupListManager({
 }) {
   const flagList = useMemo(() => flags ?? [], [flags]);
   const categoryList = useMemo(() => categories ?? [], [categories]);
-  const initialCategory =
-    defaultCategory ?? categoryList[0]?.value ?? null;
+  const initialCategory = defaultCategory ?? categoryList[0]?.value ?? null;
   const flagDefaults = useMemo(
     () =>
       Object.fromEntries(flagList.map((f) => [f.key, Boolean(f.defaultOn)])),
-    [flagList]
+    [flagList],
   );
   const queryClient = useQueryClient();
   const queryKey = setupKeys.all(table, factoryId);
@@ -112,7 +119,7 @@ export function SetupListManager({
   const [draftFlags, setDraftFlags] =
     useState<Record<string, boolean>>(flagDefaults);
   const [draftCategory, setDraftCategory] = useState<string | null>(
-    initialCategory
+    initialCategory,
   );
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
@@ -120,11 +127,16 @@ export function SetupListManager({
   /** The flags that apply to one category — see `SetupFlagConfig.showFor`. */
   function flagsFor(category: string | null): SetupFlagConfig[] {
     return flagList.filter(
-      (f) => !f.showFor || (category != null && f.showFor.includes(category))
+      (f) => !f.showFor || (category != null && f.showFor.includes(category)),
     );
   }
 
-  const { data: items = [], isPending, isError, error } = useQuery({
+  const {
+    data: items = [],
+    isPending,
+    isError,
+    error,
+  } = useQuery({
     queryKey,
     queryFn: () => fetchSetupItems(table, factoryId),
   });
@@ -149,7 +161,7 @@ export function SetupListManager({
         name,
         items.length,
         withFlags,
-        withCategory
+        withCategory,
       ),
     onSuccess: async (created) => {
       setDraft("");
@@ -169,7 +181,7 @@ export function SetupListManager({
       await queryClient.cancelQueries({ queryKey });
       const previous = queryClient.getQueryData<SetupItem[]>(queryKey);
       queryClient.setQueryData<SetupItem[]>(queryKey, (old) =>
-        (old ?? []).map((i) => (i.id === id ? { ...i, name: name.trim() } : i))
+        (old ?? []).map((i) => (i.id === id ? { ...i, name: name.trim() } : i)),
       );
       return { previous };
     },
@@ -188,7 +200,7 @@ export function SetupListManager({
       await queryClient.cancelQueries({ queryKey });
       const previous = queryClient.getQueryData<SetupItem[]>(queryKey);
       queryClient.setQueryData<SetupItem[]>(queryKey, (old) =>
-        (old ?? []).map((i) => (i.id === id ? { ...i, active } : i))
+        (old ?? []).map((i) => (i.id === id ? { ...i, active } : i)),
       );
       return { previous };
     },
@@ -214,8 +226,8 @@ export function SetupListManager({
       const previous = queryClient.getQueryData<SetupItem[]>(queryKey);
       queryClient.setQueryData<SetupItem[]>(queryKey, (old) =>
         (old ?? []).map((i) =>
-          i.id === id ? { ...i, flags: { ...i.flags, [key]: value } } : i
-        )
+          i.id === id ? { ...i, flags: { ...i.flags, [key]: value } } : i,
+        ),
       );
       return { previous };
     },
@@ -250,11 +262,11 @@ export function SetupListManager({
                   Object.entries(i.flags).map(([key, on]) => [
                     key,
                     kept.has(key) && on,
-                  ])
+                  ]),
                 ),
               }
-            : i
-        )
+            : i,
+        ),
       );
       return { previous };
     },
@@ -271,7 +283,7 @@ export function SetupListManager({
       await queryClient.cancelQueries({ queryKey });
       const previous = queryClient.getQueryData<SetupItem[]>(queryKey);
       queryClient.setQueryData<SetupItem[]>(queryKey, (old) =>
-        (old ?? []).filter((i) => i.id !== id)
+        (old ?? []).filter((i) => i.id !== id),
       );
       return { previous };
     },
@@ -292,7 +304,7 @@ export function SetupListManager({
     add.mutate({
       name,
       withFlags: Object.fromEntries(
-        Object.entries(draftFlags).filter(([key]) => keys.has(key))
+        Object.entries(draftFlags).filter(([key]) => keys.has(key)),
       ),
       withCategory: draftCategory,
     });
@@ -302,10 +314,7 @@ export function SetupListManager({
     <div className="space-y-5">
       {/* add row */}
       {canManage && (
-        <div className="rounded-2xl border border-[#E6EAF1] bg-[#FBFCFE] p-4">
-          <p className="mb-2.5 text-[13px] font-semibold text-[#0F1B34]">
-            Add {singular.toLowerCase()}
-          </p>
+        <Composer title={`Add ${singular.toLowerCase()}`}>
           <div className="flex gap-2.5">
             <input
               value={draft}
@@ -324,7 +333,7 @@ export function SetupListManager({
               type="button"
               onClick={submitDraft}
               disabled={add.isPending || !draft.trim()}
-              className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] px-4 text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(37,99,235,0.55)] transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-60"
+              className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-4 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-60"
             >
               {add.isPending ? (
                 <Loader2 className="size-4 animate-spin" />
@@ -339,7 +348,7 @@ export function SetupListManager({
               exist, and which shape the shift-log form takes. */}
           {categoryList.length > 0 && (
             <fieldset className="mt-3.5">
-              <legend className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#64748B]">
+              <legend className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-4">
                 {categoryLabel}
               </legend>
               <div className="grid gap-2 sm:grid-cols-3">
@@ -351,8 +360,8 @@ export function SetupListManager({
                       className={cn(
                         "cursor-pointer rounded-xl border p-3 transition",
                         on
-                          ? "border-[#2563EB] bg-[#EFF6FF] ring-4 ring-[#2563EB]/10"
-                          : "border-[#E6EAF1] bg-white hover:border-[#CBD5E1]"
+                          ? "border-brand bg-brand-soft ring-4 ring-brand/10"
+                          : "border-line bg-surface shadow-[0_1px_2px_rgb(20_22_43/0.04)] hover:border-line-strong",
                       )}
                     >
                       <span className="flex items-center gap-2">
@@ -362,24 +371,24 @@ export function SetupListManager({
                           value={c.value}
                           checked={on}
                           onChange={() => setDraftCategory(c.value)}
-                          className="size-4 shrink-0 cursor-pointer accent-[#2563EB]"
+                          className="size-4 shrink-0 cursor-pointer accent-brand"
                         />
                         <span
                           className={cn(
                             "text-sm font-semibold",
-                            on ? "text-[#1D4ED8]" : "text-[#0F1B34]"
+                            on ? "text-brand-deep" : "text-ink",
                           )}
                         >
                           {c.label}
                         </span>
                       </span>
                       {c.example && (
-                        <span className="mt-1 block text-xs text-[#64748B]">
+                        <span className="mt-1 block text-xs text-ink-4">
                           {c.example}
                         </span>
                       )}
                       {c.hint && (
-                        <span className="mt-1 block text-[11px] leading-snug text-[#94A3B8]">
+                        <span className="mt-1 block text-[11px] leading-snug text-ink-5">
                           {c.hint}
                         </span>
                       )}
@@ -393,7 +402,7 @@ export function SetupListManager({
           {flagsFor(draftCategory).map((f) => (
             <label
               key={f.key}
-              className="mt-3 flex cursor-pointer items-start gap-2.5 text-sm text-[#0F1B34]"
+              className="mt-3 flex cursor-pointer items-start gap-2.5 text-sm text-ink"
             >
               <input
                 type="checkbox"
@@ -404,33 +413,36 @@ export function SetupListManager({
                     [f.key]: e.target.checked,
                   }))
                 }
-                className="mt-0.5 size-4 shrink-0 cursor-pointer rounded border-[#CBD5E1] accent-[#2563EB]"
+                className="mt-0.5 size-4 shrink-0 cursor-pointer rounded border-ink-6 accent-brand"
               />
               <span>
                 {f.label}
                 {f.hint && (
-                  <span className="mt-0.5 block text-xs text-[#94A3B8]">
+                  <span className="mt-0.5 block text-xs text-ink-5">
                     {f.hint}
                   </span>
                 )}
               </span>
             </label>
           ))}
-        </div>
+        </Composer>
       )}
 
       {/* list */}
       {isPending ? (
         <ListSkeleton />
       ) : isError ? (
-        <p className="rounded-xl bg-[#FEF2F2] px-4 py-3 text-sm text-[#B91C1C]">
+        <p className="rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm font-medium text-danger-deep">
           Could not load {plural.toLowerCase()}: {(error as Error).message}
         </p>
       ) : items.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-[#CBD5E1] px-4 py-10 text-center text-sm text-[#94A3B8]">
-          No {plural.toLowerCase()} yet
-          {canManage ? " — add your first one above." : "."}
-        </p>
+        <EmptyState
+          icon={ListPlus}
+          title={`No ${plural.toLowerCase()} yet.`}
+          hint={
+            canManage ? "Add your first one above." : "A manager adds these."
+          }
+        />
       ) : (
         <ul
           className={cn(
@@ -439,7 +451,7 @@ export function SetupListManager({
             // list carrying either stays at two columns.
             flagList.length === 0 &&
               categoryList.length === 0 &&
-              "lg:grid-cols-3"
+              "lg:grid-cols-3",
           )}
         >
           {items.map((item) => {
@@ -448,8 +460,8 @@ export function SetupListManager({
               <li
                 key={item.id}
                 className={cn(
-                  "flex items-center gap-2 rounded-xl border border-[#E6EAF1] bg-white px-3.5 py-2.5",
-                  !item.active && "bg-[#F8FAFC]"
+                  "flex items-center gap-2 rounded-xl border border-line bg-surface px-3.5 py-2.5 shadow-[0_1px_2px_rgb(20_22_43/0.04)] transition hover:border-line-strong",
+                  !item.active && "bg-sunken shadow-none",
                 )}
               >
                 {editing ? (
@@ -464,7 +476,7 @@ export function SetupListManager({
                         if (e.key === "Escape") setEditingId(null);
                       }}
                       aria-label={`Rename ${item.name}`}
-                      className="h-8 min-w-0 flex-1 rounded-lg border border-[#E6EAF1] px-2 text-sm outline-none focus:border-[#2563EB]"
+                      className="h-8 min-w-0 flex-1 rounded-lg border border-line bg-surface px-2 text-sm outline-none transition focus:border-brand focus:ring-4 focus:ring-brand/12"
                     />
                     <IconButton
                       label="Save"
@@ -473,7 +485,7 @@ export function SetupListManager({
                         rename.mutate({ id: item.id, name: editValue })
                       }
                     >
-                      <Check className="size-4 text-[#16A34A]" />
+                      <Check className="size-4 text-teal" />
                     </IconButton>
                     <IconButton
                       label="Cancel"
@@ -487,9 +499,7 @@ export function SetupListManager({
                     <span
                       className={cn(
                         "min-w-0 flex-1 truncate text-sm",
-                        item.active
-                          ? "text-[#0F1B34]"
-                          : "text-[#94A3B8] line-through"
+                        item.active ? "text-ink" : "text-ink-5 line-through",
                       )}
                     >
                       {item.name}
@@ -509,7 +519,7 @@ export function SetupListManager({
                             })
                           }
                           aria-label={`${categoryLabel} of ${item.name}`}
-                          className="h-7 shrink-0 rounded-full border border-[#E6EAF1] bg-[#F8FAFC] px-2 text-[11px] font-medium text-[#475569] outline-none transition hover:border-[#CBD5E1] focus:border-[#2563EB]"
+                          className="select-chevron h-7 shrink-0 rounded-full border border-line bg-sunken py-0 pr-6 pl-2.5 text-[11px] font-semibold text-ink-3 outline-none transition hover:border-line-strong focus:border-brand focus:ring-4 focus:ring-brand/12"
                         >
                           {categoryList.map((c) => (
                             <option key={c.value} value={c.value}>
@@ -518,7 +528,7 @@ export function SetupListManager({
                           ))}
                         </select>
                       ) : (
-                        <span className="shrink-0 rounded-full bg-[#F1F5F9] px-2 py-0.5 text-[11px] font-medium text-[#475569]">
+                        <span className="shrink-0 rounded-full bg-sunken-2 px-2 py-0.5 text-[11px] font-medium text-ink-3">
                           {categoryList.find((c) => c.value === item.category)
                             ?.label ?? item.category}
                         </span>
@@ -531,7 +541,7 @@ export function SetupListManager({
                         return on ? (
                           <span
                             key={f.key}
-                            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#2563EB]/10 px-2 py-0.5 text-[11px] font-medium text-[#2563EB]"
+                            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-semibold text-brand-deep ring-1 ring-brand-line"
                           >
                             <Icon className="size-3" />
                             {f.on}
@@ -554,8 +564,8 @@ export function SetupListManager({
                           className={cn(
                             "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium transition",
                             on
-                              ? "bg-[#2563EB]/10 text-[#2563EB] hover:bg-[#2563EB]/16"
-                              : "bg-[#F1F5F9] text-[#94A3B8] hover:bg-[#E2E8F0]"
+                              ? "bg-brand-soft text-brand-deep ring-1 ring-brand-line hover:brightness-95"
+                              : "bg-sunken-2 text-ink-5 ring-1 ring-line hover:bg-line",
                           )}
                         >
                           <Icon className="size-3" />
@@ -574,7 +584,7 @@ export function SetupListManager({
                               active: !item.active,
                             })
                           }
-                          className="shrink-0 rounded-full bg-[#F1F5F9] px-2 py-0.5 text-[11px] font-medium text-[#475569] transition hover:bg-[#E2E8F0]"
+                          className="shrink-0 rounded-full bg-sunken-2 px-2 py-0.5 text-[11px] font-medium text-ink-3 transition hover:bg-line"
                         >
                           {item.active ? "Active" : "Retired"}
                         </button>
@@ -591,7 +601,7 @@ export function SetupListManager({
                           label={`Delete ${item.name}`}
                           onClick={() => remove.mutate(item.id)}
                         >
-                          <Trash2 className="size-3.5 text-[#B91C1C]" />
+                          <Trash2 className="size-3.5 text-danger-deep" />
                         </IconButton>
                       </>
                     )}
@@ -604,7 +614,7 @@ export function SetupListManager({
       )}
 
       {canManage && items.length > 0 && (
-        <p className="text-xs text-[#94A3B8]">
+        <p className="text-xs text-ink-5">
           Retire a {singular.toLowerCase()} to keep its history but hide it from
           new entries. Delete removes it entirely.
         </p>
@@ -628,7 +638,7 @@ function IconButton({
       onClick={onClick}
       aria-label={label}
       title={label}
-      className="shrink-0 rounded-md p-1 text-[#94A3B8] transition hover:bg-[#F1F5F9] hover:text-[#475569]"
+      className="shrink-0 rounded-md p-1 text-ink-5 transition hover:bg-sunken-2 hover:text-ink-3"
     >
       {children}
     </button>
@@ -641,7 +651,7 @@ function ListSkeleton() {
       {Array.from({ length: 6 }).map((_, i) => (
         <li
           key={i}
-          className="h-[46px] animate-pulse rounded-xl border border-[#EEF1F6] bg-[#F8FAFC]"
+          className="h-[46px] animate-pulse rounded-xl border border-line-soft bg-sunken"
         />
       ))}
     </ul>

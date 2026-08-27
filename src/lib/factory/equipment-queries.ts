@@ -28,7 +28,7 @@ export const equipmentKeys = {
 /** Turns a Postgres error into something an operator can act on. */
 function toMessage(
   error: { code?: string; message: string },
-  equipmentNo?: string
+  equipmentNo?: string,
 ): string {
   if (error.code === "23505") {
     return equipmentNo
@@ -54,7 +54,7 @@ export async function fetchEquipment(factoryId: string): Promise<Equipment[]> {
 export async function createEquipment(
   factoryId: string,
   values: EquipmentValues,
-  sortOrder: number
+  sortOrder: number,
 ): Promise<Equipment> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -74,7 +74,7 @@ export async function createEquipment(
 
 export async function updateEquipment(
   id: string,
-  patch: Partial<Pick<Equipment, "equipment_no" | "name" | "active">>
+  patch: Partial<Pick<Equipment, "equipment_no" | "name" | "active">>,
 ): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase
@@ -100,7 +100,7 @@ export async function deleteEquipment(id: string): Promise<void> {
  */
 export function findEquipment(
   list: Equipment[],
-  typed: string | undefined
+  typed: string | undefined,
 ): Equipment | null {
   const term = (typed ?? "").trim().toLowerCase();
   if (!term) return null;

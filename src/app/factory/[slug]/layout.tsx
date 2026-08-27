@@ -11,7 +11,7 @@ export default async function FactoryLayout({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const { factory, role } = await getFactoryContext(slug);
+  const { factory, role, viewer } = await getFactoryContext(slug);
 
   // First-run setup gates the whole workspace, not just the dashboard.
   const onboarding = !factory.onboarded_at ? (
@@ -24,7 +24,7 @@ export default async function FactoryLayout({
 
   return (
     <>
-      <FactoryShell factory={factory} role={role}>
+      <FactoryShell factory={factory} role={role} viewer={viewer}>
         {children}
       </FactoryShell>
       {onboarding}

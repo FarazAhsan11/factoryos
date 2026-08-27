@@ -11,7 +11,12 @@ export const UNIT_PRESETS = [
   { value: "Line", plural: "Lines", icon: "➡️", hint: "Line A, Line 3…" },
   { value: "Machine", plural: "Machines", icon: "⚙️", hint: "Encapsulator 1…" },
   { value: "Area", plural: "Areas", icon: "📍", hint: "Zone A, Bay 2…" },
-  { value: "Process", plural: "Processes", icon: "🔄", hint: "Mixing, Coating…" },
+  {
+    value: "Process",
+    plural: "Processes",
+    icon: "🔄",
+    hint: "Mixing, Coating…",
+  },
   { value: "Custom", plural: "Custom", icon: "📦", hint: "Name them yourself" },
 ] as const;
 
@@ -38,7 +43,7 @@ export const onboardingSchema = z
   })
   .refine(
     (v) => v.unitPreset !== "Custom" || (v.customUnitLabel ?? "").length >= 2,
-    { path: ["customUnitLabel"], message: "Name your production units." }
+    { path: ["customUnitLabel"], message: "Name your production units." },
   );
 
 export type OnboardingValues = z.infer<typeof onboardingSchema>;

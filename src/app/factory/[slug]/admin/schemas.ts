@@ -11,11 +11,7 @@ export const companySettingsSchema = z.object({
     .min(2, "Enter your company or site name.")
     .max(80, "Keep the name under 80 characters."),
   description: z.string().trim().max(280).optional(),
-  unitLabel: z
-    .string()
-    .trim()
-    .min(2, "Name your production units.")
-    .max(40),
+  unitLabel: z.string().trim().min(2, "Name your production units.").max(40),
   unitLabelPlural: z
     .string()
     .trim()
@@ -157,7 +153,7 @@ export const plannedForField = z
       limit.setDate(limit.getDate() + MAX_PLAN_DAYS);
       return v <= todayKey(limit);
     },
-    { message: `Schedule within the next ${MAX_PLAN_DAYS} days.` }
+    { message: `Schedule within the next ${MAX_PLAN_DAYS} days.` },
   );
 
 /**

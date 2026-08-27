@@ -30,22 +30,22 @@ export function TextField({
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <label htmlFor={id} className="text-xs font-medium text-[#475569]">
+        <label htmlFor={id} className="text-xs font-medium text-ink-3">
           {label}
         </label>
         {labelAction}
       </div>
       <div className="relative">
         {Icon && (
-          <Icon className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-[#94A3B8]" />
+          <Icon className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-5" />
         )}
         <input
           id={id}
           className={cn(
-            "h-12 w-full rounded-xl border border-transparent bg-[#F1F4F9] px-4 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:bg-white focus:ring-4 focus:ring-[#2563EB]/12",
+            "h-12 w-full rounded-xl border border-transparent bg-sunken px-4 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-brand focus:bg-surface focus:ring-4 focus:ring-brand/12",
             Icon && "pl-10",
             trailing && "pr-11",
-            className
+            className,
           )}
           {...props}
         />

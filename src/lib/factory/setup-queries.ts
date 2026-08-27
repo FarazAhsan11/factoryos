@@ -92,10 +92,7 @@ function toItem(table: SetupTable, row: Record<string, unknown>): SetupItem {
 }
 
 /** Translates neutral flag keys back to the table's real columns. */
-function toRow(
-  table: SetupTable,
-  patch: SetupPatch
-): Record<string, unknown> {
+function toRow(table: SetupTable, patch: SetupPatch): Record<string, unknown> {
   const { flags, category, ...rest } = patch;
   const columnFor = FLAG_COLUMNS[table] ?? {};
   const row: Record<string, unknown> = { ...rest };
@@ -123,7 +120,7 @@ export const setupKeys = {
 
 export async function fetchSetupItems(
   table: SetupTable,
-  factoryId: string
+  factoryId: string,
 ): Promise<SetupItem[]> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -135,7 +132,7 @@ export async function fetchSetupItems(
 
   if (error) throw new Error(error.message);
   return (data ?? []).map((row) =>
-    toItem(table, row as unknown as Record<string, unknown>)
+    toItem(table, row as unknown as Record<string, unknown>),
   );
 }
 
@@ -145,7 +142,7 @@ export async function createSetupItem(
   name: string,
   sortOrder: number,
   flags: Record<string, boolean> = {},
-  category: string | null = null
+  category: string | null = null,
 ): Promise<SetupItem> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -163,7 +160,7 @@ export async function createSetupItem(
     throw new Error(
       error.code === "23505"
         ? `"${name.trim()}" already exists.`
-        : error.message
+        : error.message,
     );
   }
   return toItem(table, data as unknown as Record<string, unknown>);
@@ -172,7 +169,7 @@ export async function createSetupItem(
 export async function updateSetupItem(
   table: SetupTable,
   id: string,
-  patch: SetupPatch
+  patch: SetupPatch,
 ): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase
@@ -181,14 +178,14 @@ export async function updateSetupItem(
     .eq("id", id);
   if (error) {
     throw new Error(
-      error.code === "23505" ? "That name is already in use." : error.message
+      error.code === "23505" ? "That name is already in use." : error.message,
     );
   }
 }
 
 export async function deleteSetupItem(
   table: SetupTable,
-  id: string
+  id: string,
 ): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase.from(table).delete().eq("id", id);

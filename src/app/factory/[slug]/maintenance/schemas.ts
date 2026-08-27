@@ -104,11 +104,12 @@ export const maintenanceWorkSchema = z
   // A review that is required but unsigned is the gap the paper form leaves
   // and this one does not.
   .refine(
-    (v) => v.productionReviewRequired === "no" || v.productionReviewBy.length > 0,
+    (v) =>
+      v.productionReviewRequired === "no" || v.productionReviewBy.length > 0,
     {
       path: ["productionReviewBy"],
       message: "Production review is required — record who signed it off.",
-    }
+    },
   );
 
 export type MaintenanceWorkValues = z.infer<typeof maintenanceWorkSchema>;
@@ -147,7 +148,7 @@ export const maintenanceQaSchema = z
     {
       path: ["changeControlNo"],
       message: "Change control is required — record its number.",
-    }
+    },
   )
   .refine((v) => v.deviationRaised === "no" || v.deviationNo.length > 0, {
     path: ["deviationNo"],

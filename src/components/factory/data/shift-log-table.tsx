@@ -49,10 +49,10 @@ function clock(value: string | null): string {
 }
 
 const FLAG_STYLE: Record<string, string> = {
-  Quality: "bg-[#FEE2E2] text-[#DC2626]",
-  Maintenance: "bg-[#FEF3C7] text-[#B45309]",
-  Safety: "bg-[#FEE2E2] text-[#DC2626]",
-  Process: "bg-[#EDE9FE] text-[#7C3AED]",
+  Quality: "bg-danger-soft text-danger",
+  Maintenance: "bg-warn-soft text-warn-deep",
+  Safety: "bg-danger-soft text-danger",
+  Process: "bg-violet-line text-violet",
 };
 
 /* ── Column definitions ──────────────────────────────────────────────────
@@ -64,6 +64,13 @@ interface Column {
   label: string;
   numeric?: boolean;
   className?: string;
+  /**
+   * Starts a new band of related columns. Twenty-one columns of identical
+   * weight is a wall; a hairline every few columns gives the eye somewhere
+   * to land when it scrolls sideways. Purely visual — the order and the
+   * sorting are unchanged.
+   */
+  group?: boolean;
 }
 
 const COLUMNS: Column[] = [
@@ -71,28 +78,31 @@ const COLUMNS: Column[] = [
   { key: "shift", label: "Shift" },
   { key: "start_time", label: "Start → End" },
   { key: "duration_minutes", label: "Duration", numeric: true },
-  { key: "unit_name", label: "Room" },
+  { key: "unit_name", label: "Room", group: true },
   { key: "process_name", label: "Activity / Stage" },
   { key: "batch_no", label: "Batch" },
   { key: "product_name", label: "Product" },
   { key: "product_code", label: "Code" },
-  { key: "qty", label: "Qty produced", numeric: true },
+  { key: "qty", label: "Qty produced", numeric: true, group: true },
   { key: "target_qty", label: "Shift target", numeric: true },
   { key: "qty_rejected", label: "Rejected", numeric: true },
   { key: "accumulative", label: "Accum.", numeric: true },
-  { key: "target_speed", label: "Target speed", numeric: true },
+  { key: "target_speed", label: "Target speed", numeric: true, group: true },
   { key: "actual_speed", label: "Actual speed" },
   { key: "slow_reason", label: "Slow reason" },
-  { key: "equipment_no", label: "EQ No." },
+  { key: "equipment_no", label: "EQ No.", group: true },
   { key: "operators_text", label: "Operators" },
-  { key: "action_flag", label: "Flag" },
+  { key: "action_flag", label: "Flag", group: true },
   { key: "comment", label: "Comments" },
 ];
 
 const TH =
-  "sticky top-0 z-10 whitespace-nowrap border-b-2 border-[#E6EAF1] bg-[#F8FAFC] px-2.5 py-2.5 text-left text-[10px] font-bold uppercase tracking-[0.5px] text-[#64748B]";
-const TD = "px-2.5 py-2 align-middle";
+  "sticky top-0 z-20 whitespace-nowrap border-b border-line bg-sunken-2 px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-[0.07em] text-ink-3";
+const TD = "px-3 py-2.5 align-middle";
 const MONO = "font-mono text-[11.5px]";
+
+/** A hairline opening a column band. See `Column.group`. */
+const BAND = "border-l border-line";
 
 /* ── Footer totals ───────────────────────────────────────────────────────
    Which columns a total is a truthful answer for. Deliberately short:
@@ -107,9 +117,7 @@ const MONO = "font-mono text-[11.5px]";
    Keyed by column so the row is built by walking COLUMNS — a column added or
    moved above carries its footer cell with it instead of silently shifting
    every total one place to the left. */
-const TOTALS: Partial<
-  Record<SortColumn, (stats: LogTableStats) => number>
-> = {
+const TOTALS: Partial<Record<SortColumn, (stats: LogTableStats) => number>> = {
   duration_minutes: (s) => s.totalMinutes,
   qty: (s) => s.totalQty,
   target_qty: (s) => s.totalTargetQty,
@@ -169,20 +177,30 @@ export function ShiftLogTable({
   statsPending?: boolean;
   statsError?: Error | null;
 }) {
-  if (!isPending && rows.length === 0) {
+  const empty = !isPending && rows.length === 0;
+  // First load has no rows *and* no answer yet — neither the table nor the
+  // empty state is true, so it gets ghost rows in the shape of the real ones
+  // rather than an empty grid that looks like a table with nothing in it.
+  const skeleton = isPending && rows.length === 0;
+
+  if (empty) {
     return (
-      <div className="rounded-2xl border border-dashed border-[#CBD5E1] bg-white px-4 py-16 text-center">
-        <FileSearch className="mx-auto mb-3 size-7 text-[#CBD5E1]" />
-        <p className="text-sm text-[#64748B]">
-          {hasFilters
-            ? "No entries match the current filters."
-            : "Nothing has been logged yet."}
-        </p>
-        <p className="mt-1 text-xs text-[#94A3B8]">
-          {hasFilters
-            ? "Try clearing the filters or widening the date range."
-            : "Entries logged in the Shift log tab appear here."}
-        </p>
+      <div className="grid min-h-0 flex-1 place-items-center px-4 py-16 text-center">
+        <div>
+          <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-sunken text-ink-6">
+            <FileSearch className="size-6" />
+          </span>
+          <p className="mt-3 text-sm font-medium text-ink-3">
+            {hasFilters
+              ? "No entries match the current filters."
+              : "Nothing has been logged yet."}
+          </p>
+          <p className="mt-1 text-xs text-ink-5">
+            {hasFilters
+              ? "Try clearing the filters or widening the date range."
+              : "Entries logged in the Shift log tab appear here."}
+          </p>
+        </div>
       </div>
     );
   }
@@ -194,8 +212,11 @@ export function ShiftLogTable({
        `<thead>` had nothing to stick to and the header simply scrolled away. */
     <div
       className={cn(
-        "overflow-auto rounded-2xl border border-[#E6EAF1] bg-white transition-opacity lg:min-h-0 lg:flex-1",
-        isPending && "opacity-60"
+        "scrollbar-slim overflow-auto transition-opacity lg:min-h-0 lg:flex-1",
+        // Dimming only once there is something to dim: on a refetch the
+        // previous page is still on screen and should fade, but ghost rows
+        // fading in and out would read as a fault.
+        isPending && rows.length > 0 && "opacity-60",
       )}
     >
       <table className="w-full border-collapse text-xs">
@@ -224,39 +245,48 @@ export function ShiftLogTable({
                         : "descending"
                       : "none"
                   }
-                  className={cn(TH, column.numeric && "text-right")}
+                  className={cn(
+                    TH,
+                    column.numeric && "text-right",
+                    column.group && BAND,
+                    active && "bg-brand-soft text-brand-deep",
+                  )}
                 >
                   <button
                     type="button"
                     onClick={() => onSort(column.key)}
                     className={cn(
-                      "inline-flex items-center gap-1 uppercase transition hover:text-[#2563EB]",
+                      "group/sort inline-flex items-center gap-1 uppercase transition hover:text-brand",
                       column.numeric && "flex-row-reverse",
-                      active && "text-[#2563EB]"
+                      active && "text-brand-deep",
                     )}
                   >
                     {column.key === "unit_name" ? unitWord : column.label}
                     <Icon
                       className={cn(
-                        "size-3 shrink-0",
-                        active ? "opacity-100" : "opacity-30"
+                        "size-3 shrink-0 transition-opacity",
+                        active
+                          ? "opacity-100"
+                          : "opacity-0 group-hover/sort:opacity-60",
                       )}
                     />
                   </button>
                 </th>
               );
             })}
-            <th scope="col" className={cn(TH, "text-right")}>
+            <th scope="col" className={cn(TH, BAND, "text-right")}>
               Amend
             </th>
           </tr>
         </thead>
 
         <tbody>
-          {rows.map((row) => (
+          {skeleton && <SkeletonRows />}
+          {rows.map((row, i) => (
             <Row
               key={row.id}
               row={row}
+              zebra={i % 2 === 1}
               canAmend={canAmend(row)}
               onAmend={() => onAmend(row)}
               canExplainOverrun={canExplainOverrun}
@@ -305,20 +335,23 @@ function TotalsRow({
   // Two signals, not one: a rule dark enough to read as a boundary rather
   // than another row separator, and a background a shade deeper than the
   // header's. The rows above are sometimes tinted (a flagged entry is pink,
-  // a reject amber), so a pale line like the body's #F1F5F9 dividers
+  // a reject amber), so a pale line like the body's var(--color-sunken-2) dividers
   // disappeared against them and the totals read as one more entry.
   //
   // Pinned to the bottom of the scroll box, for the same reason the header is
   // pinned to the top: a total you have to scroll to the end of the page to
   // read is a total nobody reads.
   const TF =
-    "sticky bottom-0 z-10 border-t-2 border-[#94A3B8] bg-[#F1F5F9] px-2.5 py-3 text-[11px] font-semibold text-[#0F1B34]";
+    "sticky bottom-0 z-10 border-t-2 border-ink-5 bg-sunken-2 px-2.5 py-3 text-[11px] font-semibold text-ink";
 
   if (error) {
     return (
       <tfoot>
         <tr>
-          <td colSpan={COLUMNS.length + 1} className={cn(TF, "text-[#B91C1C]")}>
+          <td
+            colSpan={COLUMNS.length + 1}
+            className={cn(TF, "text-danger-deep")}
+          >
             Totals unavailable: {error.message}
           </td>
         </tr>
@@ -333,10 +366,10 @@ function TotalsRow({
       <tr>
         <td
           colSpan={FIRST_TOTAL}
-          className={cn(TF, "whitespace-nowrap text-[#64748B]")}
+          className={cn(TF, "whitespace-nowrap text-ink-4")}
         >
-          Showing <strong className="text-[#0F1B34]">{num(shown)}</strong> of{" "}
-          <strong className="text-[#0F1B34]">
+          Showing <strong className="text-ink">{num(shown)}</strong> of{" "}
+          <strong className="text-ink">
             {stats ? num(stats.entryCount) : DASH}
           </strong>{" "}
           entries
@@ -364,7 +397,7 @@ function TotalsRow({
                 column.key === "qty_rejected" &&
                   total !== undefined &&
                   total > 0 &&
-                  "text-[#B91C1C]"
+                  "text-danger-deep",
               )}
             >
               {total === undefined
@@ -389,10 +422,10 @@ function TotalsRow({
             <span
               className={cn(
                 quality >= 98
-                  ? "text-[#16A34A]"
+                  ? "text-teal"
                   : quality >= 95
-                    ? "text-[#B45309]"
-                    : "text-[#DC2626]"
+                    ? "text-warn-deep"
+                    : "text-danger",
               )}
             >
               Quality rate: {formatQualityRate(quality)}%
@@ -406,12 +439,15 @@ function TotalsRow({
 
 function Row({
   row,
+  zebra,
   canAmend,
   onAmend,
   canExplainOverrun,
   onExplainOverrun,
 }: {
   row: LogTableRow;
+  /** Odd rows sit a shade darker — twenty-one columns is a long way to track. */
+  zebra: boolean;
   canAmend: boolean;
   onAmend: () => void;
   canExplainOverrun: boolean;
@@ -428,32 +464,47 @@ function Row({
   return (
     <tr
       className={cn(
-        "border-b border-[#F1F5F9] last:border-b-0 hover:bg-[#F8FAFC]",
+        "border-b border-line-soft last:border-b-0 hover:bg-brand-soft/45",
         // A flagged entry is the one a supervisor is scanning for; a reject
         // is the next most interesting. Tint rather than shout — a whole
         // column of red would make neither stand out.
-        row.action_flag && "bg-[#FEF2F2]/60",
-        !row.action_flag && rejected > 0 && "bg-[#FFFBEB]/60",
-        // An unexplained overrun tints too, but only when nothing louder
-        // already has: a flagged entry is still the more urgent row.
-        !row.action_flag &&
-          rejected === 0 &&
-          row.needs_overrun_note &&
-          "bg-[#FFFBEB]/60"
+        row.action_flag
+          ? "bg-danger-soft"
+          : rejected > 0
+            ? "bg-warn-tint"
+            : // An unexplained overrun tints too, but only when nothing louder
+              // already has: a flagged entry is still the more urgent row.
+              row.needs_overrun_note
+              ? "bg-warn-tint"
+              : zebra
+                ? "bg-sunken/60"
+                : "bg-surface",
       )}
     >
-      <td className={cn(TD, MONO, "whitespace-nowrap text-[#475569]")}>
+      <td className={cn(TD, MONO, "whitespace-nowrap font-medium text-ink-2")}>
         <time dateTime={row.log_date}>{formatDate(row.log_date)}</time>
       </td>
 
-      <td className={cn(TD, "whitespace-nowrap text-[11px]")}>
-        {row.shift === "morning" ? "☀ AM" : "🌙 PM"}
+      <td className={cn(TD, "whitespace-nowrap")}>
+        {/* A pill rather than an emoji: it reads at a glance in a dense grid,
+            it carries the shift's own colour, and it survives a font that
+            has no glyph for ☀. */}
+        <span
+          className={cn(
+            "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide ring-1",
+            row.shift === "morning"
+              ? "bg-warn-soft text-warn-deep ring-warn-line"
+              : "bg-brand-soft text-brand-deep ring-brand-line",
+          )}
+        >
+          {row.shift === "morning" ? "AM" : "PM"}
+        </span>
       </td>
 
-      <td className={cn(TD, MONO, "whitespace-nowrap text-[#475569]")}>
+      <td className={cn(TD, MONO, "whitespace-nowrap text-ink-3")}>
         {row.start_time ? clock(row.start_time) : DASH}
         {row.end_time && (
-          <span className="text-[#94A3B8]"> → {clock(row.end_time)}</span>
+          <span className="text-ink-5"> → {clock(row.end_time)}</span>
         )}
       </td>
 
@@ -463,7 +514,7 @@ function Row({
           spreadsheet can still sum it. Sorting is unaffected — it happens in
           Postgres on `duration_minutes`. */}
       <td
-        className={cn(TD, MONO, "whitespace-nowrap text-right text-[#475569]")}
+        className={cn(TD, MONO, "whitespace-nowrap text-right text-ink-3")}
         title={
           row.duration_minutes > 0 ? `${row.duration_minutes} min` : undefined
         }
@@ -471,26 +522,26 @@ function Row({
         {row.duration_minutes > 0 ? formatMinutes(row.duration_minutes) : DASH}
       </td>
 
-      <td className={cn(TD, "whitespace-nowrap font-semibold text-[#0F1B34]")}>
+      <td className={cn(TD, BAND, "whitespace-nowrap font-semibold text-ink")}>
         {row.unit_name ?? DASH}
       </td>
 
-      <td className={cn(TD, "whitespace-nowrap text-[#334155]")}>
+      <td className={cn(TD, "whitespace-nowrap text-ink-2")}>
         {row.process_name ?? DASH}
       </td>
 
-      <td className={cn(TD, MONO, "whitespace-nowrap text-[#475569]")}>
+      <td className={cn(TD, MONO, "whitespace-nowrap text-ink-3")}>
         {row.batch_no || DASH}
       </td>
 
       <td
-        className={cn(TD, "max-w-[160px] truncate text-[#334155]")}
+        className={cn(TD, "max-w-[160px] truncate text-ink-2")}
         title={row.product_name ?? undefined}
       >
         {row.product_name ?? DASH}
       </td>
 
-      <td className={cn(TD, MONO, "whitespace-nowrap text-[#475569]")}>
+      <td className={cn(TD, MONO, "whitespace-nowrap text-ink-3")}>
         {row.product_code || DASH}
       </td>
 
@@ -498,8 +549,9 @@ function Row({
         className={cn(
           TD,
           MONO,
+          BAND,
           "text-right font-semibold",
-          produced > 0 ? "text-[#2563EB]" : "text-[#94A3B8]"
+          produced > 0 ? "text-brand" : "text-ink-5",
         )}
       >
         {num(produced)}
@@ -507,13 +559,13 @@ function Row({
             kind of number across every row is exactly the mistake the unit
             prevents. */}
         {row.qty_unit && produced > 0 && (
-          <span className="ml-1 text-[10px] font-medium text-[#94A3B8]">
+          <span className="ml-1 text-[10px] font-medium text-ink-5">
             {row.qty_unit}
           </span>
         )}
       </td>
 
-      <td className={cn(TD, MONO, "text-right text-[#94A3B8]")}>
+      <td className={cn(TD, MONO, "text-right text-ink-5")}>
         {num(row.target_qty)}
       </td>
 
@@ -522,7 +574,7 @@ function Row({
           TD,
           MONO,
           "text-right",
-          rejected > 0 ? "font-semibold text-[#DC2626]" : "text-[#94A3B8]"
+          rejected > 0 ? "font-semibold text-danger" : "text-ink-5",
         )}
       >
         {num(rejected)}
@@ -536,7 +588,7 @@ function Row({
           TD,
           MONO,
           "text-right",
-          row.is_overrun ? "font-semibold text-[#B45309]" : "text-[#16A34A]"
+          row.is_overrun ? "font-semibold text-warn-deep" : "text-teal",
         )}
         title={
           row.is_overrun
@@ -546,29 +598,36 @@ function Row({
       >
         {num(row.accumulative)}
         {row.is_overrun && (
-          <span className="block text-[10px] font-semibold text-[#B45309]">
+          <span className="block text-[10px] font-semibold text-warn-deep">
             +{num(row.overrun_qty)}
           </span>
         )}
       </td>
 
-      <td className={cn(TD, MONO, "whitespace-nowrap text-right text-[#94A3B8]")}>
+      <td
+        className={cn(
+          TD,
+          MONO,
+          BAND,
+          "whitespace-nowrap text-right text-ink-5",
+        )}
+      >
         {target > 0 ? `${num(target)} ${row.speed_unit ?? ""}`.trim() : DASH}
       </td>
 
       <td className={cn(TD, "whitespace-nowrap text-[11px]")}>
         {actual > 0 ? (
           <>
-            <span className={cn(MONO, "text-[#334155]")}>{num(actual)}</span>
+            <span className={cn(MONO, "text-ink-2")}>{num(actual)}</span>
             {performance !== null && (
               <span
                 className={cn(
                   "ml-1 font-semibold",
                   performance >= 90
-                    ? "text-[#16A34A]"
+                    ? "text-teal"
                     : performance >= 70
-                      ? "text-[#B45309]"
-                      : "text-[#DC2626]"
+                      ? "text-warn-deep"
+                      : "text-danger",
                 )}
               >
                 {performance}%
@@ -576,32 +635,32 @@ function Row({
             )}
           </>
         ) : (
-          <span className="text-[#94A3B8]">{DASH}</span>
+          <span className="text-ink-5">{DASH}</span>
         )}
       </td>
 
       <td
-        className={cn(TD, "max-w-[140px] truncate text-[11px] text-[#64748B]")}
+        className={cn(TD, "max-w-[140px] truncate text-[11px] text-ink-4")}
         title={row.slow_reason ?? undefined}
       >
         {row.slow_reason ?? DASH}
       </td>
 
-      <td className={cn(TD, MONO, "whitespace-nowrap text-[#475569]")}>
+      <td className={cn(TD, MONO, BAND, "whitespace-nowrap text-ink-3")}>
         {row.equipment_no || DASH}
       </td>
 
       {/* Truncated, with the full list on hover: an entry run by five people
           would otherwise stretch the column past everything beside it. */}
       <td
-        className={cn(TD, "max-w-[140px] truncate text-[11.5px] text-[#334155]")}
+        className={cn(TD, "max-w-[140px] truncate text-[11.5px] text-ink-2")}
         title={row.operators?.join(" / ") || undefined}
       >
         {row.operators?.length ? (
           <>
             {row.operators[0]}
             {row.operators.length > 1 && (
-              <span className="text-[#94A3B8]">
+              <span className="text-ink-5">
                 {" "}
                 / {row.operators.slice(1).join(" / ")}
               </span>
@@ -612,18 +671,18 @@ function Row({
         )}
       </td>
 
-      <td className={cn(TD, "whitespace-nowrap")}>
+      <td className={cn(TD, BAND, "whitespace-nowrap")}>
         {row.action_flag ? (
           <span
             className={cn(
               "inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold",
-              FLAG_STYLE[row.action_flag] ?? "bg-[#F1F5F9] text-[#475569]"
+              FLAG_STYLE[row.action_flag] ?? "bg-sunken-2 text-ink-3",
             )}
           >
             {row.action_flag}
           </span>
         ) : !row.is_overrun ? (
-          <span className="text-[#94A3B8]">{DASH}</span>
+          <span className="text-ink-5">{DASH}</span>
         ) : null}
 
         {/* Two states, not one. Unexplained is the thing to act on; explained
@@ -631,14 +690,14 @@ function Row({
             batch and not a problem that went away when someone described it. */}
         {row.needs_overrun_note ? (
           <span
-            className="ml-1 inline-block rounded-full bg-[#FEF3C7] px-2 py-0.5 text-[10px] font-bold text-[#B45309]"
+            className="ml-1 inline-block rounded-full bg-warn-soft px-2 py-0.5 text-[10px] font-bold text-warn-deep"
             title={`Over the required quantity by ${num(row.overrun_qty)} — needs a manager's explanation`}
           >
             Attention
           </span>
         ) : row.is_overrun ? (
           <span
-            className="ml-1 inline-block rounded-full bg-[#F1F5F9] px-2 py-0.5 text-[10px] font-semibold text-[#475569]"
+            className="ml-1 inline-block rounded-full bg-sunken-2 px-2 py-0.5 text-[10px] font-semibold text-ink-3"
             title={row.overrun_note ?? undefined}
           >
             Overrun explained
@@ -647,13 +706,13 @@ function Row({
       </td>
 
       <td
-        className={cn(TD, "max-w-[180px] text-[#64748B]")}
+        className={cn(TD, "max-w-[180px] text-ink-4")}
         title={row.comment ?? undefined}
       >
         <span className="block truncate">{row.comment ?? DASH}</span>
         {row.amended_at && (
           <span
-            className="mt-0.5 block text-[10px] font-semibold text-[#7C3AED]"
+            className="mt-0.5 block text-[10px] font-semibold text-violet"
             title={row.amend_note ?? undefined}
           >
             ↳ Amended
@@ -664,7 +723,7 @@ function Row({
             can read is a control on paper only. */}
         {row.overrun_note && (
           <span
-            className="mt-0.5 block truncate text-[10px] text-[#B45309]"
+            className="mt-0.5 block truncate text-[10px] text-warn-deep"
             title={`${row.overrun_note}${
               row.overrun_cleared_by_name
                 ? ` — ${row.overrun_cleared_by_name}`
@@ -673,7 +732,7 @@ function Row({
           >
             ↳ Overrun: {row.overrun_note}
             {row.overrun_cleared_by_name && (
-              <span className="text-[#92400E]">
+              <span className="text-warn-ink">
                 {" "}
                 — {row.overrun_cleared_by_name}
               </span>
@@ -682,7 +741,7 @@ function Row({
         )}
       </td>
 
-      <td className={cn(TD, "text-right")}>
+      <td className={cn(TD, BAND, "text-right")}>
         {/* Offered above Amend when both apply: clearing the flag is the more
             urgent of the two, and it isn't an amendment — the entry is right,
             it just needs accounting for. */}
@@ -691,7 +750,7 @@ function Row({
             type="button"
             onClick={onExplainOverrun}
             title="Record why this batch went past its required quantity"
-            className="mb-1 inline-flex h-7 items-center gap-1 rounded-lg border border-[#FDE68A] bg-[#FFFBEB] px-2 text-[11px] font-semibold text-[#B45309] transition hover:border-[#B45309]"
+            className="mb-1 inline-flex h-7 items-center gap-1 rounded-lg border border-warn-line bg-warn-soft px-2 text-[11px] font-semibold text-warn-deep transition hover:border-warn-deep hover:bg-warn-line"
           >
             <TrendingUp className="size-3" />
             Explain
@@ -702,14 +761,14 @@ function Row({
             type="button"
             onClick={onAmend}
             title="Attach a correction note — the original entry is preserved"
-            className="inline-flex h-7 items-center gap-1 rounded-lg border border-[#E6EAF1] px-2 text-[11px] font-medium text-[#64748B] transition hover:border-[#B45309] hover:text-[#B45309]"
+            className="inline-flex h-7 items-center gap-1 rounded-lg border border-line bg-surface px-2 text-[11px] font-medium text-ink-4 transition hover:border-warn-deep hover:bg-warn-tint hover:text-warn-deep"
           >
             <PencilLine className="size-3" />
             Amend
           </button>
         ) : (
           <span
-            className="text-[10px] text-[#CBD5E1]"
+            className="text-[10px] text-ink-6"
             title="Only the operator who filed this entry, or a manager, can amend it"
           >
             —
@@ -717,5 +776,25 @@ function Row({
         )}
       </td>
     </tr>
+  );
+}
+
+/** Ghost rows in the shape of the real ones, for the first load only. */
+function SkeletonRows() {
+  return (
+    <>
+      {Array.from({ length: 8 }).map((_, row) => (
+        <tr key={row} className="border-b border-line-soft bg-surface">
+          {COLUMNS.map((column) => (
+            <td key={column.key} className={cn(TD, column.group && BAND)}>
+              <span className="block h-3 animate-pulse rounded bg-sunken-2" />
+            </td>
+          ))}
+          <td className={cn(TD, BAND)}>
+            <span className="block h-3 animate-pulse rounded bg-sunken-2" />
+          </td>
+        </tr>
+      ))}
+    </>
   );
 }

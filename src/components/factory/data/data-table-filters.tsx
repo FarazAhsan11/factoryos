@@ -3,16 +3,21 @@
 import { useEffect, useRef, useState } from "react";
 import { Search } from "lucide-react";
 
+import { DateField } from "@/components/ui/date-picker";
+
 import { ACTION_FLAGS } from "@/app/factory/[slug]/log/schemas";
 import type { SetupItem } from "@/lib/factory/setup-queries";
 import type { LogTableFilters } from "@/lib/factory/shift-log-table-queries";
 import { cn } from "@/lib/utils";
 
 const FILTER_CONTROL =
-  "h-9 w-full rounded-lg border border-[#E6EAF1] bg-[#FBFCFE] px-2.5 text-xs text-[#0F1B34] outline-none transition focus:border-[#2563EB] focus:bg-white focus:ring-2 focus:ring-[#2563EB]/12";
+  "h-9 w-full rounded-lg border border-line bg-surface px-2.5 text-xs font-medium text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)] outline-none transition placeholder:font-normal placeholder:text-placeholder hover:border-line-strong focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12";
+
+/** Same control, plus our own chevron — see `.select-chevron`. */
+const FILTER_SELECT = FILTER_CONTROL + " select-chevron";
 
 const FILTER_LABEL =
-  "block text-[10px] font-bold uppercase tracking-[0.6px] text-[#94A3B8]";
+  "block text-[10px] font-bold uppercase tracking-[0.07em] text-ink-4";
 
 function Group({
   label,
@@ -28,7 +33,12 @@ function Group({
   return (
     // Bottom-aligned: a label that wraps to two lines would otherwise push its
     // control below the rest of the row instead of growing upward.
-    <div className={cn("flex h-full min-w-0 flex-col justify-end gap-1", className)}>
+    <div
+      className={cn(
+        "flex h-full min-w-0 flex-col justify-end gap-1",
+        className,
+      )}
+    >
       <label
         htmlFor={htmlFor}
         className={cn(FILTER_LABEL, "truncate")}
@@ -72,7 +82,12 @@ export function DataTableFilters({
   const [search, setSearch] = useState(filters.search);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
 
   function handleSearch(value: string) {
     setSearch(value);
@@ -81,33 +96,33 @@ export function DataTableFilters({
   }
 
   return (
-    <div className="mb-3.5 grid gap-3 rounded-2xl border border-[#E6EAF1] bg-white p-3.5 sm:grid-cols-2 lg:grid-cols-[repeat(6,minmax(0,1fr))_minmax(200px,2fr)]">
+    <div className="mb-3.5 grid gap-3 rounded-2xl border border-line bg-surface p-3.5 shadow-card sm:grid-cols-2 lg:grid-cols-[repeat(6,minmax(0,1fr))_minmax(200px,2fr)]">
       <Group label="Date from" htmlFor="dt-from">
-        <input
+        <DateField
           id="dt-from"
-          type="date"
-          className={FILTER_CONTROL}
           value={filters.from}
           max={filters.to || undefined}
-          onChange={(e) => onChange({ from: e.target.value })}
+          onChange={(from) => onChange({ from })}
+          placeholder="Any date"
+          className="h-9 px-2.5 text-xs"
         />
       </Group>
 
       <Group label="Date to" htmlFor="dt-to">
-        <input
+        <DateField
           id="dt-to"
-          type="date"
-          className={FILTER_CONTROL}
           value={filters.to}
           min={filters.from || undefined}
-          onChange={(e) => onChange({ to: e.target.value })}
+          onChange={(to) => onChange({ to })}
+          placeholder="Any date"
+          className="h-9 px-2.5 text-xs"
         />
       </Group>
 
       <Group label="Shift" htmlFor="dt-shift">
         <select
           id="dt-shift"
-          className={FILTER_CONTROL}
+          className={FILTER_SELECT}
           value={filters.shift}
           onChange={(e) =>
             onChange({ shift: e.target.value as LogTableFilters["shift"] })
@@ -122,7 +137,7 @@ export function DataTableFilters({
       <Group label={`${unitWord} / Unit`} htmlFor="dt-unit">
         <select
           id="dt-unit"
-          className={FILTER_CONTROL}
+          className={FILTER_SELECT}
           value={filters.unitId}
           onChange={(e) => onChange({ unitId: e.target.value })}
         >
@@ -139,7 +154,7 @@ export function DataTableFilters({
       <Group label="Activity / Stage" htmlFor="dt-process">
         <select
           id="dt-process"
-          className={FILTER_CONTROL}
+          className={FILTER_SELECT}
           value={filters.processId}
           onChange={(e) => onChange({ processId: e.target.value })}
         >
@@ -156,7 +171,7 @@ export function DataTableFilters({
       <Group label="Flag" htmlFor="dt-flag">
         <select
           id="dt-flag"
-          className={FILTER_CONTROL}
+          className={FILTER_SELECT}
           value={filters.flag}
           onChange={(e) => onChange({ flag: e.target.value })}
         >
@@ -178,7 +193,7 @@ export function DataTableFilters({
         className="sm:col-span-2 lg:col-span-1"
       >
         <div className="relative">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[#94A3B8]" />
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-ink-5" />
           <input
             id="dt-search"
             type="search"

@@ -20,11 +20,7 @@ import { createClient } from "@/lib/supabase/client";
 
 export type MaintenancePriority = "urgent" | "routine" | "planned";
 export type MaintenanceStatus =
-  | "reported"
-  | "assigned"
-  | "in_progress"
-  | "completed"
-  | "verified";
+  "reported" | "assigned" | "in_progress" | "completed" | "verified";
 
 export const MAINTENANCE_PRIORITIES: {
   value: MaintenancePriority;
@@ -37,22 +33,22 @@ export const MAINTENANCE_PRIORITIES: {
     value: "urgent",
     label: "Urgent",
     hint: "stop production",
-    dot: "#DC2626",
-    pill: "bg-[#FEE2E2] text-[#B91C1C]",
+    dot: "var(--color-danger)",
+    pill: "bg-danger-soft text-danger-deep",
   },
   {
     value: "routine",
     label: "Routine",
     hint: "next available",
-    dot: "#F59E0B",
-    pill: "bg-[#FEF3C7] text-[#B45309]",
+    dot: "var(--color-warn)",
+    pill: "bg-warn-soft text-warn-deep",
   },
   {
     value: "planned",
     label: "Planned",
     hint: "scheduled",
-    dot: "#2563EB",
-    pill: "bg-[#DBEAFE] text-[#1D4ED8]",
+    dot: "var(--color-brand)",
+    pill: "bg-brand-soft text-brand-deep",
   },
 ];
 
@@ -87,11 +83,11 @@ export const STATUS_LABELS: Record<MaintenanceStatus, string> = {
 };
 
 export const STATUS_PILL: Record<MaintenanceStatus, string> = {
-  reported: "bg-[#FEF3C7] text-[#B45309]",
-  assigned: "bg-[#DBEAFE] text-[#1D4ED8]",
-  in_progress: "bg-[#E0E7FF] text-[#4338CA]",
-  completed: "bg-[#CFFAFE] text-[#0E7490]",
-  verified: "bg-[#DCFCE7] text-[#15803D]",
+  reported: "bg-warn-soft text-warn-deep",
+  assigned: "bg-brand-soft text-brand-deep",
+  in_progress: "bg-brand-soft text-brand-deep",
+  completed: "bg-teal-soft text-teal-deep",
+  verified: "bg-teal-soft text-teal-deep",
 };
 
 /**
@@ -242,7 +238,7 @@ export const maintenanceKeys = {
 
 /** Every request for the factory, newest first. */
 export async function fetchMaintenanceRequests(
-  factoryId: string
+  factoryId: string,
 ): Promise<MaintenanceRequest[]> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -271,7 +267,7 @@ export async function createMaintenanceRequest(
   values: NewMaintenanceValues,
   createdBy: string,
   /** Resolved from the typed batch number, or null when it matched nothing. */
-  productId: string | null
+  productId: string | null,
 ): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase.from("maintenance_requests").insert({
@@ -312,7 +308,7 @@ export async function createMaintenanceRequest(
 
 async function moveRequest(
   id: string,
-  patch: Record<string, unknown>
+  patch: Record<string, unknown>,
 ): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase
@@ -326,7 +322,7 @@ async function moveRequest(
 /** Section 2 opens: a name on it, and the department that is needed. */
 export function assignMaintenance(
   id: string,
-  values: MaintenanceAssignValues
+  values: MaintenanceAssignValues,
 ): Promise<void> {
   return moveRequest(id, {
     status: "assigned",
@@ -343,7 +339,7 @@ export function startMaintenanceWork(id: string): Promise<void> {
 /** Section 2 is signed. */
 export function completeMaintenanceWork(
   id: string,
-  values: MaintenanceWorkValues
+  values: MaintenanceWorkValues,
 ): Promise<void> {
   const review = values.productionReviewRequired === "yes";
   return moveRequest(id, {
@@ -361,7 +357,7 @@ export function completeMaintenanceWork(
 /** Section 3 is signed, and the request is closed out. */
 export function verifyMaintenance(
   id: string,
-  values: MaintenanceQaValues
+  values: MaintenanceQaValues,
 ): Promise<void> {
   const change = values.changeControlRequired === "yes";
   const deviation = values.deviationRaised === "yes";
@@ -422,5 +418,8 @@ export function formatMinutes(minutes: number | null): string {
 
 /** Minutes between an instant and now — the clock that is still running. */
 export function minutesSince(iso: string): number {
-  return Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  return Math.max(
+    0,
+    Math.round((Date.now() - new Date(iso).getTime()) / 60000),
+  );
 }

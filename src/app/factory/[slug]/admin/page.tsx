@@ -26,15 +26,18 @@ export default async function FactoryAdminPage({
   const initialTab = resolveAdminTab(tab);
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <div className="mb-6">
-        <p className="text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">
+    /* Fills the workspace frame from `lg` up rather than growing the page —
+       see the note on <main> in FactoryShell. The tab strip then stays put
+       while a long list of products or people scrolls under it. */
+    <div className="mx-auto flex w-full max-w-5xl flex-col lg:min-h-0 lg:flex-1">
+      <div className="mb-5 shrink-0">
+        <p className="text-[11px] font-bold tracking-[0.09em] text-ink-5 uppercase">
           Setup
         </p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#0F1B34]">
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">
           Admin &amp; configuration
         </h1>
-        <p className="mt-1 text-sm text-[#64748B]">
+        <p className="mt-1 text-sm text-ink-4">
           The vocabulary and targets every other module reads.
         </p>
       </div>

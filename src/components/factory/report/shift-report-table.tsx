@@ -33,12 +33,12 @@ export function ShiftReportTable({
        strip stays put; on paper the box is undone entirely — a printed sheet
        has no scrollbar, and clipping the report to one viewport would lose
        every room past the first dozen. */
-    <div className="overflow-auto rounded-2xl border border-[#E6EAF1] bg-white lg:min-h-0 lg:flex-1 print:block print:overflow-visible print:rounded-none print:border-0">
+    <div className="scrollbar-slim overflow-auto lg:min-h-0 lg:flex-1 print:block print:overflow-visible">
       <table className="w-full min-w-[1180px] border-collapse text-[12px]">
         <thead>
           {/* The colour is on the row, but the stickiness has to be on the
               cells: `position: sticky` on a `<tr>` is ignored outside Firefox. */}
-          <tr className="bg-[#0F1B34] text-white print:bg-white print:text-black">
+          <tr className="text-white print:bg-surface print:text-black">
             <Th>{unitWord}</Th>
             <Th>Status / stage</Th>
             <Th>EQ no.</Th>
@@ -64,7 +64,7 @@ export function ShiftReportTable({
               <IdleRow key={room.unitId} room={room} />
             ) : (
               <RoomBlock key={room.unitId} room={room} />
-            )
+            ),
           )}
         </tbody>
       </table>
@@ -82,23 +82,30 @@ export function ShiftReportTable({
 function IdleRow({ room }: { room: ShiftReportRoom }) {
   const held = room.idleStatus === "HOLD";
   return (
-    <tr className="border-t border-[#EEF1F6] bg-[#FBFCFE] text-[#94A3B8] print:bg-white">
-      <Td className="font-semibold text-[#64748B]">{room.name}</Td>
-      <Td>
-        <span
-          className={cn(
-            "text-[11px] font-semibold uppercase tracking-wide",
-            held ? "text-[#B45309]" : "text-[#94A3B8]"
-          )}
-        >
-          {room.idleStatus}
-        </span>
-      </Td>
-      {Array.from({ length: 14 }).map((_, i) => (
-        <Td key={i} className="text-center text-[#CBD5E1]">
-          —
-        </Td>
-      ))}
+    /* One spanning cell, not fourteen em-dashes. The dashes were fourteen
+       separate invitations to look for a number, and there is none to find —
+       the answer is the status, and it fits in a sentence. */
+    <tr className="border-t border-line-soft bg-sunken/60 print:bg-surface">
+      <td colSpan={16} className="px-3 py-2">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <span className="text-[12px] font-semibold text-ink-3">
+            {room.name}
+          </span>
+          <span
+            className={cn(
+              "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.07em] ring-1",
+              held
+                ? "bg-warn-soft text-warn-deep ring-warn-line"
+                : "bg-sunken-2 text-ink-4 ring-line",
+            )}
+          >
+            {room.idleStatus}
+          </span>
+          <span className="text-[11px] text-ink-5">
+            Nothing logged this shift.
+          </span>
+        </div>
+      </td>
     </tr>
   );
 }
@@ -106,17 +113,31 @@ function IdleRow({ room }: { room: ShiftReportRoom }) {
 function RoomBlock({ room }: { room: ShiftReportRoom }) {
   return (
     <>
-      <tr className="border-t-2 border-[#E6EAF1] bg-[#F1F5F9] print:bg-[#F1F5F9]">
-        <td
-          colSpan={16}
-          className="px-3 py-1.5 text-[11.5px] font-bold uppercase tracking-wide text-[#0F1B34]"
-        >
-          {room.name}
-          {room.producedQty > 0 && (
-            <span className="ml-2 font-mono text-[11px] font-semibold normal-case tracking-normal text-[#475569]">
-              {room.producedQty.toLocaleString()} this shift
+      {/* A titled band opening each room, with what the room did on the
+          right — the one figure a supervisor wants before reading the rows
+          underneath it. */}
+      <tr className="border-t border-line bg-sunken print:bg-sunken">
+        <td colSpan={16} className="px-3 py-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.07em] text-ink">
+              <span
+                aria-hidden
+                className="h-3.5 w-1 rounded-full bg-brand print:hidden"
+              />
+              {room.name}
             </span>
-          )}
+            <span className="flex items-center gap-2 text-[11px] text-ink-4">
+              <span>
+                {room.entries.length}{" "}
+                {room.entries.length === 1 ? "entry" : "entries"}
+              </span>
+              {room.producedQty > 0 && (
+                <span className="rounded-full bg-brand-soft px-2 py-0.5 font-mono text-[10.5px] font-semibold text-brand-deep print:bg-surface">
+                  {room.producedQty.toLocaleString()} produced
+                </span>
+              )}
+            </span>
+          </div>
         </td>
       </tr>
       {room.entries.map((entry, i) => (
@@ -145,18 +166,20 @@ function EntryRow({
   return (
     <tr
       className={cn(
-        "border-t border-[#EEF1F6] align-top",
-        entry.action_flag && "bg-[#FEF2F2] print:bg-[#FEF2F2]"
+        "border-t border-line-soft align-top transition-colors",
+        entry.action_flag
+          ? "bg-danger-soft print:bg-danger-soft"
+          : "hover:bg-brand-soft/40 print:hover:bg-transparent",
       )}
     >
-      <Td className="text-[11px] text-[#94A3B8]">{first ? room.name : ""}</Td>
+      <Td className="text-[11px] text-ink-5">{first ? room.name : ""}</Td>
 
       <Td>
-        <span className="font-medium text-[#0F1B34]">
+        <span className="font-medium text-ink">
           {entry.process_name ?? "—"}
         </span>
         {entry.action_flag && (
-          <span className="mt-0.5 flex items-center gap-1 text-[10.5px] font-bold uppercase tracking-wide text-[#B91C1C]">
+          <span className="mt-0.5 flex items-center gap-1 text-[10.5px] font-bold uppercase tracking-wide text-danger-deep">
             <Flag className="size-3 shrink-0" />
             {entry.action_flag}
           </span>
@@ -174,13 +197,13 @@ function EntryRow({
       <Td className="font-mono text-[11px]">{entry.product_code || "—"}</Td>
       <Td className="font-mono text-[11px]">{entry.batch_no || "—"}</Td>
 
-      <Td align="right" className="font-mono font-semibold text-[#1D4ED8]">
+      <Td align="right" className="font-mono font-semibold text-brand-deep">
         {formatQty(entry.qty)}
         {/* A preparatory room hands over "3 drums", not "3". On a printed
             handover the bare number is the one thing nobody can go back and
             ask about. */}
         {entry.qty_unit && entry.qty !== null && (
-          <span className="ml-1 text-[9px] font-medium text-[#94A3B8]">
+          <span className="ml-1 text-[9px] font-medium text-ink-5">
             {entry.qty_unit}
           </span>
         )}
@@ -194,19 +217,23 @@ function EntryRow({
 
       <Td>
         {pct === null ? (
-          <span className="text-[#CBD5E1]">—</span>
+          <span className="text-ink-6">—</span>
         ) : (
-          <div className="min-w-[64px]">
-            <span className="font-mono text-[10.5px] font-semibold text-[#475569]">
+          <div className="min-w-[72px]">
+            <span className="font-mono text-[10.5px] font-semibold tabular-nums text-ink-3">
               {pct}%
             </span>
-            <span className="mt-0.5 block h-1.5 w-full overflow-hidden rounded-full bg-[#EEF1F6]">
+            <span className="mt-1 block h-2 w-full overflow-hidden rounded-full bg-sunken-2 ring-1 ring-line-soft ring-inset">
               <span
                 className="block h-full rounded-full"
                 style={{
                   width: `${pct}%`,
                   background:
-                    pct >= 80 ? "#16A34A" : pct >= 50 ? "#F59E0B" : "#DC2626",
+                    pct >= 80
+                      ? "var(--color-teal)"
+                      : pct >= 50
+                        ? "var(--color-warn)"
+                        : "var(--color-danger)",
                 }}
               />
             </span>
@@ -218,7 +245,7 @@ function EntryRow({
         align="right"
         className={cn(
           "font-mono",
-          (entry.qty_rejected ?? 0) > 0 && "font-semibold text-[#B91C1C]"
+          (entry.qty_rejected ?? 0) > 0 && "font-semibold text-danger-deep",
         )}
       >
         {formatQty(entry.qty_rejected)}
@@ -253,9 +280,13 @@ function Th({
   return (
     <th
       className={cn(
-        "sticky top-0 z-10 whitespace-nowrap bg-[#0F1B34] px-3 py-2 text-[10.5px] font-bold uppercase tracking-wide",
-        "print:static print:bg-white",
-        align === "right" ? "text-right" : "text-left"
+        "sticky top-0 z-10 whitespace-nowrap px-3 py-2.5 text-[10px] font-bold uppercase tracking-[0.08em]",
+        // A deep indigo band rather than flat near-black: it belongs to the
+        // same family as everything else on the page, and the gradient keeps
+        // a sixteen-column header from reading as a solid bar of ink.
+        "bg-[linear-gradient(180deg,var(--color-ink)_0%,#1d2140_100%)] text-white/85",
+        "print:static print:bg-surface print:text-black",
+        align === "right" ? "text-right" : "text-left",
       )}
     >
       {children}
@@ -278,9 +309,9 @@ function Td({
     <td
       title={title}
       className={cn(
-        "px-3 py-2 text-[#334155]",
+        "px-3 py-2.5 text-ink-2",
         align === "right" ? "text-right" : "text-left",
-        className
+        className,
       )}
     >
       {children}

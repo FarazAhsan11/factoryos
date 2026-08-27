@@ -56,7 +56,7 @@ export function toShiftReportCsv(rooms: ShiftReportRoom[]): string {
       lines.push(
         [room.name, room.idleStatus ?? "READY", ...Array(16).fill("")]
           .map(escape)
-          .join(",")
+          .join(","),
       );
       continue;
     }
@@ -85,7 +85,7 @@ export function toShiftReportCsv(rooms: ShiftReportRoom[]): string {
           entry.target_speed,
         ]
           .map(escape)
-          .join(",")
+          .join(","),
       );
     }
   }
@@ -97,7 +97,7 @@ export function toShiftReportCsv(rooms: ShiftReportRoom[]): string {
 export function shiftReportFilename(
   factoryName: string,
   date: string,
-  shift: RunningShift
+  shift: RunningShift,
 ): string {
   const slug =
     factoryName

@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { ShiftReportHeader } from "@/components/factory/report/shift-report-header";
 import { ShiftReportSummary } from "@/components/factory/report/shift-report-summary";
 import { ShiftReportTable } from "@/components/factory/report/shift-report-table";
+import { DateField } from "@/components/ui/date-picker";
 import { downloadCsv } from "@/lib/factory/shift-log-csv";
 import {
   fetchPipelineJobs,
@@ -104,11 +105,13 @@ export function ShiftReportWorkspace({
   const rooms = useMemo(
     () =>
       groupByRoom(
-        unitList.filter((u) => u.active).map((u) => ({ id: u.id, name: u.name })),
+        unitList
+          .filter((u) => u.active)
+          .map((u) => ({ id: u.id, name: u.name })),
         entries,
-        pipelineByUnit
+        pipelineByUnit,
       ),
-    [unitList, entries, pipelineByUnit]
+    [unitList, entries, pipelineByUnit],
   );
 
   const totals = useMemo(() => summarise(entries), [entries]);
@@ -120,7 +123,7 @@ export function ShiftReportWorkspace({
     }
     downloadCsv(
       toShiftReportCsv(rooms),
-      shiftReportFilename(factoryName, date, shift)
+      shiftReportFilename(factoryName, date, shift),
     );
     toast.success("Shift report exported.");
   }
@@ -131,25 +134,30 @@ export function ShiftReportWorkspace({
           paper — you cannot press a button on a printed sheet. */}
       <div className="mb-4 flex shrink-0 flex-wrap items-start justify-between gap-3 print:hidden">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">
+          <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-5">
             Production floor
           </p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#0F1B34]">
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">
             Shift report
           </h1>
+          <p className="mt-1 text-sm text-ink-4">
+            One shift, every {units.singular.toLowerCase()}, on one sheet —
+            written to be printed and handed over.
+          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <input
-            type="date"
+          {/* Never blank: a report with no date is not a document, so
+              clearing falls back to today rather than to nothing. */}
+          <DateField
             value={date}
             max={todayISO()}
-            onChange={(e) => setDate(e.target.value || todayISO())}
-            aria-label="Report date"
-            className="h-9 rounded-xl border border-[#E6EAF1] bg-white px-3 text-sm text-[#0F1B34] outline-none transition focus:border-[#2563EB]"
+            onChange={(next) => setDate(next || todayISO())}
+            ariaLabel="Report date"
+            className="h-9 w-[11.5rem] shadow-soft"
           />
 
-          <div className="flex overflow-hidden rounded-xl border border-[#E6EAF1]">
+          <div className="flex overflow-hidden rounded-xl border border-line shadow-soft">
             <ShiftButton
               active={shift === "morning"}
               onClick={() => setShift("morning")}
@@ -167,27 +175,29 @@ export function ShiftReportWorkspace({
           <Ghost onClick={exportCsv} icon={<Download className="size-3.5" />}>
             Export
           </Ghost>
-          <Ghost
+          <button
+            type="button"
             onClick={() => window.print()}
-            icon={<Printer className="size-3.5" />}
+            className="ml-1 inline-flex h-9 items-center gap-1.5 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-3.5 text-xs font-semibold text-white shadow-brand transition hover:brightness-[1.06] active:scale-[0.98]"
           >
+            <Printer className="size-3.5" />
             Print
-          </Ghost>
+          </button>
         </div>
       </div>
 
       {isError ? (
-        <p className="rounded-2xl border border-[#FECACA] bg-[#FEF2F2] px-4 py-6 text-center text-sm text-[#B91C1C]">
+        <p className="rounded-2xl border border-danger-line bg-danger-soft px-4 py-6 text-center text-sm text-danger-deep">
           Could not load the shift report: {(error as Error).message}
         </p>
       ) : isPending ? (
         <ReportSkeleton />
       ) : (
-        <div className="lg:flex lg:min-h-0 lg:flex-1 lg:flex-col print:block">
-          <ShiftReportSummary
-            totals={totals}
-            unitWordPlural={units.plural}
-          />
+        /* One sheet. The masthead, the key figures and the table were three
+           separate cards with gaps between them, which is three objects that
+           happen to be stacked — not the single document this is meant to be,
+           and not what comes out of the printer either. */
+        <div className="flex flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-card lg:min-h-0 lg:flex-1 print:block print:rounded-none print:border-0 print:shadow-none">
           <ShiftReportHeader
             factoryName={factoryName}
             date={date}
@@ -195,13 +205,14 @@ export function ShiftReportWorkspace({
             clock={shiftTimes?.[shift]}
             unitWord={units.singular}
           />
+          <ShiftReportSummary totals={totals} unitWordPlural={units.plural} />
 
           {rooms.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-[#CBD5E1] bg-white px-4 py-16 text-center">
-              <p className="text-sm text-[#64748B]">
+            <div className="px-4 py-16 text-center">
+              <p className="text-sm font-medium text-ink-3">
                 No {units.plural.toLowerCase()} set up yet.
               </p>
-              <p className="mt-1 text-xs text-[#94A3B8]">
+              <p className="mt-1 text-xs text-ink-5">
                 Add them in Admin &amp; Settings and the report fills itself in.
               </p>
             </div>
@@ -209,7 +220,7 @@ export function ShiftReportWorkspace({
             <>
               <ShiftReportTable rooms={rooms} unitWord={units.singular} />
               {totals.entries === 0 && (
-                <p className="mt-3 shrink-0 text-center text-xs text-[#94A3B8] print:hidden">
+                <p className="shrink-0 border-t border-line bg-sunken px-4 py-2.5 text-center text-xs text-ink-5 print:hidden">
                   Nothing was logged on this shift — every{" "}
                   {units.singular.toLowerCase()} shows its board status instead.
                 </p>
@@ -241,8 +252,8 @@ function ShiftButton({
       className={cn(
         "inline-flex h-9 items-center gap-1.5 px-3 text-xs font-semibold transition",
         active
-          ? "bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] text-white"
-          : "bg-white text-[#475569] hover:bg-[#F8FAFC]"
+          ? "bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] text-white"
+          : "bg-surface text-ink-3 hover:bg-sunken",
       )}
     >
       {icon}
@@ -264,7 +275,7 @@ function Ghost({
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-[#E6EAF1] bg-white px-3 text-xs font-semibold text-[#475569] transition hover:border-[#2563EB] hover:text-[#2563EB]"
+      className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-line bg-surface px-3 text-xs font-semibold text-ink-3 transition hover:border-brand hover:text-brand"
     >
       {icon}
       {children}
@@ -274,16 +285,17 @@ function Ghost({
 
 function ReportSkeleton() {
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
+    <div className="flex flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-card lg:min-h-0 lg:flex-1">
+      <div className="h-[76px] shrink-0 animate-pulse border-b border-line bg-sunken" />
+      <div className="grid shrink-0 grid-cols-2 divide-x divide-line-soft border-b border-line bg-sunken sm:grid-cols-5">
         {Array.from({ length: 5 }).map((_, i) => (
-          <div
-            key={i}
-            className="h-[74px] animate-pulse rounded-2xl border border-[#EEF1F6] bg-white"
-          />
+          <div key={i} className="px-5 py-3.5">
+            <span className="block h-2.5 w-16 animate-pulse rounded bg-sunken-2" />
+            <span className="mt-2 block h-6 w-12 animate-pulse rounded bg-sunken-2" />
+          </div>
         ))}
       </div>
-      <div className="h-[420px] animate-pulse rounded-2xl border border-[#EEF1F6] bg-white" />
+      <div className="min-h-[320px] flex-1 animate-pulse bg-sunken/40" />
     </div>
   );
 }

@@ -36,7 +36,10 @@ export function ActionStageStepper({
 
   return (
     <ol
-      className={cn("flex items-center pb-6", className)}
+      className={cn(
+        "flex items-center rounded-2xl border border-line bg-sunken px-4 pt-4 pb-9",
+        className,
+      )}
       aria-label="Issue progress"
     >
       {ACTION_STAGES.map((stage, i) => {
@@ -56,12 +59,12 @@ export function ActionStageStepper({
           >
             <span
               className={cn(
-                "grid size-6 shrink-0 place-items-center rounded-full border-2 transition",
+                "grid size-7 shrink-0 place-items-center rounded-full border-2 transition",
                 done
-                  ? "border-[#16A34A] bg-[#16A34A] text-white"
+                  ? "border-teal bg-teal text-white shadow-[0_4px_10px_-4px_rgb(13_148_136/0.8)]"
                   : active
-                    ? "border-[#2563EB] bg-white text-[#2563EB] ring-4 ring-[#2563EB]/12"
-                    : "border-[#E2E8F0] bg-white text-[#CBD5E1]"
+                    ? "border-brand bg-surface text-brand ring-4 ring-brand/15"
+                    : "border-line bg-surface text-ink-6",
               )}
             >
               {done ? (
@@ -78,27 +81,27 @@ export function ActionStageStepper({
             {!last && (
               <span
                 className={cn(
-                  "mx-1.5 h-0.5 flex-1 rounded-full",
-                  railDone ? "bg-[#16A34A]" : "bg-[#E2E8F0]"
+                  "mx-1.5 h-1 flex-1 rounded-full",
+                  railDone ? "bg-teal" : "bg-line-strong/60",
                 )}
               />
             )}
 
             <span
               className={cn(
-                "absolute top-8 whitespace-nowrap text-[10.5px] font-semibold",
+                "absolute top-9 whitespace-nowrap text-[10.5px] font-semibold",
                 i === 0
                   ? "left-0"
                   : last
                     ? "right-0"
-                    : "left-3 -translate-x-1/2",
+                    : "left-3.5 -translate-x-1/2",
                 skipped
-                  ? "text-[#CBD5E1] line-through"
+                  ? "text-ink-6 line-through"
                   : active
-                    ? "text-[#2563EB]"
+                    ? "text-brand"
                     : done
-                      ? "text-[#15803D]"
-                      : "text-[#94A3B8]"
+                      ? "text-teal-deep"
+                      : "text-ink-5",
               )}
             >
               {STAGE_LABELS[stage]}

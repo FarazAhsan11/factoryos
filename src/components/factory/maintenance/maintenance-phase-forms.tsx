@@ -33,10 +33,10 @@ import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
 import { cn } from "@/lib/utils";
 
 const CONTROL =
-  "h-10 w-full rounded-xl border border-[#E6EAF1] bg-[#FBFCFE] px-3.5 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:bg-white";
+  "h-10 w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)] outline-none transition placeholder:text-placeholder hover:border-line-strong focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12";
 
 const AREA =
-  "w-full rounded-xl border border-[#E6EAF1] bg-[#FBFCFE] px-3.5 py-2.5 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:bg-white";
+  "w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)] outline-none transition placeholder:text-placeholder hover:border-line-strong focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12";
 
 /**
  * The next thing this request needs, and nothing else.
@@ -64,12 +64,12 @@ export function MaintenanceNextStep({
 }) {
   if (request.status === "verified") {
     return (
-      <div className="rounded-2xl border border-[#BBF7D0] bg-[#F0FDF4] px-4 py-6 text-center">
-        <CheckCircle2 className="mx-auto mb-2 size-6 text-[#16A34A]" />
-        <p className="text-sm font-semibold text-[#15803D]">
+      <div className="rounded-2xl border border-teal-line bg-teal-soft px-4 py-6 text-center shadow-[inset_0_1px_2px_rgb(13_148_136/0.06)]">
+        <CheckCircle2 className="mx-auto mb-2 size-6 text-teal" />
+        <p className="text-sm font-semibold text-teal-deep">
           All three sections are signed.
         </p>
-        <p className="mt-1 text-xs text-[#15803D]/80">
+        <p className="mt-1 text-xs text-teal-deep/80">
           {request.request_no} is complete. The record is on the other tabs.
         </p>
       </div>
@@ -81,13 +81,12 @@ export function MaintenanceNextStep({
   // raise one; not everyone can declare the work done.
   if (!canReview(role)) {
     return (
-      <div className="rounded-2xl border border-dashed border-[#CBD5E1] px-4 py-8 text-center">
-        <p className="text-sm text-[#64748B]">
+      <div className="rounded-2xl border border-dashed border-line-strong bg-surface px-4 py-8 text-center">
+        <p className="text-sm text-ink-4">
           A supervisor or above moves this on.
         </p>
-        <p className="mt-1 text-xs text-[#94A3B8]">
-          You can follow it here — the record updates as each section is
-          signed.
+        <p className="mt-1 text-xs text-ink-5">
+          You can follow it here — the record updates as each section is signed.
         </p>
       </div>
     );
@@ -95,7 +94,9 @@ export function MaintenanceNextStep({
 
   switch (request.status) {
     case "reported":
-      return <AssignForm request={request} factoryId={factoryId} onDone={onDone} />;
+      return (
+        <AssignForm request={request} factoryId={factoryId} onDone={onDone} />
+      );
     case "assigned":
       return <StartWork request={request} onDone={onDone} />;
     case "in_progress":
@@ -177,7 +178,7 @@ function AssignForm({
           ))}
         </select>
         {active.length === 0 && (
-          <p className="text-xs text-[#B45309]">
+          <p className="text-xs text-warn-deep">
             No departments set up yet — add them in Admin → Departments.
           </p>
         )}
@@ -217,7 +218,7 @@ function StartWork({
         type="button"
         onClick={() => start.mutate()}
         disabled={start.isPending}
-        className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] px-4 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
+        className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand to-brand-deep px-4 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
       >
         {start.isPending ? (
           <Loader2 className="size-4 animate-spin" />
@@ -391,7 +392,8 @@ function QaForm({
       <Field
         label="Change control required?"
         error={
-          errors.changeControlRequired?.message ?? errors.changeControlNo?.message
+          errors.changeControlRequired?.message ??
+          errors.changeControlNo?.message
         }
       >
         <YesNo<MaintenanceQaValues>
@@ -475,13 +477,13 @@ function YesNo<T extends FieldValues>({
       {(["yes", "no"] as const).map((value) => (
         <label
           key={value}
-          className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#E6EAF1] bg-[#FBFCFE] px-3 py-2.5 text-sm font-medium text-[#475569] transition has-[:checked]:border-[#2563EB] has-[:checked]:bg-[#EFF6FF] has-[:checked]:text-[#1D4ED8]"
+          className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border border-line bg-surface px-3 py-2.5 text-sm font-semibold text-ink-3 shadow-[0_1px_2px_rgb(20_22_43/0.04)] transition hover:border-line-strong has-[:checked]:border-brand has-[:checked]:bg-brand-soft has-[:checked]:text-brand-deep has-[:checked]:shadow-none has-[:checked]:ring-2 has-[:checked]:ring-brand/15"
         >
           <input
             type="radio"
             value={value}
             {...register(name)}
-            className="size-4 accent-[#2563EB]"
+            className="size-4 accent-brand"
           />
           {value === "yes" ? "Yes" : "No"}
         </label>
@@ -492,9 +494,9 @@ function YesNo<T extends FieldValues>({
 
 function Intro({ title, body }: { title: string; body: string }) {
   return (
-    <div className="rounded-2xl border border-[#E6EAF1] bg-[#FBFCFE] px-4 py-3">
-      <p className="text-sm font-semibold text-[#0F1B34]">{title}</p>
-      <p className="mt-1 text-xs leading-relaxed text-[#64748B]">{body}</p>
+    <div className="rounded-2xl border border-line bg-surface px-4 py-3">
+      <p className="text-sm font-semibold text-ink">{title}</p>
+      <p className="mt-1 text-xs leading-relaxed text-ink-4">{body}</p>
     </div>
   );
 }
@@ -512,14 +514,12 @@ function Field({
 }) {
   return (
     <div className="space-y-1.5">
-      <p className="text-xs font-medium text-[#475569]">
+      <p className="text-xs font-medium text-ink-3">
         {label}
-        {hint && (
-          <span className="ml-1.5 font-normal text-[#94A3B8]">{hint}</span>
-        )}
+        {hint && <span className="ml-1.5 font-normal text-ink-5">{hint}</span>}
       </p>
       {children}
-      {error && <p className="text-xs font-medium text-[#DC2626]">{error}</p>}
+      {error && <p className="text-xs font-medium text-danger">{error}</p>}
     </div>
   );
 }
@@ -535,7 +535,7 @@ function Submit({
     <button
       type="submit"
       disabled={pending}
-      className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] px-4 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
+      className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand to-brand-deep px-4 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
     >
       {pending && <Loader2 className="size-4 animate-spin" />}
       {children}

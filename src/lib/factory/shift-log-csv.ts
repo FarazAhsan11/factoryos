@@ -142,7 +142,7 @@ export function csvFilename(factoryName: string): string {
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
   const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(
-    now.getDate()
+    now.getDate(),
   )}`;
   return `shift-log-${slug}-${stamp}.csv`;
 }

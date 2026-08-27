@@ -64,10 +64,7 @@ export function JobDetailDialog({
 
   const processes = useMemo(() => totalsByProcess(entries), [entries]);
   const rooms = useMemo(() => totalsByRoom(entries), [entries]);
-  const issues = useMemo(
-    () => entries.filter((e) => e.action_flag),
-    [entries]
-  );
+  const issues = useMemo(() => entries.filter((e) => e.action_flag), [entries]);
 
   const percent = job ? jobProgress(job) : null;
 
@@ -81,47 +78,55 @@ export function JobDetailDialog({
         }
       }}
     >
-      <DialogContent className="max-w-xl">
-        <DialogHeader>
-          <DialogTitle className="text-[#0F1B34]">
+      {/* `p-0` and a flex column so the list is the only thing that scrolls.
+          The dialog used to scroll as a whole *and* cap its list at 18rem, so
+          a long batch history had two scrollbars inside one box. */}
+      <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-full max-w-xl flex-col gap-0 overflow-hidden p-0">
+        <DialogHeader className="shrink-0 gap-1.5 border-b border-line bg-surface px-5 pt-5 pr-12 pb-4">
+          <DialogTitle className="break-words text-ink">
             {job?.product_name}
           </DialogTitle>
-          <DialogDescription>
-            <span className="font-mono">
-              {job?.product_code ? `${job.product_code} · ` : ""}
+          <DialogDescription className="break-words">
+            <span className="rounded-md bg-sunken-2 px-1.5 py-0.5 font-mono text-[11px] font-bold text-ink-4 ring-1 ring-line">
               {job?.batch_no}
             </span>
+            {job?.product_code && (
+              <span className="ml-1.5 font-mono text-[11px]">
+                {job.product_code}
+              </span>
+            )}
             {job?.unit_name && ` · currently in ${job.unit_name}`}
           </DialogDescription>
         </DialogHeader>
 
         {/* The headline the card shows, restated with what it means — the
-            single most confusing number in the module without it. */}
-        <div className="rounded-xl border border-[#E6EAF1] bg-[#FBFCFE] p-3.5">
+            single most confusing number in the module without it. Pinned
+            above the tabs, because it is the answer whichever tab is open. */}
+        <div className="mx-5 mt-4 shrink-0 rounded-xl border border-line bg-surface p-3.5">
           <div className="flex items-baseline justify-between gap-3">
-            <p className="text-xs font-medium text-[#64748B]">
+            <p className="text-xs font-medium text-ink-4">
               Batch completion
-              <span className="ml-1 text-[#94A3B8]">
+              <span className="ml-1 text-ink-5">
                 (measured at the final stage)
               </span>
             </p>
-            <p className="font-mono text-sm font-semibold text-[#0F1B34]">
+            <p className="font-mono text-sm font-semibold text-ink">
               {fmt(job?.produced_qty)} / {fmt(job?.required_qty)}
               {percent !== null && (
-                <span className="ml-1.5 text-[#2563EB]">{percent}%</span>
+                <span className="ml-1.5 text-brand">{percent}%</span>
               )}
             </p>
           </div>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#F1F5F9]">
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-sunken-2 ring-1 ring-line-soft ring-inset">
             <div
-              className="h-full rounded-full bg-[#2563EB] transition-[width]"
+              className="h-full rounded-full bg-[linear-gradient(90deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] transition-[width] duration-500"
               style={{ width: `${percent ?? 0}%` }}
             />
           </div>
         </div>
 
         {job?.status === "hold" && job.hold_reason && (
-          <p className="flex items-start gap-2 rounded-xl bg-[#FFFBEB] px-3.5 py-2.5 text-xs text-[#92400E]">
+          <p className="mx-5 mt-3 flex shrink-0 items-start gap-2 rounded-xl border border-warn-line bg-warn-tint px-3.5 py-2.5 text-xs text-warn-ink">
             <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
             On hold — a {job.hold_reason.toLowerCase()} issue was flagged. The
             next entry logged without a flag releases it.
@@ -131,7 +136,7 @@ export function JobDetailDialog({
         <div
           role="tablist"
           aria-label="Batch details"
-          className="flex gap-1 rounded-xl bg-[#F1F5F9] p-1"
+          className="mx-5 mt-3 flex shrink-0 gap-1 rounded-xl border border-line bg-sunken-2 p-1"
         >
           <TabButton
             active={tab === "progress"}
@@ -158,12 +163,12 @@ export function JobDetailDialog({
         </div>
 
         {isPending ? (
-          <div className="flex items-center justify-center gap-2 py-10 text-sm text-[#94A3B8]">
+          <div className="flex min-h-0 flex-1 items-center justify-center gap-2 py-10 text-sm text-ink-5">
             <Loader2 className="size-4 animate-spin" />
             Loading the batch history…
           </div>
         ) : (
-          <div className="max-h-72 overflow-y-auto">
+          <div className="scrollbar-slim min-h-0 flex-1 overflow-y-auto px-5 py-4">
             {tab === "progress" && (
               <Table
                 empty="Nothing has been produced against this batch yet."
@@ -172,20 +177,20 @@ export function JobDetailDialog({
                 {processes.map((p) => (
                   <li
                     key={p.name}
-                    className="flex items-center gap-3 border-b border-[#F1F5F9] px-3.5 py-2.5 last:border-0"
+                    className="flex items-center gap-3 border-b border-line-soft px-3.5 py-2.5 transition last:border-0 hover:bg-sunken"
                   >
-                    <span className="min-w-0 flex-1 truncate text-sm text-[#0F1B34]">
+                    <span className="min-w-0 flex-1 truncate text-sm text-ink">
                       {p.name}
                       {p.isFinal && (
-                        <span className="ml-1.5 rounded-full bg-[#2563EB]/10 px-1.5 py-0.5 text-[10px] font-semibold text-[#2563EB]">
+                        <span className="ml-1.5 rounded-full bg-brand-soft px-1.5 py-0.5 text-[10px] font-semibold text-brand-deep ring-1 ring-brand-line">
                           Final
                         </span>
                       )}
-                      <span className="mt-0.5 block text-[11px] text-[#94A3B8]">
+                      <span className="mt-0.5 block text-[11px] text-ink-5">
                         {p.entries} entr{p.entries === 1 ? "y" : "ies"}
                         {p.minutes > 0 && ` · ${formatMinutes(p.minutes)}`}
                         {p.rejected > 0 && (
-                          <span className="text-[#B91C1C]">
+                          <span className="text-danger-deep">
                             {" "}
                             · {fmt(p.rejected)} rejected
                           </span>
@@ -195,7 +200,7 @@ export function JobDetailDialog({
                     <span
                       className={cn(
                         "shrink-0 font-mono text-sm font-semibold",
-                        p.isFinal ? "text-[#2563EB]" : "text-[#475569]"
+                        p.isFinal ? "text-brand" : "text-ink-3",
                       )}
                     >
                       {fmt(p.qty)}
@@ -213,16 +218,16 @@ export function JobDetailDialog({
                 {rooms.map((r) => (
                   <li
                     key={r.name}
-                    className="flex items-center gap-3 border-b border-[#F1F5F9] px-3.5 py-2.5 last:border-0"
+                    className="flex items-center gap-3 border-b border-line-soft px-3.5 py-2.5 transition last:border-0 hover:bg-sunken"
                   >
-                    <span className="min-w-0 flex-1 truncate text-sm text-[#0F1B34]">
+                    <span className="min-w-0 flex-1 truncate text-sm text-ink">
                       {r.name}
-                      <span className="mt-0.5 block text-[11px] text-[#94A3B8]">
+                      <span className="mt-0.5 block text-[11px] text-ink-5">
                         {r.entries} entr{r.entries === 1 ? "y" : "ies"} · last
                         used {shortDate(r.lastDate)}
                       </span>
                     </span>
-                    <span className="shrink-0 font-mono text-[12px] text-[#475569]">
+                    <span className="shrink-0 font-mono text-[12px] text-ink-3">
                       {formatMinutes(r.minutes)}
                     </span>
                   </li>
@@ -238,32 +243,32 @@ export function JobDetailDialog({
                 {issues.map((e) => (
                   <li
                     key={e.id}
-                    className="border-b border-[#F1F5F9] px-3.5 py-2.5 last:border-0"
+                    className="border-b border-line-soft px-3.5 py-2.5 transition last:border-0 hover:bg-sunken"
                   >
                     <div className="flex items-center gap-2">
-                      <span className="rounded-full bg-[#FEF2F2] px-1.5 py-0.5 text-[10px] font-semibold text-[#B91C1C]">
+                      <span className="shrink-0 rounded-full bg-danger-soft px-1.5 py-0.5 text-[10px] font-semibold text-danger-deep ring-1 ring-danger-line">
                         {e.action_flag}
                       </span>
-                      <span className="min-w-0 flex-1 truncate text-sm text-[#0F1B34]">
+                      <span className="min-w-0 flex-1 truncate text-sm text-ink">
                         {e.process?.name ?? "—"}
                       </span>
-                      <span className="shrink-0 text-[11px] text-[#94A3B8]">
+                      <span className="shrink-0 text-[11px] text-ink-5">
                         {shortDate(e.log_date)}
                         {e.unit?.name && ` · ${e.unit.name}`}
                       </span>
                     </div>
                     {e.comment && (
-                      <p className="mt-1 text-[11px] italic text-[#64748B]">
+                      <p className="mt-1 text-[11px] break-words italic text-ink-4">
                         {e.comment}
                       </p>
                     )}
                     {e.operators?.length > 0 && (
-                      <p className="mt-0.5 text-[11px] text-[#94A3B8]">
+                      <p className="mt-0.5 text-[11px] text-ink-5">
                         {e.operators.join(" / ")}
                       </p>
                     )}
                     {e.amend_note && (
-                      <p className="mt-0.5 whitespace-pre-line text-[11px] text-[#7C3AED]">
+                      <p className="mt-0.5 text-[11px] break-words whitespace-pre-line text-violet">
                         ↳ {e.amend_note}
                       </p>
                     )}
@@ -289,13 +294,15 @@ function Table({
 }) {
   if (rows === 0) {
     return (
-      <p className="rounded-xl border border-dashed border-[#CBD5E1] px-4 py-10 text-center text-xs text-[#94A3B8]">
+      <p className="rounded-xl border border-dashed border-line-strong bg-surface px-4 py-10 text-center text-xs text-ink-5">
         {empty}
       </p>
     );
   }
   return (
-    <ul className="rounded-xl border border-[#E6EAF1]">{children}</ul>
+    <ul className="overflow-hidden rounded-xl border border-line bg-surface">
+      {children}
+    </ul>
   );
 }
 
@@ -321,14 +328,14 @@ function TabButton({
       className={cn(
         "inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition",
         active
-          ? "bg-white text-[#2563EB] shadow-[0_1px_2px_rgba(15,27,52,0.08)]"
-          : "text-[#64748B] hover:text-[#0F1B34]"
+          ? "bg-surface text-brand-deep shadow-[0_1px_3px_rgb(20_22_43/0.12)] ring-1 ring-line"
+          : "text-ink-4 hover:bg-surface/60 hover:text-ink",
       )}
     >
       <Icon className="size-4" />
       {children}
       {count !== undefined && count > 0 && (
-        <span className="rounded-full bg-[#FEF2F2] px-1.5 text-[10px] font-bold text-[#B91C1C]">
+        <span className="rounded-full bg-danger-soft px-1.5 text-[10px] font-bold text-danger-deep ring-1 ring-danger-line">
           {count}
         </span>
       )}

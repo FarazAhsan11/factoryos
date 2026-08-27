@@ -85,7 +85,7 @@ export function ProductImportDialog({
     const parsed = parseProductCsv(text);
     const { fresh, duplicates: dupes } = splitExisting(
       parsed.rows,
-      existingBatchNos
+      existingBatchNos,
     );
     setFileName(name);
     setRows(fresh);
@@ -110,7 +110,7 @@ export function ProductImportDialog({
       setFatal(
         e instanceof Error
           ? `Import stopped: ${e.message}`
-          : "Import stopped unexpectedly."
+          : "Import stopped unexpectedly.",
       );
     }
 
@@ -121,7 +121,7 @@ export function ProductImportDialog({
   function downloadTemplate() {
     // Built at click time so the example dates are always still ahead.
     const url = URL.createObjectURL(
-      new Blob([productCsvTemplate()], { type: "text/csv" })
+      new Blob([productCsvTemplate()], { type: "text/csv" }),
     );
     const a = document.createElement("a");
     a.href = url;
@@ -141,7 +141,7 @@ export function ProductImportDialog({
           resetAll();
           setOpen(true);
         }}
-        className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border border-[#E6EAF1] bg-white px-3 text-sm font-medium text-[#475569] transition hover:bg-[#F8FAFC]"
+        className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border border-line bg-surface px-3 text-sm font-medium text-ink-3 transition hover:bg-sunken"
       >
         <Upload className="size-4" />
         Bulk import
@@ -157,7 +157,7 @@ export function ProductImportDialog({
       >
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-[#0F1B34]">Import products</DialogTitle>
+            <DialogTitle className="text-ink">Import products</DialogTitle>
             <DialogDescription>
               Upload a CSV of batches. Existing batch numbers are skipped, so
               re-uploading a sheet never overwrites what production has been
@@ -169,13 +169,13 @@ export function ProductImportDialog({
             <div className="space-y-3">
               <label
                 htmlFor="product-csv"
-                className="flex cursor-pointer flex-col items-center gap-2 rounded-2xl border border-dashed border-[#CBD5E1] bg-[#FBFCFE] px-4 py-10 text-center transition hover:border-[#2563EB] hover:bg-[#F5F8FF]"
+                className="flex cursor-pointer flex-col items-center gap-2 rounded-2xl border border-dashed border-line-strong bg-surface px-4 py-10 text-center transition hover:border-brand hover:bg-brand-tint"
               >
-                <FileUp className="size-6 text-[#94A3B8]" />
-                <span className="text-sm font-medium text-[#0F1B34]">
+                <FileUp className="size-6 text-ink-5" />
+                <span className="text-sm font-medium text-ink">
                   Choose a CSV file
                 </span>
-                <span className="text-xs text-[#94A3B8]">
+                <span className="text-xs text-ink-5">
                   Columns: batch, code, product name, work order, required qty,
                   planned for
                 </span>
@@ -195,17 +195,17 @@ export function ProductImportDialog({
               <button
                 type="button"
                 onClick={downloadTemplate}
-                className="inline-flex items-center gap-1.5 text-xs font-medium text-[#2563EB] transition hover:underline"
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-brand transition hover:underline"
               >
                 <Download className="size-3.5" />
                 Download a template
               </button>
-              <p className="text-xs text-[#94A3B8]">
+              <p className="text-xs text-ink-5">
                 In Excel or Sheets: File → Save As (or Download) → CSV. Keep the
                 header row — it&rsquo;s what lets the columns be in any order.
               </p>
-              <p className="text-xs text-[#94A3B8]">
-                <strong className="font-semibold text-[#475569]">
+              <p className="text-xs text-ink-5">
+                <strong className="font-semibold text-ink-3">
                   Planned for
                 </strong>{" "}
                 is optional: a date puts the batch on the pipeline as Planned
@@ -220,10 +220,10 @@ export function ProductImportDialog({
 
           {stage === "review" && (
             <div className="space-y-3">
-              <div className="rounded-xl border border-[#E6EAF1] bg-[#FBFCFE] px-4 py-3 text-sm">
-                <p className="font-medium text-[#0F1B34]">{fileName}</p>
-                <p className="mt-0.5 text-[#64748B]">
-                  <strong className="text-[#0F1B34]">{rows.length}</strong> batch
+              <div className="rounded-xl border border-line bg-surface px-4 py-3 text-sm">
+                <p className="font-medium text-ink">{fileName}</p>
+                <p className="mt-0.5 text-ink-4">
+                  <strong className="text-ink">{rows.length}</strong> batch
                   {rows.length === 1 ? "" : "es"} ready to add
                   {duplicates.length > 0 &&
                     ` · ${duplicates.length} already in the catalogue`}
@@ -264,27 +264,27 @@ export function ProductImportDialog({
               )}
 
               {rows.length > 0 && (
-                <ul className="max-h-40 overflow-y-auto rounded-xl border border-[#E6EAF1] text-sm">
+                <ul className="max-h-40 overflow-y-auto rounded-xl border border-line text-sm">
                   {rows.slice(0, 50).map((r) => (
                     <li
                       key={r.batchNo}
-                      className="flex items-center gap-3 border-b border-[#F1F5F9] px-3.5 py-2 last:border-0"
+                      className="flex items-center gap-3 border-b border-sunken-2 px-3.5 py-2 last:border-0"
                     >
-                      <span className="shrink-0 font-mono text-[12px] font-medium text-[#0F1B34]">
+                      <span className="shrink-0 font-mono text-[12px] font-medium text-ink">
                         {r.batchNo}
                       </span>
-                      <span className="min-w-0 flex-1 truncate text-[#334155]">
+                      <span className="min-w-0 flex-1 truncate text-ink-2">
                         {r.name}
                       </span>
                       {r.plannedFor && (
                         <span
                           title={`Joins the pipeline as Planned on ${r.plannedFor}`}
-                          className="shrink-0 rounded-full bg-[#F5F3FF] px-1.5 py-0.5 text-[10px] font-semibold text-[#7C3AED]"
+                          className="shrink-0 rounded-full bg-violet-soft px-1.5 py-0.5 text-[10px] font-semibold text-violet"
                         >
                           {formatDay(r.plannedFor)}
                         </span>
                       )}
-                      <span className="shrink-0 font-mono text-[12px] text-[#64748B]">
+                      <span className="shrink-0 font-mono text-[12px] text-ink-4">
                         {r.requiredQty.toLocaleString(undefined, {
                           maximumFractionDigits: 2,
                         })}
@@ -292,7 +292,7 @@ export function ProductImportDialog({
                     </li>
                   ))}
                   {rows.length > 50 && (
-                    <li className="px-3.5 py-2 text-xs text-[#94A3B8]">
+                    <li className="px-3.5 py-2 text-xs text-ink-5">
                       …and {rows.length - 50} more.
                     </li>
                   )}
@@ -309,44 +309,44 @@ export function ProductImportDialog({
           )}
 
           {stage === "running" && (
-            <div className="flex items-center gap-2 rounded-2xl border border-[#E6EAF1] bg-[#FBFCFE] p-4 text-sm font-medium text-[#0F1B34]">
-              <Loader2 className="size-4 animate-spin text-[#2563EB]" />
+            <div className="flex items-center gap-2 rounded-2xl border border-line bg-surface p-4 text-sm font-medium text-ink">
+              <Loader2 className="size-4 animate-spin text-brand" />
               Adding {rows.length} batch{rows.length === 1 ? "" : "es"}…
             </div>
           )}
 
           {stage === "done" && (
             <div className="space-y-3">
-              <div className="flex items-start gap-3 rounded-2xl border border-[#BBF7D0] bg-[#F0FDF4] p-4">
-                <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-[#16A34A]" />
+              <div className="flex items-start gap-3 rounded-2xl border border-teal-line bg-teal-soft p-4">
+                <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-teal" />
                 <div className="text-sm">
-                  <p className="font-semibold text-[#0F1B34]">
+                  <p className="font-semibold text-ink">
                     {added} batch{added === 1 ? "" : "es"} added
                   </p>
-                  <p className="mt-0.5 text-[#475569]">
+                  <p className="mt-0.5 text-ink-3">
                     They can be logged against in the shift log straight away.
                   </p>
                 </div>
               </div>
 
               {fatal && (
-                <p className="rounded-xl bg-[#FEF2F2] px-4 py-3 text-sm text-[#B91C1C]">
+                <p className="rounded-xl bg-danger-soft px-4 py-3 text-sm text-danger-deep">
                   {fatal}
                 </p>
               )}
 
               {failed.length > 0 && (
-                <ul className="max-h-44 overflow-y-auto rounded-xl border border-[#E6EAF1] text-sm">
+                <ul className="max-h-44 overflow-y-auto rounded-xl border border-line text-sm">
                   {failed.map((r) => (
                     <li
                       key={r.batchNo}
-                      className="flex items-start gap-2 border-b border-[#F1F5F9] px-3.5 py-2 last:border-0"
+                      className="flex items-start gap-2 border-b border-sunken-2 px-3.5 py-2 last:border-0"
                     >
-                      <XCircle className="mt-0.5 size-3.5 shrink-0 text-[#B91C1C]" />
-                      <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-[#0F1B34]">
+                      <XCircle className="mt-0.5 size-3.5 shrink-0 text-danger-deep" />
+                      <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-ink">
                         {r.batchNo}
                       </span>
-                      <span className="shrink-0 text-xs text-[#B91C1C]">
+                      <span className="shrink-0 text-xs text-danger-deep">
                         {r.error ?? "Skipped"}
                       </span>
                     </li>
@@ -356,7 +356,9 @@ export function ProductImportDialog({
 
               <div className="flex justify-end gap-2 pt-1">
                 <GhostButton onClick={resetAll}>Import more</GhostButton>
-                <PrimaryButton onClick={() => setOpen(false)}>Done</PrimaryButton>
+                <PrimaryButton onClick={() => setOpen(false)}>
+                  Done
+                </PrimaryButton>
               </div>
             </div>
           )}
@@ -374,7 +376,7 @@ function ProblemList({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-[#FDE68A] bg-[#FFFBEB] p-3 text-xs text-[#92400E]">
+    <div className="rounded-xl border border-warn-line bg-warn-tint p-3 text-xs text-warn-ink">
       <p className="mb-1.5 flex items-center gap-1.5 font-semibold">
         <AlertTriangle className="size-3.5" />
         {title}
@@ -398,7 +400,7 @@ function PrimaryButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex h-10 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] px-4 text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(37,99,235,0.55)] transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-60"
+      className="inline-flex h-10 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-4 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-60"
     >
       {children}
     </button>
@@ -416,7 +418,7 @@ function GhostButton({
     <button
       type="button"
       onClick={onClick}
-      className="h-10 rounded-xl px-4 text-sm font-medium text-[#475569] transition hover:bg-[#F1F5F9]"
+      className="h-10 rounded-xl px-4 text-sm font-medium text-ink-3 transition hover:bg-sunken-2"
     >
       {children}
     </button>

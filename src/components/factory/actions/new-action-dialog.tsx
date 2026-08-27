@@ -20,12 +20,16 @@ import {
   type NewActionValues,
 } from "@/lib/factory/action-queries";
 import { BatchSummary } from "@/components/factory/batch/batch-summary";
+import { DateTimeField } from "@/components/ui/date-picker";
 import { fetchProducts, productKeys } from "@/lib/factory/product-queries";
 import type { SetupItem } from "@/lib/factory/setup-queries";
 import { cn } from "@/lib/utils";
 
 const CONTROL =
-  "h-10 w-full rounded-xl border border-[#E6EAF1] bg-[#FBFCFE] px-3.5 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:bg-white";
+  "h-10 w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)] outline-none transition placeholder:text-placeholder hover:border-line-strong focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12";
+
+/** Same control, plus our own chevron — see `.select-chevron`. */
+const SELECT = CONTROL + " select-chevron";
 
 const EMPTY: NewActionValues = {
   title: "",
@@ -64,7 +68,7 @@ export function NewActionDialog({
 
   function set<K extends keyof NewActionValues>(
     key: K,
-    value: NewActionValues[K]
+    value: NewActionValues[K],
   ) {
     setValues((current) => ({ ...current, [key]: value }));
   }
@@ -104,7 +108,7 @@ export function NewActionDialog({
           setValues(EMPTY);
           setOpen(true);
         }}
-        className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] px-3.5 text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(37,99,235,0.55)] transition hover:brightness-[1.06]"
+        className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-3.5 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06]"
       >
         <Plus className="size-4" />
         New action
@@ -117,16 +121,20 @@ export function NewActionDialog({
           setOpen(next);
         }}
       >
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="text-[#0F1B34]">New action</DialogTitle>
+        {/* `p-0` and a flex column so the fields are the only thing that
+            scrolls. With the dialog's own padding the whole box scrolled, which
+            took Create action off the bottom of the screen — the one control
+            the dialog exists for. */}
+        <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col gap-0 overflow-hidden p-0">
+          <DialogHeader className="shrink-0 gap-1.5 border-b border-line bg-surface px-5 pt-5 pr-12 pb-4">
+            <DialogTitle className="text-ink">New action</DialogTitle>
             <DialogDescription>
               Issues flagged in the shift log create these automatically — this
               is for everything else.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3">
+          <div className="scrollbar-slim min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
             <Field label="Title" htmlFor="na-title">
               <input
                 id="na-title"
@@ -144,7 +152,7 @@ export function NewActionDialog({
                   id="na-unit"
                   value={values.unitId}
                   onChange={(e) => set("unitId", e.target.value)}
-                  className={CONTROL}
+                  className={SELECT}
                 >
                   <option value="">Factory-wide</option>
                   {units
@@ -162,7 +170,7 @@ export function NewActionDialog({
                   id="na-category"
                   value={values.category}
                   onChange={(e) => set("category", e.target.value)}
-                  className={CONTROL}
+                  className={SELECT}
                 >
                   {ACTION_CATEGORIES.map((c) => (
                     <option key={c} value={c}>
@@ -181,7 +189,7 @@ export function NewActionDialog({
                   onChange={(e) =>
                     set("priority", e.target.value as ActionPriority)
                   }
-                  className={CONTROL}
+                  className={SELECT}
                 >
                   {ACTION_PRIORITIES.map((p) => (
                     <option key={p.value} value={p.value}>
@@ -220,17 +228,16 @@ export function NewActionDialog({
             </Field>
 
             <Field label="Due by" htmlFor="na-due" note="(optional)">
-              <input
+              <DateTimeField
                 id="na-due"
-                type="datetime-local"
                 value={values.dueAt}
-                onChange={(e) => set("dueAt", e.target.value)}
-                className={CONTROL}
+                onChange={(dueAt) => set("dueAt", dueAt)}
+                placeholder="Use the priority's own window"
               />
-              <p className="mt-1 text-[11px] text-[#94A3B8]">
+              <p className="mt-1 text-[11px] text-ink-5">
                 Leave blank and it&rsquo;s due in {window?.within} — the{" "}
-                {window?.label.toLowerCase()} window — escalating {window?.within}{" "}
-                after that.
+                {window?.label.toLowerCase()} window — escalating{" "}
+                {window?.within} after that.
               </p>
             </Field>
 
@@ -241,29 +248,29 @@ export function NewActionDialog({
                 value={values.notes}
                 onChange={(e) => set("notes", e.target.value)}
                 placeholder="Context, root cause, what needs to happen…"
-                className="w-full rounded-xl border border-[#E6EAF1] bg-[#FBFCFE] px-3.5 py-2.5 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:bg-white"
+                className="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)] outline-none transition placeholder:text-placeholder hover:border-line-strong focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12"
               />
             </Field>
+          </div>
 
-            <div className="flex justify-end gap-2 pt-1">
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                disabled={create.isPending}
-                className="h-10 rounded-xl px-4 text-sm font-medium text-[#475569] transition hover:bg-[#F1F5F9] disabled:opacity-60"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => create.mutate()}
-                disabled={create.isPending || !values.title.trim()}
-                className="inline-flex h-10 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] px-4 text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(37,99,235,0.55)] transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-60"
-              >
-                {create.isPending && <Loader2 className="size-4 animate-spin" />}
-                Create action
-              </button>
-            </div>
+          <div className="flex shrink-0 justify-end gap-2 border-t border-line bg-surface px-5 py-3.5">
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              disabled={create.isPending}
+              className="h-10 rounded-xl px-4 text-sm font-semibold text-ink-3 transition hover:bg-sunken-2 hover:text-ink disabled:opacity-60"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => create.mutate()}
+              disabled={create.isPending || !values.title.trim()}
+              className="inline-flex h-10 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-4 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60"
+            >
+              {create.isPending && <Loader2 className="size-4 animate-spin" />}
+              Create action
+            </button>
           </div>
         </DialogContent>
       </Dialog>
@@ -288,10 +295,14 @@ function Field({
     <div className={cn("space-y-1.5", className)}>
       <label
         htmlFor={htmlFor}
-        className="block text-xs font-medium text-[#475569]"
+        className="block text-xs font-semibold text-ink-2"
       >
         {label}
-        {note && <span className="ml-1 text-[10px] text-[#94A3B8]">{note}</span>}
+        {note && (
+          <span className="ml-1 text-[10px] font-normal text-ink-5">
+            {note}
+          </span>
+        )}
       </label>
       {children}
     </div>

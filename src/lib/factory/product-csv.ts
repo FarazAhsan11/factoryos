@@ -68,13 +68,7 @@ const BATCH_HEADERS = [
   "lot",
 ];
 const CODE_HEADERS = ["code", "product code", "item code", "sku"];
-const NAME_HEADERS = [
-  "name",
-  "product",
-  "product name",
-  "description",
-  "item",
-];
+const NAME_HEADERS = ["name", "product", "product name", "description", "item"];
 const WORK_ORDER_HEADERS = [
   "work order",
   "work_order",
@@ -191,7 +185,7 @@ export function parseProductCsv(text: string): ParsedProductCsv {
 
   for (const { line, raw } of body) {
     const cells = splitLine(raw, delimiter);
-    const pick = (index: number) => (index >= 0 ? cells[index] ?? "" : "");
+    const pick = (index: number) => (index >= 0 ? (cells[index] ?? "") : "");
 
     const batchNo = pick(columns.batch);
     const name = pick(columns.name);
@@ -271,7 +265,7 @@ export function parseProductCsv(text: string): ParsedProductCsv {
  */
 export function splitExisting(
   rows: ProductValues[],
-  existingBatchNos: string[]
+  existingBatchNos: string[],
 ): { fresh: ProductValues[]; duplicates: ProductValues[] } {
   const known = new Set(existingBatchNos.map((b) => b.trim().toLowerCase()));
   const fresh: ProductValues[] = [];

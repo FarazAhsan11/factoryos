@@ -16,7 +16,7 @@ export function getTransport() {
 
   if (!host || !user || !pass) {
     throw new Error(
-      "SMTP is not configured. Set SMTP_HOST, SMTP_USER and SMTP_PASS in .env.local."
+      "SMTP is not configured. Set SMTP_HOST, SMTP_USER and SMTP_PASS in .env.local.",
     );
   }
 

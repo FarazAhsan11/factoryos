@@ -49,7 +49,9 @@ export function LogWorkspace({
   }, []);
 
   return (
-    <>
+    /* A column that fills what the shell gave it, so the two panels below can
+       each take a bounded height and scroll inside it. */
+    <div className="flex flex-col lg:min-h-0 lg:flex-1">
       <AdminTabs
         tabs={LOG_TABS}
         active={tab}
@@ -57,17 +59,24 @@ export function LogWorkspace({
         onSelect={select}
       />
 
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+      {/* `lg:grid-rows-1` is what makes the columns equal-height: without a
+          single explicit row, each panel sizes to its own content and the
+          taller one sets a page scroll again. */}
+      <div className="grid items-start gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_380px] lg:grid-rows-1 lg:items-stretch">
         {/* The entry form is hidden rather than unmounted: it is long, often
             half-filled, and a glance at the Kaizen tab must not throw that
             away. The Kaizen form is short enough that remounting it costs
             nothing, so it is only rendered when its tab is open. */}
-        <div role="tabpanel" hidden={tab !== "entry"}>
+        <div
+          role="tabpanel"
+          hidden={tab !== "entry"}
+          className="min-w-0 lg:min-h-0"
+        >
           <LogEntryForm factoryId={factoryId} userId={userId} units={units} />
         </div>
 
         {tab === "kaizen" && (
-          <div role="tabpanel">
+          <div role="tabpanel" className="min-w-0 lg:min-h-0">
             <KaizenForm
               factoryId={factoryId}
               userId={userId}
@@ -91,6 +100,6 @@ export function LogWorkspace({
           />
         )}
       </div>
-    </>
+    </div>
   );
 }

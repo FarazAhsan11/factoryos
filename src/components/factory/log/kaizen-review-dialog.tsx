@@ -123,7 +123,9 @@ function Body({
   function decline() {
     if (!note.trim()) {
       setDeclining(true);
-      toast.error("Give a reason — it's the part that keeps people suggesting.");
+      toast.error(
+        "Give a reason — it's the part that keeps people suggesting.",
+      );
       return;
     }
     move.mutate("declined");
@@ -132,8 +134,8 @@ function Body({
   return (
     <>
       <DialogHeader>
-        <DialogTitle className="text-[#0F1B34]">Improvement idea</DialogTitle>
-        <DialogDescription>
+        <DialogTitle className="text-ink">Improvement idea</DialogTitle>
+        <DialogDescription className="break-words">
           {idea.submitted_by_name ?? "Unknown"} · {timeAgo(idea.created_at)} ·{" "}
           {idea.category} · {IMPACT_LABELS[idea.impact]}
         </DialogDescription>
@@ -147,13 +149,13 @@ function Body({
           {status.label}
         </span>
         {idea.reviewed_by_name && idea.reviewed_at && (
-          <span className="rounded-full bg-[#F1F5F9] px-2 py-0.5 text-[10px] font-semibold text-[#475569]">
+          <span className="rounded-full bg-sunken-2 px-2 py-0.5 text-[10px] font-semibold text-ink-3">
             {idea.reviewed_by_name} · {timeAgo(idea.reviewed_at)}
           </span>
         )}
       </div>
 
-      <p className="whitespace-pre-line rounded-xl border border-[#E6EAF1] bg-[#FBFCFE] px-3.5 py-3 text-sm leading-relaxed text-[#0F1B34]">
+      <p className="max-h-64 overflow-y-auto rounded-xl border border-line bg-surface px-3.5 py-3 text-sm leading-relaxed break-words whitespace-pre-line text-ink scrollbar-slim">
         {idea.idea}
       </p>
 
@@ -161,10 +163,10 @@ function Body({
         <div className="space-y-2">
           <label
             htmlFor="k-review-note"
-            className="block text-[10px] font-bold uppercase tracking-[0.6px] text-[#94A3B8]"
+            className="block text-[10px] font-bold uppercase tracking-[0.6px] text-ink-5"
           >
             Reviewer&rsquo;s note{" "}
-            <span className="font-normal normal-case tracking-normal text-[#64748B]">
+            <span className="font-normal normal-case tracking-normal text-ink-4">
               {declining
                 ? "— required to decline"
                 : "— optional, and read by whoever suggested it"}
@@ -180,18 +182,18 @@ function Body({
             }}
             placeholder="What happens next, or why this one can't work…"
             className={cn(
-              "w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#2563EB]",
-              declining ? "border-[#FCA5A5]" : "border-[#E6EAF1]"
+              "w-full rounded-xl border bg-surface px-3.5 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-brand",
+              declining ? "border-danger-line" : "border-line",
             )}
           />
         </div>
       ) : (
         idea.review_note && (
           <div className="space-y-1">
-            <p className="text-[10px] font-bold uppercase tracking-[0.6px] text-[#94A3B8]">
+            <p className="text-[10px] font-bold uppercase tracking-[0.6px] text-ink-5">
               Reviewer&rsquo;s note
             </p>
-            <p className="whitespace-pre-line rounded-xl bg-[#F8FAFC] px-3.5 py-2.5 text-[13px] text-[#475569]">
+            <p className="rounded-xl bg-surface px-3.5 py-2.5 text-[13px] break-words whitespace-pre-line text-ink-3">
               {idea.review_note}
             </p>
           </div>
@@ -203,7 +205,7 @@ function Body({
           type="button"
           onClick={onClose}
           disabled={busy}
-          className="h-10 flex-1 rounded-xl border border-[#E6EAF1] text-sm font-medium text-[#475569] transition hover:border-[#2563EB] hover:text-[#2563EB] disabled:opacity-60"
+          className="h-10 flex-1 rounded-xl border border-line text-sm font-medium text-ink-3 transition hover:border-brand hover:text-brand disabled:opacity-60"
         >
           Close
         </button>
@@ -214,7 +216,7 @@ function Body({
             onClick={() => withdraw.mutate()}
             disabled={busy}
             title="Remove your own idea — only possible before anyone has reviewed it"
-            className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-[#E6EAF1] px-3 text-sm font-medium text-[#94A3B8] transition hover:border-[#B91C1C] hover:text-[#B91C1C] disabled:opacity-60"
+            className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-line px-3 text-sm font-medium text-ink-5 transition hover:border-danger-deep hover:text-danger-deep disabled:opacity-60"
           >
             <Trash2 className="size-3.5" />
             Withdraw
@@ -226,7 +228,7 @@ function Body({
             type="button"
             onClick={decline}
             disabled={busy}
-            className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-[#E6EAF1] px-3 text-sm font-medium text-[#475569] transition hover:border-[#B91C1C] hover:text-[#B91C1C] disabled:opacity-60"
+            className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-line px-3 text-sm font-medium text-ink-3 transition hover:border-danger-deep hover:text-danger-deep disabled:opacity-60"
           >
             <ThumbsDown className="size-3.5" />
             Decline
@@ -238,7 +240,7 @@ function Body({
             type="button"
             onClick={() => move.mutate(status.next!)}
             disabled={busy}
-            className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] px-4 text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(37,99,235,0.55)] transition hover:brightness-[1.06] disabled:opacity-60"
+            className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-4 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] disabled:opacity-60"
           >
             {move.isPending ? (
               <Loader2 className="size-3.5 animate-spin" />
@@ -257,7 +259,7 @@ function Body({
             type="button"
             onClick={() => move.mutate("under_review")}
             disabled={busy}
-            className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-[#E6EAF1] px-4 text-sm font-medium text-[#475569] transition hover:border-[#2563EB] hover:text-[#2563EB] disabled:opacity-60"
+            className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-line px-4 text-sm font-medium text-ink-3 transition hover:border-brand hover:text-brand disabled:opacity-60"
           >
             Reopen
           </button>

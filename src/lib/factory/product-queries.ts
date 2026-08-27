@@ -35,7 +35,7 @@ export const productKeys = {
 /** Turns a Postgres error into something an operator can act on. */
 function toMessage(
   error: { code?: string; message: string },
-  batchNo?: string
+  batchNo?: string,
 ): string {
   if (error.code === "23505") {
     return batchNo
@@ -59,7 +59,7 @@ export async function fetchProducts(factoryId: string): Promise<Product[]> {
 
 export async function createProduct(
   factoryId: string,
-  values: ProductValues
+  values: ProductValues,
 ): Promise<Product> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -109,7 +109,7 @@ const IMPORT_CHUNK = 50;
  */
 export async function createProducts(
   factoryId: string,
-  rows: ProductValues[]
+  rows: ProductValues[],
 ): Promise<ProductImportResult[]> {
   const supabase = createClient();
   const results: ProductImportResult[] = [];
@@ -172,7 +172,7 @@ export async function updateProduct(
       | "planned_for"
       | "active"
     >
-  >
+  >,
 ): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase

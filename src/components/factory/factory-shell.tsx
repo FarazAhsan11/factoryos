@@ -1,8 +1,8 @@
-import { Building2 } from "lucide-react";
-
-import { SignOutButton } from "@/components/auth/sign-out-button";
 import { FactorySidebar } from "@/components/factory/factory-sidebar";
 import { ShiftIndicator } from "@/components/factory/shift-indicator";
+import { SidebarMenuButton } from "@/components/factory/sidebar-menu-button";
+import { SidebarProvider } from "@/components/factory/sidebar-context";
+import { UserMenu } from "@/components/factory/user-menu";
 import type { FactoryContext } from "@/lib/factory/context";
 
 const ROLE_LABELS: Record<FactoryContext["role"], string> = {
@@ -14,16 +14,22 @@ const ROLE_LABELS: Record<FactoryContext["role"], string> = {
 };
 
 /**
- * Chrome shared by every /factory/[slug] route: top bar with the tenant's
- * identity and the role-gated left rail. Pages render inside <main>.
+ * Chrome shared by every /factory/[slug] route.
+ *
+ * The rail runs the full height of the window and the top bar starts where the
+ * rail ends, so the tenant's identity is stated once — at the top of the rail —
+ * and the bar is free to be what it actually is: the running shift on the left,
+ * the account on the right. Pages render inside <main>.
  */
 export function FactoryShell({
   factory,
   role,
+  viewer,
   children,
 }: {
   factory: FactoryContext["factory"];
   role: FactoryContext["role"];
+  viewer: FactoryContext["viewer"];
   children: React.ReactNode;
 }) {
   return (
@@ -33,62 +39,56 @@ export function FactoryShell({
        header only sticks to the element that scrolls, so while the document
        was the scroller the `sticky top-0` on `<thead>` did nothing.
 
-       Below `lg` the document scrolls as before. Locking a phone viewport
-       whose nav stacks above the content would trap the rail on screen and
-       leave a sliver for the page. Print is exempt for the same reason — a
-       fixed-height frame would print exactly one screen of a report. */
-    <div className="bg-[#F6F8FC] max-lg:min-h-svh lg:flex lg:h-svh lg:flex-col lg:overflow-hidden print:block print:h-auto print:overflow-visible">
-      {/* The workspace chrome is navigation, and navigation is meaningless on
-          paper. The shift report prints; the rail and the top bar don't. */}
-      <header className="sticky top-0 z-30 flex shrink-0 items-center justify-between border-b border-[#E6EAF1] bg-white px-6 py-3.5 print:hidden">
-        <div className="flex items-center gap-3">
-          {factory.logo_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={factory.logo_url}
-              alt=""
-              className="size-9 rounded-lg object-cover"
-            />
-          ) : (
-            <div className="flex size-9 items-center justify-center rounded-lg bg-[#EFF4FF] text-[#2563EB]">
-              <Building2 className="size-5" />
-            </div>
-          )}
-          <div>
-            <p className="text-sm font-semibold text-[#0F1B34]">
-              {factory.name}
-            </p>
-            <p className="text-xs text-[#94A3B8]">
-              {factory.slug ?? "factory"} · workspace
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          {/* Workspace-wide context, so it lives in the workspace chrome: the
-              feed, the data table and the entry form are all read against the
-              running shift, and none of them owns it. Hidden on narrow screens
-              — the tenant identity and Sign out win that space. */}
-          <ShiftIndicator factoryId={factory.id} className="hidden md:flex" />
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#EFF4FF] px-2.5 py-1 text-xs font-semibold text-[#2563EB]">
-            {ROLE_LABELS[role]}
-          </span>
-          <SignOutButton />
-        </div>
-      </header>
+       Below `lg` the document scrolls as before, and the rail is a drawer
+       floating over it rather than a column beside it. Print is exempt for the
+       same reason — a fixed-height frame would print exactly one screen of a
+       report. */
+    <SidebarProvider>
+      <div className="bg-canvas max-lg:min-h-svh lg:flex lg:h-svh lg:overflow-hidden print:block print:h-auto print:overflow-visible">
+        <FactorySidebar
+          slug={factory.slug ?? ""}
+          role={role}
+          factoryName={factory.name}
+          logoUrl={factory.logo_url}
+        />
 
-      <div className="lg:flex lg:min-h-0 lg:flex-1">
-        <div className="shrink-0 print:hidden lg:overflow-y-auto">
-          <FactorySidebar slug={factory.slug ?? ""} role={role} />
+        <div className="flex min-w-0 flex-1 flex-col lg:min-h-0">
+          {/* The workspace chrome is navigation, and navigation is meaningless
+              on paper. The shift report prints; the rail and the bar don't. */}
+          <header className="sticky top-0 z-30 flex h-[3.75rem] shrink-0 items-center justify-between gap-3 border-b border-line bg-surface/85 px-4 backdrop-blur-sm sm:px-6 print:hidden">
+            <div className="flex min-w-0 items-center gap-3">
+              <SidebarMenuButton />
+              {/* Identity below `lg` only: from there up the rail carries it,
+                  and two copies of one logo in a corner is just noise. */}
+              <p className="truncate text-sm font-semibold text-ink lg:hidden">
+                {factory.name}
+              </p>
+              {/* Workspace-wide context, so it lives in the workspace chrome:
+                  the feed, the data table and the entry form are all read
+                  against the running shift, and none of them owns it. */}
+              <ShiftIndicator
+                factoryId={factory.id}
+                className="hidden md:flex"
+              />
+            </div>
+
+            <UserMenu
+              name={viewer.fullName}
+              email={viewer.email}
+              roleLabel={ROLE_LABELS[role]}
+            />
+          </header>
+
+          {/* `<main>` is the scroll container from `lg` up. Ordinary pages
+              overflow it and scroll exactly as they did; a page that wants the
+              viewport instead makes its own root `lg:min-h-0 lg:flex-1`, fills
+              the space and scrolls internally. No prop, no route-sniffing —
+              the page decides by how it sizes itself. */}
+          <main className="min-w-0 flex-1 px-6 py-8 lg:flex lg:min-h-0 lg:flex-col lg:overflow-y-auto print:overflow-visible print:px-0 print:py-0">
+            {children}
+          </main>
         </div>
-        {/* `<main>` is the scroll container from `lg` up. Ordinary pages
-            overflow it and scroll exactly as they did; a page that wants the
-            viewport instead makes its own root `lg:min-h-0 lg:flex-1`, fills
-            the space and scrolls internally. No prop, no route-sniffing —
-            the page decides by how it sizes itself. */}
-        <main className="min-w-0 flex-1 px-6 py-8 lg:flex lg:flex-col lg:overflow-y-auto print:overflow-visible print:px-0 print:py-0">
-          {children}
-        </main>
       </div>
-    </div>
+    </SidebarProvider>
   );
 }

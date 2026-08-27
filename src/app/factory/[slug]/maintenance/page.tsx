@@ -29,7 +29,11 @@ export default async function MaintenancePage({
   if (!user) redirect("/login");
 
   return (
-    <div className="mx-auto max-w-4xl">
+    /* Fills the workspace frame from `lg` up rather than growing the page —
+       see the note on <main> in FactoryShell. The section chips then stay put
+       while the tray under them scrolls, which is the whole point of chips
+       that carry counts. */
+    <div className="mx-auto w-full max-w-5xl lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
       <MaintenanceWorkspace
         factoryId={factory.id}
         userId={user.id}

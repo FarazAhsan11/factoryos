@@ -71,8 +71,7 @@ export function ActionStageTimeline({
         const stamp = stampFor(action, stage);
         // The rail runs green only into a stage that actually happened, so a
         // skipped stretch reads as the detour it was.
-        const railDone =
-          done && !isStageSkipped(action, ACTION_STAGES[i + 1]);
+        const railDone = done && !isStageSkipped(action, ACTION_STAGES[i + 1]);
 
         return (
           <li key={stage} className="flex gap-3">
@@ -83,10 +82,10 @@ export function ActionStageTimeline({
                 className={cn(
                   "grid size-6 shrink-0 place-items-center rounded-full border-2",
                   done
-                    ? "border-[#16A34A] bg-[#16A34A] text-white"
+                    ? "border-teal bg-teal text-white"
                     : active
-                      ? "border-[#2563EB] bg-white text-[#2563EB]"
-                      : "border-[#E6EAF1] bg-white text-[#CBD5E1]"
+                      ? "border-brand bg-surface text-brand"
+                      : "border-line bg-surface text-ink-6",
                 )}
               >
                 {done ? (
@@ -103,44 +102,49 @@ export function ActionStageTimeline({
                 <span
                   className={cn(
                     "w-0.5 flex-1",
-                    railDone ? "bg-[#16A34A]" : "bg-[#E6EAF1]"
+                    railDone ? "bg-teal" : "bg-line",
                   )}
                 />
               )}
             </div>
 
-            <div className={cn("min-w-0 flex-1 pb-4", i === ACTION_STAGES.length - 1 && "pb-0")}>
+            <div
+              className={cn(
+                "min-w-0 flex-1 pb-4",
+                i === ACTION_STAGES.length - 1 && "pb-0",
+              )}
+            >
               <div className="flex flex-wrap items-baseline gap-x-2">
                 <p
                   className={cn(
                     "text-[13px] font-semibold",
                     skipped
-                      ? "text-[#94A3B8] line-through"
+                      ? "text-ink-5 line-through"
                       : done || active
-                        ? "text-[#0F1B34]"
-                        : "text-[#94A3B8]"
+                        ? "text-ink"
+                        : "text-ink-5",
                   )}
                 >
                   {STAGE_LABELS[stage]}
                 </p>
                 {skipped && (
-                  <span className="text-[11px] text-[#94A3B8]">Skipped</span>
+                  <span className="text-[11px] text-ink-5">Skipped</span>
                 )}
                 {stamp && (
-                  <span className="text-[11px] text-[#94A3B8]">
+                  <span className="text-[11px] text-ink-5">
                     {formatDue(stamp)}
                   </span>
                 )}
               </div>
 
               {active && (
-                <p className="mt-0.5 text-[11.5px] text-[#64748B]">
+                <p className="mt-0.5 text-[11.5px] text-ink-4">
                   {blurbFor(action, stage)}
                 </p>
               )}
 
               {evidence.length > 0 && (
-                <dl className="mt-1.5 space-y-2 rounded-xl border border-[#E6EAF1] bg-[#FBFCFE] p-3">
+                <dl className="mt-2 space-y-2 rounded-xl border border-line bg-sunken p-3 ring-1 ring-surface ring-inset">
                   {evidence.map((row) => (
                     <Evidence
                       key={row.label}
@@ -288,7 +292,7 @@ function Evidence({
 
   return (
     <div>
-      <dt className="flex items-center justify-between gap-2 text-[10px] font-bold uppercase tracking-[0.5px] text-[#94A3B8]">
+      <dt className="flex items-center justify-between gap-2 text-[10px] font-bold tracking-[0.07em] text-ink-5 uppercase">
         {row.label}
         {editable && !editing && (
           <button
@@ -297,7 +301,7 @@ function Evidence({
               setDraft(row.value);
               setEditing(true);
             }}
-            className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-[#64748B] transition hover:bg-white hover:text-[#2563EB]"
+            className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-ink-4 transition hover:bg-surface hover:text-brand"
           >
             <Pencil className="size-3" />
             Edit
@@ -311,12 +315,12 @@ function Evidence({
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             rows={3}
-            className="w-full rounded-lg border border-[#E6EAF1] bg-white px-3 py-2 text-[13px] text-[#0F1B34] outline-none transition focus:border-[#2563EB]"
+            className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[13px] text-ink outline-none transition hover:border-line-strong focus:border-brand focus:ring-4 focus:ring-brand/12"
           />
           {/* The previous text is kept in the thread, so this is a correction
               with a paper trail rather than an overwrite. Saying so is what
               makes it safe to use. */}
-          <p className="text-[10.5px] text-[#94A3B8]">
+          <p className="text-[10.5px] text-ink-5">
             The current text is kept in the notes below.
           </p>
           <div className="flex gap-2">
@@ -324,7 +328,7 @@ function Evidence({
               type="button"
               onClick={save}
               disabled={saving || draft.trim() === row.value.trim()}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#2563EB] px-3 text-[11.5px] font-semibold text-white transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-40"
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-brand px-3 text-[11.5px] font-semibold text-white transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-40"
             >
               {saving && <Loader2 className="size-3 animate-spin" />}
               Save
@@ -333,14 +337,14 @@ function Evidence({
               type="button"
               onClick={() => setEditing(false)}
               disabled={saving}
-              className="h-8 rounded-lg border border-[#E6EAF1] bg-white px-3 text-[11.5px] font-medium text-[#475569] transition hover:border-[#2563EB] hover:text-[#2563EB] disabled:opacity-40"
+              className="h-8 rounded-lg border border-line bg-surface px-3 text-[11.5px] font-medium text-ink-3 transition hover:border-brand hover:text-brand disabled:opacity-40"
             >
               Cancel
             </button>
           </div>
         </div>
       ) : (
-        <dd className="whitespace-pre-wrap text-[13px] text-[#0F1B34]">
+        <dd className="text-[13px] break-words whitespace-pre-wrap text-ink">
           {row.value}
         </dd>
       )}

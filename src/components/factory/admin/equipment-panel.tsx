@@ -2,7 +2,16 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Loader2, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import {
+  Check,
+  Cog,
+  Loader2,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -17,10 +26,11 @@ import {
   updateEquipment,
   type Equipment,
 } from "@/lib/factory/equipment-queries";
+import { Composer, PanelHeader } from "@/components/factory/admin/settings-ui";
 import { cn } from "@/lib/utils";
 
 const FIELD =
-  "h-10 w-full rounded-xl border border-[#E6EAF1] bg-white px-3.5 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:ring-4 focus:ring-[#2563EB]/12";
+  "h-10 w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-brand focus:ring-4 focus:ring-brand/12";
 
 /**
  * Admin → Equipment: the machine register. One row per asset — the number
@@ -51,7 +61,12 @@ export function EquipmentPanel({
     name: "",
   });
 
-  const { data: equipment = [], isPending, isError, error } = useQuery({
+  const {
+    data: equipment = [],
+    isPending,
+    isError,
+    error,
+  } = useQuery({
     queryKey,
     queryFn: () => fetchEquipment(factoryId),
   });
@@ -79,7 +94,7 @@ export function EquipmentPanel({
       await queryClient.cancelQueries({ queryKey });
       const previous = queryClient.getQueryData<Equipment[]>(queryKey);
       queryClient.setQueryData<Equipment[]>(queryKey, (old) =>
-        (old ?? []).map((e) => (e.id === id ? { ...e, ...values } : e))
+        (old ?? []).map((e) => (e.id === id ? { ...e, ...values } : e)),
       );
       return { previous };
     },
@@ -97,7 +112,7 @@ export function EquipmentPanel({
       await queryClient.cancelQueries({ queryKey });
       const previous = queryClient.getQueryData<Equipment[]>(queryKey);
       queryClient.setQueryData<Equipment[]>(queryKey, (old) =>
-        (old ?? []).filter((e) => e.id !== id)
+        (old ?? []).filter((e) => e.id !== id),
       );
       return { previous };
     },
@@ -115,8 +130,8 @@ export function EquipmentPanel({
     if (!term) return equipment;
     return equipment.filter((e) =>
       [e.equipment_no, e.name].some((field) =>
-        field.toLowerCase().includes(term)
-      )
+        field.toLowerCase().includes(term),
+      ),
     );
   }, [equipment, search]);
 
@@ -150,11 +165,15 @@ export function EquipmentPanel({
 
   return (
     <div className="space-y-5">
+      <PanelHeader
+        icon={Cog}
+        title="Equipment"
+        description="The machine register. An operator types the number painted on the asset and the shift log reads back the name from here."
+        count={equipment.length}
+      />
+
       {canManage && (
-        <div className="rounded-2xl border border-[#E6EAF1] bg-[#FBFCFE] p-4">
-          <p className="mb-2.5 text-[13px] font-semibold text-[#0F1B34]">
-            Add equipment
-          </p>
+        <Composer title="Add equipment">
           <div className="flex flex-col gap-2.5 sm:flex-row">
             <input
               value={draft.equipmentNo}
@@ -173,7 +192,9 @@ export function EquipmentPanel({
             />
             <input
               value={draft.name}
-              onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+              onChange={(e) =>
+                setDraft((d) => ({ ...d, name: e.target.value }))
+              }
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
@@ -188,7 +209,7 @@ export function EquipmentPanel({
               type="button"
               onClick={submitDraft}
               disabled={add.isPending}
-              className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] px-4 text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(37,99,235,0.55)] transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-60"
+              className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-4 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-60"
             >
               {add.isPending ? (
                 <Loader2 className="size-4 animate-spin" />
@@ -198,16 +219,16 @@ export function EquipmentPanel({
               Add
             </button>
           </div>
-          <p className="mt-2.5 text-xs text-[#94A3B8]">
+          <p className="mt-2.5 text-xs text-ink-5">
             The number is what an operator types in the shift log; the name is
             what the log fills in for them.
           </p>
-        </div>
+        </Composer>
       )}
 
       {equipment.length > 0 && (
         <div className="relative">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-[#94A3B8]" />
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-5" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -221,23 +242,23 @@ export function EquipmentPanel({
       {isPending ? (
         <TableSkeleton />
       ) : isError ? (
-        <p className="rounded-xl bg-[#FEF2F2] px-4 py-3 text-sm text-[#B91C1C]">
+        <p className="rounded-xl bg-danger-soft px-4 py-3 text-sm text-danger-deep">
           Could not load the equipment register: {(error as Error).message}
         </p>
       ) : equipment.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-[#CBD5E1] px-4 py-10 text-center text-sm text-[#94A3B8]">
+        <p className="rounded-2xl border border-dashed border-ink-6 px-4 py-10 text-center text-sm text-ink-5">
           No equipment yet
           {canManage ? " — add your first machine above." : "."}
         </p>
       ) : visible.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-[#CBD5E1] px-4 py-10 text-center text-sm text-[#94A3B8]">
+        <p className="rounded-2xl border border-dashed border-ink-6 px-4 py-10 text-center text-sm text-ink-5">
           Nothing matches “{search}”.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-[#E6EAF1] bg-white">
+        <div className="overflow-x-auto rounded-2xl border border-line bg-surface">
           <table className="w-full min-w-[620px] text-sm">
             <thead>
-              <tr className="border-b border-[#EEF1F6] text-left text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">
+              <tr className="border-b border-line-soft text-left text-xs font-semibold uppercase tracking-wide text-ink-5">
                 <th className="px-4 py-3">Equipment no.</th>
                 <th className="px-4 py-3">Machine name</th>
                 {canManage && <th className="px-4 py-3 text-right">Actions</th>}
@@ -250,11 +271,11 @@ export function EquipmentPanel({
                   <tr
                     key={item.id}
                     className={cn(
-                      "border-b border-[#F5F7FA] last:border-0",
-                      !item.active && "bg-[#FBFCFE] text-[#94A3B8]"
+                      "border-b border-sunken last:border-0",
+                      !item.active && "bg-sunken text-ink-5",
                     )}
                   >
-                    <td className="px-4 py-3 font-mono text-[13px] font-medium text-[#0F1B34]">
+                    <td className="px-4 py-3 font-mono text-[13px] font-medium text-ink">
                       {editing ? (
                         <input
                           autoFocus
@@ -270,7 +291,7 @@ export function EquipmentPanel({
                             if (e.key === "Escape") setEditingId(null);
                           }}
                           aria-label={`Equipment number for ${item.name}`}
-                          className="h-8 w-32 rounded-lg border border-[#E6EAF1] px-2 font-mono text-[13px] outline-none focus:border-[#2563EB]"
+                          className="h-8 w-32 rounded-lg border border-line px-2 font-mono text-[13px] outline-none focus:border-brand"
                         />
                       ) : (
                         item.equipment_no
@@ -288,12 +309,12 @@ export function EquipmentPanel({
                             if (e.key === "Escape") setEditingId(null);
                           }}
                           aria-label={`Name for ${item.equipment_no}`}
-                          className="h-8 w-full max-w-sm rounded-lg border border-[#E6EAF1] px-2 text-sm outline-none focus:border-[#2563EB]"
+                          className="h-8 w-full max-w-sm rounded-lg border border-line px-2 text-sm outline-none focus:border-brand"
                         />
                       ) : (
                         <span
                           className={cn(
-                            item.active ? "text-[#0F1B34]" : "line-through"
+                            item.active ? "text-ink" : "line-through",
                           )}
                         >
                           {item.name}
@@ -310,7 +331,7 @@ export function EquipmentPanel({
                                 label="Save"
                                 onClick={() => saveEdit(item)}
                               >
-                                <Check className="size-4 text-[#16A34A]" />
+                                <Check className="size-4 text-teal" />
                               </IconButton>
                               <IconButton
                                 label="Cancel"
@@ -329,7 +350,7 @@ export function EquipmentPanel({
                                     values: { active: !item.active },
                                   })
                                 }
-                                className="shrink-0 rounded-full bg-[#F1F5F9] px-2 py-0.5 text-[11px] font-medium text-[#475569] transition hover:bg-[#E2E8F0]"
+                                className="shrink-0 rounded-full bg-sunken-2 px-2 py-0.5 text-[11px] font-medium text-ink-3 transition hover:bg-line"
                               >
                                 {item.active ? "Active" : "Retired"}
                               </button>
@@ -349,7 +370,7 @@ export function EquipmentPanel({
                                 label={`Delete ${item.equipment_no}`}
                                 onClick={() => remove.mutate(item.id)}
                               >
-                                <Trash2 className="size-3.5 text-[#B91C1C]" />
+                                <Trash2 className="size-3.5 text-danger-deep" />
                               </IconButton>
                             </>
                           )}
@@ -365,7 +386,7 @@ export function EquipmentPanel({
       )}
 
       {canManage && equipment.length > 0 && (
-        <p className="text-xs text-[#94A3B8]">
+        <p className="text-xs text-ink-5">
           Retire a decommissioned machine to keep its shift history but hide it
           from new entries. Delete removes it from the register entirely —
           entries that named its number keep the number, but stop resolving to a
@@ -391,7 +412,7 @@ function IconButton({
       onClick={onClick}
       aria-label={label}
       title={label}
-      className="shrink-0 rounded-md p-1 text-[#94A3B8] transition hover:bg-[#F1F5F9] hover:text-[#475569]"
+      className="shrink-0 rounded-md p-1 text-ink-5 transition hover:bg-sunken-2 hover:text-ink-3"
     >
       {children}
     </button>
@@ -400,9 +421,9 @@ function IconButton({
 
 function TableSkeleton() {
   return (
-    <div className="space-y-2 rounded-2xl border border-[#EEF1F6] p-4">
+    <div className="space-y-2 rounded-2xl border border-line-soft p-4">
       {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="h-9 animate-pulse rounded-lg bg-[#F8FAFC]" />
+        <div key={i} className="h-9 animate-pulse rounded-lg bg-sunken" />
       ))}
     </div>
   );

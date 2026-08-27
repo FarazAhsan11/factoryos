@@ -37,8 +37,7 @@ export interface ImportRowResult {
 }
 
 export type ImportResult =
-  | { ok: true; results: ImportRowResult[] }
-  | { error: string };
+  { ok: true; results: ImportRowResult[] } | { error: string };
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -52,7 +51,7 @@ interface FactoryBrand {
 function siteUrl() {
   return (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(
     /\/$/,
-    ""
+    "",
   );
 }
 
@@ -62,7 +61,7 @@ function siteUrl() {
  * id so actions can refuse self-targeting operations.
  */
 async function requireFactoryAdmin(
-  factoryId: string
+  factoryId: string,
 ): Promise<{ callerId: string } | { error: string }> {
   const supabase = await createClient();
   const {
@@ -86,7 +85,7 @@ async function requireFactoryAdmin(
 
 async function loadFactory(
   admin: Admin,
-  factoryId: string
+  factoryId: string,
 ): Promise<FactoryBrand | null> {
   const { data } = await admin
     .from("factories")
@@ -117,7 +116,7 @@ async function deliverInvite(
     roleLabel: string;
     factory: FactoryBrand;
     metadata?: Record<string, unknown>;
-  }
+  },
 ): Promise<{ userId?: string }> {
   const { data: link, error } = await admin.auth.admin.generateLink({
     type,
@@ -162,7 +161,7 @@ async function stampInvited(admin: Admin, profileId: string) {
  * trigger turns that into a profile — and returns a token we deliver ourselves.
  */
 export async function addEmployee(
-  values: AddEmployeeValues
+  values: AddEmployeeValues,
 ): Promise<EmployeeResult> {
   const parsed = addEmployeeSchema.safeParse(values);
   if (!parsed.success) {
@@ -235,7 +234,7 @@ export async function addEmployee(
  * picks it up later.
  */
 export async function importEmployees(
-  values: ImportEmployeesValues
+  values: ImportEmployeesValues,
 ): Promise<ImportResult> {
   const parsed = importEmployeesSchema.safeParse(values);
   if (!parsed.success) {
@@ -290,8 +289,13 @@ export async function importEmployees(
       });
       results.push(
         error
-          ? { email: row.email, ok: false, invited: false, error: error.message }
-          : { email: row.email, ok: true, invited: false }
+          ? {
+              email: row.email,
+              ok: false,
+              invited: false,
+              error: error.message,
+            }
+          : { email: row.email, ok: true, invited: false },
       );
       continue;
     }
@@ -333,7 +337,7 @@ export async function importEmployees(
               invited: false,
               error: `Account created, invite email failed: ${message}`,
             }
-          : { email: row.email, ok: false, invited: false, error: message }
+          : { email: row.email, ok: false, invited: false, error: message },
       );
     }
   }
@@ -345,7 +349,7 @@ export async function importEmployees(
 /* ── Invite an existing (imported) member ───────────────────────────────── */
 
 export async function sendEmployeeInvite(
-  profileId: string
+  profileId: string,
 ): Promise<EmployeeResult> {
   const parsed = employeeIdSchema.safeParse({ profileId });
   if (!parsed.success) return { error: "Invalid request." };
@@ -390,7 +394,7 @@ export async function sendEmployeeInvite(
 
 /** Changes a person's role and/or default shift from the roster. */
 export async function updateEmployee(
-  values: UpdateEmployeeValues
+  values: UpdateEmployeeValues,
 ): Promise<EmployeeResult> {
   const parsed = updateEmployeeSchema.safeParse(values);
   if (!parsed.success) {
@@ -436,7 +440,7 @@ export async function updateEmployee(
 
 /** Removes the person entirely — the auth user goes, the profile cascades. */
 export async function removeEmployee(
-  profileId: string
+  profileId: string,
 ): Promise<EmployeeResult> {
   const parsed = employeeIdSchema.safeParse({ profileId });
   if (!parsed.success) return { error: "Invalid request." };
@@ -463,7 +467,9 @@ export async function removeEmployee(
       .eq("factory_id", profile.factory_id)
       .eq("role", "admin");
     if ((count ?? 0) <= 1) {
-      return { error: "This is the factory's only admin — promote someone else first." };
+      return {
+        error: "This is the factory's only admin — promote someone else first.",
+      };
     }
   }
 

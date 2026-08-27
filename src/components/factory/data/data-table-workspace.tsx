@@ -133,7 +133,7 @@ export function DataTableWorkspace({
           {
             column,
             direction: NUMERIC_FIRST_DESC.has(column) ? "desc" : "asc",
-          }
+          },
     );
     setPage(0);
   }, []);
@@ -149,7 +149,7 @@ export function DataTableWorkspace({
         toast.info("Nothing to export — no entries match these filters.");
       } else if (count >= EXPORT_LIMIT) {
         toast.warning(
-          `Exported the first ${EXPORT_LIMIT.toLocaleString()} entries. Narrow the date range to export the rest.`
+          `Exported the first ${EXPORT_LIMIT.toLocaleString()} entries. Narrow the date range to export the rest.`,
         );
       } else {
         toast.success(`Exported ${count.toLocaleString()} entries.`);
@@ -167,25 +167,35 @@ export function DataTableWorkspace({
    */
   const canAmend = useCallback(
     (row: LogTableRow) => canManage || row.logged_by === userId,
-    [canManage, userId]
+    [canManage, userId],
   );
 
   return (
     <div className="lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
-      <div className="mb-4 flex shrink-0 flex-wrap items-start justify-between gap-3">
+      <div className="mb-4 flex shrink-0 flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">
+          <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-5">
             Shift log
           </p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#0F1B34]">
+          <h1 className="mt-1 flex items-center gap-2.5 text-2xl font-semibold tracking-tight text-ink">
             Data table
+            {/* How much there is, stated once at the top. Reading it off the
+                pager at the foot of a full-height table means scrolling to
+                find out how far there is to scroll. */}
+            {pageQuery.data && (
+              <span className="rounded-full bg-sunken-2 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-ink-4">
+                {pageQuery.data.total.toLocaleString()}
+              </span>
+            )}
           </h1>
-          <p className="mt-1 text-sm text-[#64748B]">
+          <p className="mt-1 text-sm text-ink-4">
             Every entry ever logged, filterable and sortable. Read-only —
             entries are audit-protected.
           </p>
         </div>
 
+        {/* Export is set apart from the two filter controls: it acts on the
+            result rather than shaping it, so it reads as the primary verb. */}
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -193,23 +203,23 @@ export function DataTableWorkspace({
             aria-expanded={filtersOpen}
             aria-controls="data-table-filters"
             className={cn(
-              "inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition",
+              "inline-flex h-9 items-center gap-1.5 rounded-xl border px-3 text-xs font-semibold shadow-soft transition",
               filtersOpen || activeCount > 0
-                ? "border-[#2563EB] bg-[#EFF4FF] text-[#1D4ED8]"
-                : "border-[#E6EAF1] text-[#475569] hover:border-[#2563EB] hover:text-[#2563EB]"
+                ? "border-brand bg-brand-soft text-brand-deep"
+                : "border-line bg-surface text-ink-3 hover:border-brand hover:text-brand",
             )}
           >
             <SlidersHorizontal className="size-3.5" />
             Filters
             {activeCount > 0 && (
-              <span className="rounded-full bg-[#2563EB] px-1.5 text-[10px] font-bold text-white">
+              <span className="rounded-full bg-brand px-1.5 text-[10px] font-bold text-white">
                 {activeCount}
               </span>
             )}
             <ChevronDown
               className={cn(
                 "size-3.5 transition-transform",
-                filtersOpen && "rotate-180"
+                filtersOpen && "rotate-180",
               )}
             />
           </button>
@@ -217,7 +227,7 @@ export function DataTableWorkspace({
             type="button"
             onClick={clearFilters}
             disabled={isDefault}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#E6EAF1] px-3 text-xs font-medium text-[#475569] transition hover:border-[#2563EB] hover:text-[#2563EB] disabled:pointer-events-none disabled:opacity-40"
+            className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-line bg-surface px-3 text-xs font-semibold text-ink-3 shadow-soft transition hover:border-brand hover:text-brand disabled:pointer-events-none disabled:opacity-40"
           >
             <X className="size-3.5" />
             Clear filters
@@ -226,7 +236,7 @@ export function DataTableWorkspace({
             type="button"
             onClick={() => exportCsv.mutate()}
             disabled={exportCsv.isPending}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#E6EAF1] px-3 text-xs font-medium text-[#475569] transition hover:border-[#2563EB] hover:text-[#2563EB] disabled:pointer-events-none disabled:opacity-60"
+            className="ml-1 inline-flex h-9 items-center gap-1.5 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-3.5 text-xs font-semibold text-white shadow-brand transition hover:brightness-[1.06] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60"
           >
             {exportCsv.isPending ? (
               <Loader2 className="size-3.5 animate-spin" />
@@ -252,11 +262,14 @@ export function DataTableWorkspace({
       )}
 
       {pageQuery.isError ? (
-        <p className="rounded-2xl border border-[#FECACA] bg-[#FEF2F2] px-4 py-6 text-center text-sm text-[#B91C1C]">
+        <p className="rounded-2xl border border-danger-line bg-danger-soft px-4 py-6 text-center text-sm font-medium text-danger-deep">
           Could not load the shift log: {(pageQuery.error as Error).message}
         </p>
       ) : (
-        <div className="lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
+        /* The table and its pager are one object, so they get one frame. The
+           pager used to float below the card, which read as a separate
+           control that happened to be nearby. */
+        <div className="flex flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-card lg:min-h-0 lg:flex-1">
           <ShiftLogTable
             rows={rows}
             sort={sort}
@@ -279,7 +292,7 @@ export function DataTableWorkspace({
             statsError={statsQuery.error as Error | null}
           />
 
-          <div className="shrink-0">
+          <div className="shrink-0 border-t border-line bg-gradient-to-b from-surface to-sunken px-3 py-2.5">
             <TablePagination
               page={page}
               pageSize={pageSize}

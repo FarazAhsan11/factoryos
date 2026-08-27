@@ -142,7 +142,7 @@ export const logTableKeys = {
     filters: LogTableFilters,
     sort: LogTableSort,
     page: number,
-    pageSize: number
+    pageSize: number,
   ) =>
     [
       "shift_log_table",
@@ -184,7 +184,11 @@ const SEARCH_COLUMNS = [
  * paged through.
  */
 function sanitizeSearch(term: string): string {
-  return term.trim().replace(/[,()"\\]/g, " ").replace(/\s+/g, " ").trim();
+  return term
+    .trim()
+    .replace(/[,()"\\]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /**
@@ -200,7 +204,7 @@ interface FilterBuilder {
   or(filters: string): FilterBuilder;
   order(
     column: string,
-    options: { ascending: boolean; nullsFirst?: boolean }
+    options: { ascending: boolean; nullsFirst?: boolean },
   ): FilterBuilder;
   range(from: number, to: number): FilterBuilder;
   limit(count: number): FilterBuilder;
@@ -210,7 +214,7 @@ interface FilterBuilder {
 function applyFilters(
   query: FilterBuilder,
   factoryId: string,
-  f: LogTableFilters
+  f: LogTableFilters,
 ): FilterBuilder {
   let q = query.eq("factory_id", factoryId);
 
@@ -249,7 +253,7 @@ export async function fetchLogTablePage(
   filters: LogTableFilters,
   sort: LogTableSort,
   page: number,
-  pageSize: number
+  pageSize: number,
 ): Promise<LogTablePage> {
   const supabase = createClient();
   const start = page * pageSize;
@@ -259,7 +263,7 @@ export async function fetchLogTablePage(
       .from("shift_log_entries_expanded")
       .select(COLUMNS, { count: "exact" }) as unknown as FilterBuilder,
     factoryId,
-    filters
+    filters,
   );
 
   const query = filtered
@@ -295,7 +299,7 @@ export interface LogTableStats {
 
 export async function fetchLogTableStats(
   factoryId: string,
-  filters: LogTableFilters
+  filters: LogTableFilters,
 ): Promise<LogTableStats> {
   const supabase = createClient();
   const term = sanitizeSearch(filters.search);
@@ -348,7 +352,7 @@ export async function fetchLogTableStats(
 export async function fetchLogTableExportRows(
   factoryId: string,
   filters: LogTableFilters,
-  sort: LogTableSort
+  sort: LogTableSort,
 ): Promise<LogTableRow[]> {
   const supabase = createClient();
 
@@ -357,7 +361,7 @@ export async function fetchLogTableExportRows(
       .from("shift_log_entries_expanded")
       .select(COLUMNS) as unknown as FilterBuilder,
     factoryId,
-    filters
+    filters,
   )
     .order(SORTABLE[sort.column], {
       ascending: sort.direction === "asc",

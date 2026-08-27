@@ -35,7 +35,7 @@ export async function fetchEmployees(factoryId: string): Promise<Employee[]> {
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "id, email, full_name, role, default_shift, invited_at, activated_at, created_at"
+      "id, email, full_name, role, default_shift, invited_at, activated_at, created_at",
     )
     .eq("factory_id", factoryId)
     .order("created_at", { ascending: true });

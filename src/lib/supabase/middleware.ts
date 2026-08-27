@@ -18,15 +18,15 @@ export async function updateSession(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
+            request.cookies.set(name, value),
           );
           response = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
+            response.cookies.set(name, value, options),
           );
         },
       },
-    }
+    },
   );
 
   // IMPORTANT: getUser() revalidates the token; keep it right after client init.
@@ -37,8 +37,7 @@ export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
   // Unauthenticated users can't reach the app shells.
-  const isProtected =
-    path.startsWith("/admin") || path.startsWith("/factory");
+  const isProtected = path.startsWith("/admin") || path.startsWith("/factory");
   if (!user && isProtected) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";

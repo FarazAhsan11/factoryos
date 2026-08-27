@@ -9,7 +9,8 @@
   --color-foreground: var(--foreground);
   --font-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
-  --font-heading: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  --font-heading:
+    "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -49,24 +50,27 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  /* shadcn's own variables, pointed at the palette above so a Dialog, a
+     DropdownMenu or a Button matches hand-built chrome without a second
+     set of colours to keep in step. */
+  --background: var(--color-surface);
+  --foreground: var(--color-ink);
+  --card: var(--color-surface);
+  --card-foreground: var(--color-ink);
+  --popover: var(--color-raised);
+  --popover-foreground: var(--color-ink);
+  --primary: var(--color-brand);
+  --primary-foreground: #ffffff;
+  --secondary: var(--color-sunken);
+  --secondary-foreground: var(--color-ink);
+  --muted: var(--color-sunken);
+  --muted-foreground: var(--color-ink-4);
+  --accent: var(--color-brand-soft);
+  --accent-foreground: var(--color-brand-deep);
+  --destructive: var(--color-danger);
+  --border: var(--color-line);
+  --input: var(--color-line);
+  --ring: var(--color-brand);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -126,6 +130,149 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   PALETTE — the single place any colour in this app is decided.
+   ─────────────────────────────────────────────────────────────────────────
+
+   Every token here becomes a Tailwind utility: `--color-canvas` gives you
+   `bg-canvas`, `text-canvas`, `border-canvas`, `ring-canvas/40`, and so on.
+   Components must use those utilities and never a raw hex — changing the
+   look of the whole product should mean editing this block and nothing else.
+
+   The names avoid `primary`, `secondary`, `muted`, `card` and `border` on
+   purpose: shadcn already owns those in the `@theme inline` block above, and
+   two different meanings behind one utility is how a palette rots.
+
+   Adding a colour? Put it here first, then use it. If you find yourself
+   reaching for a one-off hex in a component, the palette is missing a token.
+   ───────────────────────────────────────────────────────────────────────── */
+@theme {
+  /* ── Surfaces ─────────────────────────────────────────────────────────
+     Four depths, and they only read as depths because they differ enough
+     to see. Pure white cards on a near-white page was the flatness. */
+  --color-canvas: #eaedf5; /* the desk everything sits on */
+  --color-surface: #fcfcfe; /* cards, panels, the top bar */
+  --color-sunken: #f4f6fb; /* section bands, hover rows, resting inputs */
+  --color-sunken-2: #edf0f8; /* chips, table stripes, skeletons */
+  --color-raised: #ffffff; /* popovers and menus only — they lift off a card */
+
+  /* ── Lines ────────────────────────────────────────────────────────── */
+  --color-line: #dcdfec; /* the edge of a card or a control */
+  --color-line-soft: #e9ebf3; /* dividers *inside* a card */
+  --color-line-strong: #c9cddf; /* dashed drop zones, hovered borders */
+
+  /* ── Ink ──────────────────────────────────────────────────────────────
+     A six-step ramp, darkest first. Anything below `ink-4` is decoration
+     and must never be the only carrier of meaning. */
+  --color-ink: #14162b; /* headings, values */
+  --color-ink-2: #3a4055; /* field labels */
+  --color-ink-3: #545a72; /* body copy */
+  --color-ink-4: #6b7189; /* secondary copy, captions */
+  --color-ink-5: #9297ae; /* eyebrows, timestamps, empty states */
+  --color-ink-6: #b7bcd0; /* disabled text, "Soon" */
+  --color-placeholder: #a6abc2;
+
+  /* ── Brand — indigo ───────────────────────────────────────────────── */
+  --color-brand: #4f46e5; /* the one accent: active nav, submit, focus */
+  --color-brand-deep: #4338ca; /* pressed, and text on a soft brand tint */
+  --color-brand-bright: #6366f1; /* the light end of a brand gradient */
+  --color-brand-line: #d4d6fa;
+  --color-brand-soft: #edeefe; /* badge and active-row backgrounds */
+  --color-brand-tint: #f5f5ff; /* computed/read-only fields */
+
+  /* ── Teal — the secondary, and the positive semantic ───────────────────
+     One family does both jobs: "this is confirmed / live / audited" and
+     "this produced output". Two near-identical greens would only compete. */
+  --color-teal: #0d9488;
+  --color-teal-deep: #0f766e;
+  --color-teal-line: #99e9dc;
+  --color-teal-soft: #e9fbf6;
+
+  /* ── Amber — attention, not failure ───────────────────────────────── */
+  --color-warn: #f59e0b;
+  --color-warn-deep: #b45309;
+  --color-warn-ink: #92400e;
+  --color-warn-line: #fce08a;
+  --color-warn-soft: #fef4d6;
+  --color-warn-tint: #fffbeb;
+
+  /* ── Red — rejected, failed, refused ──────────────────────────────── */
+  --color-danger: #dc2626;
+  --color-danger-deep: #b91c1c;
+  --color-danger-line: #fcb6b6;
+  --color-danger-soft: #fef2f2;
+  --color-danger-tint: #fee9e9;
+
+  /* ── Violet — amendments and corrections, which are neither good nor bad */
+  --color-violet: #7c3aed;
+  --color-violet-deep: #6d28d9;
+  --color-violet-line: #ded8fd;
+  --color-violet-soft: #f3f1fe;
+
+  /* ── Elevation ────────────────────────────────────────────────────────
+     Named so a shadow can be re-tuned once. `shadow-card` is the resting
+     state of a panel, `shadow-lift` is what hovering one adds, and
+     `shadow-brand` is the glow under a primary button. */
+  --shadow-card:
+    0 1px 2px rgb(20 22 43 / 0.04), 0 12px 32px -24px rgb(20 22 43 / 0.5);
+  --shadow-lift: 0 6px 18px -12px rgb(20 22 43 / 0.55);
+  --shadow-soft: 0 2px 8px -4px rgb(20 22 43 / 0.25);
+  --shadow-brand: 0 8px 20px -6px rgb(79 70 229 / 0.5);
+  --shadow-brand-sm: 0 4px 12px -6px rgb(79 70 229 / 0.75);
+}
+
+/**
+ * Native selects draw their own arrow, and every browser draws a different
+ * one — a grey wedge in Chrome, a black triangle in Firefox, nothing at all
+ * on some Linux themes. This replaces it with the same chevron the rest of
+ * the app uses, so a select and an input read as the same family of control.
+ */
+@layer utilities {
+  .select-chevron {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2394A3B8' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 8 4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.7rem center;
+    background-size: 1.1rem;
+    padding-right: 2.25rem;
+  }
+
+  .select-chevron::-ms-expand {
+    display: none;
+  }
+}
+
+/**
+ * A scrollbar that doesn't shout. The workspace rail and other panes scroll
+ * inside a bounded box, and the OS default there is a wide grey slab that
+ * reads as part of the design. This is the same scrollbar, thinned to a
+ * rounded track-less thumb that only darkens on hover.
+ */
+@layer utilities {
+  .scrollbar-slim {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(203 213 225) transparent;
+  }
+
+  .scrollbar-slim::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-slim::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-slim::-webkit-scrollbar-thumb {
+    background-color: rgb(203 213 225);
+    border-radius: 9999px;
+  }
+
+  .scrollbar-slim::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(148 163 184);
   }
 }
 

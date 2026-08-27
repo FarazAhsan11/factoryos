@@ -73,13 +73,13 @@ function toValues(row: ShiftTimeRow): ShiftClockValues {
  * times still gets a sensible clock rather than an empty form.
  */
 export async function fetchShiftTimes(
-  factoryId: string
+  factoryId: string,
 ): Promise<Record<RunningShift, ShiftClockValues>> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("factory_shift_times")
     .select(
-      "slot, start_time, end_time, break1_start, break1_minutes, break2_start, break2_minutes, supervisor_name"
+      "slot, start_time, end_time, break1_start, break1_minutes, break2_start, break2_minutes, supervisor_name",
     )
     .eq("factory_id", factoryId);
 
@@ -143,7 +143,7 @@ export function formatDuration(minutes: number): string {
  */
 export function resolveCurrentShift(
   times: Record<RunningShift, ShiftClockValues>,
-  now: Date = new Date()
+  now: Date = new Date(),
 ): RunningShift {
   const nowMins = now.getHours() * 60 + now.getMinutes();
   const inside = (slot: RunningShift) => {
@@ -169,12 +169,13 @@ export function resolveCurrentShift(
 export function overlapWithShift(
   shift: ShiftClockValues,
   startClock: string,
-  durationMins: number
+  durationMins: number,
 ): number {
   const entryStart = minutesOfDay(startClock);
   const windowStart = minutesOfDay(shift.startTime);
   const windowLength = shiftLengthMinutes(shift);
-  if (entryStart === null || windowStart === null || durationMins <= 0) return 0;
+  if (entryStart === null || windowStart === null || durationMins <= 0)
+    return 0;
 
   const DAY = 24 * 60;
   // Rotate so the window sits at [0, windowLength).
@@ -200,7 +201,7 @@ export function overlapWithShift(
 export function resolveShiftForEntry(
   times: Record<RunningShift, ShiftClockValues>,
   startClock: string,
-  durationMins: number
+  durationMins: number,
 ): RunningShift | null {
   if (!startClock || durationMins <= 0) return null;
 
@@ -239,7 +240,7 @@ export function clockNow(now: Date = new Date()): string {
  */
 export function breakIsInsideShift(
   shift: ShiftClockValues,
-  breakStart: string | undefined
+  breakStart: string | undefined,
 ): boolean {
   const start = minutesOfDay(shift.startTime);
   const breakAt = minutesOfDay(breakStart);

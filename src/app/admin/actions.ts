@@ -12,12 +12,10 @@ import {
 } from "./schemas";
 
 export type CreateFactoryResult =
-  | { ok: true; warning?: string }
-  | { error: string };
+  { ok: true; warning?: string } | { error: string };
 
 export type DeleteFactoryResult =
-  | { ok: true; deletedUsers: number; warning?: string }
-  | { error: string };
+  { ok: true; deletedUsers: number; warning?: string } | { error: string };
 
 function slugify(name: string) {
   return name
@@ -31,7 +29,7 @@ function slugify(name: string) {
 function siteUrl() {
   return (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(
     /\/$/,
-    ""
+    "",
   );
 }
 
@@ -55,7 +53,7 @@ async function requireSuperAdmin(action: string): Promise<string | null> {
 }
 
 export async function createFactory(
-  formData: FormData
+  formData: FormData,
 ): Promise<CreateFactoryResult> {
   // ── 1. Authorize: only a signed-in super admin may create factories ──────
   const denied = await requireSuperAdmin("create factories");
@@ -137,7 +135,7 @@ export async function createFactory(
     }
 
     const next = `/set-password?next=${encodeURIComponent(
-      `/factory/${factory.slug}`
+      `/factory/${factory.slug}`,
     )}`;
     const inviteUrl = `${siteUrl()}/auth/confirm?token_hash=${
       link.properties.hashed_token
@@ -173,7 +171,7 @@ export async function createFactory(
  * The step order is load-bearing; see the comments inline before changing it.
  */
 export async function deleteFactory(
-  values: DeleteFactoryValues
+  values: DeleteFactoryValues,
 ): Promise<DeleteFactoryResult> {
   // ── 1. Authorize ─────────────────────────────────────────────────────────
   const denied = await requireSuperAdmin("delete factories");
@@ -227,10 +225,9 @@ export async function deleteFactory(
       .list(factory.slug);
     const paths = (files ?? []).map((f) => `${factory.slug}/${f.name}`);
     if (paths.length) {
-      const { error } = await admin.storage
-        .from("factory-logos")
-        .remove(paths);
-      if (error) storageWarning = `logo files could not be removed (${error.message})`;
+      const { error } = await admin.storage.from("factory-logos").remove(paths);
+      if (error)
+        storageWarning = `logo files could not be removed (${error.message})`;
     }
   }
 

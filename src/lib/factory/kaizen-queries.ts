@@ -12,11 +12,7 @@ import { createClient } from "@/lib/supabase/client";
  */
 
 export type KaizenStatus =
-  | "new"
-  | "under_review"
-  | "approved"
-  | "implemented"
-  | "declined";
+  "new" | "under_review" | "approved" | "implemented" | "declined";
 
 export type KaizenImpact = "quick_win" | "medium" | "major";
 
@@ -45,15 +41,25 @@ export const KAIZEN_IMPACTS: {
   {
     value: "quick_win",
     label: "Quick win (days)",
-    tint: "#ECFDF5",
-    ink: "#047857",
+    tint: "var(--color-teal-soft)",
+    ink: "var(--color-teal-deep)",
   },
-  { value: "medium", label: "Medium (weeks)", tint: "#EFF6FF", ink: "#1D4ED8" },
-  { value: "major", label: "Major (months)", tint: "#F5F3FF", ink: "#6D28D9" },
+  {
+    value: "medium",
+    label: "Medium (weeks)",
+    tint: "var(--color-brand-soft)",
+    ink: "var(--color-brand-deep)",
+  },
+  {
+    value: "major",
+    label: "Major (months)",
+    tint: "var(--color-violet-soft)",
+    ink: "var(--color-violet-deep)",
+  },
 ];
 
 export const IMPACT_LABELS: Record<KaizenImpact, string> = Object.fromEntries(
-  KAIZEN_IMPACTS.map((i) => [i.value, i.label])
+  KAIZEN_IMPACTS.map((i) => [i.value, i.label]),
 ) as Record<KaizenImpact, string>;
 
 /**
@@ -74,50 +80,50 @@ export const KAIZEN_FLOW: {
   {
     status: "new",
     label: "New",
-    tint: "#F1F5F9",
-    ink: "#475569",
-    dot: "#94A3B8",
+    tint: "var(--color-sunken-2)",
+    ink: "var(--color-ink-3)",
+    dot: "var(--color-ink-5)",
     next: "under_review",
     nextLabel: "Start review",
   },
   {
     status: "under_review",
     label: "Under review",
-    tint: "#FEF3C7",
-    ink: "#B45309",
-    dot: "#F59E0B",
+    tint: "var(--color-warn-soft)",
+    ink: "var(--color-warn-deep)",
+    dot: "var(--color-warn)",
     next: "approved",
     nextLabel: "Approve",
   },
   {
     status: "approved",
     label: "Approved",
-    tint: "#DBEAFE",
-    ink: "#1D4ED8",
-    dot: "#2563EB",
+    tint: "var(--color-brand-soft)",
+    ink: "var(--color-brand-deep)",
+    dot: "var(--color-brand)",
     next: "implemented",
     nextLabel: "Mark implemented",
   },
   {
     status: "implemented",
     label: "Implemented",
-    tint: "#DCFCE7",
-    ink: "#15803D",
-    dot: "#16A34A",
+    tint: "var(--color-teal-soft)",
+    ink: "var(--color-teal-deep)",
+    dot: "var(--color-teal)",
     next: null,
   },
   {
     status: "declined",
     label: "Declined",
-    tint: "#FEF2F2",
-    ink: "#B91C1C",
-    dot: "#DC2626",
+    tint: "var(--color-danger-soft)",
+    ink: "var(--color-danger-deep)",
+    dot: "var(--color-danger)",
     next: null,
   },
 ];
 
 export const STATUS_META = Object.fromEntries(
-  KAIZEN_FLOW.map((s) => [s.status, s])
+  KAIZEN_FLOW.map((s) => [s.status, s]),
 ) as Record<KaizenStatus, (typeof KAIZEN_FLOW)[number]>;
 
 export interface KaizenIdea {
@@ -154,7 +160,7 @@ export const kaizenKeys = {
  * overnight would be a suggestion box with a hole in the bottom.
  */
 export async function fetchKaizenIdeas(
-  factoryId: string
+  factoryId: string,
 ): Promise<KaizenIdea[]> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -176,7 +182,7 @@ export interface NewKaizenValues {
 export async function submitKaizenIdea(
   factoryId: string,
   userId: string,
-  values: NewKaizenValues
+  values: NewKaizenValues,
 ): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase.from("kaizen_ideas").insert({
@@ -203,7 +209,7 @@ export async function submitKaizenIdea(
 export async function reviewKaizenIdea(
   ideaId: string,
   status: KaizenStatus,
-  note?: string
+  note?: string,
 ): Promise<void> {
   const supabase = createClient();
   const patch: { status: KaizenStatus; review_note?: string | null } = {
@@ -254,7 +260,7 @@ export const FILTER_LABELS: Record<KaizenFilter, string> = {
 
 export function matchesKaizenFilter(
   idea: KaizenIdea,
-  filter: KaizenFilter
+  filter: KaizenFilter,
 ): boolean {
   return filter === "all" || idea.status === filter;
 }

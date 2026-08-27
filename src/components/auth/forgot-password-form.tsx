@@ -3,7 +3,15 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Eye, EyeOff, KeyRound, Lock, Mail } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Eye,
+  EyeOff,
+  KeyRound,
+  Lock,
+  Mail,
+} from "lucide-react";
 
 import { TextField } from "@/components/auth/text-field";
 import {
@@ -39,7 +47,9 @@ export function ForgotPasswordForm() {
       return;
     }
     setStep("reset");
-    setNotice(`If an account exists for ${email}, a verification code is on its way.`);
+    setNotice(
+      `If an account exists for ${email}, a verification code is on its way.`,
+    );
   }
 
   async function resetPassword(event: React.FormEvent) {
@@ -74,10 +84,10 @@ export function ForgotPasswordForm() {
 
   return (
     <>
-      <h1 className="text-[2rem] font-semibold leading-tight tracking-tight text-[#0F1B34]">
+      <h1 className="text-[2rem] font-semibold leading-tight tracking-tight text-ink">
         {step === "email" ? "Forgot password?" : "Enter your code"}
       </h1>
-      <p className="mt-2 text-sm text-[#64748B]">
+      <p className="mt-2 text-sm text-ink-4">
         {step === "email"
           ? "Enter your email and we'll send you a 6-digit reset code."
           : "Check your inbox, then set a new password below."}
@@ -102,8 +112,11 @@ export function ForgotPasswordForm() {
 
           <SubmitButton loading={loading} label="Send code" />
 
-          <p className="text-center text-sm text-[#64748B]">
-            <Link href="/login" className="font-medium text-[#2563EB] hover:underline">
+          <p className="text-center text-sm text-ink-4">
+            <Link
+              href="/login"
+              className="font-medium text-brand hover:underline"
+            >
               Back to sign in
             </Link>
           </p>
@@ -111,7 +124,7 @@ export function ForgotPasswordForm() {
       ) : (
         <form className="mt-9 space-y-5" onSubmit={resetPassword}>
           {notice && (
-            <p className="rounded-lg bg-[#EFF6FF] px-3 py-2 text-sm text-[#1D4ED8]">
+            <p className="rounded-lg bg-brand-soft px-3 py-2 text-sm text-brand-deep">
               {notice}
             </p>
           )}
@@ -148,9 +161,13 @@ export function ForgotPasswordForm() {
                 tabIndex={-1}
                 aria-label={show ? "Hide password" : "Show password"}
                 onClick={() => setShow((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94A3B8] transition hover:text-[#475569]"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-5 transition hover:text-ink-3"
               >
-                {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                {show ? (
+                  <EyeOff className="size-4" />
+                ) : (
+                  <Eye className="size-4" />
+                )}
               </button>
             }
           />
@@ -180,7 +197,7 @@ export function ForgotPasswordForm() {
                 setError(null);
                 setNotice(null);
               }}
-              className="inline-flex items-center gap-1 font-medium text-[#64748B] hover:text-[#334155]"
+              className="inline-flex items-center gap-1 font-medium text-ink-4 hover:text-ink-2"
             >
               <ArrowLeft className="size-3.5" />
               Change email
@@ -189,7 +206,7 @@ export function ForgotPasswordForm() {
               type="button"
               disabled={loading}
               onClick={() => sendCode()}
-              className="font-medium text-[#2563EB] hover:underline disabled:opacity-60"
+              className="font-medium text-brand hover:underline disabled:opacity-60"
             >
               Resend code
             </button>
@@ -204,7 +221,7 @@ function ErrorNote({ children }: { children: React.ReactNode }) {
   return (
     <p
       role="alert"
-      className="rounded-lg bg-[#FEF2F2] px-3 py-2 text-sm text-[#B91C1C]"
+      className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger-deep"
     >
       {children}
     </p>
@@ -216,7 +233,7 @@ function SubmitButton({ loading, label }: { loading: boolean; label: string }) {
     <button
       type="submit"
       disabled={loading}
-      className="group flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(37,99,235,0.55)] transition hover:brightness-[1.06] active:translate-y-px disabled:pointer-events-none disabled:opacity-70"
+      className="group flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] active:translate-y-px disabled:pointer-events-none disabled:opacity-70"
     >
       {loading ? "Working…" : label}
       {!loading && (

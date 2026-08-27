@@ -60,14 +60,14 @@ export default async function AdminPage() {
       (adminProfiles ?? []).map(async (p) => {
         const { data } = await admin.auth.admin.getUserById(p.id);
         const active = Boolean(
-          data.user?.email_confirmed_at || data.user?.last_sign_in_at
+          data.user?.email_confirmed_at || data.user?.last_sign_in_at,
         );
         return {
           factory_id: p.factory_id as string,
           email: p.email as string,
           status: active ? ("active" as const) : ("invited" as const),
         };
-      })
+      }),
     );
     const byFactory = new Map(statuses.map((s) => [s.factory_id, s]));
 
@@ -83,18 +83,18 @@ export default async function AdminPage() {
   }
 
   return (
-    <div className="min-h-svh bg-[#F6F8FC]">
+    <div className="min-h-svh bg-canvas">
       {/* top bar */}
-      <header className="flex items-center justify-between border-b border-[#E6EAF1] bg-white px-6 py-3.5">
+      <header className="flex items-center justify-between border-b border-line bg-surface px-6 py-3.5">
         <div className="flex items-center gap-3">
           <Logo className="h-7" />
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#EFF4FF] px-2.5 py-1 text-xs font-semibold text-[#2563EB]">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-soft px-2.5 py-1 text-xs font-semibold text-brand">
             <ShieldCheck className="size-3.5" />
             Super Admin
           </span>
         </div>
         <div className="flex items-center gap-4">
-          <span className="hidden text-sm text-[#64748B] sm:inline">
+          <span className="hidden text-sm text-ink-4 sm:inline">
             {profile.full_name ?? profile.email}
           </span>
           <SignOutButton />

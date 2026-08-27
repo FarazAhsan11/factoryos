@@ -43,7 +43,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const FIELD =
-  "w-full rounded-xl border border-[#E6EAF1] bg-white px-3.5 py-2.5 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#2563EB]";
+  "w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-brand";
 
 const PRIMARY =
   "inline-flex h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold text-white transition hover:brightness-[1.06] disabled:opacity-60";
@@ -52,7 +52,7 @@ const PRIMARY =
 const BLOCK = "w-full justify-center";
 
 const GHOST =
-  "inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#E6EAF1] bg-white px-3 text-xs font-medium text-[#475569] transition hover:border-[#2563EB] hover:text-[#2563EB] disabled:pointer-events-none disabled:opacity-40";
+  "inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-xs font-medium text-ink-3 transition hover:border-brand hover:text-brand disabled:pointer-events-none disabled:opacity-40";
 
 /**
  * The form for the move this issue can make next — and nothing else.
@@ -137,16 +137,16 @@ function OpenPanel({
   onDone: () => Promise<void> | void;
 }) {
   return (
-    <div className="space-y-4 rounded-2xl border border-[#E6EAF1] bg-white p-4">
+    <div className="space-y-4 rounded-2xl border border-line bg-surface p-4">
       <StartForm action={action} onDone={onDone} />
       {canReview(role) && (
         <>
           <div className="flex items-center gap-3">
-            <span className="h-px flex-1 bg-[#EEF1F6]" />
-            <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-[#CBD5E1]">
+            <span className="h-px flex-1 bg-line-soft" />
+            <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-ink-6">
               or
             </span>
-            <span className="h-px flex-1 bg-[#EEF1F6]" />
+            <span className="h-px flex-1 bg-line-soft" />
           </div>
           <ResolveDirectPanel action={action} onDone={onDone} />
         </>
@@ -191,7 +191,10 @@ function StartForm({
         title="Start the investigation"
         hint="An issue nobody owns is everybody&rsquo;s, which is to say nobody&rsquo;s."
       />
-      <Field label="Who is looking into this?" error={errors.assignedTo?.message}>
+      <Field
+        label="Who is looking into this?"
+        error={errors.assignedTo?.message}
+      >
         <input
           {...register("assignedTo")}
           placeholder="Name — the person, not the department"
@@ -205,7 +208,7 @@ function StartForm({
         className={cn(
           PRIMARY,
           BLOCK,
-          "bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] shadow-[0_8px_20px_-8px_rgba(37,99,235,0.6)]"
+          "bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] shadow-brand",
         )}
       >
         {isSubmitting ? (
@@ -272,7 +275,7 @@ function ResolveDirectPanel({
   if (!open) {
     return (
       <div className="space-y-2">
-        <p className="text-xs text-[#64748B]">
+        <p className="text-xs text-ink-4">
           Dealt with already, and no root cause worth chasing?
         </p>
         <button
@@ -280,7 +283,7 @@ function ResolveDirectPanel({
           onClick={() => setOpen(true)}
           className={cn(
             BLOCK,
-            "inline-flex h-11 items-center gap-2 rounded-xl border border-[#BBF7D0] bg-[#F0FDF4] text-sm font-semibold text-[#15803D] transition hover:border-[#16A34A] hover:bg-[#DCFCE7]"
+            "inline-flex h-11 items-center gap-2 rounded-xl border border-teal-line bg-teal-soft text-sm font-semibold text-teal-deep transition hover:border-teal hover:bg-teal-soft",
           )}
         >
           <CheckCheck className="size-4" />
@@ -296,7 +299,10 @@ function ResolveDirectPanel({
         title="Resolve without a full CAPA"
         hint="It closes here — the account below is the whole record of it."
       />
-      <Field label="What was done about it?" error={errors.verification?.message}>
+      <Field
+        label="What was done about it?"
+        error={errors.verification?.message}
+      >
         <textarea
           {...register("verification")}
           rows={3}
@@ -308,7 +314,7 @@ function ResolveDirectPanel({
       </Field>
       {/* Said before the click, not discovered after it: this is a shortcut
           through the record, not around it. */}
-      <p className="text-[11px] text-[#64748B]">
+      <p className="text-[11px] text-ink-4">
         Recorded as resolved without an investigation, under your name. If it
         comes back, re-open it and it takes the full route.
       </p>
@@ -318,7 +324,7 @@ function ResolveDirectPanel({
           disabled={isSubmitting}
           className={cn(
             PRIMARY,
-            "flex-1 justify-center bg-[#16A34A] shadow-[0_8px_20px_-8px_rgba(22,163,74,0.6)]"
+            "flex-1 justify-center bg-teal shadow-[0_8px_20px_-8px_rgba(13,148,136,0.6)]",
           )}
         >
           {isSubmitting ? (
@@ -407,7 +413,7 @@ function RootCauseForm({
   return (
     <form
       onSubmit={submit}
-      className="space-y-3 rounded-2xl border border-[#E6EAF1] bg-white p-4"
+      className="space-y-3 rounded-2xl border border-line bg-surface p-4"
     >
       <Legend
         title="What caused it"
@@ -430,7 +436,7 @@ function RootCauseForm({
           disabled={busy}
           className={cn(
             PRIMARY,
-            "flex-1 justify-center bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] shadow-[0_8px_20px_-8px_rgba(37,99,235,0.6)]"
+            "flex-1 justify-center bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] shadow-brand",
           )}
         >
           {isSubmitting ? (
@@ -499,7 +505,7 @@ function CorrectiveActionForm({
   return (
     <form
       onSubmit={submit}
-      className="space-y-3 rounded-2xl border border-[#E6EAF1] bg-white p-4"
+      className="space-y-3 rounded-2xl border border-line bg-surface p-4"
     >
       <Legend
         title="Record the fix"
@@ -535,7 +541,7 @@ function CorrectiveActionForm({
         className={cn(
           PRIMARY,
           BLOCK,
-          "bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] shadow-[0_8px_20px_-8px_rgba(37,99,235,0.6)]"
+          "bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] shadow-brand",
         )}
       >
         {isSubmitting ? (
@@ -585,7 +591,7 @@ function ClosePanel({
   // only a supervisor and up gets the form for it.
   if (!canReview(role)) {
     return (
-      <p className="rounded-2xl border border-[#E6EAF1] bg-white p-4 text-[13px] text-[#475569]">
+      <p className="rounded-2xl border border-line bg-surface p-4 text-[13px] text-ink-3">
         The fix is recorded. A supervisor or above signs it off
         {action.verify_due_at && (
           <>
@@ -593,7 +599,7 @@ function ClosePanel({
             <span
               className={cn(
                 "font-semibold",
-                action.is_verify_overdue ? "text-[#B45309]" : "text-[#0F1B34]"
+                action.is_verify_overdue ? "text-warn-deep" : "text-ink",
               )}
             >
               {relativeTime(action.verify_due_at)}
@@ -608,7 +614,7 @@ function ClosePanel({
   return (
     <form
       onSubmit={submit}
-      className="space-y-3 rounded-2xl border border-[#BBF7D0] bg-[#F0FDF4] p-4"
+      className="space-y-3 rounded-2xl border border-teal-line bg-teal-soft p-4"
     >
       <Legend
         title="Verify and close"
@@ -629,7 +635,7 @@ function ClosePanel({
         className={cn(
           PRIMARY,
           BLOCK,
-          "bg-[#16A34A] shadow-[0_8px_20px_-8px_rgba(22,163,74,0.6)]"
+          "bg-teal shadow-[0_8px_20px_-8px_rgba(13,148,136,0.6)]",
         )}
       >
         {isSubmitting ? (
@@ -651,7 +657,7 @@ function ClosedPanel({
   role: FactoryRole;
 }) {
   return (
-    <p className="rounded-2xl border border-[#BBF7D0] bg-[#F0FDF4] p-4 text-[13px] text-[#15803D]">
+    <p className="rounded-2xl border border-teal-line bg-teal-soft p-4 text-[13px] text-teal-deep">
       {/* Two different things ended here, and saying which is the whole point
           of having recorded it: one issue was investigated and its fix
           verified, the other was small enough not to need either. */}
@@ -760,7 +766,7 @@ function RevertPanel({
   return (
     <form
       onSubmit={submit}
-      className="space-y-3 rounded-2xl border border-[#FDE68A] bg-[#FFFBEB] p-4"
+      className="space-y-3 rounded-2xl border border-warn-line bg-warn-tint p-4"
     >
       <Legend
         title={label}
@@ -786,7 +792,7 @@ function RevertPanel({
         <button
           type="submit"
           disabled={isSubmitting}
-          className={cn(PRIMARY, "h-9 bg-[#B45309] text-xs")}
+          className={cn(PRIMARY, "h-9 bg-warn-deep text-xs")}
         >
           {isSubmitting && <Loader2 className="size-3.5 animate-spin" />}
           {label}
@@ -812,10 +818,10 @@ function RevertPanel({
 function Legend({ title, hint }: { title: string; hint: string }) {
   return (
     <div>
-      <p className="text-[10px] font-bold uppercase tracking-[0.6px] text-[#94A3B8]">
+      <p className="text-[10px] font-bold uppercase tracking-[0.6px] text-ink-5">
         {title}
       </p>
-      <p className="mt-0.5 text-[11.5px] text-[#64748B]">{hint}</p>
+      <p className="mt-0.5 text-[11.5px] text-ink-4">{hint}</p>
     </div>
   );
 }
@@ -835,16 +841,16 @@ function Field({
     <div className="space-y-1">
       {/* The control sits inside the label, so it is associated with it
           without every caller having to invent a matching id. */}
-      <label className="block space-y-1 text-xs font-medium text-[#475569]">
+      <label className="block space-y-1 text-xs font-medium text-ink-3">
         <span className="block">
           {label}
           {optional && (
-            <span className="ml-1 font-normal text-[#94A3B8]">(optional)</span>
+            <span className="ml-1 font-normal text-ink-5">(optional)</span>
           )}
         </span>
         {children}
       </label>
-      {error && <p className="text-[11.5px] text-[#DC2626]">{error}</p>}
+      {error && <p className="text-[11.5px] text-danger">{error}</p>}
     </div>
   );
 }

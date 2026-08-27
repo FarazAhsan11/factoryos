@@ -46,7 +46,7 @@ export type ProcessCategory = (typeof PROCESS_CATEGORIES)[number]["value"];
 
 /** The three values as a zod-ready tuple, derived so the two can't drift. */
 export const PROCESS_CATEGORY_VALUES = PROCESS_CATEGORIES.map(
-  (c) => c.value
+  (c) => c.value,
 ) as unknown as [ProcessCategory, ...ProcessCategory[]];
 
 /**
@@ -147,7 +147,7 @@ export function targetQtyFromSpeed(
   speedType: string | undefined,
   speedRate: SpeedRate | undefined,
   targetSpeed: number | undefined,
-  durationMins: number
+  durationMins: number,
 ): number | null {
   if (!speedType || !speedTypeTakesRate(speedType)) return null;
   if (!targetSpeed || !Number.isFinite(targetSpeed) || targetSpeed <= 0) {
@@ -215,9 +215,12 @@ const operatorList = z
       // answer. The message on `z.string()` still covers a picker reporting
       // `undefined`, which would otherwise surface zod's own wording.
       name: z.string({ error: OPERATOR_REQUIRED }).trim().max(80),
-    })
+    }),
   )
-  .max(MAX_OPERATORS, `That's more than ${MAX_OPERATORS} people — check the entry.`)
+  .max(
+    MAX_OPERATORS,
+    `That's more than ${MAX_OPERATORS} people — check the entry.`,
+  )
   .superRefine((rows, ctx) => {
     // The pickers already hide a name chosen in another row, but
     // "Not on the list…" is free text and can repeat one.
@@ -326,10 +329,7 @@ export const logEntrySchema = z
     // Who did the work — required unless this is downtime. The issue is
     // pinned to the first picker rather than the array, so it renders inline
     // on the control the operator has to act on.
-    if (
-      operatorsRequired(values.category) &&
-      values.operators.length === 0
-    ) {
+    if (operatorsRequired(values.category) && values.operators.length === 0) {
       ctx.addIssue({
         code: "custom",
         path: ["operators", 0, "name"],

@@ -2,12 +2,7 @@
 
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  ClipboardCheck,
-  ClipboardList,
-  Package,
-  Wrench,
-} from "lucide-react";
+import { ClipboardCheck, ClipboardList, Package, Wrench } from "lucide-react";
 
 import { BatchSummary } from "@/components/factory/batch/batch-summary";
 import { MaintenanceNextStep } from "@/components/factory/maintenance/maintenance-phase-forms";
@@ -112,9 +107,9 @@ function Body({
   return (
     <>
       {/* ── Header: what this is, and how far it has got ─────────────── */}
-      <DialogHeader className="shrink-0 gap-2 border-b border-[#EEF1F6] px-5 pt-5 pr-12 pb-4">
+      <DialogHeader className="shrink-0 gap-2 border-b border-line bg-surface px-5 pt-5 pr-12 pb-4">
         <div className="flex flex-wrap items-center gap-1.5">
-          <Badge className="bg-[#F1F5F9] font-mono text-[#475569]">
+          <Badge className="bg-sunken-2 font-mono text-ink-3">
             {request.request_no}
           </Badge>
           <Badge className={priority.pill}>{priority.label}</Badge>
@@ -123,10 +118,10 @@ function Body({
           </Badge>
         </div>
 
-        <DialogTitle className="flex flex-wrap items-baseline gap-x-2 text-base leading-snug text-[#0F1B34]">
+        <DialogTitle className="flex flex-wrap items-baseline gap-x-2 text-base leading-snug text-ink">
           <span className="font-mono">{request.equipment_no}</span>
           {request.equipment_name && (
-            <span className="font-normal text-[#475569]">
+            <span className="font-normal text-ink-3">
               {request.equipment_name}
             </span>
           )}
@@ -146,7 +141,7 @@ function Body({
         <div
           role="tablist"
           aria-label="Request sections"
-          className="flex gap-1 rounded-xl bg-[#F1F5F9] p-1"
+          className="flex gap-1 rounded-xl border border-line bg-sunken-2 p-1"
         >
           <TabButton
             active={tab === "initiation"}
@@ -175,7 +170,7 @@ function Body({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+      <div className="scrollbar-slim min-h-0 flex-1 overflow-y-auto px-5 py-4">
         {tab === "initiation" && (
           <Initiation
             request={request}
@@ -188,7 +183,7 @@ function Body({
 
         {/* The gate for whichever section is waiting, inside that section. */}
         {tab === waiting && (
-          <div className="mt-5 border-t border-dashed border-[#E6EAF1] pt-5">
+          <div className="mt-5 border-t border-dashed border-line pt-5">
             <MaintenanceNextStep
               request={request}
               factoryId={factoryId}
@@ -200,12 +195,12 @@ function Body({
       </div>
 
       {/* ── Footer: the clocks ───────────────────────────────────────── */}
-      <div className="flex shrink-0 items-center justify-between gap-3 border-t border-[#EEF1F6] bg-[#FBFCFE] px-5 py-3">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-t border-line bg-surface px-5 py-3">
         <Clocks request={request} />
         <button
           type="button"
           onClick={onClose}
-          className="h-9 shrink-0 rounded-lg border border-[#E6EAF1] bg-white px-4 text-sm font-medium text-[#475569] transition hover:border-[#2563EB] hover:text-[#2563EB]"
+          className="h-9 shrink-0 rounded-lg border border-line bg-surface px-4 text-sm font-semibold text-ink-3 shadow-soft transition hover:border-brand hover:text-brand"
         >
           Close
         </button>
@@ -227,39 +222,39 @@ function Initiation({
 }) {
   return (
     <div className="space-y-5">
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl border border-[#E6EAF1] bg-[#FBFCFE] p-4 sm:grid-cols-3">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl border border-line bg-surface p-4 sm:grid-cols-3">
         <Fact label="Equipment ID">
           <span className="font-mono">{request.equipment_no}</span>
         </Fact>
         <Fact label="Equipment name">
           {request.equipment_name ?? (
-            <span className="italic text-[#94A3B8]">Not in the register</span>
+            <span className="italic text-ink-5">Not in the register</span>
           )}
         </Fact>
         <Fact label={`${unitWord} no.`}>
-          {request.unit_name ?? <span className="italic text-[#94A3B8]">—</span>}
+          {request.unit_name ?? <span className="italic text-ink-5">—</span>}
         </Fact>
         <Fact label="Initiating department">
           {request.initiating_department_name ?? (
-            <span className="italic text-[#94A3B8]">Not recorded</span>
+            <span className="italic text-ink-5">Not recorded</span>
           )}
         </Fact>
         <Fact label="Department needed">
           {request.department_name ?? (
-            <span className="italic text-[#94A3B8]">Not yet decided</span>
+            <span className="italic text-ink-5">Not yet decided</span>
           )}
         </Fact>
         <Fact label="Priority">{priorityMeta(request.priority).label}</Fact>
         <Fact label="Initiated by">
           {request.reported_by ?? (
-            <span className="italic text-[#94A3B8]">Not recorded</span>
+            <span className="italic text-ink-5">Not recorded</span>
           )}
         </Fact>
         <Fact label="Date &amp; time">{formatStamp(request.created_at)}</Fact>
       </dl>
 
       <Section label="Description of problem">
-        <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-[#334155]">
+        <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-ink-2">
           {request.description}
         </p>
       </Section>
@@ -267,15 +262,15 @@ function Initiation({
       {request.batch_no && (
         <Section label="Products impacted">
           <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
-            <Package className="size-4 shrink-0 translate-y-0.5 text-[#94A3B8]" />
-            <span className="font-mono font-semibold text-[#0F1B34]">
+            <Package className="size-4 shrink-0 translate-y-0.5 text-ink-5" />
+            <span className="font-mono font-semibold text-ink">
               {request.batch_no}
             </span>
             {request.product_name && (
-              <span className="text-[#475569]">{request.product_name}</span>
+              <span className="text-ink-3">{request.product_name}</span>
             )}
             {request.product_code && (
-              <span className="font-mono text-xs text-[#94A3B8]">
+              <span className="font-mono text-xs text-ink-5">
                 {request.product_code}
               </span>
             )}
@@ -302,11 +297,9 @@ function Engineering({ request }: { request: MaintenanceRequest }) {
 
   return (
     <div className="space-y-5">
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl border border-[#E6EAF1] bg-[#FBFCFE] p-4 sm:grid-cols-3">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl border border-line bg-surface p-4 sm:grid-cols-3">
         <Fact label="Work assigned to">
-          {request.assigned_to ?? (
-            <span className="italic text-[#94A3B8]">—</span>
-          )}
+          {request.assigned_to ?? <span className="italic text-ink-5">—</span>}
         </Fact>
         <Fact label="Assigned">{formatStamp(request.assigned_at)}</Fact>
         <Fact label="Work started">{formatStamp(request.work_started_at)}</Fact>
@@ -315,7 +308,7 @@ function Engineering({ request }: { request: MaintenanceRequest }) {
           {request.downtime_minutes !== null ? (
             formatMinutes(request.downtime_minutes)
           ) : request.work_started_at ? (
-            <span className="font-semibold text-[#B45309]">
+            <span className="font-semibold text-warn-deep">
               {formatMinutes(minutesSince(request.work_started_at))} and running
             </span>
           ) : (
@@ -327,7 +320,7 @@ function Engineering({ request }: { request: MaintenanceRequest }) {
 
       {request.work_details && (
         <Section label="Details of maintenance work carried out">
-          <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-[#334155]">
+          <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-ink-2">
             {request.work_details}
           </p>
         </Section>
@@ -391,19 +384,15 @@ function Qa({ request }: { request: MaintenanceRequest }) {
 
       {request.qa_remarks && (
         <Section label="Remarks">
-          <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-[#334155]">
+          <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-ink-2">
             {request.qa_remarks}
           </p>
         </Section>
       )}
 
       <Section label="QA sign">
-        <p className="text-sm font-semibold text-[#0F1B34]">
-          {request.qa_sign_name}
-        </p>
-        <p className="text-xs text-[#94A3B8]">
-          {formatStamp(request.verified_at)}
-        </p>
+        <p className="text-sm font-semibold text-ink">{request.qa_sign_name}</p>
+        <p className="text-xs text-ink-5">{formatStamp(request.verified_at)}</p>
       </Section>
     </div>
   );
@@ -430,24 +419,24 @@ function Answer({
   mono?: boolean;
 }) {
   return (
-    <div className="rounded-2xl border border-[#E6EAF1] bg-white p-3.5">
-      <p className="text-[10px] font-bold uppercase tracking-[0.5px] text-[#94A3B8]">
+    <div className="rounded-2xl border border-line bg-surface p-3.5">
+      <p className="text-[10px] font-bold uppercase tracking-[0.5px] text-ink-5">
         {question}
       </p>
       <p
         className={cn(
           "mt-1 text-sm font-semibold",
           answer === null
-            ? "italic text-[#94A3B8]"
+            ? "italic text-ink-5"
             : answer
-              ? "text-[#B45309]"
-              : "text-[#475569]"
+              ? "text-warn-deep"
+              : "text-ink-3",
         )}
       >
         {answer === null ? "Not answered" : answer ? "Yes" : "No"}
       </p>
       {answer && detail && (
-        <p className={cn("mt-0.5 text-xs text-[#475569]", mono && "font-mono")}>
+        <p className={cn("mt-0.5 text-xs text-ink-3", mono && "font-mono")}>
           {detail}
         </p>
       )}
@@ -459,9 +448,9 @@ function Answer({
 function Clocks({ request }: { request: MaintenanceRequest }) {
   if (request.status === "reported") {
     return (
-      <p className="min-w-0 truncate text-xs text-[#64748B]">
+      <p className="min-w-0 truncate text-xs text-ink-4">
         Waiting{" "}
-        <span className="font-semibold text-[#0F1B34]">
+        <span className="font-semibold text-ink">
           {formatMinutes(minutesSince(request.created_at))}
         </span>{" "}
         for someone to take it
@@ -470,10 +459,10 @@ function Clocks({ request }: { request: MaintenanceRequest }) {
   }
 
   return (
-    <p className="flex min-w-0 flex-wrap items-baseline gap-x-3 text-xs text-[#64748B]">
+    <p className="flex min-w-0 flex-wrap items-baseline gap-x-3 text-xs text-ink-4">
       <span>
         Response{" "}
-        <span className="font-semibold text-[#0F1B34]">
+        <span className="font-semibold text-ink">
           {formatMinutes(request.response_minutes)}
         </span>
       </span>
@@ -483,8 +472,8 @@ function Clocks({ request }: { request: MaintenanceRequest }) {
           className={cn(
             "font-semibold",
             request.downtime_minutes === null && request.work_started_at
-              ? "text-[#B45309]"
-              : "text-[#0F1B34]"
+              ? "text-warn-deep"
+              : "text-ink",
           )}
         >
           {request.downtime_minutes !== null
@@ -507,7 +496,7 @@ function Section({
 }) {
   return (
     <section className="space-y-1.5">
-      <p className="text-[10px] font-bold uppercase tracking-[0.6px] text-[#94A3B8]">
+      <p className="text-[10px] font-bold tracking-[0.07em] text-ink-4 uppercase">
         {label}
       </p>
       {children}
@@ -524,10 +513,10 @@ function Fact({
 }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[10px] font-bold uppercase tracking-[0.5px] text-[#94A3B8]">
+      <dt className="text-[10px] font-bold tracking-[0.07em] text-ink-5 uppercase">
         {label}
       </dt>
-      <dd className="mt-0.5 truncate text-[13px] text-[#0F1B34]">{children}</dd>
+      <dd className="mt-0.5 truncate text-[13px] text-ink">{children}</dd>
     </div>
   );
 }
@@ -542,10 +531,12 @@ function Empty({
   body: string;
 }) {
   return (
-    <div className="rounded-2xl border border-dashed border-[#CBD5E1] px-4 py-10 text-center">
-      <Icon className="mx-auto mb-2 size-6 text-[#CBD5E1]" />
-      <p className="text-sm text-[#64748B]">{title}</p>
-      <p className="mt-1 text-xs text-[#94A3B8]">{body}</p>
+    <div className="rounded-2xl border border-dashed border-line-strong bg-surface px-4 py-10 text-center">
+      <span className="mx-auto grid size-11 place-items-center rounded-2xl bg-surface text-ink-6 ring-1 ring-line">
+        <Icon className="size-5" />
+      </span>
+      <p className="mt-2.5 text-sm font-medium text-ink-3">{title}</p>
+      <p className="mt-1 text-xs text-ink-5">{body}</p>
     </div>
   );
 }
@@ -573,8 +564,8 @@ function TabButton({
       className={cn(
         "inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition",
         active
-          ? "bg-white text-[#2563EB] shadow-[0_1px_2px_rgba(15,27,52,0.08)]"
-          : "text-[#64748B] hover:text-[#0F1B34]"
+          ? "bg-surface text-brand-deep shadow-[0_1px_3px_rgb(20_22_43/0.12)] ring-1 ring-line"
+          : "text-ink-4 hover:bg-surface/60 hover:text-ink",
       )}
     >
       <Icon className="size-4" />
@@ -582,10 +573,7 @@ function TabButton({
       {/* A dot rather than a count: there is only ever one section waiting,
           and "1" against it would invite the question "one what?". */}
       {due && (
-        <span
-          className="size-1.5 rounded-full bg-[#2563EB]"
-          aria-label="waiting"
-        />
+        <span className="size-1.5 rounded-full bg-brand" aria-label="waiting" />
       )}
     </button>
   );
@@ -601,8 +589,8 @@ function Badge({
   return (
     <span
       className={cn(
-        "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
-        className
+        "rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase ring-1 ring-current/15",
+        className,
       )}
     >
       {children}

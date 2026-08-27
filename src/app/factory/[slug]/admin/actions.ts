@@ -41,7 +41,7 @@ async function requireManages(factoryId: string): Promise<string | null> {
  * back as a readable message rather than a silent no-op.
  */
 export async function updateCompanySettings(
-  values: CompanySettingsValues
+  values: CompanySettingsValues,
 ): Promise<UpdateCompanyResult> {
   const parsed = companySettingsSchema.safeParse(values);
   if (!parsed.success) {
@@ -80,7 +80,7 @@ export async function updateCompanySettings(
  * and an afternoon one lost.
  */
 export async function updateShiftTimes(
-  values: ShiftTimesValues
+  values: ShiftTimesValues,
 ): Promise<UpdateShiftTimesResult> {
   const parsed = shiftTimesSchema.safeParse(values);
   if (!parsed.success) {

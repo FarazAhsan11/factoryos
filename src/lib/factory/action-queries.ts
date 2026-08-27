@@ -19,11 +19,7 @@ import { createClient } from "@/lib/supabase/client";
  */
 
 export type ActionStage =
-  | "open"
-  | "investigating"
-  | "action_taken"
-  | "verification"
-  | "closed";
+  "open" | "investigating" | "action_taken" | "verification" | "closed";
 export type ActionPriority = "critical" | "high" | "medium" | "low";
 
 export const ACTION_CATEGORIES = [
@@ -124,7 +120,7 @@ export function verificationLabel(action: FactoryAction): string {
  */
 export function isStageSkipped(
   action: FactoryAction,
-  stage: ActionStage | undefined
+  stage: ActionStage | undefined,
 ): boolean {
   if (!stage || !action.resolved_direct) return false;
   return (
@@ -251,7 +247,7 @@ export const actionKeys = {
  * overdue, so it rises to the top without a separate sort key.
  */
 export async function fetchActions(
-  factoryId: string
+  factoryId: string,
 ): Promise<FactoryAction[]> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -266,7 +262,7 @@ export async function fetchActions(
 }
 
 export async function fetchActionNotes(
-  actionId: string
+  actionId: string,
 ): Promise<ActionNote[]> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -302,7 +298,7 @@ export async function createAction(
   values: NewActionValues,
   createdBy: string,
   /** Resolved from the typed batch number, or null when it matched nothing. */
-  productId: string | null = null
+  productId: string | null = null,
 ): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase.from("actions").insert({
@@ -363,7 +359,7 @@ export interface AdvancePayload {
 export async function advanceAction(
   actionId: string,
   to: ActionStage,
-  payload: AdvancePayload = {}
+  payload: AdvancePayload = {},
 ): Promise<void> {
   const supabase = createClient();
 
@@ -401,7 +397,7 @@ export async function advanceAction(
 export async function revertAction(
   actionId: string,
   to: ActionStage,
-  reason: string
+  reason: string,
 ): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase.rpc("revert_action", {
@@ -415,7 +411,7 @@ export async function revertAction(
 /** Reassigns an issue. Empty string clears it back to unassigned. */
 export async function assignAction(
   actionId: string,
-  assignedTo: string
+  assignedTo: string,
 ): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase
@@ -435,7 +431,7 @@ export async function assignAction(
  */
 export async function saveRootCause(
   actionId: string,
-  rootCause: string
+  rootCause: string,
 ): Promise<void> {
   return updateEvidence(actionId, "root_cause", rootCause);
 }
@@ -461,7 +457,7 @@ export type EvidenceField = keyof typeof EVIDENCE_FIELDS;
 export async function updateEvidence(
   actionId: string,
   field: EvidenceField,
-  value: string
+  value: string,
 ): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase
@@ -486,7 +482,7 @@ export async function addActionNote(
   factoryId: string,
   actionId: string,
   note: string,
-  createdBy: string
+  createdBy: string,
 ): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase.from("action_notes").insert({
@@ -537,7 +533,7 @@ export function relativeTime(iso: string, now: number = Date.now()): string {
  * see `escalatedOnly` in the workspace.
  */
 export function stageCounts(
-  actions: FactoryAction[]
+  actions: FactoryAction[],
 ): Record<ActionStage, number> {
   const counts: Record<ActionStage, number> = {
     open: 0,

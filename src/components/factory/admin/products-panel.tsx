@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarPlus, Check, Search, Trash2, X } from "lucide-react";
+import { CalendarPlus, Check, Package, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -24,6 +24,13 @@ import {
   updateProduct,
   type Product,
 } from "@/lib/factory/product-queries";
+import { DateField } from "@/components/ui/date-picker";
+import {
+  EmptyState,
+  FIELD,
+  PANEL,
+  PanelHeader,
+} from "@/components/factory/admin/settings-ui";
 import { cn } from "@/lib/utils";
 
 /** 540000 → "540,000"; 2.85 stays "2.85". */
@@ -51,7 +58,12 @@ export function ProductsPanel({
   const [editingDateId, setEditingDateId] = useState<string | null>(null);
   const [editDate, setEditDate] = useState("");
 
-  const { data: products = [], isPending, isError, error } = useQuery({
+  const {
+    data: products = [],
+    isPending,
+    isError,
+    error,
+  } = useQuery({
     queryKey,
     queryFn: () => fetchProducts(factoryId),
   });
@@ -70,7 +82,7 @@ export function ProductsPanel({
   });
   const onBoard = useMemo(
     () => new Set(jobs.map((job) => job.product_id)),
-    [jobs]
+    [jobs],
   );
 
   function refresh() {
@@ -88,18 +100,13 @@ export function ProductsPanel({
 
   /** Shared optimistic patch for the row-level edits. */
   const patch = useMutation({
-    mutationFn: ({
-      id,
-      values,
-    }: {
-      id: string;
-      values: Partial<Product>;
-    }) => updateProduct(id, values),
+    mutationFn: ({ id, values }: { id: string; values: Partial<Product> }) =>
+      updateProduct(id, values),
     onMutate: async ({ id, values }) => {
       await queryClient.cancelQueries({ queryKey });
       const previous = queryClient.getQueryData<Product[]>(queryKey);
       queryClient.setQueryData<Product[]>(queryKey, (old) =>
-        (old ?? []).map((p) => (p.id === id ? { ...p, ...values } : p))
+        (old ?? []).map((p) => (p.id === id ? { ...p, ...values } : p)),
       );
       return { previous };
     },
@@ -120,7 +127,7 @@ export function ProductsPanel({
       await queryClient.cancelQueries({ queryKey });
       const previous = queryClient.getQueryData<Product[]>(queryKey);
       queryClient.setQueryData<Product[]>(queryKey, (old) =>
-        (old ?? []).filter((p) => p.id !== id)
+        (old ?? []).filter((p) => p.id !== id),
       );
       return { previous };
     },
@@ -139,7 +146,7 @@ export function ProductsPanel({
     return products.filter((p) =>
       [p.batch_no, p.code, p.name, p.work_order]
         .filter(Boolean)
-        .some((field) => field!.toLowerCase().includes(term))
+        .some((field) => field!.toLowerCase().includes(term)),
     );
   }, [products, search]);
 
@@ -182,29 +189,13 @@ export function ProductsPanel({
 
   return (
     <div className="space-y-5">
-      {canManage && (
-        <AddProductForm onAdd={(values) => add.mutateAsync(values).then(() => {})} />
-      )}
-
-      {/* Import sits beside the search rather than inside the Add form: it is
-          a second way to fill the catalogue, not a field of the first. The row
-          renders for a manager even on an empty catalogue, which is exactly
-          when a bulk import is most wanted. */}
-      {(canManage || products.length > 0) && (
-        <div className="flex items-center gap-2">
-          {products.length > 0 && (
-            <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-[#94A3B8]" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by batch, code or product name…"
-                aria-label="Search the catalogue"
-                className="h-10 w-full rounded-xl border border-[#E6EAF1] bg-white pl-10 pr-3.5 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:ring-4 focus:ring-[#2563EB]/12"
-              />
-            </div>
-          )}
-          {canManage && (
+      <PanelHeader
+        icon={Package}
+        title="Products"
+        description="The batch catalogue. A batch number typed into the shift log resolves to a product here, and a scheduled date puts it on the pipeline board."
+        count={products.length}
+        action={
+          canManage ? (
             <ProductImportDialog
               factoryId={factoryId}
               // The catalogue is already loaded here, so the dialog can name
@@ -212,30 +203,54 @@ export function ProductsPanel({
               existingBatchNos={products.map((p) => p.batch_no)}
               onImported={refresh}
             />
-          )}
+          ) : undefined
+        }
+      />
+
+      {canManage && (
+        <AddProductForm
+          onAdd={(values) => add.mutateAsync(values).then(() => {})}
+        />
+      )}
+
+      {/* Import moved up beside the title — it is a second way to fill the
+          catalogue, not a field of the Add form and not a sibling of search. */}
+      {products.length > 0 && (
+        <div className="relative">
+          <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-ink-5" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by batch, code or product name…"
+            aria-label="Search the catalogue"
+            className={cn(FIELD, "pr-3.5 pl-10")}
+          />
         </div>
       )}
 
       {isPending ? (
         <TableSkeleton />
       ) : isError ? (
-        <p className="rounded-xl bg-[#FEF2F2] px-4 py-3 text-sm text-[#B91C1C]">
+        <p className="rounded-xl bg-danger-soft px-4 py-3 text-sm text-danger-deep">
           Could not load the catalogue: {(error as Error).message}
         </p>
       ) : products.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-[#CBD5E1] px-4 py-10 text-center text-sm text-[#94A3B8]">
-          No products yet
-          {canManage ? " — add your first batch above." : "."}
-        </p>
+        <EmptyState
+          icon={Package}
+          title="No products yet."
+          hint={
+            canManage
+              ? "Add your first batch above, or import the catalogue from CSV."
+              : "A manager fills the catalogue."
+          }
+        />
       ) : visible.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-[#CBD5E1] px-4 py-10 text-center text-sm text-[#94A3B8]">
-          Nothing matches “{search}”.
-        </p>
+        <EmptyState icon={Search} title={`Nothing matches “${search}”.`} />
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-[#E6EAF1] bg-white">
+        <div className={cn(PANEL, "overflow-x-auto")}>
           <table className="w-full min-w-[860px] text-sm">
             <thead>
-              <tr className="border-b border-[#EEF1F6] text-left text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">
+              <tr className="border-b border-line bg-sunken-2 text-left text-[10px] font-bold tracking-[0.07em] text-ink-3 uppercase">
                 <th className="px-4 py-3">Batch</th>
                 <th className="px-4 py-3">Code</th>
                 <th className="px-4 py-3">Product name</th>
@@ -254,29 +269,29 @@ export function ProductsPanel({
                   <tr
                     key={product.id}
                     className={cn(
-                      "border-b border-[#F5F7FA] last:border-0",
-                      !product.active && "bg-[#FBFCFE] text-[#94A3B8]"
+                      "border-b border-sunken last:border-0",
+                      !product.active && "bg-sunken text-ink-5",
                     )}
                   >
-                    <td className="px-4 py-3 font-mono text-[13px] font-medium text-[#0F1B34]">
+                    <td className="px-4 py-3 font-mono text-[13px] font-medium text-ink">
                       {product.batch_no}
                     </td>
-                    <td className="px-4 py-3 font-mono text-[13px] text-[#64748B]">
+                    <td className="px-4 py-3 font-mono text-[13px] text-ink-4">
                       {product.code || "—"}
                     </td>
                     <td className="px-4 py-3">
                       <span
                         className={cn(
-                          product.active ? "text-[#0F1B34]" : "line-through"
+                          product.active ? "text-ink" : "line-through",
                         )}
                       >
                         {product.name}
                       </span>
                     </td>
-                    <td className="px-4 py-3 font-mono text-[13px] text-[#64748B]">
+                    <td className="px-4 py-3 font-mono text-[13px] text-ink-4">
                       {product.work_order || "—"}
                     </td>
-                    <td className="px-4 py-3 text-right font-mono text-[13px] text-[#0F1B34]">
+                    <td className="px-4 py-3 text-right font-mono text-[13px] text-ink">
                       {editing ? (
                         <span className="inline-flex items-center gap-1">
                           <input
@@ -291,13 +306,13 @@ export function ProductsPanel({
                               if (e.key === "Escape") setEditingId(null);
                             }}
                             aria-label={`Required quantity for batch ${product.batch_no}`}
-                            className="h-8 w-28 rounded-lg border border-[#E6EAF1] px-2 text-right text-sm outline-none focus:border-[#2563EB]"
+                            className="h-8 w-28 rounded-lg border border-line px-2 text-right text-sm outline-none focus:border-brand"
                           />
                           <IconButton
                             label="Save quantity"
                             onClick={() => saveQty(product)}
                           >
-                            <Check className="size-4 text-[#16A34A]" />
+                            <Check className="size-4 text-teal" />
                           </IconButton>
                           <IconButton
                             label="Cancel"
@@ -314,7 +329,7 @@ export function ProductsPanel({
                             setEditQty(String(product.required_qty));
                           }}
                           title="Edit required quantity"
-                          className="rounded-md px-1.5 py-0.5 transition hover:bg-[#F1F5F9]"
+                          className="rounded-md px-1.5 py-0.5 transition hover:bg-sunken-2"
                         >
                           {formatQty(product.required_qty)}
                         </button>
@@ -331,24 +346,19 @@ export function ProductsPanel({
                     <td className="px-4 py-3 text-[13px]">
                       {editingDate ? (
                         <span className="inline-flex items-center gap-1">
-                          <input
-                            autoFocus
-                            type="date"
+                          <DateField
                             min={todayKey()}
                             value={editDate}
-                            onChange={(e) => setEditDate(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") saveDate(product);
-                              if (e.key === "Escape") setEditingDateId(null);
-                            }}
-                            aria-label={`Planned date for batch ${product.batch_no}`}
-                            className="h-8 w-36 rounded-lg border border-[#E6EAF1] px-2 text-[13px] outline-none focus:border-[#2563EB]"
+                            onChange={setEditDate}
+                            ariaLabel={`Planned date for batch ${product.batch_no}`}
+                            placeholder="Not scheduled"
+                            className="h-8 w-44 rounded-lg px-2 text-[13px]"
                           />
                           <IconButton
                             label="Save planned date"
                             onClick={() => saveDate(product)}
                           >
-                            <Check className="size-4 text-[#16A34A]" />
+                            <Check className="size-4 text-teal" />
                           </IconButton>
                           <IconButton
                             label="Cancel"
@@ -368,10 +378,11 @@ export function ProductsPanel({
                               ? `Scheduled for ${product.planned_for} and already on the pipeline board, so the date is now fixed.`
                               : "Added to the pipeline board by hand from New job."
                           }
-                          className="inline-flex items-center gap-1.5 text-[#64748B]"
+                          className="inline-flex items-center gap-1.5 text-ink-4"
                         >
-                          {product.planned_for && formatDay(product.planned_for)}
-                          <span className="rounded-full bg-[#EFF6FF] px-1.5 py-0.5 text-[10px] font-semibold text-[#2563EB]">
+                          {product.planned_for &&
+                            formatDay(product.planned_for)}
+                          <span className="rounded-full bg-brand-soft px-1.5 py-0.5 text-[10px] font-semibold text-brand">
                             On board
                           </span>
                         </span>
@@ -384,10 +395,10 @@ export function ProductsPanel({
                           }}
                           title="The day this batch joins the pipeline as Planned"
                           className={cn(
-                            "inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 transition hover:bg-[#F1F5F9]",
+                            "inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 transition hover:bg-sunken-2",
                             product.planned_for
-                              ? "font-medium text-[#0F1B34]"
-                              : "text-[#94A3B8]"
+                              ? "font-medium text-ink"
+                              : "text-ink-5",
                           )}
                         >
                           {product.planned_for ? (
@@ -400,7 +411,7 @@ export function ProductsPanel({
                           )}
                         </button>
                       ) : (
-                        <span className="text-[#64748B]">
+                        <span className="text-ink-4">
                           {product.planned_for
                             ? formatDay(product.planned_for)
                             : "—"}
@@ -419,7 +430,7 @@ export function ProductsPanel({
                                 values: { active: !product.active },
                               })
                             }
-                            className="shrink-0 rounded-full bg-[#F1F5F9] px-2 py-0.5 text-[11px] font-medium text-[#475569] transition hover:bg-[#E2E8F0]"
+                            className="shrink-0 rounded-full bg-sunken-2 px-2 py-0.5 text-[11px] font-medium text-ink-3 transition hover:bg-line"
                           >
                             {product.active ? "Active" : "Retired"}
                           </button>
@@ -427,7 +438,7 @@ export function ProductsPanel({
                             label={`Delete batch ${product.batch_no}`}
                             onClick={() => remove.mutate(product.id)}
                           >
-                            <Trash2 className="size-3.5 text-[#B91C1C]" />
+                            <Trash2 className="size-3.5 text-danger-deep" />
                           </IconButton>
                         </div>
                       </td>
@@ -441,7 +452,7 @@ export function ProductsPanel({
       )}
 
       {canManage && products.length > 0 && (
-        <p className="text-xs text-[#94A3B8]">
+        <p className="text-xs text-ink-5">
           Retire a finished batch to keep its shift history but hide it from new
           entries. Click a quantity or a planned date to change it. A batch with
           a planned date joins the pipeline as <strong>Planned</strong> on that
@@ -467,7 +478,7 @@ function IconButton({
       onClick={onClick}
       aria-label={label}
       title={label}
-      className="shrink-0 rounded-md p-1 text-[#94A3B8] transition hover:bg-[#F1F5F9] hover:text-[#475569]"
+      className="shrink-0 rounded-md p-1 text-ink-5 transition hover:bg-sunken-2 hover:text-ink-3"
     >
       {children}
     </button>
@@ -476,9 +487,9 @@ function IconButton({
 
 function TableSkeleton() {
   return (
-    <div className="space-y-2 rounded-2xl border border-[#EEF1F6] p-4">
+    <div className="space-y-2 rounded-2xl border border-line-soft p-4">
       {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="h-9 animate-pulse rounded-lg bg-[#F8FAFC]" />
+        <div key={i} className="h-9 animate-pulse rounded-lg bg-sunken" />
       ))}
     </div>
   );

@@ -36,14 +36,14 @@ import {
 import { cn } from "@/lib/utils";
 
 const CONTROL =
-  "h-10 w-full rounded-xl border border-[#E6EAF1] bg-[#FBFCFE] px-3.5 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:bg-white";
+  "h-10 w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)] outline-none transition placeholder:text-placeholder hover:border-line-strong focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12";
 
 const STAGE_PILL: Record<string, string> = {
-  open: "bg-[#FEF3C7] text-[#B45309]",
-  investigating: "bg-[#DBEAFE] text-[#1D4ED8]",
-  action_taken: "bg-[#E0E7FF] text-[#4338CA]",
-  verification: "bg-[#CFFAFE] text-[#0E7490]",
-  closed: "bg-[#DCFCE7] text-[#15803D]",
+  open: "bg-warn-soft text-warn-deep ring-warn-line",
+  investigating: "bg-brand-soft text-brand-deep ring-brand-line",
+  action_taken: "bg-brand-soft text-brand-deep ring-brand-line",
+  verification: "bg-teal-soft text-teal-deep ring-teal-line",
+  closed: "bg-teal-soft text-teal-deep ring-teal-line",
 };
 
 type Tab = "next" | "record" | "activity";
@@ -157,7 +157,7 @@ function Body({
     onSuccess: async () => {
       await refresh();
       toast.success(
-        assignee.trim() ? `Assigned to ${assignee.trim()}.` : "Unassigned."
+        assignee.trim() ? `Assigned to ${assignee.trim()}.` : "Unassigned.",
       );
     },
     onError: (e: Error) => toast.error(e.message),
@@ -170,29 +170,29 @@ function Body({
     <>
       {/* ── Header: what this is ─────────────────────────────────────── */}
       {/* `pr-12` keeps the title clear of the dialog's own close button. */}
-      <DialogHeader className="shrink-0 gap-2 border-b border-[#EEF1F6] px-5 pt-5 pr-12 pb-4">
+      <DialogHeader className="shrink-0 gap-2 border-b border-line bg-surface px-5 pt-5 pr-12 pb-4">
         <div className="flex flex-wrap items-center gap-1.5">
           {action.is_escalated && (
-            <Badge className="bg-[#EDE9FE] text-[#6D28D9]">Escalated</Badge>
+            <Badge className="bg-violet-line text-violet-deep">Escalated</Badge>
           )}
           {action.is_overdue && !action.is_escalated && (
-            <Badge className="bg-[#FEE2E2] text-[#B91C1C]">Overdue</Badge>
+            <Badge className="bg-danger-soft text-danger-deep">Overdue</Badge>
           )}
           {action.is_verify_overdue && (
-            <Badge className="bg-[#FEF3C7] text-[#B45309]">Sign-off late</Badge>
+            <Badge className="bg-warn-soft text-warn-deep">Sign-off late</Badge>
           )}
           {action.resolved_direct && (
-            <Badge className="bg-[#F1F5F9] text-[#64748B]">No CAPA</Badge>
+            <Badge className="bg-sunken-2 text-ink-4">No CAPA</Badge>
           )}
           <Badge className={STAGE_PILL[action.status]}>
             {STAGE_LABELS[action.status]}
           </Badge>
         </div>
 
-        <DialogTitle className="text-base leading-snug text-[#0F1B34]">
+        <DialogTitle className="text-base leading-snug break-words text-ink">
           {action.title}
         </DialogTitle>
-        <DialogDescription className="text-xs">
+        <DialogDescription className="text-xs break-words">
           {action.unit_name ?? "Factory-wide"} · {action.category} ·{" "}
           {action.priority} priority
         </DialogDescription>
@@ -203,7 +203,7 @@ function Body({
         <div
           role="tablist"
           aria-label="Issue detail"
-          className="flex gap-1 rounded-xl bg-[#F1F5F9] p-1"
+          className="flex gap-1 rounded-xl border border-line bg-sunken-2 p-1"
         >
           <TabButton
             active={tab === "next"}
@@ -231,7 +231,7 @@ function Body({
       </div>
 
       {/* ── The one scrolling region ─────────────────────────────────── */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+      <div className="scrollbar-slim min-h-0 flex-1 overflow-y-auto px-5 py-4">
         {tab === "next" && (
           <div className="space-y-4">
             {/* Position first, and only here: on the working tab it is the
@@ -253,17 +253,15 @@ function Body({
                     re-pointing an investigation at a different run halfway
                     through is a new issue, not an edit. */}
                 <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
-                  <Package className="size-4 shrink-0 translate-y-0.5 text-[#94A3B8]" />
-                  <span className="font-mono font-semibold text-[#0F1B34]">
+                  <Package className="size-4 shrink-0 translate-y-0.5 text-ink-5" />
+                  <span className="font-mono font-semibold text-ink">
                     {action.batch_no}
                   </span>
                   {action.product_name && (
-                    <span className="text-[#475569]">
-                      {action.product_name}
-                    </span>
+                    <span className="text-ink-3">{action.product_name}</span>
                   )}
                   {action.product_code && (
-                    <span className="font-mono text-xs text-[#94A3B8]">
+                    <span className="font-mono text-xs text-ink-5">
                       {action.product_code}
                     </span>
                   )}
@@ -281,7 +279,7 @@ function Body({
               <section className="space-y-1.5">
                 <label
                   htmlFor="action-assignee"
-                  className="block text-xs font-medium text-[#475569]"
+                  className="block text-xs font-medium text-ink-3"
                 >
                   Assigned to
                 </label>
@@ -297,7 +295,7 @@ function Body({
                     type="button"
                     onClick={() => reassign.mutate()}
                     disabled={busy || assignee === (action.assigned_to ?? "")}
-                    className="h-10 shrink-0 rounded-xl border border-[#E6EAF1] px-3 text-sm font-medium text-[#475569] transition hover:border-[#2563EB] hover:text-[#2563EB] disabled:pointer-events-none disabled:opacity-40"
+                    className="h-10 shrink-0 rounded-xl border border-line px-3 text-sm font-medium text-ink-3 transition hover:border-brand hover:text-brand disabled:pointer-events-none disabled:opacity-40"
                   >
                     Save
                   </button>
@@ -319,11 +317,9 @@ function Body({
         {tab === "activity" && (
           <div className="space-y-3">
             {notesPending ? (
-              <p className="py-8 text-center text-xs text-[#94A3B8]">
-                Loading…
-              </p>
+              <p className="py-8 text-center text-xs text-ink-5">Loading…</p>
             ) : notes.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-[#CBD5E1] px-3.5 py-8 text-center text-xs text-[#94A3B8]">
+              <p className="rounded-xl border border-dashed border-line-strong bg-surface px-3.5 py-8 text-center text-xs text-ink-5">
                 Nothing yet — the first update will show here.
               </p>
             ) : (
@@ -334,12 +330,14 @@ function Body({
                     className={cn(
                       "rounded-xl px-3 py-2 text-[13px]",
                       entry.is_system
-                        ? "bg-[#F8FAFC] text-[#64748B] italic"
-                        : "border border-[#E6EAF1] text-[#0F1B34]"
+                        ? "bg-sunken-2 text-ink-4 italic"
+                        : "border border-line bg-surface text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)]",
                     )}
                   >
-                    <span className="whitespace-pre-wrap">{entry.note}</span>
-                    <span className="mt-0.5 block text-[10.5px] not-italic text-[#94A3B8]">
+                    <span className="break-words whitespace-pre-wrap">
+                      {entry.note}
+                    </span>
+                    <span className="mt-0.5 block text-[10.5px] not-italic text-ink-5">
                       {formatDue(entry.created_at)}
                     </span>
                   </li>
@@ -348,10 +346,10 @@ function Body({
             )}
 
             {!closed && (
-              <div className="space-y-2 rounded-2xl border border-[#E6EAF1] bg-white p-3.5">
+              <div className="space-y-2 rounded-2xl border border-line bg-surface p-3.5">
                 <label
                   htmlFor="action-note"
-                  className="block text-[10px] font-bold uppercase tracking-[0.6px] text-[#94A3B8]"
+                  className="block text-[10px] font-bold uppercase tracking-[0.6px] text-ink-5"
                 >
                   Add note{" "}
                   <span className="font-normal normal-case">
@@ -364,13 +362,13 @@ function Body({
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   placeholder="Update, progress, next steps…"
-                  className="w-full rounded-xl border border-[#E6EAF1] bg-[#FBFCFE] px-3.5 py-2.5 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:bg-white"
+                  className="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink outline-none transition placeholder:text-placeholder hover:border-line-strong focus:border-brand focus:ring-4 focus:ring-brand/12"
                 />
                 <button
                   type="button"
                   onClick={() => saveNote.mutate()}
                   disabled={busy || !note.trim()}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#E6EAF1] bg-white px-3 text-xs font-medium text-[#475569] transition hover:border-[#2563EB] hover:text-[#2563EB] disabled:pointer-events-none disabled:opacity-40"
+                  className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-3.5 text-xs font-semibold text-white shadow-brand transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-40"
                 >
                   {saveNote.isPending && (
                     <Loader2 className="size-3.5 animate-spin" />
@@ -384,13 +382,13 @@ function Body({
       </div>
 
       {/* ── Footer: the clock that is actually running ───────────────── */}
-      <div className="flex shrink-0 items-center justify-between gap-3 border-t border-[#EEF1F6] bg-[#FBFCFE] px-5 py-3">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-t border-line bg-surface px-5 py-3">
         <Clock action={action} />
         <button
           type="button"
           onClick={onClose}
           disabled={busy}
-          className="h-9 shrink-0 rounded-lg border border-[#E6EAF1] bg-white px-4 text-sm font-medium text-[#475569] transition hover:border-[#2563EB] hover:text-[#2563EB] disabled:opacity-60"
+          className="h-9 shrink-0 rounded-lg border border-line bg-surface px-4 text-sm font-semibold text-ink-3 shadow-soft transition hover:border-brand hover:text-brand disabled:opacity-60"
         >
           Close
         </button>
@@ -410,7 +408,7 @@ function Body({
 function Clock({ action }: { action: FactoryAction }) {
   if (action.status === "closed") {
     return (
-      <p className="min-w-0 truncate text-xs text-[#64748B]">
+      <p className="min-w-0 truncate text-xs text-ink-4">
         {action.resolved_direct ? "Resolved" : "Closed"}
         {action.closed_at && ` ${formatDue(action.closed_at)}`}
       </p>
@@ -418,25 +416,28 @@ function Clock({ action }: { action: FactoryAction }) {
   }
 
   const [label, at, late, tone] = action.verify_due_at
-    ? ["Sign-off due", action.verify_due_at, action.is_verify_overdue, "#B45309"]
-    : ["Due", action.due_at, action.is_overdue, "#B91C1C"];
+    ? [
+        "Sign-off due",
+        action.verify_due_at,
+        action.is_verify_overdue,
+        "var(--color-warn-deep)",
+      ]
+    : ["Due", action.due_at, action.is_overdue, "var(--color-danger-deep)"];
 
   return (
-    <p className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 text-xs text-[#64748B]">
+    <p className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 text-xs text-ink-4">
       <span>{label}</span>
-      <span className="font-medium text-[#0F1B34]">
-        {formatDue(at as string)}
-      </span>
+      <span className="font-medium text-ink">{formatDue(at as string)}</span>
       <span
         className="font-semibold"
-        style={{ color: late ? (tone as string) : "#64748B" }}
+        style={{ color: late ? (tone as string) : "var(--color-ink-4)" }}
       >
         {relativeTime(at as string)}
       </span>
       {/* The one number that turns "overdue" into something actionable: how
           long before this becomes a management problem. */}
       {action.is_overdue && !action.is_escalated && (
-        <span className="text-[#B45309]">
+        <span className="text-warn-deep">
           · escalates {relativeTime(action.escalates_at)}
         </span>
       )}
@@ -447,11 +448,11 @@ function Clock({ action }: { action: FactoryAction }) {
 /** The issue's fixed facts — the ones that never change after it is raised. */
 function Facts({ action }: { action: FactoryAction }) {
   return (
-    <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl border border-[#E6EAF1] bg-[#FBFCFE] p-4 text-sm sm:grid-cols-3">
+    <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl border border-line bg-surface p-4 text-sm sm:grid-cols-3">
       <Fact label="Raised">{formatDue(action.created_at)}</Fact>
       <Fact label="Owner">
         {action.assigned_to ?? (
-          <span className="italic text-[#B45309]">Unassigned</span>
+          <span className="italic text-warn-deep">Unassigned</span>
         )}
       </Fact>
       <Fact label="Source">
@@ -482,17 +483,17 @@ function Fact({
 }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[10px] font-bold uppercase tracking-[0.5px] text-[#94A3B8]">
+      <dt className="text-[10px] font-bold tracking-[0.07em] text-ink-5 uppercase">
         {label}
       </dt>
-      <dd className="mt-0.5 truncate text-[13px] text-[#0F1B34]">{children}</dd>
+      <dd className="mt-0.5 truncate text-[13px] text-ink">{children}</dd>
     </div>
   );
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[10px] font-bold uppercase tracking-[0.6px] text-[#94A3B8]">
+    <p className="text-[10px] font-bold tracking-[0.07em] text-ink-4 uppercase">
       {children}
     </p>
   );
@@ -521,8 +522,8 @@ function TabButton({
       className={cn(
         "inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition",
         active
-          ? "bg-white text-[#2563EB] shadow-[0_1px_2px_rgba(15,27,52,0.08)]"
-          : "text-[#64748B] hover:text-[#0F1B34]"
+          ? "bg-surface text-brand-deep shadow-[0_1px_3px_rgb(20_22_43/0.12)] ring-1 ring-line"
+          : "text-ink-4 hover:bg-surface/60 hover:text-ink",
       )}
     >
       <Icon className="size-4" />
@@ -531,7 +532,7 @@ function TabButton({
         <span
           className={cn(
             "rounded-full px-1.5 text-[10px] font-bold",
-            active ? "bg-[#EFF6FF] text-[#2563EB]" : "bg-[#E2E8F0] text-[#64748B]"
+            active ? "bg-brand-soft text-brand" : "bg-line text-ink-4",
           )}
         >
           {count}
@@ -551,8 +552,8 @@ function Badge({
   return (
     <span
       className={cn(
-        "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
-        className
+        "rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase ring-1 ring-current/15",
+        className,
       )}
     >
       {children}

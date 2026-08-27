@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, LayoutGrid } from "lucide-react";
 import { toast } from "sonner";
 
 import { JobDetailDialog } from "@/components/factory/pipeline/job-detail-dialog";
@@ -58,7 +58,7 @@ export function PipelineWorkspace({
       const promoted = await promoteScheduledJobs(factoryId).catch(() => 0);
       if (promoted > 0) {
         toast.success(
-          `${promoted} scheduled batch${promoted === 1 ? "" : "es"} added to Planned.`
+          `${promoted} scheduled batch${promoted === 1 ? "" : "es"} added to Planned.`,
         );
       }
       return fetchPipelineJobs(factoryId);
@@ -79,7 +79,7 @@ export function PipelineWorkspace({
   const refresh = useCallback(
     () =>
       queryClient.invalidateQueries({ queryKey: pipelineKeys.all(factoryId) }),
-    [queryClient, factoryId]
+    [queryClient, factoryId],
   );
 
   /** Active batches with no job yet — exactly what the New Job modal offers. */
@@ -93,7 +93,7 @@ export function PipelineWorkspace({
   // quietly stops working — the fix is one click in Admin.
   const hasFinalStage = useMemo(
     () => processList.some((p) => p.flags.final),
-    [processList]
+    [processList],
   );
 
   const remove = useMutation({
@@ -106,16 +106,16 @@ export function PipelineWorkspace({
   });
 
   return (
-    <>
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+    <div className="flex flex-col lg:min-h-0 lg:flex-1">
+      <div className="mb-5 flex shrink-0 flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">
+          <p className="text-[11px] font-bold tracking-[0.09em] text-ink-5 uppercase">
             Production pipeline
           </p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#0F1B34]">
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">
             Batch tracker
           </h1>
-          <p className="mt-1 text-sm text-[#64748B]">
+          <p className="mt-1 text-sm text-ink-4">
             Cards move themselves: first entry → In production · issue flagged →
             On hold · final stage complete → Finished.
           </p>
@@ -132,7 +132,7 @@ export function PipelineWorkspace({
       </div>
 
       {!isPending && !hasFinalStage && jobs.length > 0 && (
-        <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-[#FDE68A] bg-[#FFFBEB] px-4 py-3 text-sm text-[#92400E]">
+        <div className="mb-4 flex shrink-0 items-start gap-2.5 rounded-xl border border-warn-line bg-warn-tint px-4 py-3 text-sm text-warn-ink shadow-[inset_0_1px_2px_rgb(180_83_9/0.06)]">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
           <p>
             <strong className="font-semibold">No final stage set.</strong> Jobs
@@ -146,13 +146,18 @@ export function PipelineWorkspace({
       {isPending ? (
         <BoardSkeleton />
       ) : isError ? (
-        <p className="rounded-2xl border border-[#FECACA] bg-[#FEF2F2] px-4 py-6 text-center text-sm text-[#B91C1C]">
+        <p className="rounded-2xl border border-danger-line bg-danger-soft px-4 py-6 text-center text-sm font-medium text-danger-deep">
           Could not load the pipeline: {(error as Error).message}
         </p>
       ) : jobs.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[#CBD5E1] bg-white px-4 py-16 text-center">
-          <p className="text-sm text-[#64748B]">Nothing on the board yet.</p>
-          <p className="mt-1 text-xs text-[#94A3B8]">
+        <div className="rounded-2xl border border-dashed border-line-strong bg-surface px-4 py-16 text-center">
+          <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-sunken text-ink-6">
+            <LayoutGrid className="size-6" />
+          </span>
+          <p className="mt-3 text-sm font-medium text-ink-3">
+            Nothing on the board yet.
+          </p>
+          <p className="mt-1 text-xs text-ink-5">
             {canManage
               ? "Use New job to start tracking batches from the catalogue."
               : "A manager adds batches from the product catalogue."}
@@ -173,21 +178,23 @@ export function PipelineWorkspace({
         unitWord={units.singular}
         onClose={() => setDetailJob(null)}
       />
-    </>
+    </div>
   );
 }
 
 function BoardSkeleton() {
   return (
-    <div className="grid gap-4 lg:grid-cols-4">
+    <div className="grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-4 lg:grid-rows-1">
       {Array.from({ length: 4 }).map((_, i) => (
         <div
           key={i}
-          className="space-y-2.5 rounded-2xl border border-[#EEF1F6] bg-white p-3"
+          className="flex flex-col overflow-hidden rounded-2xl border border-line bg-sunken lg:min-h-0"
         >
-          <div className="h-8 animate-pulse rounded-lg bg-[#F8FAFC]" />
-          <div className="h-24 animate-pulse rounded-xl bg-[#F8FAFC]" />
-          <div className="h-24 animate-pulse rounded-xl bg-[#F8FAFC]" />
+          <div className="h-[41px] shrink-0 animate-pulse border-b border-line bg-sunken-2" />
+          <div className="space-y-2.5 p-2.5">
+            <div className="h-28 animate-pulse rounded-xl bg-surface" />
+            <div className="h-28 animate-pulse rounded-xl bg-surface" />
+          </div>
         </div>
       ))}
     </div>

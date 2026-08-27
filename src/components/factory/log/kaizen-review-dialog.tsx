@@ -123,7 +123,9 @@ function Body({
   function decline() {
     if (!note.trim()) {
       setDeclining(true);
-      toast.error("Give a reason — it's the part that keeps people suggesting.");
+      toast.error(
+        "Give a reason — it's the part that keeps people suggesting.",
+      );
       return;
     }
     move.mutate("declined");
@@ -133,7 +135,7 @@ function Body({
     <>
       <DialogHeader>
         <DialogTitle className="text-[#0F1B34]">Improvement idea</DialogTitle>
-        <DialogDescription>
+        <DialogDescription className="break-words">
           {idea.submitted_by_name ?? "Unknown"} · {timeAgo(idea.created_at)} ·{" "}
           {idea.category} · {IMPACT_LABELS[idea.impact]}
         </DialogDescription>
@@ -153,7 +155,7 @@ function Body({
         )}
       </div>
 
-      <p className="whitespace-pre-line rounded-xl border border-[#E6EAF1] bg-[#FBFCFE] px-3.5 py-3 text-sm leading-relaxed text-[#0F1B34]">
+      <p className="max-h-64 overflow-y-auto rounded-xl border border-[#E6EAF1] bg-[#FBFCFE] px-3.5 py-3 text-sm leading-relaxed break-words whitespace-pre-line text-[#0F1B34] scrollbar-slim">
         {idea.idea}
       </p>
 
@@ -181,7 +183,7 @@ function Body({
             placeholder="What happens next, or why this one can't work…"
             className={cn(
               "w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-[#0F1B34] outline-none transition placeholder:text-[#94A3B8] focus:border-[#2563EB]",
-              declining ? "border-[#FCA5A5]" : "border-[#E6EAF1]"
+              declining ? "border-[#FCA5A5]" : "border-[#E6EAF1]",
             )}
           />
         </div>
@@ -191,7 +193,7 @@ function Body({
             <p className="text-[10px] font-bold uppercase tracking-[0.6px] text-[#94A3B8]">
               Reviewer&rsquo;s note
             </p>
-            <p className="whitespace-pre-line rounded-xl bg-[#F8FAFC] px-3.5 py-2.5 text-[13px] text-[#475569]">
+            <p className="rounded-xl bg-[#F8FAFC] px-3.5 py-2.5 text-[13px] break-words whitespace-pre-line text-[#475569]">
               {idea.review_note}
             </p>
           </div>

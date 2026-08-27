@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { ClipboardList } from "lucide-react";
 
 import { AmendEntryDialog } from "@/components/factory/data/amend-entry-dialog";
 import { ExplainOverrunDialog } from "@/components/factory/data/explain-overrun-dialog";
@@ -21,7 +22,7 @@ function tone(entry: LogEntry): string {
   if (entry.action_flag) return "#DC2626";
   if (Number(entry.qty_rejected ?? 0) > 0) return "#F59E0B";
   if (Number(entry.qty ?? 0) > 0) return "#16A34A";
-  return "#2563EB";
+  return "#93B4F5";
 }
 
 function fmt(n: number | null) {
@@ -57,7 +58,12 @@ export function ActivityFeed({
   // rolls onto the new day at midnight instead of freezing on yesterday.
   const date = todayKey();
 
-  const { data: entries = [], isPending, isError, error } = useQuery({
+  const {
+    data: entries = [],
+    isPending,
+    isError,
+    error,
+  } = useQuery({
     queryKey: logKeys.day(factoryId, date),
     queryFn: () => fetchLogEntries(factoryId, date),
   });
@@ -72,8 +78,10 @@ export function ActivityFeed({
 
   const unitNames = useMemo(
     () =>
-      [...new Set(entries.map((e) => e.unit?.name).filter(Boolean))].sort() as string[],
-    [entries]
+      [
+        ...new Set(entries.map((e) => e.unit?.name).filter(Boolean)),
+      ].sort() as string[],
+    [entries],
   );
 
   const visible = useMemo(
@@ -81,25 +89,45 @@ export function ActivityFeed({
       unitFilter === "all"
         ? entries
         : entries.filter((e) => e.unit?.name === unitFilter),
-    [entries, unitFilter]
+    [entries, unitFilter],
   );
 
   return (
-    <aside className="rounded-2xl border border-[#E6EAF1] bg-white lg:sticky lg:top-6">
-      <header className="flex items-center justify-between gap-2 border-b border-[#EEF1F6] px-4 py-3.5">
-        <h2 className="text-sm font-semibold text-[#0F1B34]">Shift activity</h2>
-        <span className="inline-flex items-center gap-1 rounded-full bg-[#ECFDF5] px-2 py-0.5 text-[10px] font-semibold text-[#047857]">
-          ● Live · immutable
+    /* Its own scroll container, not a sticky block in the page's scroll. The
+       feed and the form are two views of the same shift and are read against
+       each other — tying them to one scrollbar meant reaching the bottom of
+       the form pushed the feed off the top of the screen. */
+    <aside className="flex flex-col overflow-hidden rounded-2xl border border-[#E6EAF1] bg-white shadow-[0_1px_2px_rgba(15,27,52,0.04),0_12px_32px_-24px_rgba(15,27,52,0.5)] lg:h-full">
+      <header className="flex shrink-0 items-center justify-between gap-2 border-b border-[#EEF1F6] px-4 py-3.5">
+        <div className="flex items-baseline gap-2">
+          <h2 className="text-[15px] font-semibold text-[#0F1B34]">
+            Shift activity
+          </h2>
+          {entries.length > 0 && (
+            <span className="text-[11px] font-medium text-[#94A3B8]">
+              {entries.length} today
+            </span>
+          )}
+        </div>
+        <span
+          title="Entries appear here the moment they are filed, and are never edited in place"
+          className="inline-flex items-center gap-1.5 rounded-full bg-[#ECFDF5] px-2 py-0.5 text-[10px] font-semibold text-[#047857] ring-1 ring-[#A7F3D0]/70"
+        >
+          <span className="relative flex size-1.5">
+            <span className="absolute inline-flex size-full animate-ping rounded-full bg-[#10B981] opacity-75" />
+            <span className="relative inline-flex size-1.5 rounded-full bg-[#059669]" />
+          </span>
+          Live · immutable
         </span>
       </header>
 
       {unitNames.length > 1 && (
-        <div className="border-b border-[#EEF1F6] px-4 py-2.5">
+        <div className="shrink-0 border-b border-[#EEF1F6] bg-[#FBFCFE] px-4 py-2.5">
           <select
             value={unitFilter}
             onChange={(e) => setUnitFilter(e.target.value)}
             aria-label={`Filter by ${units.singular.toLowerCase()}`}
-            className="h-9 w-full rounded-lg border border-[#E6EAF1] bg-[#FBFCFE] px-2.5 text-xs text-[#0F1B34] outline-none focus:border-[#2563EB]"
+            className="select-chevron h-9 w-full rounded-lg border border-[#E2E8F0] bg-white px-2.5 text-xs font-medium text-[#0F1B34] outline-none transition hover:border-[#CBD5E1] focus:border-[#2563EB] focus:ring-4 focus:ring-[#2563EB]/12"
           >
             <option value="all">All {units.plural.toLowerCase()}</option>
             {unitNames.map((name) => (
@@ -111,25 +139,33 @@ export function ActivityFeed({
         </div>
       )}
 
-      <div className="max-h-[70vh] overflow-y-auto px-4 py-3">
+      <div className="scrollbar-slim min-h-0 flex-1 overflow-y-auto px-3.5 py-3 max-lg:max-h-[32rem]">
         {isPending ? (
           <div className="space-y-2">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-14 animate-pulse rounded-lg bg-[#F8FAFC]" />
+              <div
+                key={i}
+                className="h-16 animate-pulse rounded-xl bg-[#F4F7FB]"
+              />
             ))}
           </div>
         ) : isError ? (
-          <p className="rounded-lg bg-[#FEF2F2] px-3 py-2 text-xs text-[#B91C1C]">
+          <p className="rounded-xl border border-[#FECACA] bg-[#FEF2F2] px-3 py-2.5 text-xs font-medium text-[#B91C1C]">
             Could not load the feed: {(error as Error).message}
           </p>
         ) : visible.length === 0 ? (
-          <p className="py-10 text-center text-xs text-[#94A3B8]">
-            {entries.length === 0
-              ? "Nothing logged yet today."
-              : `No entries for ${unitFilter}.`}
-          </p>
+          <div className="py-12 text-center">
+            <span className="mx-auto grid size-10 place-items-center rounded-full bg-[#F4F7FB] text-[#CBD5E1]">
+              <ClipboardList className="size-5" />
+            </span>
+            <p className="mt-2.5 text-xs text-[#94A3B8]">
+              {entries.length === 0
+                ? "Nothing logged yet today."
+                : `No entries for ${unitFilter}.`}
+            </p>
+          </div>
         ) : (
-          <ul className="space-y-3">
+          <ul className="space-y-2">
             {visible.map((entry) => (
               <FeedRow
                 key={entry.id}
@@ -204,137 +240,144 @@ function FeedRow({
       : null;
 
   return (
-    <li className="group flex gap-2.5">
+    /* A card with a coloured spine rather than a dot in a list. The dot was
+       two pixels of the only thing that says at a glance whether an entry is
+       routine, rejected or flagged; the spine says it from across the room. */
+    <li className="group relative overflow-hidden rounded-xl border border-[#EDF1F7] bg-white py-2.5 pr-2.5 pl-4 transition hover:border-[#DBE3EF] hover:shadow-[0_6px_18px_-12px_rgba(15,27,52,0.55)]">
       <span
-        className="mt-1.5 size-2 shrink-0 rounded-full"
+        className="absolute inset-y-0 left-0 w-1"
         style={{ background: tone(entry) }}
         aria-hidden
       />
-      <div className="min-w-0 flex-1 space-y-0.5">
-        <p className="text-[13px] leading-snug text-[#0F1B34]">
-          <strong className="font-semibold">{entry.unit?.name ?? "—"}</strong>
-          {" — "}
-          {entry.process?.name ?? "—"}
-          {entry.product && (
-            <span className="text-[#64748B]"> · {entry.product.name}</span>
-          )}
-          {Number(entry.qty ?? 0) > 0 && (
-            <span className="font-semibold text-[#2563EB]">
-              {" "}
-              {/* A preparatory stage counts in drums or kg, not units —
+      <div className="flex gap-2">
+        <div className="min-w-0 flex-1 space-y-0.5">
+          <p className="text-[13px] leading-snug break-words text-[#0F1B34]">
+            <strong className="font-semibold">{entry.unit?.name ?? "—"}</strong>
+            {" — "}
+            {entry.process?.name ?? "—"}
+            {entry.product && (
+              <span className="text-[#64748B]"> · {entry.product.name}</span>
+            )}
+            {Number(entry.qty ?? 0) > 0 && (
+              <span className="font-semibold text-[#2563EB]">
+                {" "}
+                {/* A preparatory stage counts in drums or kg, not units —
                   printing "units" against 3 drums is a wrong number, not a
                   vague one. Production carries no qty_unit and falls back. */}
-              {fmt(entry.qty)} {entry.qty_unit ?? "units"}
-            </span>
-          )}
-          {entry.action_flag && (
-            <span className="ml-1.5 rounded-full bg-[#FEF2F2] px-1.5 py-0.5 text-[9.5px] font-semibold text-[#B91C1C]">
-              {entry.action_flag}
-            </span>
-          )}
-          {/* Clickable for a manager, because the feed is where a supervisor
+                {fmt(entry.qty)} {entry.qty_unit ?? "units"}
+              </span>
+            )}
+            {entry.action_flag && (
+              <span className="ml-1.5 rounded-full bg-[#FEF2F2] px-1.5 py-0.5 text-[9.5px] font-semibold text-[#B91C1C]">
+                {entry.action_flag}
+              </span>
+            )}
+            {/* Clickable for a manager, because the feed is where a supervisor
               is actually looking when the overrun lands — making them go to
               the data table to clear it is how a flag gets ignored. */}
-          {overrun?.needs_overrun_note &&
-            (canExplainOverrun ? (
-              <button
-                type="button"
-                onClick={onExplainOverrun}
-                title={`Over the required quantity by ${fmt(overrun.overrun_qty)} — tap to explain`}
-                className="ml-1.5 rounded-full bg-[#FEF3C7] px-1.5 py-0.5 text-[9.5px] font-bold text-[#B45309] transition hover:bg-[#FDE68A]"
-              >
-                Attention · +{fmt(overrun.overrun_qty)}
-              </button>
-            ) : (
-              <span
-                title={`Over the required quantity by ${fmt(overrun.overrun_qty)} — a manager has to explain it`}
-                className="ml-1.5 rounded-full bg-[#FEF3C7] px-1.5 py-0.5 text-[9.5px] font-bold text-[#B45309]"
-              >
-                Attention · +{fmt(overrun.overrun_qty)}
+            {overrun?.needs_overrun_note &&
+              (canExplainOverrun ? (
+                <button
+                  type="button"
+                  onClick={onExplainOverrun}
+                  title={`Over the required quantity by ${fmt(overrun.overrun_qty)} — tap to explain`}
+                  className="ml-1.5 rounded-full bg-[#FEF3C7] px-1.5 py-0.5 text-[9.5px] font-bold text-[#B45309] transition hover:bg-[#FDE68A]"
+                >
+                  Attention · +{fmt(overrun.overrun_qty)}
+                </button>
+              ) : (
+                <span
+                  title={`Over the required quantity by ${fmt(overrun.overrun_qty)} — a manager has to explain it`}
+                  className="ml-1.5 rounded-full bg-[#FEF3C7] px-1.5 py-0.5 text-[9.5px] font-bold text-[#B45309]"
+                >
+                  Attention · +{fmt(overrun.overrun_qty)}
+                </span>
+              ))}
+            {entry.amended_at && (
+              <span className="ml-1.5 rounded-full bg-[#F1F5F9] px-1.5 py-0.5 text-[9.5px] font-semibold text-[#475569]">
+                Amended
               </span>
-            ))}
-          {entry.amended_at && (
-            <span className="ml-1.5 rounded-full bg-[#F1F5F9] px-1.5 py-0.5 text-[9.5px] font-semibold text-[#475569]">
-              Amended
-            </span>
-          )}
-        </p>
+            )}
+          </p>
 
-        {/* Once explained, the reason and the name stay on the entry. The
+          {/* Once explained, the reason and the name stay on the entry. The
             flag is gone; the record of why is not. */}
-        {overrun?.overrun_note && (
-          <p className="text-[11px] leading-snug text-[#B45309]">
-            ↳ Overrun: {overrun.overrun_note}
-            {overrun.overrun_cleared_by_name && (
-              <span className="text-[#92400E]">
-                {" "}
-                — {overrun.overrun_cleared_by_name}
-              </span>
-            )}
+          {overrun?.overrun_note && (
+            <p className="text-[11px] leading-snug break-words text-[#B45309]">
+              ↳ Overrun: {overrun.overrun_note}
+              {overrun.overrun_cleared_by_name && (
+                <span className="text-[#92400E]">
+                  {" "}
+                  — {overrun.overrun_cleared_by_name}
+                </span>
+              )}
+            </p>
+          )}
+
+          <p className="text-[11px] text-[#94A3B8]">
+            {entry.start_time?.slice(0, 5) ?? "—"}
+            {entry.end_time && ` → ${entry.end_time.slice(0, 5)}`}
+            {entry.duration_minutes > 0 &&
+              ` · ${formatMinutes(entry.duration_minutes)}`}
+            {entry.equipment_no && ` · ${entry.equipment_no}`}
+            {entry.operators?.length > 0 && ` · ${entry.operators.join(" / ")}`}
           </p>
-        )}
 
-        <p className="text-[11px] text-[#94A3B8]">
-          {entry.start_time?.slice(0, 5) ?? "—"}
-          {entry.end_time && ` → ${entry.end_time.slice(0, 5)}`}
-          {entry.duration_minutes > 0 &&
-            ` · ${formatMinutes(entry.duration_minutes)}`}
-          {entry.equipment_no && ` · ${entry.equipment_no}`}
-          {entry.operators?.length > 0 && ` · ${entry.operators.join(" / ")}`}
-        </p>
+          {entry.target_speed ? (
+            <p className="text-[11px] text-[#64748B]">
+              Speed: {entry.actual_speed ?? "—"} / {entry.target_speed}{" "}
+              {entry.speed_unit ?? ""}
+              {perf !== null && (
+                <span
+                  className={cn(
+                    "font-semibold",
+                    perf >= 90
+                      ? "text-[#16A34A]"
+                      : perf >= 70
+                        ? "text-[#F59E0B]"
+                        : "text-[#DC2626]",
+                  )}
+                >
+                  {" "}
+                  · {perf}%
+                </span>
+              )}
+              {entry.slow_reason && (
+                <em className="text-[#94A3B8]"> · {entry.slow_reason}</em>
+              )}
+            </p>
+          ) : null}
 
-        {entry.target_speed ? (
-          <p className="text-[11px] text-[#64748B]">
-            Speed: {entry.actual_speed ?? "—"} / {entry.target_speed}{" "}
-            {entry.speed_unit ?? ""}
-            {perf !== null && (
-              <span
-                className={cn(
-                  "font-semibold",
-                  perf >= 90
-                    ? "text-[#16A34A]"
-                    : perf >= 70
-                      ? "text-[#F59E0B]"
-                      : "text-[#DC2626]"
-                )}
-              >
-                {" "}
-                · {perf}%
-              </span>
-            )}
-            {entry.slow_reason && (
-              <em className="text-[#94A3B8]"> · {entry.slow_reason}</em>
-            )}
-          </p>
-        ) : null}
+          {Number(entry.qty_rejected ?? 0) > 0 && (
+            <p className="text-[11px] font-medium text-[#B91C1C]">
+              ⚠ {fmt(entry.qty_rejected)} rejected / rework
+            </p>
+          )}
 
-        {Number(entry.qty_rejected ?? 0) > 0 && (
-          <p className="text-[11px] font-medium text-[#B91C1C]">
-            ⚠ {fmt(entry.qty_rejected)} rejected / rework
-          </p>
-        )}
+          {entry.comment && (
+            <p className="line-clamp-3 text-[11px] break-words italic text-[#64748B]">
+              {entry.comment}
+            </p>
+          )}
 
-        {entry.comment && (
-          <p className="text-[11px] italic text-[#64748B]">{entry.comment}</p>
-        )}
+          {entry.amend_note && (
+            <p className="line-clamp-3 text-[11px] break-words whitespace-pre-line text-[#7C3AED]">
+              ↳ {entry.amend_note}
+            </p>
+          )}
+        </div>
 
-        {entry.amend_note && (
-          <p className="whitespace-pre-line text-[11px] text-[#7C3AED]">
-            ↳ {entry.amend_note}
-          </p>
+        {canAmend && (
+          <button
+            type="button"
+            onClick={onAmend}
+            title="Attach a correction note — the original entry is preserved"
+            className="h-6 shrink-0 self-start rounded-md border border-[#E6EAF1] bg-white px-1.5 text-[10px] font-semibold text-[#94A3B8] opacity-0 transition hover:border-[#B45309] hover:bg-[#FFFBEB] hover:text-[#B45309] focus-visible:opacity-100 group-hover:opacity-100"
+          >
+            Amend
+          </button>
         )}
       </div>
-
-      {canAmend && (
-        <button
-          type="button"
-          onClick={onAmend}
-          title="Attach a correction note — the original entry is preserved"
-          className="h-6 shrink-0 self-start rounded-md border border-[#E6EAF1] px-1.5 text-[10px] font-medium text-[#94A3B8] opacity-0 transition hover:border-[#B45309] hover:text-[#B45309] focus-visible:opacity-100 group-hover:opacity-100"
-        >
-          Amend
-        </button>
-      )}
     </li>
   );
 }

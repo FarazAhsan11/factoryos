@@ -4,7 +4,19 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Cog, Loader2, Plus, ShieldCheck, Zap } from "lucide-react";
+import {
+  Boxes,
+  Cog,
+  Gauge,
+  Loader2,
+  MapPin,
+  MessageSquareText,
+  Package,
+  Plus,
+  ShieldCheck,
+  Users,
+  Zap,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -30,6 +42,8 @@ import {
   Field,
   FieldRow,
   MONO,
+  SECTION,
+  SELECT,
   SectionTitle,
 } from "@/components/factory/log/log-fields";
 import { OperatorPicker } from "@/components/factory/log/operator-picker";
@@ -94,7 +108,6 @@ export function LogEntryForm({
   const queryClient = useQueryClient();
   const [quick, setQuick] = useState(false);
 
-
   /**
    * Quick mode hides the Speed fields, so it must also clear them.
    *
@@ -143,11 +156,11 @@ export function LogEntryForm({
 
   const activeUnits = useMemo(
     () => unitList.filter((u) => u.active),
-    [unitList]
+    [unitList],
   );
   const activeProcesses = useMemo(
     () => processList.filter((p) => p.active),
-    [processList]
+    [processList],
   );
 
   const {
@@ -239,7 +252,7 @@ export function LogEntryForm({
     // speed rules from firing against fields the form isn't showing.
     setValue(
       "hasMachine",
-      next === "production" && Boolean(process?.flags.machine)
+      next === "production" && Boolean(process?.flags.machine),
     );
   }, [processId, activeProcesses, setValue]);
 
@@ -277,7 +290,7 @@ export function LogEntryForm({
 
   const equipment = useMemo(
     () => findEquipment(equipmentList, equipmentNo),
-    [equipmentList, equipmentNo]
+    [equipmentList, equipmentNo],
   );
 
   // Accumulative total: everything already logged for this batch + activity,
@@ -293,7 +306,7 @@ export function LogEntryForm({
       batchEntries
         .filter((e) => e.process_id === processId)
         .reduce((sum, e) => sum + Number(e.qty ?? 0), 0),
-    [batchEntries, processId]
+    [batchEntries, processId],
   );
   const thisQty = typeof qty === "number" && !Number.isNaN(qty) ? qty : 0;
   const runningTotal = previousQty + thisQty;
@@ -306,7 +319,7 @@ export function LogEntryForm({
   // validates with, so the marking on screen and the rule that blocks submit
   // can't disagree.
   const needsOperators = operatorsRequired(
-    (category as ProcessCategory) ?? "production"
+    (category as ProcessCategory) ?? "production",
   );
 
   /**
@@ -321,7 +334,7 @@ export function LogEntryForm({
     setValue(
       "shift",
       resolveShiftForEntry(shiftTimes, startTime ?? "", duration) ??
-        resolveCurrentShift(shiftTimes)
+        resolveCurrentShift(shiftTimes),
     );
   }, [shiftTimes, startTime, duration, setValue]);
 
@@ -340,7 +353,7 @@ export function LogEntryForm({
     typeof targetSpeed === "number" && !Number.isNaN(targetSpeed)
       ? targetSpeed
       : undefined,
-    duration
+    duration,
   );
 
   // Never typed, in either direction. Clearing it when the inputs stop
@@ -380,7 +393,7 @@ export function LogEntryForm({
         `Logged — ${entry.unit?.name ?? ""} · ${entry.process?.name ?? ""}` +
           (entry.duration_minutes
             ? ` · ${formatMinutes(entry.duration_minutes)}`
-            : "")
+            : ""),
       );
 
       // Keep unit + activity: an operator stays in one room for a whole shift,
@@ -410,7 +423,7 @@ export function LogEntryForm({
 
   if (setupMissing) {
     return (
-      <div className="rounded-2xl border border-dashed border-[#CBD5E1] px-4 py-10 text-center text-sm text-[#94A3B8]">
+      <div className="rounded-2xl border border-dashed border-[#CBD5E1] bg-white px-4 py-12 text-center text-sm text-[#94A3B8]">
         {activeUnits.length === 0
           ? `No ${units.plural.toLowerCase()} set up yet.`
           : "No process stages set up yet."}
@@ -433,16 +446,25 @@ export function LogEntryForm({
           toast.error(
             first?.message
               ? String(first.message)
-              : "Some details are missing — check the highlighted fields."
+              : "Some details are missing — check the highlighted fields.",
           );
-        }
+        },
       )}
-      className="rounded-2xl border border-[#E6EAF1] bg-white"
+      /* A column, not a document: the header states what this is, the body
+         scrolls, and the submit button is pinned where it can always be
+         reached. A form eleven fields tall whose button is only findable by
+         scrolling past everything is how half-filled entries happen. */
+      className="flex flex-col overflow-hidden rounded-2xl border border-[#E6EAF1] bg-white shadow-[0_1px_2px_rgba(15,27,52,0.04),0_12px_32px_-24px_rgba(15,27,52,0.5)] lg:h-full"
     >
-      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-[#EEF1F6] px-5 py-4">
-        <h2 className="text-sm font-semibold text-[#0F1B34]">New entry</h2>
+      <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-[#EEF1F6] bg-white px-5 py-3.5">
+        <h2 className="flex items-center gap-2 text-[15px] font-semibold text-[#0F1B34]">
+          <span className="grid size-7 place-items-center rounded-lg bg-gradient-to-br from-[#EFF4FF] to-[#DCE7FF] text-[#2563EB]">
+            <Plus className="size-4" />
+          </span>
+          New entry
+        </h2>
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1 rounded-full bg-[#ECFDF5] px-2.5 py-1 text-[10px] font-semibold text-[#047857]">
+          <span className="inline-flex items-center gap-1 rounded-full bg-[#ECFDF5] px-2.5 py-1 text-[10px] font-semibold text-[#047857] ring-1 ring-[#A7F3D0]/70">
             <ShieldCheck className="size-3" />
             Audit-protected
           </span>
@@ -455,8 +477,8 @@ export function LogEntryForm({
               className={cn(
                 "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition",
                 quick
-                  ? "border-[#2563EB] bg-[#EFF6FF] text-[#1D4ED8]"
-                  : "border-[#E6EAF1] text-[#64748B] hover:text-[#0F1B34]"
+                  ? "border-[#2563EB] bg-[#EFF6FF] text-[#1D4ED8] shadow-[0_0_0_3px_rgba(37,99,235,0.10)]"
+                  : "border-[#E6EAF1] bg-white text-[#64748B] hover:border-[#CBD5E1] hover:text-[#0F1B34]",
               )}
             >
               <Zap className="size-3" />
@@ -466,17 +488,17 @@ export function LogEntryForm({
         </div>
       </header>
 
-      <div className="space-y-4 p-5">
+      <div className="scrollbar-slim min-h-0 flex-1 space-y-3.5 overflow-y-auto p-4 sm:p-5">
         {/* ── Where & when ─────────────────────────────────────────── */}
-        <section>
-          <SectionTitle>Where &amp; when</SectionTitle>
+        <section className={SECTION}>
+          <SectionTitle icon={MapPin}>Where &amp; when</SectionTitle>
           <FieldRow cols={3}>
             <Field
               label={units.singular}
               htmlFor="log-unit"
               error={errors.unitId?.message}
             >
-              <select id="log-unit" className={CONTROL} {...register("unitId")}>
+              <select id="log-unit" className={SELECT} {...register("unitId")}>
                 <option value="">Select…</option>
                 {activeUnits.map((u) => (
                   <option key={u.id} value={u.id}>
@@ -492,7 +514,7 @@ export function LogEntryForm({
             >
               <select
                 id="log-process"
-                className={CONTROL}
+                className={SELECT}
                 {...register("processId")}
               >
                 <option value="">Select…</option>
@@ -513,7 +535,7 @@ export function LogEntryForm({
               <output
                 className={cn(
                   CONTROL,
-                  "flex items-center font-medium capitalize text-[#0F1B34]"
+                  "flex items-center font-medium capitalize text-[#0F1B34]",
                 )}
               >
                 {shift ?? "—"}
@@ -525,82 +547,87 @@ export function LogEntryForm({
               the form silently grows and shrinks between activities and the
               operator is left wondering which fields went missing. */}
           {processId && <CategoryBadge category={category} />}
-        </section>
 
-        <FieldRow>
-          <Field
-            label="Activity start"
-            htmlFor="log-start"
-            error={errors.startTime?.message}
-          >
-            <div className="flex gap-1.5">
-              <input
-                id="log-start"
-                type="time"
-                className={cn(CONTROL, "flex-1")}
-                {...register("startTime")}
-              />
-              <NowButton onClick={() => setValue("startTime", clockNow())} />
-            </div>
-          </Field>
-          <Field
-            label="Activity end"
-            htmlFor="log-end"
-            error={errors.endTime?.message}
-          >
-            <div className="flex gap-1.5">
-              <input
-                id="log-end"
-                type="time"
-                className={cn(CONTROL, "flex-1")}
-                {...register("endTime")}
-              />
-              <NowButton onClick={() => setValue("endTime", clockNow())} />
-            </div>
-          </Field>
-          <Field label="Duration" note="(auto)">
-            <output
-              className={cn(
-                CONTROL,
-                MONO,
-                "flex items-center font-semibold text-[#2563EB]"
-              )}
+          <FieldRow className="mt-3">
+            <Field
+              label="Activity start"
+              htmlFor="log-start"
+              error={errors.startTime?.message}
             >
-              {duration ? formatMinutes(duration) : "—"}
-            </output>
-          </Field>
-        </FieldRow>
+              <div className="flex gap-1.5">
+                <input
+                  id="log-start"
+                  type="time"
+                  className={cn(CONTROL, "flex-1")}
+                  {...register("startTime")}
+                />
+                <NowButton onClick={() => setValue("startTime", clockNow())} />
+              </div>
+            </Field>
+            <Field
+              label="Activity end"
+              htmlFor="log-end"
+              error={errors.endTime?.message}
+            >
+              <div className="flex gap-1.5">
+                <input
+                  id="log-end"
+                  type="time"
+                  className={cn(CONTROL, "flex-1")}
+                  {...register("endTime")}
+                />
+                <NowButton onClick={() => setValue("endTime", clockNow())} />
+              </div>
+            </Field>
+            <Field label="Duration" note="(auto)">
+              <output
+                className={cn(
+                  CONTROL,
+                  MONO,
+                  "flex items-center border-[#DCE7FF] bg-[#F5F8FF] font-semibold text-[#2563EB]",
+                )}
+              >
+                {duration ? formatMinutes(duration) : "—"}
+              </output>
+            </Field>
+          </FieldRow>
+        </section>
 
         {/* Equipment belongs to machine activities — a manual stage has none,
             and neither preparatory nor downtime is ever one. */}
         {hasMachine && !quickOn && (
-          <Field
-            label="Equipment no."
-            optional
-            htmlFor="log-equipment"
-            error={errors.equipmentNo?.message}
-          >
-            <div className="space-y-2">
-              <input
-                id="log-equipment"
-                className={cn(CONTROL, MONO)}
-                placeholder="e.g. EQ383, EQ112…"
-                autoComplete="off"
-                {...register("equipmentNo")}
-              />
-              {/* Resolved out of Admin → Equipment: the operator types the
+          <section className={SECTION}>
+            <SectionTitle icon={Cog}>Equipment</SectionTitle>
+            <Field
+              label="Equipment no."
+              optional
+              htmlFor="log-equipment"
+              error={errors.equipmentNo?.message}
+            >
+              <div className="space-y-2">
+                <input
+                  id="log-equipment"
+                  className={cn(CONTROL, MONO)}
+                  placeholder="e.g. EQ383, EQ112…"
+                  autoComplete="off"
+                  {...register("equipmentNo")}
+                />
+                {/* Resolved out of Admin → Equipment: the operator types the
                   number off the machine, the register supplies the name. */}
-              <EquipmentAutofill
-                query={(equipmentNo ?? "").trim()}
-                equipment={equipment}
-              />
-            </div>
-          </Field>
+                <EquipmentAutofill
+                  query={(equipmentNo ?? "").trim()}
+                  equipment={equipment}
+                />
+              </div>
+            </Field>
+          </section>
         )}
 
         {/* ── Batch ────────────────────────────────────────────────── */}
-        <section className="space-y-2.5">
-          <SectionTitle hint="→ auto-fills product details">Batch</SectionTitle>
+        <section className={cn(SECTION, "space-y-2.5")}>
+          <SectionTitle icon={Package} hint="→ auto-fills product details">
+            Batch
+          </SectionTitle>
           <Field
             label="Batch number"
             optional
@@ -627,8 +654,8 @@ export function LogEntryForm({
             counts in; production records the full target / actual / rejected
             set; downtime records nothing and says so. */}
         {isPreparatory && (
-          <section>
-            <SectionTitle>Output</SectionTitle>
+          <section className={SECTION}>
+            <SectionTitle icon={Boxes}>Output</SectionTitle>
             <Field
               label="Qty / batches processed"
               htmlFor="log-qty-prep"
@@ -649,7 +676,7 @@ export function LogEntryForm({
                 <select
                   id="log-qty-unit"
                   aria-label="Unit"
-                  className={cn(CONTROL, "w-36 shrink-0")}
+                  className={cn(SELECT, "w-36 shrink-0")}
                   {...register("qtyUnit")}
                 >
                   <option value="">Unit…</option>
@@ -676,109 +703,118 @@ export function LogEntryForm({
         )}
 
         {isProduction && (
-        <section>
-          <SectionTitle>Output</SectionTitle>
-          <FieldRow>
-            <Field
-              label="Shift target qty"
-              note="(auto)"
-              htmlFor="log-target-qty"
-              error={errors.targetQty?.message}
-            >
-              <input
-                id="log-target-qty"
-                type="number"
-                step="any"
-                min={0}
-                // Read-only rather than disabled: a disabled input is skipped
-                // by form serialisation and drops out of the tab order, and
-                // the operator still needs to see and copy the number.
-                readOnly
-                tabIndex={-1}
-                className={cn(
-                  CONTROL,
-                  MONO,
-                  "cursor-default border-[#E6EAF1] bg-[#F1F5F9] font-semibold text-[#2563EB] focus:border-[#E6EAF1] focus:bg-[#F1F5F9] focus:ring-0"
-                )}
-                placeholder="Set a target speed"
-                {...register("targetQty", { valueAsNumber: true })}
-              />
-            </Field>
-            <Field
-              label="Actual qty produced"
-              htmlFor="log-qty"
-              error={errors.qty?.message}
-            >
-              <input
-                id="log-qty"
-                type="number"
-                step="any"
-                min={0}
-                className={cn(CONTROL, MONO)}
-                placeholder="e.g. 231453"
-                {...register("qty", { valueAsNumber: true })}
-              />
-            </Field>
-            <Field
-              label="Qty rejected"
-              note="/ rework — blank counts as none"
-              htmlFor="log-rejected"
-              error={errors.qtyRejected?.message}
-            >
-              <input
-                id="log-rejected"
-                type="number"
-                step="any"
-                min={0}
-                className={cn(CONTROL, MONO)}
-                placeholder="e.g. 1240"
-                {...register("qtyRejected", { valueAsNumber: true })}
-              />
-            </Field>
-          </FieldRow>
+          <section className={SECTION}>
+            <SectionTitle icon={Boxes}>Output</SectionTitle>
+            <FieldRow>
+              <Field
+                label="Shift target qty"
+                note="(auto)"
+                htmlFor="log-target-qty"
+                error={errors.targetQty?.message}
+              >
+                <input
+                  id="log-target-qty"
+                  type="number"
+                  step="any"
+                  min={0}
+                  // Read-only rather than disabled: a disabled input is skipped
+                  // by form serialisation and drops out of the tab order, and
+                  // the operator still needs to see and copy the number.
+                  readOnly
+                  tabIndex={-1}
+                  className={cn(
+                    CONTROL,
+                    MONO,
+                    "cursor-default border-[#DCE7FF] bg-[#F5F8FF] font-semibold text-[#2563EB] shadow-none focus:border-[#DCE7FF] focus:bg-[#F5F8FF] focus:ring-0",
+                  )}
+                  placeholder="Set a target speed"
+                  {...register("targetQty", { valueAsNumber: true })}
+                />
+              </Field>
+              <Field
+                label="Actual qty produced"
+                htmlFor="log-qty"
+                error={errors.qty?.message}
+              >
+                <input
+                  id="log-qty"
+                  type="number"
+                  step="any"
+                  min={0}
+                  className={cn(CONTROL, MONO)}
+                  placeholder="e.g. 231453"
+                  {...register("qty", { valueAsNumber: true })}
+                />
+              </Field>
+              <Field
+                label="Qty rejected"
+                note="/ rework — blank counts as none"
+                htmlFor="log-rejected"
+                error={errors.qtyRejected?.message}
+              >
+                <input
+                  id="log-rejected"
+                  type="number"
+                  step="any"
+                  min={0}
+                  className={cn(CONTROL, MONO)}
+                  placeholder="e.g. 1240"
+                  {...register("qtyRejected", { valueAsNumber: true })}
+                />
+              </Field>
+            </FieldRow>
 
-          {product && (
-            <p className="mt-2 text-[11px] text-[#64748B]">
-              Accumulative for this batch &amp; activity:{" "}
-              <span className="font-mono font-semibold text-[#16A34A]">
-                {runningTotal.toLocaleString(undefined, {
-                  maximumFractionDigits: 2,
-                })}
-              </span>{" "}
-              {previousQty > 0 && (
-                <>
-                  (previously{" "}
-                  {previousQty.toLocaleString(undefined, {
+            {product && (
+              <p className="mt-2 text-[11px] text-[#64748B]">
+                Accumulative for this batch &amp; activity:{" "}
+                <span className="font-mono font-semibold text-[#16A34A]">
+                  {runningTotal.toLocaleString(undefined, {
                     maximumFractionDigits: 2,
                   })}
-                  )
-                </>
-              )}
-            </p>
-          )}
-        </section>
+                </span>{" "}
+                {previousQty > 0 && (
+                  <>
+                    (previously{" "}
+                    {previousQty.toLocaleString(undefined, {
+                      maximumFractionDigits: 2,
+                    })}
+                    )
+                  </>
+                )}
+              </p>
+            )}
+          </section>
         )}
 
         {isDowntime && (
           // Not an omission — a stated fact. A break, a breakdown or an idle
           // period stores null quantities, never 0, so it can't drag an
           // output average.
-          <p className="rounded-xl border border-dashed border-[#CBD5E1] px-3.5 py-2.5 text-xs text-[#94A3B8]">
-            Downtime — no quantities, speed or operators are recorded, only
-            the time it consumed.
+          <p className="flex items-start gap-2 rounded-2xl border border-dashed border-[#CBD5E1] bg-[#FBFCFE] px-4 py-3 text-xs text-[#64748B]">
+            <Cog
+              className="mt-px size-3.5 shrink-0 text-[#94A3B8]"
+              aria-hidden
+            />
+            <span>
+              <strong className="font-semibold text-[#334155]">Downtime</strong>{" "}
+              — no quantities, speed or operators are recorded, only the time it
+              consumed.
+            </span>
           </p>
         )}
 
         {/* ── Speed — machine activities only ──────────────────────── */}
         {hasMachine && !quickOn && (
-          <section>
-            <SectionTitle hint="→ feeds Performance OEE">Speed</SectionTitle>
+          <section className={SECTION}>
+            <SectionTitle icon={Gauge} hint="→ feeds Performance OEE">
+              Speed
+            </SectionTitle>
             <FieldRow>
               <Field label="Speed unit" htmlFor="log-speed-type">
                 <div className="flex gap-1.5">
                   <select
                     id="log-speed-type"
-                    className={cn(CONTROL, "flex-1")}
+                    className={cn(SELECT, "flex-1")}
                     {...register("speedType")}
                   >
                     {SPEED_TYPES.map((type) => (
@@ -829,7 +865,7 @@ export function LogEntryForm({
             </FieldRow>
 
             <SlowReason control={control} error={errors.slowReason?.message}>
-              <select className={CONTROL} {...register("slowReason")}>
+              <select className={SELECT} {...register("slowReason")}>
                 <option value="">Select reason…</option>
                 {SLOW_REASONS.map((reason) => (
                   <option key={reason}>{reason}</option>
@@ -849,80 +885,80 @@ export function LogEntryForm({
             section isn't optional, it's absent: nobody was operating
             anything, so there is no one to name. */}
         {!isDowntime && (
-        <section>
-          <SectionTitle>Operators</SectionTitle>
-          {/* The pickers render even with an empty roster: "Not on the list…"
+          <section className={SECTION}>
+            <SectionTitle icon={Users}>Operators</SectionTitle>
+            {/* The pickers render even with an empty roster: "Not on the list…"
               opens a free-text name, so a factory mid-setup can still file a
               shift instead of hitting a required field it has no way to fill. */}
-          {employees.length === 0 && needsOperators && (
-            <p className="mb-2 rounded-xl border border-dashed border-[#CBD5E1] px-3.5 py-3 text-xs text-[#94A3B8]">
-              No one on the roster yet — add people in Admin &amp; Settings →
-              Employees and they&rsquo;ll appear here. Until then, use
-              &ldquo;Not on the list…&rdquo; to type a name.
-            </p>
-          )}
-          <FieldRow cols={2}>
-            {operatorFields.map((row, i) => (
-              <OperatorPicker
-                // `row.id`, not the index: removing a middle row would
-                // otherwise re-key every picker below it and carry the wrong
-                // free-text state down with it.
-                key={row.id}
-                control={control}
-                name={`operators.${i}.name`}
-                label={`Operator ${i + 1}`}
-                optional={!needsOperators}
-                employees={employees}
-                shift={shift as RunningShift}
-                // Everyone picked in the *other* rows, so nobody is named twice.
-                exclude={(operators ?? [])
-                  .filter((_, j) => j !== i)
-                  .map((o) => o?.name)
-                  .filter((n): n is string => Boolean(n))}
-                action={
-                  // The first row is the required one and has no Remove — the
-                  // schema would reject an empty list anyway, so offering it
-                  // would only be a button that fails.
-                  i > 0 ? (
-                    <button
-                      type="button"
-                      onClick={() => removeOperator(i)}
-                      className="text-[11px] font-semibold text-[#94A3B8] transition hover:text-[#B91C1C]"
-                    >
-                      Remove
-                    </button>
-                  ) : undefined
-                }
-              />
-            ))}
-            {/* Takes the next cell in the same grid, so it lands beside the
+            {employees.length === 0 && needsOperators && (
+              <p className="mb-2.5 rounded-xl border border-dashed border-[#CBD5E1] bg-white px-3.5 py-3 text-xs text-[#64748B]">
+                No one on the roster yet — add people in Admin &amp; Settings →
+                Employees and they&rsquo;ll appear here. Until then, use
+                &ldquo;Not on the list…&rdquo; to type a name.
+              </p>
+            )}
+            <FieldRow cols={2}>
+              {operatorFields.map((row, i) => (
+                <OperatorPicker
+                  // `row.id`, not the index: removing a middle row would
+                  // otherwise re-key every picker below it and carry the wrong
+                  // free-text state down with it.
+                  key={row.id}
+                  control={control}
+                  name={`operators.${i}.name`}
+                  label={`Operator ${i + 1}`}
+                  optional={!needsOperators}
+                  employees={employees}
+                  shift={shift as RunningShift}
+                  // Everyone picked in the *other* rows, so nobody is named twice.
+                  exclude={(operators ?? [])
+                    .filter((_, j) => j !== i)
+                    .map((o) => o?.name)
+                    .filter((n): n is string => Boolean(n))}
+                  action={
+                    // The first row is the required one and has no Remove — the
+                    // schema would reject an empty list anyway, so offering it
+                    // would only be a button that fails.
+                    i > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => removeOperator(i)}
+                        className="text-[11px] font-semibold text-[#94A3B8] transition hover:text-[#B91C1C]"
+                      >
+                        Remove
+                      </button>
+                    ) : undefined
+                  }
+                />
+              ))}
+              {/* Takes the next cell in the same grid, so it lands beside the
                 last picker on an odd count and starts a fresh row on an even
                 one. The blank line stands in for a label, which is what lines
                 the button up with the dropdowns rather than their labels. */}
-            {operatorFields.length < MAX_OPERATORS && (
-              <div className="flex flex-col space-y-1.5">
-                <span className="text-xs" aria-hidden>
-                  &nbsp;
-                </span>
-                <button
-                  type="button"
-                  onClick={() => addOperator({ name: "" })}
-                  className="flex h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-[#CBD5E1] text-sm font-medium text-[#64748B] transition hover:border-[#2563EB] hover:bg-[#2563EB]/5 hover:text-[#2563EB]"
-                >
-                  <Plus className="size-4" aria-hidden />
-                  Add operator
-                </button>
-              </div>
-            )}
-          </FieldRow>
-        </section>
+              {operatorFields.length < MAX_OPERATORS && (
+                <div className="flex flex-col space-y-1.5">
+                  <span className="text-xs" aria-hidden>
+                    &nbsp;
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => addOperator({ name: "" })}
+                    className="flex h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-[#CBD5E1] bg-white text-sm font-medium text-[#64748B] transition hover:border-[#2563EB] hover:bg-[#F5F8FF] hover:text-[#2563EB]"
+                  >
+                    <Plus className="size-4" aria-hidden />
+                    Add operator
+                  </button>
+                </div>
+              )}
+            </FieldRow>
+          </section>
         )}
 
         {/* ── Notes ────────────────────────────────────────────────── */}
         {!quickOn && (
           <>
-            <section className="space-y-3">
-              <SectionTitle>Notes</SectionTitle>
+            <section className={cn(SECTION, "space-y-3")}>
+              <SectionTitle icon={MessageSquareText}>Notes</SectionTitle>
               <Field
                 label="Comments"
                 optional
@@ -948,7 +984,7 @@ export function LogEntryForm({
                 >
                   <select
                     id="log-flag"
-                    className={CONTROL}
+                    className={SELECT}
                     {...register("actionFlag")}
                   >
                     <option value="">No — routine entry</option>
@@ -963,19 +999,25 @@ export function LogEntryForm({
             </section>
           </>
         )}
+      </div>
 
+      {/* Pinned: the button belongs to the form, not to the bottom of the
+          scroll. The note sits beside it rather than under it so the footer
+          costs one row of height instead of two. */}
+      <footer className="shrink-0 border-t border-[#EEF1F6] bg-gradient-to-b from-white to-[#F8FAFC] p-4 sm:px-5">
         <button
           type="submit"
           disabled={isSubmitting}
-          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(37,99,235,0.55)] transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-70"
+          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_100%)] text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(37,99,235,0.55)] transition hover:brightness-[1.06] active:scale-[0.995] disabled:pointer-events-none disabled:opacity-70"
         >
           {isSubmitting && <Loader2 className="size-4 animate-spin" />}
           {isSubmitting ? "Logging…" : "Log entry"}
         </button>
-        <p className="text-center text-[11px] text-[#94A3B8]">
-          Entries are audit-protected. Corrections are amendments, not deletes.
+        <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-[11px] text-[#94A3B8]">
+          <ShieldCheck className="size-3 shrink-0" aria-hidden />
+          Corrections are amendments, not deletes.
         </p>
-      </div>
+      </footer>
     </form>
   );
 }
@@ -990,7 +1032,9 @@ function RateToggle({
   control,
   setValue,
 }: {
-  control: ReturnType<typeof useForm<LogEntryValues, unknown, LogEntryParsed>>["control"];
+  control: ReturnType<
+    typeof useForm<LogEntryValues, unknown, LogEntryParsed>
+  >["control"];
   setValue: ReturnType<
     typeof useForm<LogEntryValues, unknown, LogEntryParsed>
   >["setValue"];
@@ -1000,7 +1044,7 @@ function RateToggle({
     <div
       role="group"
       aria-label="Speed rate"
-      className="flex shrink-0 overflow-hidden rounded-xl border border-[#E6EAF1]"
+      className="flex shrink-0 overflow-hidden rounded-xl border border-[#E2E8F0] bg-white"
     >
       {(["min", "hr"] as const).map((option) => (
         <button
@@ -1011,8 +1055,8 @@ function RateToggle({
           className={cn(
             "px-2.5 text-xs font-semibold transition",
             rate === option
-              ? "bg-[#EFF6FF] text-[#1D4ED8]"
-              : "text-[#94A3B8] hover:text-[#0F1B34]"
+              ? "bg-[#2563EB] text-white"
+              : "text-[#94A3B8] hover:bg-[#F8FAFC] hover:text-[#0F1B34]",
           )}
         >
           /{option}
@@ -1033,15 +1077,15 @@ const CATEGORY_STYLES: Record<
 > = {
   downtime: {
     summary: "time only",
-    className: "bg-[#F1F5F9] text-[#475569]",
+    className: "bg-[#F1F5F9] text-[#475569] ring-[#E2E8F0]",
   },
   preparatory: {
     summary: "batch & output",
-    className: "bg-[#FEF3C7] text-[#92400E]",
+    className: "bg-[#FEF3C7] text-[#92400E] ring-[#FDE68A]",
   },
   production: {
     summary: "full record",
-    className: "bg-[#DBEAFE] text-[#1D4ED8]",
+    className: "bg-[#DBEAFE] text-[#1D4ED8] ring-[#BFDBFE]",
   },
 };
 
@@ -1054,8 +1098,8 @@ function CategoryBadge({ category }: { category?: string }) {
   return (
     <span
       className={cn(
-        "mt-2.5 inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide",
-        style.className
+        "mt-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ring-1",
+        style.className,
       )}
     >
       <Cog className="size-3" aria-hidden />
@@ -1070,7 +1114,7 @@ function NowButton({ onClick }: { onClick: () => void }) {
       type="button"
       onClick={onClick}
       title="Set to now"
-      className="h-11 shrink-0 rounded-xl border border-[#E6EAF1] px-3 text-xs font-medium text-[#475569] transition hover:border-[#2563EB] hover:text-[#2563EB]"
+      className="h-11 shrink-0 rounded-xl border border-[#DCE7FF] bg-[#F5F8FF] px-3 text-xs font-semibold text-[#2563EB] transition hover:border-[#2563EB] hover:bg-[#EFF4FF] active:scale-95"
     >
       Now
     </button>
@@ -1086,7 +1130,9 @@ function SlowReason({
   error,
   children,
 }: {
-  control: ReturnType<typeof useForm<LogEntryValues, unknown, LogEntryParsed>>["control"];
+  control: ReturnType<
+    typeof useForm<LogEntryValues, unknown, LogEntryParsed>
+  >["control"];
   error?: string;
   children: React.ReactNode;
 }) {
@@ -1105,7 +1151,7 @@ function SlowReason({
   if (!isSlow) return null;
 
   return (
-    <div className="mt-3 space-y-2 rounded-xl border border-[#FDE68A] bg-[#FFFBEB] p-3.5">
+    <div className="mt-3 space-y-2 rounded-xl border border-[#FDE68A] bg-[#FFFBEB] p-3.5 shadow-[0_1px_2px_rgba(180,83,9,0.06)]">
       <Field
         label="⚠ Reason for running below target speed"
         note="(required)"
@@ -1114,8 +1160,8 @@ function SlowReason({
         {children}
       </Field>
       <p className="text-[11px] text-[#92400E]">
-        This is what the Pareto chart in OEE &amp; Downtime is built from —
-        an unexplained slow run is a gap in the analysis later.
+        This is what the Pareto chart in OEE &amp; Downtime is built from — an
+        unexplained slow run is a gap in the analysis later.
       </p>
     </div>
   );

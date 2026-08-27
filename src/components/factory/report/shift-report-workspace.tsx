@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { ShiftReportHeader } from "@/components/factory/report/shift-report-header";
 import { ShiftReportSummary } from "@/components/factory/report/shift-report-summary";
 import { ShiftReportTable } from "@/components/factory/report/shift-report-table";
+import { DateField } from "@/components/ui/date-picker";
 import { downloadCsv } from "@/lib/factory/shift-log-csv";
 import {
   fetchPipelineJobs,
@@ -146,13 +147,14 @@ export function ShiftReportWorkspace({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <input
-            type="date"
+          {/* Never blank: a report with no date is not a document, so
+              clearing falls back to today rather than to nothing. */}
+          <DateField
             value={date}
             max={todayISO()}
-            onChange={(e) => setDate(e.target.value || todayISO())}
-            aria-label="Report date"
-            className="h-9 rounded-xl border border-line bg-surface px-3 text-sm font-medium text-ink shadow-soft outline-none transition hover:border-line-strong focus:border-brand focus:ring-4 focus:ring-brand/12"
+            onChange={(next) => setDate(next || todayISO())}
+            ariaLabel="Report date"
+            className="h-9 w-[11.5rem] shadow-soft"
           />
 
           <div className="flex overflow-hidden rounded-xl border border-line shadow-soft">

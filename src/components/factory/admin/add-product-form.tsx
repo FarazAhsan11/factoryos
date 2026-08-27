@@ -1,6 +1,6 @@
 "use client";
 
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Plus } from "lucide-react";
 
@@ -11,6 +11,7 @@ import {
 import { todayKey } from "@/lib/factory/dates";
 
 import { FIELD } from "@/components/factory/admin/settings-ui";
+import { DateField } from "@/components/ui/date-picker";
 const MONO = "font-mono tracking-tight";
 const LABEL = "text-xs font-medium text-ink-3";
 
@@ -34,6 +35,7 @@ export function AddProductForm({
   onAdd: (values: ProductValues) => Promise<void>;
 }) {
   const {
+    control,
     register,
     handleSubmit,
     reset,
@@ -147,14 +149,23 @@ export function AddProductForm({
           <label htmlFor="p-planned" className={LABEL}>
             Plan for <span className="text-[10px] text-ink-5">(optional)</span>
           </label>
-          <input
-            id="p-planned"
-            type="date"
-            min={today}
-            title="The day this batch joins the pipeline as Planned"
-            aria-invalid={Boolean(errors.plannedFor)}
-            className={FIELD}
-            {...register("plannedFor")}
+          {/* Through a Controller rather than `register`: the picker owns a
+              formatted value and a popover, so it is a controlled field. The
+              string it stores is the same `YYYY-MM-DD` the schema validates. */}
+          <Controller
+            name="plannedFor"
+            control={control}
+            render={({ field }) => (
+              <DateField
+                id="p-planned"
+                value={field.value ?? ""}
+                onChange={field.onChange}
+                min={today}
+                title="The day this batch joins the pipeline as Planned"
+                placeholder="Not scheduled"
+                ariaInvalid={Boolean(errors.plannedFor)}
+              />
+            )}
           />
         </div>
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useFieldArray, useForm, useWatch } from "react-hook-form";
+import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -47,6 +47,7 @@ import {
   SectionTitle,
 } from "@/components/factory/log/log-fields";
 import { OperatorPicker } from "@/components/factory/log/operator-picker";
+import { TimeField } from "@/components/ui/date-picker";
 import { employeeKeys, fetchEmployees } from "@/lib/factory/employee-queries";
 import {
   equipmentKeys,
@@ -555,11 +556,17 @@ export function LogEntryForm({
               error={errors.startTime?.message}
             >
               <div className="flex gap-1.5">
-                <input
-                  id="log-start"
-                  type="time"
-                  className={cn(CONTROL, "flex-1")}
-                  {...register("startTime")}
+                <Controller
+                  name="startTime"
+                  control={control}
+                  render={({ field }) => (
+                    <TimeField
+                      id="log-start"
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                      className="h-11 flex-1"
+                    />
+                  )}
                 />
                 <NowButton onClick={() => setValue("startTime", clockNow())} />
               </div>
@@ -570,11 +577,17 @@ export function LogEntryForm({
               error={errors.endTime?.message}
             >
               <div className="flex gap-1.5">
-                <input
-                  id="log-end"
-                  type="time"
-                  className={cn(CONTROL, "flex-1")}
-                  {...register("endTime")}
+                <Controller
+                  name="endTime"
+                  control={control}
+                  render={({ field }) => (
+                    <TimeField
+                      id="log-end"
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                      className="h-11 flex-1"
+                    />
+                  )}
                 />
                 <NowButton onClick={() => setValue("endTime", clockNow())} />
               </div>

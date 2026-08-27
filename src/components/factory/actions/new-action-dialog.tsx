@@ -20,6 +20,7 @@ import {
   type NewActionValues,
 } from "@/lib/factory/action-queries";
 import { BatchSummary } from "@/components/factory/batch/batch-summary";
+import { DateTimeField } from "@/components/ui/date-picker";
 import { fetchProducts, productKeys } from "@/lib/factory/product-queries";
 import type { SetupItem } from "@/lib/factory/setup-queries";
 import { cn } from "@/lib/utils";
@@ -227,12 +228,11 @@ export function NewActionDialog({
             </Field>
 
             <Field label="Due by" htmlFor="na-due" note="(optional)">
-              <input
+              <DateTimeField
                 id="na-due"
-                type="datetime-local"
                 value={values.dueAt}
-                onChange={(e) => set("dueAt", e.target.value)}
-                className={CONTROL}
+                onChange={(dueAt) => set("dueAt", dueAt)}
+                placeholder="Use the priority's own window"
               />
               <p className="mt-1 text-[11px] text-ink-5">
                 Leave blank and it&rsquo;s due in {window?.within} — the{" "}

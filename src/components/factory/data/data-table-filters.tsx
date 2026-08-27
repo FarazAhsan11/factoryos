@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Search } from "lucide-react";
 
+import { DateField } from "@/components/ui/date-picker";
+
 import { ACTION_FLAGS } from "@/app/factory/[slug]/log/schemas";
 import type { SetupItem } from "@/lib/factory/setup-queries";
 import type { LogTableFilters } from "@/lib/factory/shift-log-table-queries";
@@ -96,24 +98,24 @@ export function DataTableFilters({
   return (
     <div className="mb-3.5 grid gap-3 rounded-2xl border border-line bg-surface p-3.5 shadow-card sm:grid-cols-2 lg:grid-cols-[repeat(6,minmax(0,1fr))_minmax(200px,2fr)]">
       <Group label="Date from" htmlFor="dt-from">
-        <input
+        <DateField
           id="dt-from"
-          type="date"
-          className={FILTER_CONTROL}
           value={filters.from}
           max={filters.to || undefined}
-          onChange={(e) => onChange({ from: e.target.value })}
+          onChange={(from) => onChange({ from })}
+          placeholder="Any date"
+          className="h-9 px-2.5 text-xs"
         />
       </Group>
 
       <Group label="Date to" htmlFor="dt-to">
-        <input
+        <DateField
           id="dt-to"
-          type="date"
-          className={FILTER_CONTROL}
           value={filters.to}
           min={filters.from || undefined}
-          onChange={(e) => onChange({ to: e.target.value })}
+          onChange={(to) => onChange({ to })}
+          placeholder="Any date"
+          className="h-9 px-2.5 text-xs"
         />
       </Group>
 

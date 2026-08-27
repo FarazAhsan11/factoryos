@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useForm, useWatch, type UseFormRegister } from "react-hook-form";
+import {
+  Controller,
+  useForm,
+  useWatch,
+  type UseFormRegister,
+} from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { AlertTriangle, Loader2, Moon, Sun } from "lucide-react";
@@ -23,6 +28,7 @@ import {
   shiftTimeKeys,
   type RunningShift,
 } from "@/lib/factory/shift-time-queries";
+import { TimeField } from "@/components/ui/date-picker";
 
 const FIELD =
   "h-10 w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-brand focus:ring-4 focus:ring-brand/12 disabled:bg-sunken disabled:text-ink-5";
@@ -212,30 +218,45 @@ function ShiftCard({
 
       <div className="grid gap-4 p-5 sm:grid-cols-2">
         <Field label="Shift start" error={errors?.startTime?.message}>
-          <input
-            type="time"
-            disabled={disabled}
-            aria-invalid={Boolean(errors?.startTime)}
-            className={FIELD}
-            {...register(`${slot}.startTime`)}
+          <Controller
+            name={`${slot}.startTime`}
+            control={control}
+            render={({ field }) => (
+              <TimeField
+                value={field.value ?? ""}
+                onChange={field.onChange}
+                disabled={disabled}
+                ariaInvalid={Boolean(errors?.startTime)}
+              />
+            )}
           />
         </Field>
         <Field label="Shift end" error={errors?.endTime?.message}>
-          <input
-            type="time"
-            disabled={disabled}
-            aria-invalid={Boolean(errors?.endTime)}
-            className={FIELD}
-            {...register(`${slot}.endTime`)}
+          <Controller
+            name={`${slot}.endTime`}
+            control={control}
+            render={({ field }) => (
+              <TimeField
+                value={field.value ?? ""}
+                onChange={field.onChange}
+                disabled={disabled}
+                ariaInvalid={Boolean(errors?.endTime)}
+              />
+            )}
           />
         </Field>
 
         <Field label="Break 1 start" error={errors?.break1Start?.message}>
-          <input
-            type="time"
-            disabled={disabled}
-            className={FIELD}
-            {...register(`${slot}.break1Start`)}
+          <Controller
+            name={`${slot}.break1Start`}
+            control={control}
+            render={({ field }) => (
+              <TimeField
+                value={field.value ?? ""}
+                onChange={field.onChange}
+                disabled={disabled}
+              />
+            )}
           />
         </Field>
         <Field
@@ -253,11 +274,16 @@ function ShiftCard({
         </Field>
 
         <Field label="Break 2 start" error={errors?.break2Start?.message}>
-          <input
-            type="time"
-            disabled={disabled}
-            className={FIELD}
-            {...register(`${slot}.break2Start`)}
+          <Controller
+            name={`${slot}.break2Start`}
+            control={control}
+            render={({ field }) => (
+              <TimeField
+                value={field.value ?? ""}
+                onChange={field.onChange}
+                disabled={disabled}
+              />
+            )}
           />
         </Field>
         <Field

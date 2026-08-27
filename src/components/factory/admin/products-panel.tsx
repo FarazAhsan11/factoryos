@@ -24,6 +24,7 @@ import {
   updateProduct,
   type Product,
 } from "@/lib/factory/product-queries";
+import { DateField } from "@/components/ui/date-picker";
 import {
   EmptyState,
   FIELD,
@@ -345,18 +346,13 @@ export function ProductsPanel({
                     <td className="px-4 py-3 text-[13px]">
                       {editingDate ? (
                         <span className="inline-flex items-center gap-1">
-                          <input
-                            autoFocus
-                            type="date"
+                          <DateField
                             min={todayKey()}
                             value={editDate}
-                            onChange={(e) => setEditDate(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") saveDate(product);
-                              if (e.key === "Escape") setEditingDateId(null);
-                            }}
-                            aria-label={`Planned date for batch ${product.batch_no}`}
-                            className="h-8 w-36 rounded-lg border border-line px-2 text-[13px] outline-none focus:border-brand"
+                            onChange={setEditDate}
+                            ariaLabel={`Planned date for batch ${product.batch_no}`}
+                            placeholder="Not scheduled"
+                            className="h-8 w-44 rounded-lg px-2 text-[13px]"
                           />
                           <IconButton
                             label="Save planned date"

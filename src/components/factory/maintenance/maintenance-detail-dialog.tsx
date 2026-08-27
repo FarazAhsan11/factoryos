@@ -107,7 +107,7 @@ function Body({
   return (
     <>
       {/* ── Header: what this is, and how far it has got ─────────────── */}
-      <DialogHeader className="shrink-0 gap-2 border-b border-line-soft px-5 pt-5 pr-12 pb-4">
+      <DialogHeader className="shrink-0 gap-2 border-b border-line bg-gradient-to-b from-sunken to-surface px-5 pt-5 pr-12 pb-4">
         <div className="flex flex-wrap items-center gap-1.5">
           <Badge className="bg-sunken-2 font-mono text-ink-3">
             {request.request_no}
@@ -141,7 +141,7 @@ function Body({
         <div
           role="tablist"
           aria-label="Request sections"
-          className="flex gap-1 rounded-xl bg-sunken-2 p-1"
+          className="flex gap-1 rounded-xl border border-line bg-sunken-2 p-1"
         >
           <TabButton
             active={tab === "initiation"}
@@ -170,7 +170,7 @@ function Body({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+      <div className="scrollbar-slim min-h-0 flex-1 overflow-y-auto px-5 py-4">
         {tab === "initiation" && (
           <Initiation
             request={request}
@@ -195,12 +195,12 @@ function Body({
       </div>
 
       {/* ── Footer: the clocks ───────────────────────────────────────── */}
-      <div className="flex shrink-0 items-center justify-between gap-3 border-t border-line-soft bg-sunken px-5 py-3">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-t border-line bg-gradient-to-b from-surface to-sunken px-5 py-3">
         <Clocks request={request} />
         <button
           type="button"
           onClick={onClose}
-          className="h-9 shrink-0 rounded-lg border border-line bg-surface px-4 text-sm font-medium text-ink-3 transition hover:border-brand hover:text-brand"
+          className="h-9 shrink-0 rounded-lg border border-line bg-surface px-4 text-sm font-semibold text-ink-3 shadow-soft transition hover:border-brand hover:text-brand"
         >
           Close
         </button>
@@ -222,7 +222,7 @@ function Initiation({
 }) {
   return (
     <div className="space-y-5">
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl border border-line bg-sunken p-4 sm:grid-cols-3">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl border border-line bg-sunken p-4 ring-1 ring-surface ring-inset sm:grid-cols-3">
         <Fact label="Equipment ID">
           <span className="font-mono">{request.equipment_no}</span>
         </Fact>
@@ -297,7 +297,7 @@ function Engineering({ request }: { request: MaintenanceRequest }) {
 
   return (
     <div className="space-y-5">
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl border border-line bg-sunken p-4 sm:grid-cols-3">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl border border-line bg-sunken p-4 ring-1 ring-surface ring-inset sm:grid-cols-3">
         <Fact label="Work assigned to">
           {request.assigned_to ?? <span className="italic text-ink-5">—</span>}
         </Fact>
@@ -496,7 +496,7 @@ function Section({
 }) {
   return (
     <section className="space-y-1.5">
-      <p className="text-[10px] font-bold uppercase tracking-[0.6px] text-ink-5">
+      <p className="text-[10px] font-bold tracking-[0.07em] text-ink-4 uppercase">
         {label}
       </p>
       {children}
@@ -513,7 +513,7 @@ function Fact({
 }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[10px] font-bold uppercase tracking-[0.5px] text-ink-5">
+      <dt className="text-[10px] font-bold tracking-[0.07em] text-ink-5 uppercase">
         {label}
       </dt>
       <dd className="mt-0.5 truncate text-[13px] text-ink">{children}</dd>
@@ -531,9 +531,11 @@ function Empty({
   body: string;
 }) {
   return (
-    <div className="rounded-2xl border border-dashed border-ink-6 px-4 py-10 text-center">
-      <Icon className="mx-auto mb-2 size-6 text-ink-6" />
-      <p className="text-sm text-ink-4">{title}</p>
+    <div className="rounded-2xl border border-dashed border-line-strong bg-sunken px-4 py-10 text-center">
+      <span className="mx-auto grid size-11 place-items-center rounded-2xl bg-surface text-ink-6 ring-1 ring-line">
+        <Icon className="size-5" />
+      </span>
+      <p className="mt-2.5 text-sm font-medium text-ink-3">{title}</p>
       <p className="mt-1 text-xs text-ink-5">{body}</p>
     </div>
   );
@@ -562,8 +564,8 @@ function TabButton({
       className={cn(
         "inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition",
         active
-          ? "bg-surface text-brand shadow-[0_1px_2px_rgba(20,22,43,0.08)]"
-          : "text-ink-4 hover:text-ink",
+          ? "bg-surface text-brand-deep shadow-[0_1px_3px_rgb(20_22_43/0.12)] ring-1 ring-line"
+          : "text-ink-4 hover:bg-surface/60 hover:text-ink",
       )}
     >
       <Icon className="size-4" />
@@ -587,7 +589,7 @@ function Badge({
   return (
     <span
       className={cn(
-        "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+        "rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase ring-1 ring-current/15",
         className,
       )}
     >

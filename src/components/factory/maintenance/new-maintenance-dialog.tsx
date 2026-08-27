@@ -28,7 +28,10 @@ import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
 import { cn } from "@/lib/utils";
 
 const CONTROL =
-  "h-10 w-full rounded-xl border border-line bg-sunken px-3.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-brand focus:bg-surface";
+  "h-10 w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)] outline-none transition placeholder:text-placeholder hover:border-line-strong focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12";
+
+/** Same control, plus our own chevron — see `.select-chevron`. */
+const SELECT = CONTROL + " select-chevron";
 
 const EMPTY: MaintenanceRequestValues = {
   equipmentNo: "",
@@ -139,8 +142,12 @@ export function NewMaintenanceDialog({
           setOpen(next);
         }}
       >
-        <DialogContent className="max-h-[88vh] max-w-lg overflow-y-auto">
-          <DialogHeader>
+        {/* `p-0` and a flex column so the fields are the only thing that
+            scrolls. With the dialog's own padding the whole box scrolled and
+            took Submit request off the bottom of the screen — the one control
+            the dialog exists for. */}
+        <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col gap-0 overflow-hidden p-0">
+          <DialogHeader className="shrink-0 gap-1.5 border-b border-line bg-gradient-to-b from-sunken to-surface px-5 pt-5 pr-12 pb-4">
             <DialogTitle className="flex items-center gap-2 text-ink">
               <Wrench className="size-4 text-brand" />
               New maintenance request
@@ -153,173 +160,179 @@ export function NewMaintenanceDialog({
 
           <form
             onSubmit={handleSubmit((values) => create.mutate(values))}
-            className="space-y-3"
+            className="flex min-h-0 flex-1 flex-col"
           >
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field
-                label="Equipment no."
-                htmlFor="mr-eq"
-                required
-                error={errors.equipmentNo?.message}
-              >
-                <input
-                  id="mr-eq"
-                  autoFocus
-                  placeholder="e.g. EQ296"
-                  aria-invalid={Boolean(errors.equipmentNo)}
-                  className={cn(CONTROL, "font-mono")}
-                  {...register("equipmentNo")}
-                />
-              </Field>
-
-              <Field
-                label={`${unitWord} / line`}
-                htmlFor="mr-unit"
-                note="(optional)"
-              >
-                <select
-                  id="mr-unit"
-                  className={CONTROL}
-                  {...register("unitId")}
+            <div className="scrollbar-slim min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field
+                  label="Equipment no."
+                  htmlFor="mr-eq"
+                  required
+                  error={errors.equipmentNo?.message}
                 >
-                  <option value="">
-                    Not {unitWord.toLowerCase()}-specific
-                  </option>
-                  {activeUnits.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-            </div>
+                  <input
+                    id="mr-eq"
+                    autoFocus
+                    placeholder="e.g. EQ296"
+                    aria-invalid={Boolean(errors.equipmentNo)}
+                    className={cn(CONTROL, "font-mono")}
+                    {...register("equipmentNo")}
+                  />
+                </Field>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Department needed" htmlFor="mr-dept">
-                <select
-                  id="mr-dept"
-                  className={CONTROL}
-                  disabled={activeDepartments.length === 0}
-                  {...register("departmentId")}
+                <Field
+                  label={`${unitWord} / line`}
+                  htmlFor="mr-unit"
+                  note="(optional)"
                 >
-                  <option value="">
-                    {activeDepartments.length === 0
-                      ? "None set up yet"
-                      : "Select department…"}
-                  </option>
-                  {activeDepartments.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
+                  <select
+                    id="mr-unit"
+                    className={SELECT}
+                    {...register("unitId")}
+                  >
+                    <option value="">
+                      Not {unitWord.toLowerCase()}-specific
                     </option>
-                  ))}
-                </select>
-                {/* Says where the list comes from rather than silently
-                    offering an empty dropdown — the fix is one tab away. */}
-                {activeDepartments.length === 0 && (
-                  <p className="mt-1 text-[11px] text-ink-5">
-                    Add them in Admin &amp; Settings → Departments.
-                  </p>
-                )}
-              </Field>
-
-              <Field label="Priority" htmlFor="mr-priority">
-                <select
-                  id="mr-priority"
-                  className={CONTROL}
-                  {...register("priority")}
-                >
-                  {MAINTENANCE_PRIORITIES.map((p) => (
-                    <option key={p.value} value={p.value}>
-                      {p.label} — {p.hint}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-            </div>
-
-            <Field
-              label="Issue description"
-              htmlFor="mr-description"
-              required
-              error={errors.description?.message}
-            >
-              <textarea
-                id="mr-description"
-                rows={3}
-                placeholder="Describe the fault, what was happening, when it started…"
-                aria-invalid={Boolean(errors.description)}
-                className="w-full rounded-xl border border-line bg-sunken px-3.5 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-brand focus:bg-surface"
-                {...register("description")}
-              />
-            </Field>
-
-            <Field label="Affected batch" htmlFor="mr-batch" note="(optional)">
-              <input
-                id="mr-batch"
-                placeholder="Type a batch number"
-                className={cn(CONTROL, "font-mono")}
-                {...register("batchNo")}
-              />
-              <div className="mt-1.5">
-                <BatchSummary factoryId={factoryId} batchNo={batchNo ?? ""} />
+                    {activeUnits.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
               </div>
-            </Field>
 
-            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Department needed" htmlFor="mr-dept">
+                  <select
+                    id="mr-dept"
+                    className={SELECT}
+                    disabled={activeDepartments.length === 0}
+                    {...register("departmentId")}
+                  >
+                    <option value="">
+                      {activeDepartments.length === 0
+                        ? "None set up yet"
+                        : "Select department…"}
+                    </option>
+                    {activeDepartments.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                      </option>
+                    ))}
+                  </select>
+                  {/* Says where the list comes from rather than silently
+                    offering an empty dropdown — the fix is one tab away. */}
+                  {activeDepartments.length === 0 && (
+                    <p className="mt-1 text-[11px] text-ink-5">
+                      Add them in Admin &amp; Settings → Departments.
+                    </p>
+                  )}
+                </Field>
+
+                <Field label="Priority" htmlFor="mr-priority">
+                  <select
+                    id="mr-priority"
+                    className={SELECT}
+                    {...register("priority")}
+                  >
+                    {MAINTENANCE_PRIORITIES.map((p) => (
+                      <option key={p.value} value={p.value}>
+                        {p.label} — {p.hint}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+
               <Field
-                label="Reported by"
-                htmlFor="mr-reported"
-                note="(optional)"
+                label="Issue description"
+                htmlFor="mr-description"
+                required
+                error={errors.description?.message}
               >
-                <input
-                  id="mr-reported"
-                  placeholder="Your name"
-                  className={CONTROL}
-                  {...register("reportedBy")}
+                <textarea
+                  id="mr-description"
+                  rows={3}
+                  placeholder="Describe the fault, what was happening, when it started…"
+                  aria-invalid={Boolean(errors.description)}
+                  className="w-full rounded-xl border border-line bg-sunken px-3.5 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-brand focus:bg-surface"
+                  {...register("description")}
                 />
               </Field>
 
-              {/* "Initiating Department" on the paper form — who is raising
+              <Field
+                label="Affected batch"
+                htmlFor="mr-batch"
+                note="(optional)"
+              >
+                <input
+                  id="mr-batch"
+                  placeholder="Type a batch number"
+                  className={cn(CONTROL, "font-mono")}
+                  {...register("batchNo")}
+                />
+                <div className="mt-1.5">
+                  <BatchSummary factoryId={factoryId} batchNo={batchNo ?? ""} />
+                </div>
+              </Field>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field
+                  label="Reported by"
+                  htmlFor="mr-reported"
+                  note="(optional)"
+                >
+                  <input
+                    id="mr-reported"
+                    placeholder="Your name"
+                    className={CONTROL}
+                    {...register("reportedBy")}
+                  />
+                </Field>
+
+                {/* "Initiating Department" on the paper form — who is raising
                   it, as opposed to who is needed. Two different questions that
                   the same dropdown answers, so they sit apart on the form. */}
-              <Field
-                label="Initiating department"
-                htmlFor="mr-initiating"
-                note="(optional)"
-              >
-                <select
-                  id="mr-initiating"
-                  className={CONTROL}
-                  disabled={activeDepartments.length === 0}
-                  {...register("initiatingDepartmentId")}
+                <Field
+                  label="Initiating department"
+                  htmlFor="mr-initiating"
+                  note="(optional)"
                 >
-                  <option value="">
-                    {activeDepartments.length === 0
-                      ? "None set up yet"
-                      : "Select department…"}
-                  </option>
-                  {activeDepartments.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
+                  <select
+                    id="mr-initiating"
+                    className={SELECT}
+                    disabled={activeDepartments.length === 0}
+                    {...register("initiatingDepartmentId")}
+                  >
+                    <option value="">
+                      {activeDepartments.length === 0
+                        ? "None set up yet"
+                        : "Select department…"}
                     </option>
-                  ))}
-                </select>
-              </Field>
+                    {activeDepartments.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-1">
+            <div className="flex shrink-0 justify-end gap-2 border-t border-line bg-gradient-to-b from-surface to-sunken px-5 py-3.5">
               <button
                 type="button"
                 onClick={() => setOpen(false)}
                 disabled={isSubmitting}
-                className="h-10 rounded-xl px-4 text-sm font-medium text-ink-3 transition hover:bg-sunken-2 disabled:opacity-60"
+                className="h-10 rounded-xl px-4 text-sm font-semibold text-ink-3 transition hover:bg-sunken-2 hover:text-ink disabled:opacity-60"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="inline-flex h-10 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-4 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-60"
+                className="inline-flex h-10 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-4 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60"
               >
                 {isSubmitting && <Loader2 className="size-4 animate-spin" />}
                 Submit request

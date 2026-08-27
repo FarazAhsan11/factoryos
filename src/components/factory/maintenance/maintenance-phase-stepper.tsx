@@ -47,7 +47,12 @@ export function MaintenancePhaseStepper({
   const finished = request.status === "verified";
 
   return (
-    <ol className={cn("flex items-center gap-1", className)}>
+    <ol
+      className={cn(
+        "flex items-center gap-1 rounded-xl border border-line bg-sunken p-1",
+        className,
+      )}
+    >
       {PHASES.map((phase, i) => {
         const done = finished || i < current;
         const active = !finished && i === current;
@@ -59,10 +64,11 @@ export function MaintenancePhaseStepper({
           >
             <div
               className={cn(
-                "flex min-w-0 flex-1 items-center gap-1.5 rounded-lg px-2 py-1.5",
-                active && "bg-brand-soft",
-                done && "bg-teal-soft",
-                !active && !done && "bg-sunken",
+                "flex min-w-0 flex-1 items-center gap-1.5 rounded-lg px-2 py-1.5 transition",
+                active &&
+                  "bg-surface shadow-[0_1px_3px_rgb(20_22_43/0.12)] ring-1 ring-brand-line",
+                done && "bg-teal-soft ring-1 ring-teal-line",
+                !active && !done && "bg-transparent",
               )}
             >
               <span

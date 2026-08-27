@@ -33,10 +33,10 @@ import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
 import { cn } from "@/lib/utils";
 
 const CONTROL =
-  "h-10 w-full rounded-xl border border-line bg-sunken px-3.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-brand focus:bg-surface";
+  "h-10 w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)] outline-none transition placeholder:text-placeholder hover:border-line-strong focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12";
 
 const AREA =
-  "w-full rounded-xl border border-line bg-sunken px-3.5 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-brand focus:bg-surface";
+  "w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)] outline-none transition placeholder:text-placeholder hover:border-line-strong focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12";
 
 /**
  * The next thing this request needs, and nothing else.
@@ -64,7 +64,7 @@ export function MaintenanceNextStep({
 }) {
   if (request.status === "verified") {
     return (
-      <div className="rounded-2xl border border-teal-line bg-teal-soft px-4 py-6 text-center">
+      <div className="rounded-2xl border border-teal-line bg-teal-soft px-4 py-6 text-center shadow-[inset_0_1px_2px_rgb(13_148_136/0.06)]">
         <CheckCircle2 className="mx-auto mb-2 size-6 text-teal" />
         <p className="text-sm font-semibold text-teal-deep">
           All three sections are signed.
@@ -81,7 +81,7 @@ export function MaintenanceNextStep({
   // raise one; not everyone can declare the work done.
   if (!canReview(role)) {
     return (
-      <div className="rounded-2xl border border-dashed border-ink-6 px-4 py-8 text-center">
+      <div className="rounded-2xl border border-dashed border-line-strong bg-sunken px-4 py-8 text-center">
         <p className="text-sm text-ink-4">
           A supervisor or above moves this on.
         </p>
@@ -477,7 +477,7 @@ function YesNo<T extends FieldValues>({
       {(["yes", "no"] as const).map((value) => (
         <label
           key={value}
-          className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border border-line bg-sunken px-3 py-2.5 text-sm font-medium text-ink-3 transition has-[:checked]:border-brand has-[:checked]:bg-brand-soft has-[:checked]:text-brand-deep"
+          className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border border-line bg-surface px-3 py-2.5 text-sm font-semibold text-ink-3 shadow-[0_1px_2px_rgb(20_22_43/0.04)] transition hover:border-line-strong has-[:checked]:border-brand has-[:checked]:bg-brand-soft has-[:checked]:text-brand-deep has-[:checked]:shadow-none has-[:checked]:ring-2 has-[:checked]:ring-brand/15"
         >
           <input
             type="radio"
@@ -494,7 +494,7 @@ function YesNo<T extends FieldValues>({
 
 function Intro({ title, body }: { title: string; body: string }) {
   return (
-    <div className="rounded-2xl border border-line bg-sunken px-4 py-3">
+    <div className="rounded-2xl border border-line bg-sunken px-4 py-3 ring-1 ring-surface ring-inset">
       <p className="text-sm font-semibold text-ink">{title}</p>
       <p className="mt-1 text-xs leading-relaxed text-ink-4">{body}</p>
     </div>

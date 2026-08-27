@@ -107,7 +107,7 @@ function Body({
   return (
     <>
       {/* ── Header: what this is, and how far it has got ─────────────── */}
-      <DialogHeader className="shrink-0 gap-2 border-b border-line bg-gradient-to-b from-sunken to-surface px-5 pt-5 pr-12 pb-4">
+      <DialogHeader className="shrink-0 gap-2 border-b border-line bg-surface px-5 pt-5 pr-12 pb-4">
         <div className="flex flex-wrap items-center gap-1.5">
           <Badge className="bg-sunken-2 font-mono text-ink-3">
             {request.request_no}
@@ -195,7 +195,7 @@ function Body({
       </div>
 
       {/* ── Footer: the clocks ───────────────────────────────────────── */}
-      <div className="flex shrink-0 items-center justify-between gap-3 border-t border-line bg-gradient-to-b from-surface to-sunken px-5 py-3">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-t border-line bg-surface px-5 py-3">
         <Clocks request={request} />
         <button
           type="button"
@@ -222,7 +222,7 @@ function Initiation({
 }) {
   return (
     <div className="space-y-5">
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl border border-line bg-sunken p-4 ring-1 ring-surface ring-inset sm:grid-cols-3">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl border border-line bg-surface p-4 sm:grid-cols-3">
         <Fact label="Equipment ID">
           <span className="font-mono">{request.equipment_no}</span>
         </Fact>
@@ -297,7 +297,7 @@ function Engineering({ request }: { request: MaintenanceRequest }) {
 
   return (
     <div className="space-y-5">
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl border border-line bg-sunken p-4 ring-1 ring-surface ring-inset sm:grid-cols-3">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl border border-line bg-surface p-4 sm:grid-cols-3">
         <Fact label="Work assigned to">
           {request.assigned_to ?? <span className="italic text-ink-5">—</span>}
         </Fact>
@@ -531,7 +531,7 @@ function Empty({
   body: string;
 }) {
   return (
-    <div className="rounded-2xl border border-dashed border-line-strong bg-sunken px-4 py-10 text-center">
+    <div className="rounded-2xl border border-dashed border-line-strong bg-surface px-4 py-10 text-center">
       <span className="mx-auto grid size-11 place-items-center rounded-2xl bg-surface text-ink-6 ring-1 ring-line">
         <Icon className="size-5" />
       </span>

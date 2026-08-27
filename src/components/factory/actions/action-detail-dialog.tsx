@@ -170,7 +170,7 @@ function Body({
     <>
       {/* ── Header: what this is ─────────────────────────────────────── */}
       {/* `pr-12` keeps the title clear of the dialog's own close button. */}
-      <DialogHeader className="shrink-0 gap-2 border-b border-line bg-gradient-to-b from-sunken to-surface px-5 pt-5 pr-12 pb-4">
+      <DialogHeader className="shrink-0 gap-2 border-b border-line bg-surface px-5 pt-5 pr-12 pb-4">
         <div className="flex flex-wrap items-center gap-1.5">
           {action.is_escalated && (
             <Badge className="bg-violet-line text-violet-deep">Escalated</Badge>
@@ -319,7 +319,7 @@ function Body({
             {notesPending ? (
               <p className="py-8 text-center text-xs text-ink-5">Loading…</p>
             ) : notes.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-line-strong bg-sunken px-3.5 py-8 text-center text-xs text-ink-5">
+              <p className="rounded-xl border border-dashed border-line-strong bg-surface px-3.5 py-8 text-center text-xs text-ink-5">
                 Nothing yet — the first update will show here.
               </p>
             ) : (
@@ -330,7 +330,7 @@ function Body({
                     className={cn(
                       "rounded-xl px-3 py-2 text-[13px]",
                       entry.is_system
-                        ? "bg-sunken text-ink-4 italic"
+                        ? "bg-sunken-2 text-ink-4 italic"
                         : "border border-line bg-surface text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)]",
                     )}
                   >
@@ -382,7 +382,7 @@ function Body({
       </div>
 
       {/* ── Footer: the clock that is actually running ───────────────── */}
-      <div className="flex shrink-0 items-center justify-between gap-3 border-t border-line bg-gradient-to-b from-surface to-sunken px-5 py-3">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-t border-line bg-surface px-5 py-3">
         <Clock action={action} />
         <button
           type="button"
@@ -448,7 +448,7 @@ function Clock({ action }: { action: FactoryAction }) {
 /** The issue's fixed facts — the ones that never change after it is raised. */
 function Facts({ action }: { action: FactoryAction }) {
   return (
-    <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl border border-line bg-sunken p-4 text-sm ring-1 ring-surface ring-inset sm:grid-cols-3">
+    <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl border border-line bg-surface p-4 text-sm sm:grid-cols-3">
       <Fact label="Raised">{formatDue(action.created_at)}</Fact>
       <Fact label="Owner">
         {action.assigned_to ?? (

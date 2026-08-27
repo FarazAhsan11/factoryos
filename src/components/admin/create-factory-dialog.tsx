@@ -22,7 +22,7 @@ import {
 import { downscaleImage, MAX_UPLOAD_BYTES } from "@/lib/images/downscale-image";
 
 const FIELD =
-  "h-11 w-full rounded-xl border border-line bg-sunken px-3.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-brand focus:bg-surface focus:ring-4 focus:ring-brand/12";
+  "h-11 w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-brand focus:bg-surface focus:ring-4 focus:ring-brand/12";
 const LABEL = "text-xs font-medium text-ink-3";
 
 const EMPTY: CreateFactoryValues = {
@@ -205,7 +205,7 @@ export function CreateFactoryDialog() {
                 onChange={(e) => void onPickLogo(e.target.files?.[0] ?? null)}
               />
               {logoPreview ? (
-                <div className="flex items-center gap-3 rounded-xl border border-line bg-sunken p-2.5">
+                <div className="flex items-center gap-3 rounded-xl border border-line bg-surface p-2.5">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={logoPreview}
@@ -233,7 +233,7 @@ export function CreateFactoryDialog() {
                   type="button"
                   disabled={preparing}
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex w-full items-center gap-2 rounded-xl border border-dashed border-ink-6 bg-sunken px-3.5 py-3 text-sm text-ink-4 transition hover:border-brand hover:text-brand disabled:pointer-events-none disabled:opacity-70"
+                  className="flex w-full items-center gap-2 rounded-xl border border-dashed border-line-strong bg-surface px-3.5 py-3 text-sm text-ink-4 transition hover:border-brand hover:text-brand disabled:pointer-events-none disabled:opacity-70"
                 >
                   {preparing ? (
                     <Loader2 className="size-4 animate-spin" />

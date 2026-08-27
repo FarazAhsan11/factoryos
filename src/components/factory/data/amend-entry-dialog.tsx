@@ -125,7 +125,7 @@ export function AmendEntryDialog({
         </div>
 
         {entry?.amend_note && (
-          <div className="rounded-xl border border-line bg-sunken p-3">
+          <div className="rounded-xl border border-line bg-surface p-3">
             <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.6px] text-ink-5">
               Existing amendments
             </p>
@@ -152,7 +152,7 @@ export function AmendEntryDialog({
               autoFocus
               aria-invalid={Boolean(errors.note)}
               className={cn(
-                "w-full rounded-xl border bg-sunken px-3.5 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:bg-surface focus:ring-4 focus:ring-brand/12",
+                "w-full rounded-xl border bg-surface px-3.5 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:bg-surface focus:ring-4 focus:ring-brand/12",
                 errors.note
                   ? "border-danger-line focus:border-danger"
                   : "border-line focus:border-brand",

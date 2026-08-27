@@ -81,7 +81,7 @@ export function MaintenanceNextStep({
   // raise one; not everyone can declare the work done.
   if (!canReview(role)) {
     return (
-      <div className="rounded-2xl border border-dashed border-line-strong bg-sunken px-4 py-8 text-center">
+      <div className="rounded-2xl border border-dashed border-line-strong bg-surface px-4 py-8 text-center">
         <p className="text-sm text-ink-4">
           A supervisor or above moves this on.
         </p>
@@ -494,7 +494,7 @@ function YesNo<T extends FieldValues>({
 
 function Intro({ title, body }: { title: string; body: string }) {
   return (
-    <div className="rounded-2xl border border-line bg-sunken px-4 py-3 ring-1 ring-surface ring-inset">
+    <div className="rounded-2xl border border-line bg-surface px-4 py-3">
       <p className="text-sm font-semibold text-ink">{title}</p>
       <p className="mt-1 text-xs leading-relaxed text-ink-4">{body}</p>
     </div>

@@ -155,7 +155,7 @@ function Body({
         )}
       </div>
 
-      <p className="max-h-64 overflow-y-auto rounded-xl border border-line bg-sunken px-3.5 py-3 text-sm leading-relaxed break-words whitespace-pre-line text-ink scrollbar-slim">
+      <p className="max-h-64 overflow-y-auto rounded-xl border border-line bg-surface px-3.5 py-3 text-sm leading-relaxed break-words whitespace-pre-line text-ink scrollbar-slim">
         {idea.idea}
       </p>
 
@@ -193,7 +193,7 @@ function Body({
             <p className="text-[10px] font-bold uppercase tracking-[0.6px] text-ink-5">
               Reviewer&rsquo;s note
             </p>
-            <p className="rounded-xl bg-sunken px-3.5 py-2.5 text-[13px] break-words whitespace-pre-line text-ink-3">
+            <p className="rounded-xl bg-surface px-3.5 py-2.5 text-[13px] break-words whitespace-pre-line text-ink-3">
               {idea.review_note}
             </p>
           </div>

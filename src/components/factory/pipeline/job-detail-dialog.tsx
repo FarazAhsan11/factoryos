@@ -78,21 +78,31 @@ export function JobDetailDialog({
         }
       }}
     >
-      <DialogContent className="max-w-xl">
-        <DialogHeader>
-          <DialogTitle className="text-ink">{job?.product_name}</DialogTitle>
-          <DialogDescription>
-            <span className="font-mono">
-              {job?.product_code ? `${job.product_code} · ` : ""}
+      {/* `p-0` and a flex column so the list is the only thing that scrolls.
+          The dialog used to scroll as a whole *and* cap its list at 18rem, so
+          a long batch history had two scrollbars inside one box. */}
+      <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-full max-w-xl flex-col gap-0 overflow-hidden p-0">
+        <DialogHeader className="shrink-0 gap-1.5 border-b border-line bg-surface px-5 pt-5 pr-12 pb-4">
+          <DialogTitle className="break-words text-ink">
+            {job?.product_name}
+          </DialogTitle>
+          <DialogDescription className="break-words">
+            <span className="rounded-md bg-sunken-2 px-1.5 py-0.5 font-mono text-[11px] font-bold text-ink-4 ring-1 ring-line">
               {job?.batch_no}
             </span>
+            {job?.product_code && (
+              <span className="ml-1.5 font-mono text-[11px]">
+                {job.product_code}
+              </span>
+            )}
             {job?.unit_name && ` · currently in ${job.unit_name}`}
           </DialogDescription>
         </DialogHeader>
 
         {/* The headline the card shows, restated with what it means — the
-            single most confusing number in the module without it. */}
-        <div className="rounded-xl border border-line bg-sunken p-3.5">
+            single most confusing number in the module without it. Pinned
+            above the tabs, because it is the answer whichever tab is open. */}
+        <div className="mx-5 mt-4 shrink-0 rounded-xl border border-line bg-surface p-3.5">
           <div className="flex items-baseline justify-between gap-3">
             <p className="text-xs font-medium text-ink-4">
               Batch completion
@@ -107,16 +117,16 @@ export function JobDetailDialog({
               )}
             </p>
           </div>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-sunken-2">
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-sunken-2 ring-1 ring-line-soft ring-inset">
             <div
-              className="h-full rounded-full bg-brand transition-[width]"
+              className="h-full rounded-full bg-[linear-gradient(90deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] transition-[width] duration-500"
               style={{ width: `${percent ?? 0}%` }}
             />
           </div>
         </div>
 
         {job?.status === "hold" && job.hold_reason && (
-          <p className="flex items-start gap-2 rounded-xl bg-warn-tint px-3.5 py-2.5 text-xs text-warn-ink">
+          <p className="mx-5 mt-3 flex shrink-0 items-start gap-2 rounded-xl border border-warn-line bg-warn-tint px-3.5 py-2.5 text-xs text-warn-ink">
             <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
             On hold — a {job.hold_reason.toLowerCase()} issue was flagged. The
             next entry logged without a flag releases it.
@@ -126,7 +136,7 @@ export function JobDetailDialog({
         <div
           role="tablist"
           aria-label="Batch details"
-          className="flex gap-1 rounded-xl bg-sunken-2 p-1"
+          className="mx-5 mt-3 flex shrink-0 gap-1 rounded-xl border border-line bg-sunken-2 p-1"
         >
           <TabButton
             active={tab === "progress"}
@@ -153,12 +163,12 @@ export function JobDetailDialog({
         </div>
 
         {isPending ? (
-          <div className="flex items-center justify-center gap-2 py-10 text-sm text-ink-5">
+          <div className="flex min-h-0 flex-1 items-center justify-center gap-2 py-10 text-sm text-ink-5">
             <Loader2 className="size-4 animate-spin" />
             Loading the batch history…
           </div>
         ) : (
-          <div className="max-h-72 overflow-y-auto">
+          <div className="scrollbar-slim min-h-0 flex-1 overflow-y-auto px-5 py-4">
             {tab === "progress" && (
               <Table
                 empty="Nothing has been produced against this batch yet."
@@ -167,12 +177,12 @@ export function JobDetailDialog({
                 {processes.map((p) => (
                   <li
                     key={p.name}
-                    className="flex items-center gap-3 border-b border-sunken-2 px-3.5 py-2.5 last:border-0"
+                    className="flex items-center gap-3 border-b border-line-soft px-3.5 py-2.5 transition last:border-0 hover:bg-sunken"
                   >
                     <span className="min-w-0 flex-1 truncate text-sm text-ink">
                       {p.name}
                       {p.isFinal && (
-                        <span className="ml-1.5 rounded-full bg-brand/10 px-1.5 py-0.5 text-[10px] font-semibold text-brand">
+                        <span className="ml-1.5 rounded-full bg-brand-soft px-1.5 py-0.5 text-[10px] font-semibold text-brand-deep ring-1 ring-brand-line">
                           Final
                         </span>
                       )}
@@ -208,7 +218,7 @@ export function JobDetailDialog({
                 {rooms.map((r) => (
                   <li
                     key={r.name}
-                    className="flex items-center gap-3 border-b border-sunken-2 px-3.5 py-2.5 last:border-0"
+                    className="flex items-center gap-3 border-b border-line-soft px-3.5 py-2.5 transition last:border-0 hover:bg-sunken"
                   >
                     <span className="min-w-0 flex-1 truncate text-sm text-ink">
                       {r.name}
@@ -233,10 +243,10 @@ export function JobDetailDialog({
                 {issues.map((e) => (
                   <li
                     key={e.id}
-                    className="border-b border-sunken-2 px-3.5 py-2.5 last:border-0"
+                    className="border-b border-line-soft px-3.5 py-2.5 transition last:border-0 hover:bg-sunken"
                   >
                     <div className="flex items-center gap-2">
-                      <span className="rounded-full bg-danger-soft px-1.5 py-0.5 text-[10px] font-semibold text-danger-deep">
+                      <span className="shrink-0 rounded-full bg-danger-soft px-1.5 py-0.5 text-[10px] font-semibold text-danger-deep ring-1 ring-danger-line">
                         {e.action_flag}
                       </span>
                       <span className="min-w-0 flex-1 truncate text-sm text-ink">
@@ -248,7 +258,7 @@ export function JobDetailDialog({
                       </span>
                     </div>
                     {e.comment && (
-                      <p className="mt-1 text-[11px] italic text-ink-4">
+                      <p className="mt-1 text-[11px] break-words italic text-ink-4">
                         {e.comment}
                       </p>
                     )}
@@ -258,7 +268,7 @@ export function JobDetailDialog({
                       </p>
                     )}
                     {e.amend_note && (
-                      <p className="mt-0.5 whitespace-pre-line text-[11px] text-violet">
+                      <p className="mt-0.5 text-[11px] break-words whitespace-pre-line text-violet">
                         ↳ {e.amend_note}
                       </p>
                     )}
@@ -284,12 +294,16 @@ function Table({
 }) {
   if (rows === 0) {
     return (
-      <p className="rounded-xl border border-dashed border-ink-6 px-4 py-10 text-center text-xs text-ink-5">
+      <p className="rounded-xl border border-dashed border-line-strong bg-surface px-4 py-10 text-center text-xs text-ink-5">
         {empty}
       </p>
     );
   }
-  return <ul className="rounded-xl border border-line">{children}</ul>;
+  return (
+    <ul className="overflow-hidden rounded-xl border border-line bg-surface">
+      {children}
+    </ul>
+  );
 }
 
 function TabButton({
@@ -314,14 +328,14 @@ function TabButton({
       className={cn(
         "inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition",
         active
-          ? "bg-surface text-brand shadow-[0_1px_2px_rgba(20,22,43,0.08)]"
-          : "text-ink-4 hover:text-ink",
+          ? "bg-surface text-brand-deep shadow-[0_1px_3px_rgb(20_22_43/0.12)] ring-1 ring-line"
+          : "text-ink-4 hover:bg-surface/60 hover:text-ink",
       )}
     >
       <Icon className="size-4" />
       {children}
       {count !== undefined && count > 0 && (
-        <span className="rounded-full bg-danger-soft px-1.5 text-[10px] font-bold text-danger-deep">
+        <span className="rounded-full bg-danger-soft px-1.5 text-[10px] font-bold text-danger-deep ring-1 ring-danger-line">
           {count}
         </span>
       )}

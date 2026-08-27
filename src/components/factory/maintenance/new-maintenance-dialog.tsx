@@ -147,7 +147,7 @@ export function NewMaintenanceDialog({
             took Submit request off the bottom of the screen — the one control
             the dialog exists for. */}
         <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col gap-0 overflow-hidden p-0">
-          <DialogHeader className="shrink-0 gap-1.5 border-b border-line bg-gradient-to-b from-sunken to-surface px-5 pt-5 pr-12 pb-4">
+          <DialogHeader className="shrink-0 gap-1.5 border-b border-line bg-surface px-5 pt-5 pr-12 pb-4">
             <DialogTitle className="flex items-center gap-2 text-ink">
               <Wrench className="size-4 text-brand" />
               New maintenance request
@@ -256,7 +256,7 @@ export function NewMaintenanceDialog({
                   rows={3}
                   placeholder="Describe the fault, what was happening, when it started…"
                   aria-invalid={Boolean(errors.description)}
-                  className="w-full rounded-xl border border-line bg-sunken px-3.5 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-brand focus:bg-surface"
+                  className="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-brand focus:bg-surface"
                   {...register("description")}
                 />
               </Field>
@@ -320,7 +320,7 @@ export function NewMaintenanceDialog({
               </div>
             </div>
 
-            <div className="flex shrink-0 justify-end gap-2 border-t border-line bg-gradient-to-b from-surface to-sunken px-5 py-3.5">
+            <div className="flex shrink-0 justify-end gap-2 border-t border-line bg-surface px-5 py-3.5">
               <button
                 type="button"
                 onClick={() => setOpen(false)}

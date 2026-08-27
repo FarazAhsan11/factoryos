@@ -169,7 +169,7 @@ export function ProductImportDialog({
             <div className="space-y-3">
               <label
                 htmlFor="product-csv"
-                className="flex cursor-pointer flex-col items-center gap-2 rounded-2xl border border-dashed border-ink-6 bg-sunken px-4 py-10 text-center transition hover:border-brand hover:bg-brand-tint"
+                className="flex cursor-pointer flex-col items-center gap-2 rounded-2xl border border-dashed border-line-strong bg-surface px-4 py-10 text-center transition hover:border-brand hover:bg-brand-tint"
               >
                 <FileUp className="size-6 text-ink-5" />
                 <span className="text-sm font-medium text-ink">
@@ -220,7 +220,7 @@ export function ProductImportDialog({
 
           {stage === "review" && (
             <div className="space-y-3">
-              <div className="rounded-xl border border-line bg-sunken px-4 py-3 text-sm">
+              <div className="rounded-xl border border-line bg-surface px-4 py-3 text-sm">
                 <p className="font-medium text-ink">{fileName}</p>
                 <p className="mt-0.5 text-ink-4">
                   <strong className="text-ink">{rows.length}</strong> batch
@@ -309,7 +309,7 @@ export function ProductImportDialog({
           )}
 
           {stage === "running" && (
-            <div className="flex items-center gap-2 rounded-2xl border border-line bg-sunken p-4 text-sm font-medium text-ink">
+            <div className="flex items-center gap-2 rounded-2xl border border-line bg-surface p-4 text-sm font-medium text-ink">
               <Loader2 className="size-4 animate-spin text-brand" />
               Adding {rows.length} batch{rows.length === 1 ? "" : "es"}…
             </div>

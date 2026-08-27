@@ -27,7 +27,10 @@ export default async function PipelinePage({
   if (!user) redirect("/login");
 
   return (
-    <div className="mx-auto max-w-[1400px]">
+    /* Fills the workspace frame from `lg` up rather than growing the page —
+       see the note on <main> in FactoryShell. That is what gives each board
+       column a bounded height to scroll inside. */
+    <div className="mx-auto w-full max-w-[1500px] lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
       <PipelineWorkspace
         factoryId={factory.id}
         userId={user.id}

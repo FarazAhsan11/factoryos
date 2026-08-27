@@ -22,7 +22,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const FIELD =
-  "h-11 w-full rounded-xl border border-line bg-sunken px-3.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-danger focus:bg-surface focus:ring-4 focus:ring-danger/12";
+  "h-11 w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-danger focus:bg-surface focus:ring-4 focus:ring-danger/12";
 const LABEL = "text-xs font-medium text-ink-3";
 
 export function DeleteFactoryDialog({

@@ -36,7 +36,10 @@ export function ActionStageStepper({
 
   return (
     <ol
-      className={cn("flex items-center pb-6", className)}
+      className={cn(
+        "flex items-center rounded-2xl border border-line bg-sunken px-4 pt-4 pb-9",
+        className,
+      )}
       aria-label="Issue progress"
     >
       {ACTION_STAGES.map((stage, i) => {
@@ -56,11 +59,11 @@ export function ActionStageStepper({
           >
             <span
               className={cn(
-                "grid size-6 shrink-0 place-items-center rounded-full border-2 transition",
+                "grid size-7 shrink-0 place-items-center rounded-full border-2 transition",
                 done
-                  ? "border-teal bg-teal text-white"
+                  ? "border-teal bg-teal text-white shadow-[0_4px_10px_-4px_rgb(13_148_136/0.8)]"
                   : active
-                    ? "border-brand bg-surface text-brand ring-4 ring-brand/12"
+                    ? "border-brand bg-surface text-brand ring-4 ring-brand/15"
                     : "border-line bg-surface text-ink-6",
               )}
             >
@@ -78,20 +81,20 @@ export function ActionStageStepper({
             {!last && (
               <span
                 className={cn(
-                  "mx-1.5 h-0.5 flex-1 rounded-full",
-                  railDone ? "bg-teal" : "bg-line",
+                  "mx-1.5 h-1 flex-1 rounded-full",
+                  railDone ? "bg-teal" : "bg-line-strong/60",
                 )}
               />
             )}
 
             <span
               className={cn(
-                "absolute top-8 whitespace-nowrap text-[10.5px] font-semibold",
+                "absolute top-9 whitespace-nowrap text-[10.5px] font-semibold",
                 i === 0
                   ? "left-0"
                   : last
                     ? "right-0"
-                    : "left-3 -translate-x-1/2",
+                    : "left-3.5 -translate-x-1/2",
                 skipped
                   ? "text-ink-6 line-through"
                   : active

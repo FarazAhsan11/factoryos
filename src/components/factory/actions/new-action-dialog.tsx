@@ -25,7 +25,10 @@ import type { SetupItem } from "@/lib/factory/setup-queries";
 import { cn } from "@/lib/utils";
 
 const CONTROL =
-  "h-10 w-full rounded-xl border border-line bg-sunken px-3.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-brand focus:bg-surface";
+  "h-10 w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)] outline-none transition placeholder:text-placeholder hover:border-line-strong focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12";
+
+/** Same control, plus our own chevron — see `.select-chevron`. */
+const SELECT = CONTROL + " select-chevron";
 
 const EMPTY: NewActionValues = {
   title: "",
@@ -117,8 +120,12 @@ export function NewActionDialog({
           setOpen(next);
         }}
       >
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
+        {/* `p-0` and a flex column so the fields are the only thing that
+            scrolls. With the dialog's own padding the whole box scrolled, which
+            took Create action off the bottom of the screen — the one control
+            the dialog exists for. */}
+        <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col gap-0 overflow-hidden p-0">
+          <DialogHeader className="shrink-0 gap-1.5 border-b border-line bg-gradient-to-b from-sunken to-surface px-5 pt-5 pr-12 pb-4">
             <DialogTitle className="text-ink">New action</DialogTitle>
             <DialogDescription>
               Issues flagged in the shift log create these automatically — this
@@ -126,7 +133,7 @@ export function NewActionDialog({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3">
+          <div className="scrollbar-slim min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
             <Field label="Title" htmlFor="na-title">
               <input
                 id="na-title"
@@ -144,7 +151,7 @@ export function NewActionDialog({
                   id="na-unit"
                   value={values.unitId}
                   onChange={(e) => set("unitId", e.target.value)}
-                  className={CONTROL}
+                  className={SELECT}
                 >
                   <option value="">Factory-wide</option>
                   {units
@@ -162,7 +169,7 @@ export function NewActionDialog({
                   id="na-category"
                   value={values.category}
                   onChange={(e) => set("category", e.target.value)}
-                  className={CONTROL}
+                  className={SELECT}
                 >
                   {ACTION_CATEGORIES.map((c) => (
                     <option key={c} value={c}>
@@ -181,7 +188,7 @@ export function NewActionDialog({
                   onChange={(e) =>
                     set("priority", e.target.value as ActionPriority)
                   }
-                  className={CONTROL}
+                  className={SELECT}
                 >
                   {ACTION_PRIORITIES.map((p) => (
                     <option key={p.value} value={p.value}>
@@ -241,31 +248,29 @@ export function NewActionDialog({
                 value={values.notes}
                 onChange={(e) => set("notes", e.target.value)}
                 placeholder="Context, root cause, what needs to happen…"
-                className="w-full rounded-xl border border-line bg-sunken px-3.5 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-brand focus:bg-surface"
+                className="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)] outline-none transition placeholder:text-placeholder hover:border-line-strong focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12"
               />
             </Field>
+          </div>
 
-            <div className="flex justify-end gap-2 pt-1">
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                disabled={create.isPending}
-                className="h-10 rounded-xl px-4 text-sm font-medium text-ink-3 transition hover:bg-sunken-2 disabled:opacity-60"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => create.mutate()}
-                disabled={create.isPending || !values.title.trim()}
-                className="inline-flex h-10 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-4 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-60"
-              >
-                {create.isPending && (
-                  <Loader2 className="size-4 animate-spin" />
-                )}
-                Create action
-              </button>
-            </div>
+          <div className="flex shrink-0 justify-end gap-2 border-t border-line bg-gradient-to-b from-surface to-sunken px-5 py-3.5">
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              disabled={create.isPending}
+              className="h-10 rounded-xl px-4 text-sm font-semibold text-ink-3 transition hover:bg-sunken-2 hover:text-ink disabled:opacity-60"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => create.mutate()}
+              disabled={create.isPending || !values.title.trim()}
+              className="inline-flex h-10 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-4 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60"
+            >
+              {create.isPending && <Loader2 className="size-4 animate-spin" />}
+              Create action
+            </button>
           </div>
         </DialogContent>
       </Dialog>
@@ -288,9 +293,16 @@ function Field({
 }) {
   return (
     <div className={cn("space-y-1.5", className)}>
-      <label htmlFor={htmlFor} className="block text-xs font-medium text-ink-3">
+      <label
+        htmlFor={htmlFor}
+        className="block text-xs font-semibold text-ink-2"
+      >
         {label}
-        {note && <span className="ml-1 text-[10px] text-ink-5">{note}</span>}
+        {note && (
+          <span className="ml-1 text-[10px] font-normal text-ink-5">
+            {note}
+          </span>
+        )}
       </label>
       {children}
     </div>

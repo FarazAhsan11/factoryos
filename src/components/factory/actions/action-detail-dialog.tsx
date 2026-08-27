@@ -36,14 +36,14 @@ import {
 import { cn } from "@/lib/utils";
 
 const CONTROL =
-  "h-10 w-full rounded-xl border border-line bg-sunken px-3.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-brand focus:bg-surface";
+  "h-10 w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)] outline-none transition placeholder:text-placeholder hover:border-line-strong focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12";
 
 const STAGE_PILL: Record<string, string> = {
-  open: "bg-warn-soft text-warn-deep",
-  investigating: "bg-brand-soft text-brand-deep",
-  action_taken: "bg-brand-soft text-brand-deep",
-  verification: "bg-teal-soft text-teal-deep",
-  closed: "bg-teal-soft text-teal-deep",
+  open: "bg-warn-soft text-warn-deep ring-warn-line",
+  investigating: "bg-brand-soft text-brand-deep ring-brand-line",
+  action_taken: "bg-brand-soft text-brand-deep ring-brand-line",
+  verification: "bg-teal-soft text-teal-deep ring-teal-line",
+  closed: "bg-teal-soft text-teal-deep ring-teal-line",
 };
 
 type Tab = "next" | "record" | "activity";
@@ -170,7 +170,7 @@ function Body({
     <>
       {/* ── Header: what this is ─────────────────────────────────────── */}
       {/* `pr-12` keeps the title clear of the dialog's own close button. */}
-      <DialogHeader className="shrink-0 gap-2 border-b border-line-soft px-5 pt-5 pr-12 pb-4">
+      <DialogHeader className="shrink-0 gap-2 border-b border-line bg-gradient-to-b from-sunken to-surface px-5 pt-5 pr-12 pb-4">
         <div className="flex flex-wrap items-center gap-1.5">
           {action.is_escalated && (
             <Badge className="bg-violet-line text-violet-deep">Escalated</Badge>
@@ -189,10 +189,10 @@ function Body({
           </Badge>
         </div>
 
-        <DialogTitle className="text-base leading-snug text-ink">
+        <DialogTitle className="text-base leading-snug break-words text-ink">
           {action.title}
         </DialogTitle>
-        <DialogDescription className="text-xs">
+        <DialogDescription className="text-xs break-words">
           {action.unit_name ?? "Factory-wide"} · {action.category} ·{" "}
           {action.priority} priority
         </DialogDescription>
@@ -203,7 +203,7 @@ function Body({
         <div
           role="tablist"
           aria-label="Issue detail"
-          className="flex gap-1 rounded-xl bg-sunken-2 p-1"
+          className="flex gap-1 rounded-xl border border-line bg-sunken-2 p-1"
         >
           <TabButton
             active={tab === "next"}
@@ -231,7 +231,7 @@ function Body({
       </div>
 
       {/* ── The one scrolling region ─────────────────────────────────── */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+      <div className="scrollbar-slim min-h-0 flex-1 overflow-y-auto px-5 py-4">
         {tab === "next" && (
           <div className="space-y-4">
             {/* Position first, and only here: on the working tab it is the
@@ -319,7 +319,7 @@ function Body({
             {notesPending ? (
               <p className="py-8 text-center text-xs text-ink-5">Loading…</p>
             ) : notes.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-ink-6 px-3.5 py-8 text-center text-xs text-ink-5">
+              <p className="rounded-xl border border-dashed border-line-strong bg-sunken px-3.5 py-8 text-center text-xs text-ink-5">
                 Nothing yet — the first update will show here.
               </p>
             ) : (
@@ -331,10 +331,12 @@ function Body({
                       "rounded-xl px-3 py-2 text-[13px]",
                       entry.is_system
                         ? "bg-sunken text-ink-4 italic"
-                        : "border border-line text-ink",
+                        : "border border-line bg-surface text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)]",
                     )}
                   >
-                    <span className="whitespace-pre-wrap">{entry.note}</span>
+                    <span className="break-words whitespace-pre-wrap">
+                      {entry.note}
+                    </span>
                     <span className="mt-0.5 block text-[10.5px] not-italic text-ink-5">
                       {formatDue(entry.created_at)}
                     </span>
@@ -360,13 +362,13 @@ function Body({
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   placeholder="Update, progress, next steps…"
-                  className="w-full rounded-xl border border-line bg-sunken px-3.5 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-brand focus:bg-surface"
+                  className="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink outline-none transition placeholder:text-placeholder hover:border-line-strong focus:border-brand focus:ring-4 focus:ring-brand/12"
                 />
                 <button
                   type="button"
                   onClick={() => saveNote.mutate()}
                   disabled={busy || !note.trim()}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-xs font-medium text-ink-3 transition hover:border-brand hover:text-brand disabled:pointer-events-none disabled:opacity-40"
+                  className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-3.5 text-xs font-semibold text-white shadow-brand transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-40"
                 >
                   {saveNote.isPending && (
                     <Loader2 className="size-3.5 animate-spin" />
@@ -380,13 +382,13 @@ function Body({
       </div>
 
       {/* ── Footer: the clock that is actually running ───────────────── */}
-      <div className="flex shrink-0 items-center justify-between gap-3 border-t border-line-soft bg-sunken px-5 py-3">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-t border-line bg-gradient-to-b from-surface to-sunken px-5 py-3">
         <Clock action={action} />
         <button
           type="button"
           onClick={onClose}
           disabled={busy}
-          className="h-9 shrink-0 rounded-lg border border-line bg-surface px-4 text-sm font-medium text-ink-3 transition hover:border-brand hover:text-brand disabled:opacity-60"
+          className="h-9 shrink-0 rounded-lg border border-line bg-surface px-4 text-sm font-semibold text-ink-3 shadow-soft transition hover:border-brand hover:text-brand disabled:opacity-60"
         >
           Close
         </button>
@@ -446,7 +448,7 @@ function Clock({ action }: { action: FactoryAction }) {
 /** The issue's fixed facts — the ones that never change after it is raised. */
 function Facts({ action }: { action: FactoryAction }) {
   return (
-    <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl border border-line bg-sunken p-4 text-sm sm:grid-cols-3">
+    <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl border border-line bg-sunken p-4 text-sm ring-1 ring-surface ring-inset sm:grid-cols-3">
       <Fact label="Raised">{formatDue(action.created_at)}</Fact>
       <Fact label="Owner">
         {action.assigned_to ?? (
@@ -481,7 +483,7 @@ function Fact({
 }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[10px] font-bold uppercase tracking-[0.5px] text-ink-5">
+      <dt className="text-[10px] font-bold tracking-[0.07em] text-ink-5 uppercase">
         {label}
       </dt>
       <dd className="mt-0.5 truncate text-[13px] text-ink">{children}</dd>
@@ -491,7 +493,7 @@ function Fact({
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[10px] font-bold uppercase tracking-[0.6px] text-ink-5">
+    <p className="text-[10px] font-bold tracking-[0.07em] text-ink-4 uppercase">
       {children}
     </p>
   );
@@ -520,8 +522,8 @@ function TabButton({
       className={cn(
         "inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition",
         active
-          ? "bg-surface text-brand shadow-[0_1px_2px_rgba(20,22,43,0.08)]"
-          : "text-ink-4 hover:text-ink",
+          ? "bg-surface text-brand-deep shadow-[0_1px_3px_rgb(20_22_43/0.12)] ring-1 ring-line"
+          : "text-ink-4 hover:bg-surface/60 hover:text-ink",
       )}
     >
       <Icon className="size-4" />
@@ -550,7 +552,7 @@ function Badge({
   return (
     <span
       className={cn(
-        "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+        "rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase ring-1 ring-current/15",
         className,
       )}
     >

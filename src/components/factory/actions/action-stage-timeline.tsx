@@ -144,7 +144,7 @@ export function ActionStageTimeline({
               )}
 
               {evidence.length > 0 && (
-                <dl className="mt-1.5 space-y-2 rounded-xl border border-line bg-sunken p-3">
+                <dl className="mt-2 space-y-2 rounded-xl border border-line bg-sunken p-3 ring-1 ring-surface ring-inset">
                   {evidence.map((row) => (
                     <Evidence
                       key={row.label}
@@ -292,7 +292,7 @@ function Evidence({
 
   return (
     <div>
-      <dt className="flex items-center justify-between gap-2 text-[10px] font-bold uppercase tracking-[0.5px] text-ink-5">
+      <dt className="flex items-center justify-between gap-2 text-[10px] font-bold tracking-[0.07em] text-ink-5 uppercase">
         {row.label}
         {editable && !editing && (
           <button
@@ -315,7 +315,7 @@ function Evidence({
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             rows={3}
-            className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[13px] text-ink outline-none transition focus:border-brand"
+            className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[13px] text-ink outline-none transition hover:border-line-strong focus:border-brand focus:ring-4 focus:ring-brand/12"
           />
           {/* The previous text is kept in the thread, so this is a correction
               with a paper trail rather than an overwrite. Saying so is what
@@ -344,7 +344,7 @@ function Evidence({
           </div>
         </div>
       ) : (
-        <dd className="whitespace-pre-wrap text-[13px] text-ink">
+        <dd className="text-[13px] break-words whitespace-pre-wrap text-ink">
           {row.value}
         </dd>
       )}

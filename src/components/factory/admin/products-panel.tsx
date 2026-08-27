@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarPlus, Check, Search, Trash2, X } from "lucide-react";
+import { CalendarPlus, Check, Package, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -24,6 +24,12 @@ import {
   updateProduct,
   type Product,
 } from "@/lib/factory/product-queries";
+import {
+  EmptyState,
+  FIELD,
+  PANEL,
+  PanelHeader,
+} from "@/components/factory/admin/settings-ui";
 import { cn } from "@/lib/utils";
 
 /** 540000 → "540,000"; 2.85 stays "2.85". */
@@ -182,31 +188,13 @@ export function ProductsPanel({
 
   return (
     <div className="space-y-5">
-      {canManage && (
-        <AddProductForm
-          onAdd={(values) => add.mutateAsync(values).then(() => {})}
-        />
-      )}
-
-      {/* Import sits beside the search rather than inside the Add form: it is
-          a second way to fill the catalogue, not a field of the first. The row
-          renders for a manager even on an empty catalogue, which is exactly
-          when a bulk import is most wanted. */}
-      {(canManage || products.length > 0) && (
-        <div className="flex items-center gap-2">
-          {products.length > 0 && (
-            <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-5" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by batch, code or product name…"
-                aria-label="Search the catalogue"
-                className="h-10 w-full rounded-xl border border-line bg-surface pl-10 pr-3.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-brand focus:ring-4 focus:ring-brand/12"
-              />
-            </div>
-          )}
-          {canManage && (
+      <PanelHeader
+        icon={Package}
+        title="Products"
+        description="The batch catalogue. A batch number typed into the shift log resolves to a product here, and a scheduled date puts it on the pipeline board."
+        count={products.length}
+        action={
+          canManage ? (
             <ProductImportDialog
               factoryId={factoryId}
               // The catalogue is already loaded here, so the dialog can name
@@ -214,7 +202,28 @@ export function ProductsPanel({
               existingBatchNos={products.map((p) => p.batch_no)}
               onImported={refresh}
             />
-          )}
+          ) : undefined
+        }
+      />
+
+      {canManage && (
+        <AddProductForm
+          onAdd={(values) => add.mutateAsync(values).then(() => {})}
+        />
+      )}
+
+      {/* Import moved up beside the title — it is a second way to fill the
+          catalogue, not a field of the Add form and not a sibling of search. */}
+      {products.length > 0 && (
+        <div className="relative">
+          <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-ink-5" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by batch, code or product name…"
+            aria-label="Search the catalogue"
+            className={cn(FIELD, "pr-3.5 pl-10")}
+          />
         </div>
       )}
 
@@ -225,19 +234,22 @@ export function ProductsPanel({
           Could not load the catalogue: {(error as Error).message}
         </p>
       ) : products.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-ink-6 px-4 py-10 text-center text-sm text-ink-5">
-          No products yet
-          {canManage ? " — add your first batch above." : "."}
-        </p>
+        <EmptyState
+          icon={Package}
+          title="No products yet."
+          hint={
+            canManage
+              ? "Add your first batch above, or import the catalogue from CSV."
+              : "A manager fills the catalogue."
+          }
+        />
       ) : visible.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-ink-6 px-4 py-10 text-center text-sm text-ink-5">
-          Nothing matches “{search}”.
-        </p>
+        <EmptyState icon={Search} title={`Nothing matches “${search}”.`} />
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-line bg-surface">
+        <div className={cn(PANEL, "overflow-x-auto")}>
           <table className="w-full min-w-[860px] text-sm">
             <thead>
-              <tr className="border-b border-line-soft text-left text-xs font-semibold uppercase tracking-wide text-ink-5">
+              <tr className="border-b border-line bg-sunken-2 text-left text-[10px] font-bold tracking-[0.07em] text-ink-3 uppercase">
                 <th className="px-4 py-3">Batch</th>
                 <th className="px-4 py-3">Code</th>
                 <th className="px-4 py-3">Product name</th>

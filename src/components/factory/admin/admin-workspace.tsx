@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Cog, Flag } from "lucide-react";
+import { Building2, Clock3, Cog, Flag, LayoutGrid, Wrench } from "lucide-react";
 
 import { PROCESS_CATEGORIES } from "@/app/factory/[slug]/log/schemas";
 import { AdminTabs } from "@/components/factory/admin/admin-tabs";
@@ -12,6 +12,7 @@ import { EmployeesPanel } from "@/components/factory/admin/employees-panel";
 import { EquipmentPanel } from "@/components/factory/admin/equipment-panel";
 import { ProductsPanel } from "@/components/factory/admin/products-panel";
 import { ShiftTimesForm } from "@/components/factory/admin/shift-times-form";
+import { PanelHeader } from "@/components/factory/admin/settings-ui";
 import { ADMIN_TABS, TAB_TABLE } from "@/lib/factory/admin-tabs";
 import type { FactoryContext } from "@/lib/factory/context";
 import { employeeKeys, fetchEmployees } from "@/lib/factory/employee-queries";
@@ -94,7 +95,7 @@ export function AdminWorkspace({
   }, []);
 
   return (
-    <>
+    <div className="flex flex-col lg:min-h-0 lg:flex-1">
       <AdminTabs
         tabs={ADMIN_TABS}
         active={tab}
@@ -102,115 +103,145 @@ export function AdminWorkspace({
         onPrefetch={prefetch}
       />
 
-      {/* Panels stay mounted once visited, so going back to one is instant
+      {/* One scrolling region for whichever panel is open, so the tab strip
+          never leaves the screen. The inset padding keeps a card's focus ring
+          from being clipped by the scroll box's edge. */}
+      <div className="scrollbar-slim -mx-1 min-h-0 flex-1 px-1 pb-1 lg:overflow-y-auto">
+        {/* Panels stay mounted once visited, so going back to one is instant
           and in-progress edits survive a tab round-trip. */}
-      <Panel active={tab === "company"}>
-        <CompanySettingsForm factory={factory} canManage={canManage} />
-      </Panel>
+        <Panel active={tab === "company"}>
+          <PanelHeader
+            icon={Building2}
+            title="Company"
+            description="The site's name, the words it uses for its rooms, and the targets every report measures against."
+          />
+          <CompanySettingsForm factory={factory} canManage={canManage} />
+        </Panel>
 
-      <Panel active={tab === "units"} lazy>
-        <SetupListManager
-          table="factory_units"
-          factoryId={factory.id}
-          singular={units.singular}
-          plural={units.plural}
-          placeholder={`e.g. ${units.singular} 29…`}
-          canManage={canManage}
-        />
-      </Panel>
+        <Panel active={tab === "units"} lazy>
+          <PanelHeader
+            icon={LayoutGrid}
+            title={units.plural}
+            description={`Where work happens. Every shift-log entry names one, and the shift report gives each its own row — including the ones that ran nothing.`}
+          />
+          <SetupListManager
+            table="factory_units"
+            factoryId={factory.id}
+            singular={units.singular}
+            plural={units.plural}
+            placeholder={`e.g. ${units.singular} 29…`}
+            canManage={canManage}
+          />
+        </Panel>
 
-      {/* Who a maintenance request is *for*. A managed list rather than a
+        {/* Who a maintenance request is *for*. A managed list rather than a
           fixed dropdown because the trades a plant keeps in-house differ —
           one factory has Electrical and Utilities, the next outsources both. */}
-      <Panel active={tab === "departments"} lazy>
-        <SetupListManager
-          table="factory_departments"
-          factoryId={factory.id}
-          singular="Department"
-          plural="Departments"
-          placeholder="e.g. Electrical, Mechanical, Utilities…"
-          canManage={canManage}
-        />
-      </Panel>
+        <Panel active={tab === "departments"} lazy>
+          <PanelHeader
+            icon={Wrench}
+            title="Departments"
+            description="The trades a maintenance request can be raised by and assigned to — whichever ones this plant keeps in-house."
+          />
+          <SetupListManager
+            table="factory_departments"
+            factoryId={factory.id}
+            singular="Department"
+            plural="Departments"
+            placeholder="e.g. Electrical, Mechanical, Utilities…"
+            canManage={canManage}
+          />
+        </Panel>
 
-      <Panel active={tab === "processes"} lazy>
-        <SetupListManager
-          table="factory_processes"
-          factoryId={factory.id}
-          singular="Process stage"
-          plural="Process stages"
-          placeholder="e.g. Compression, Spray Drying…"
-          canManage={canManage}
-          categoryLabel="Type of stage"
-          // The one thing that decides what the shift-log form asks for. It
-          // replaces the old "produces output" / "runs on a machine" pair,
-          // which had four combinations for three real kinds of stage and
-          // said nothing about how the output is measured — so a mixing room
-          // reporting 3 drums got the same three quantity boxes as an
-          // encapsulation line reporting 231,453 capsules.
-          categories={PROCESS_CATEGORIES.map((c) => ({
-            value: c.value,
-            label: c.label,
-            example: c.example,
-            hint: c.hint,
-          }))}
-          defaultCategory="production"
-          flags={[
-            {
-              key: "machine",
-              label: "This stage runs on a machine",
-              hint: "Machine stages get equipment, speed and OEE tracking; a manual production stage (hand packing against a target) doesn't.",
-              on: "Machine",
-              off: "Manual",
-              icon: Cog,
-              // Production only. A preparatory stage has no target speed to
-              // run below, and downtime has no machine to attribute time to —
-              // the database forces the flag off for both (migration 0030),
-              // so offering the tick there would be a control that snaps back.
-              showFor: ["production"],
-            },
-            // Unlike the one above, this is a choice *between* stages: a
-            // batch is dispensed, encapsulated, sorted and packed, and each
-            // logs roughly the full quantity. Without naming which of them
-            // means "the batch is done", completion is unknowable — summing
-            // them finishes a job at a quarter of the work, and taking the
-            // largest finishes it when the first stage does.
-            {
-              key: "final",
-              label: "This is the final stage",
-              hint: "The stage whose output IS the finished batch — usually the last pack or label step. Pipeline jobs complete when it reaches the required quantity. Only one stage can hold this; ticking it here clears it from the other.",
-              on: "Final",
-              off: "Not final",
-              icon: Flag,
-              // Not downtime: the final stage is measured by what it
-              // produced, and downtime produces nothing — a job tagged that
-              // way would sit at 0 for ever with nothing explaining why. The
-              // constraint from 0016 refuses it outright.
-              showFor: ["preparatory", "production"],
-            },
-          ]}
-        />
-      </Panel>
+        <Panel active={tab === "processes"} lazy>
+          <PanelHeader
+            icon={Cog}
+            title="Process stages"
+            description="What a room can be doing. A stage's type decides which shape the shift-log form takes, and the Final tag is what completes a pipeline job."
+          />
+          <SetupListManager
+            table="factory_processes"
+            factoryId={factory.id}
+            singular="Process stage"
+            plural="Process stages"
+            placeholder="e.g. Compression, Spray Drying…"
+            canManage={canManage}
+            categoryLabel="Type of stage"
+            // The one thing that decides what the shift-log form asks for. It
+            // replaces the old "produces output" / "runs on a machine" pair,
+            // which had four combinations for three real kinds of stage and
+            // said nothing about how the output is measured — so a mixing room
+            // reporting 3 drums got the same three quantity boxes as an
+            // encapsulation line reporting 231,453 capsules.
+            categories={PROCESS_CATEGORIES.map((c) => ({
+              value: c.value,
+              label: c.label,
+              example: c.example,
+              hint: c.hint,
+            }))}
+            defaultCategory="production"
+            flags={[
+              {
+                key: "machine",
+                label: "This stage runs on a machine",
+                hint: "Machine stages get equipment, speed and OEE tracking; a manual production stage (hand packing against a target) doesn't.",
+                on: "Machine",
+                off: "Manual",
+                icon: Cog,
+                // Production only. A preparatory stage has no target speed to
+                // run below, and downtime has no machine to attribute time to —
+                // the database forces the flag off for both (migration 0030),
+                // so offering the tick there would be a control that snaps back.
+                showFor: ["production"],
+              },
+              // Unlike the one above, this is a choice *between* stages: a
+              // batch is dispensed, encapsulated, sorted and packed, and each
+              // logs roughly the full quantity. Without naming which of them
+              // means "the batch is done", completion is unknowable — summing
+              // them finishes a job at a quarter of the work, and taking the
+              // largest finishes it when the first stage does.
+              {
+                key: "final",
+                label: "This is the final stage",
+                hint: "The stage whose output IS the finished batch — usually the last pack or label step. Pipeline jobs complete when it reaches the required quantity. Only one stage can hold this; ticking it here clears it from the other.",
+                on: "Final",
+                off: "Not final",
+                icon: Flag,
+                // Not downtime: the final stage is measured by what it
+                // produced, and downtime produces nothing — a job tagged that
+                // way would sit at 0 for ever with nothing explaining why. The
+                // constraint from 0016 refuses it outright.
+                showFor: ["preparatory", "production"],
+              },
+            ]}
+          />
+        </Panel>
 
-      {/* The machine register. A pair — the number painted on the asset and
+        {/* The machine register. A pair — the number painted on the asset and
           the name people call it by — which is why it isn't a SetupListManager
           list: the shift log types the number and reads back the name. */}
-      <Panel active={tab === "equipment"} lazy>
-        <EquipmentPanel factoryId={factory.id} canManage={canManage} />
-      </Panel>
+        <Panel active={tab === "equipment"} lazy>
+          <EquipmentPanel factoryId={factory.id} canManage={canManage} />
+        </Panel>
 
-      <Panel active={tab === "employees"} lazy>
-        <EmployeesPanel factoryId={factory.id} isAdmin={isAdmin} />
-      </Panel>
+        <Panel active={tab === "employees"} lazy>
+          <EmployeesPanel factoryId={factory.id} isAdmin={isAdmin} />
+        </Panel>
 
-      <Panel active={tab === "products"} lazy>
-        <ProductsPanel factoryId={factory.id} canManage={canManage} />
-      </Panel>
+        <Panel active={tab === "products"} lazy>
+          <ProductsPanel factoryId={factory.id} canManage={canManage} />
+        </Panel>
 
-      <Panel active={tab === "shift-times"} lazy>
-        <ShiftTimesForm factoryId={factory.id} canManage={canManage} />
-      </Panel>
-    </>
+        <Panel active={tab === "shift-times"} lazy>
+          <PanelHeader
+            icon={Clock3}
+            title="Shift times"
+            description="When each shift starts and ends, and who supervises it. The workspace clock, the log form and the printed handover all read these."
+          />
+          <ShiftTimesForm factoryId={factory.id} canManage={canManage} />
+        </Panel>
+      </div>
+    </div>
   );
 }
 

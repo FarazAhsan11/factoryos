@@ -2,7 +2,16 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Cog, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import {
+  Check,
+  Cog,
+  ListPlus,
+  Loader2,
+  Pencil,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -16,8 +25,11 @@ import {
 } from "@/lib/factory/setup-queries";
 import { cn } from "@/lib/utils";
 
-const FIELD =
-  "h-10 w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-brand focus:ring-4 focus:ring-brand/12";
+import {
+  Composer,
+  EmptyState,
+  FIELD,
+} from "@/components/factory/admin/settings-ui";
 
 /**
  * A boolean attribute a list can carry. Processes have two — "runs on a
@@ -302,10 +314,7 @@ export function SetupListManager({
     <div className="space-y-5">
       {/* add row */}
       {canManage && (
-        <div className="rounded-2xl border border-line bg-sunken p-4">
-          <p className="mb-2.5 text-[13px] font-semibold text-ink">
-            Add {singular.toLowerCase()}
-          </p>
+        <Composer title={`Add ${singular.toLowerCase()}`}>
           <div className="flex gap-2.5">
             <input
               value={draft}
@@ -352,7 +361,7 @@ export function SetupListManager({
                         "cursor-pointer rounded-xl border p-3 transition",
                         on
                           ? "border-brand bg-brand-soft ring-4 ring-brand/10"
-                          : "border-line bg-surface hover:border-ink-6",
+                          : "border-line bg-surface shadow-[0_1px_2px_rgb(20_22_43/0.04)] hover:border-line-strong",
                       )}
                     >
                       <span className="flex items-center gap-2">
@@ -416,21 +425,24 @@ export function SetupListManager({
               </span>
             </label>
           ))}
-        </div>
+        </Composer>
       )}
 
       {/* list */}
       {isPending ? (
         <ListSkeleton />
       ) : isError ? (
-        <p className="rounded-xl bg-danger-soft px-4 py-3 text-sm text-danger-deep">
+        <p className="rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm font-medium text-danger-deep">
           Could not load {plural.toLowerCase()}: {(error as Error).message}
         </p>
       ) : items.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-ink-6 px-4 py-10 text-center text-sm text-ink-5">
-          No {plural.toLowerCase()} yet
-          {canManage ? " — add your first one above." : "."}
-        </p>
+        <EmptyState
+          icon={ListPlus}
+          title={`No ${plural.toLowerCase()} yet.`}
+          hint={
+            canManage ? "Add your first one above." : "A manager adds these."
+          }
+        />
       ) : (
         <ul
           className={cn(
@@ -448,8 +460,8 @@ export function SetupListManager({
               <li
                 key={item.id}
                 className={cn(
-                  "flex items-center gap-2 rounded-xl border border-line bg-surface px-3.5 py-2.5",
-                  !item.active && "bg-sunken",
+                  "flex items-center gap-2 rounded-xl border border-line bg-surface px-3.5 py-2.5 shadow-[0_1px_2px_rgb(20_22_43/0.04)] transition hover:border-line-strong",
+                  !item.active && "bg-sunken shadow-none",
                 )}
               >
                 {editing ? (
@@ -464,7 +476,7 @@ export function SetupListManager({
                         if (e.key === "Escape") setEditingId(null);
                       }}
                       aria-label={`Rename ${item.name}`}
-                      className="h-8 min-w-0 flex-1 rounded-lg border border-line px-2 text-sm outline-none focus:border-brand"
+                      className="h-8 min-w-0 flex-1 rounded-lg border border-line bg-surface px-2 text-sm outline-none transition focus:border-brand focus:ring-4 focus:ring-brand/12"
                     />
                     <IconButton
                       label="Save"
@@ -507,7 +519,7 @@ export function SetupListManager({
                             })
                           }
                           aria-label={`${categoryLabel} of ${item.name}`}
-                          className="h-7 shrink-0 rounded-full border border-line bg-sunken px-2 text-[11px] font-medium text-ink-3 outline-none transition hover:border-ink-6 focus:border-brand"
+                          className="select-chevron h-7 shrink-0 rounded-full border border-line bg-sunken py-0 pr-6 pl-2.5 text-[11px] font-semibold text-ink-3 outline-none transition hover:border-line-strong focus:border-brand focus:ring-4 focus:ring-brand/12"
                         >
                           {categoryList.map((c) => (
                             <option key={c.value} value={c.value}>
@@ -529,7 +541,7 @@ export function SetupListManager({
                         return on ? (
                           <span
                             key={f.key}
-                            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-medium text-brand"
+                            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-semibold text-brand-deep ring-1 ring-brand-line"
                           >
                             <Icon className="size-3" />
                             {f.on}
@@ -552,8 +564,8 @@ export function SetupListManager({
                           className={cn(
                             "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium transition",
                             on
-                              ? "bg-brand/10 text-brand hover:bg-brand/16"
-                              : "bg-sunken-2 text-ink-5 hover:bg-line",
+                              ? "bg-brand-soft text-brand-deep ring-1 ring-brand-line hover:brightness-95"
+                              : "bg-sunken-2 text-ink-5 ring-1 ring-line hover:bg-line",
                           )}
                         >
                           <Icon className="size-3" />

@@ -15,8 +15,7 @@ import {
   type AddEmployeeValues,
 } from "@/app/factory/[slug]/admin/schemas";
 
-const FIELD =
-  "h-10 w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-brand focus:ring-4 focus:ring-brand/12";
+import { FIELD, SELECT } from "@/components/factory/admin/settings-ui";
 const LABEL = "text-xs font-medium text-ink-3";
 
 /**
@@ -69,9 +68,9 @@ export function AddEmployeeForm({
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
-      className="rounded-2xl border border-line bg-sunken p-4"
+      className="rounded-2xl border border-line bg-sunken p-4 shadow-[inset_0_1px_2px_rgb(20_22_43/0.04)]"
     >
-      <p className="mb-3 text-[13px] font-semibold text-ink">
+      <p className="mb-3 text-[11px] font-bold tracking-[0.07em] text-ink-4 uppercase">
         Add someone to this factory
       </p>
 
@@ -108,7 +107,7 @@ export function AddEmployeeForm({
           <label htmlFor="emp-role" className={LABEL}>
             Role
           </label>
-          <select id="emp-role" className={FIELD} {...register("role")}>
+          <select id="emp-role" className={SELECT} {...register("role")}>
             {ASSIGNABLE_ROLES.map((role) => (
               <option key={role} value={role}>
                 {ROLE_LABELS[role]}
@@ -123,7 +122,7 @@ export function AddEmployeeForm({
           </label>
           <select
             id="emp-shift"
-            className={FIELD}
+            className={SELECT}
             {...register("defaultShift")}
           >
             {SHIFT_SLOTS.map((shift) => (

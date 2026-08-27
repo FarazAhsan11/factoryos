@@ -2,7 +2,16 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Loader2, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import {
+  Check,
+  Cog,
+  Loader2,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -17,6 +26,7 @@ import {
   updateEquipment,
   type Equipment,
 } from "@/lib/factory/equipment-queries";
+import { Composer, PanelHeader } from "@/components/factory/admin/settings-ui";
 import { cn } from "@/lib/utils";
 
 const FIELD =
@@ -155,11 +165,15 @@ export function EquipmentPanel({
 
   return (
     <div className="space-y-5">
+      <PanelHeader
+        icon={Cog}
+        title="Equipment"
+        description="The machine register. An operator types the number painted on the asset and the shift log reads back the name from here."
+        count={equipment.length}
+      />
+
       {canManage && (
-        <div className="rounded-2xl border border-line bg-sunken p-4">
-          <p className="mb-2.5 text-[13px] font-semibold text-ink">
-            Add equipment
-          </p>
+        <Composer title="Add equipment">
           <div className="flex flex-col gap-2.5 sm:flex-row">
             <input
               value={draft.equipmentNo}
@@ -209,7 +223,7 @@ export function EquipmentPanel({
             The number is what an operator types in the shift log; the name is
             what the log fills in for them.
           </p>
-        </div>
+        </Composer>
       )}
 
       {equipment.length > 0 && (

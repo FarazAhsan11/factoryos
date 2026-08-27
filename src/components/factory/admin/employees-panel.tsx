@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Mail, Trash2 } from "lucide-react";
+import { Loader2, Mail, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -26,6 +26,11 @@ import {
   type Employee,
   type EmployeeStatus,
 } from "@/lib/factory/employee-queries";
+import {
+  EmptyState,
+  PANEL,
+  PanelHeader,
+} from "@/components/factory/admin/settings-ui";
 import { cn } from "@/lib/utils";
 
 const STATUS: Record<EmployeeStatus, { label: string; className: string }> = {
@@ -139,19 +144,23 @@ export function EmployeesPanel({
 
   return (
     <div className="space-y-5">
-      {isAdmin && (
-        <>
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm text-ink-4">
-              {employees.length} {employees.length === 1 ? "person" : "people"}
-              {notInvited > 0 && ` · ${notInvited} not invited yet`}
-            </p>
+      <PanelHeader
+        icon={Users}
+        title="Employees"
+        description={
+          notInvited > 0
+            ? `Who works here. The shift log picks operators from this list. ${notInvited} ${notInvited === 1 ? "person has" : "people have"} not been invited yet.`
+            : "Who works here. The shift log picks operators from this list, and an invite gives them a login."
+        }
+        count={employees.length}
+        action={
+          isAdmin ? (
             <EmployeeImportDialog factoryId={factoryId} onImported={refresh} />
-          </div>
+          ) : undefined
+        }
+      />
 
-          <AddEmployeeForm factoryId={factoryId} onAdded={refresh} />
-        </>
-      )}
+      {isAdmin && <AddEmployeeForm factoryId={factoryId} onAdded={refresh} />}
 
       {isPending ? (
         <TableSkeleton />
@@ -160,15 +169,20 @@ export function EmployeesPanel({
           Could not load the team: {(error as Error).message}
         </p>
       ) : employees.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-ink-6 px-4 py-10 text-center text-sm text-ink-5">
-          Nobody here yet
-          {isAdmin ? " — add your first teammate above." : "."}
-        </p>
+        <EmptyState
+          icon={Users}
+          title="Nobody here yet."
+          hint={
+            isAdmin
+              ? "Add your first teammate above, or import a roster from CSV."
+              : "An admin adds people to the roster."
+          }
+        />
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-line bg-surface">
+        <div className={cn(PANEL, "overflow-x-auto")}>
           <table className="w-full min-w-[640px] text-sm">
             <thead>
-              <tr className="border-b border-line-soft text-left text-xs font-semibold uppercase tracking-wide text-ink-5">
+              <tr className="border-b border-line bg-sunken-2 text-left text-[10px] font-bold tracking-[0.07em] text-ink-3 uppercase">
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Email</th>
                 <th className="px-4 py-3">Role</th>

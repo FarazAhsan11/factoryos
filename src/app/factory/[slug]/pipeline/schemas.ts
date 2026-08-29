@@ -99,10 +99,16 @@ const optionalQty = z
   .transform((v) => (v === undefined || Number.isNaN(v) ? undefined : v))
   .refine((v) => v === undefined || v >= 0, "Enter a positive number.");
 
-export const newBatchSchema = z
-  .object({
-    factoryId: z.uuid(),
-    batchType: z.enum(BATCH_TYPE_VALUES, { error: "Pick a batch type." }),
+/**
+ * Everything the *pipeline* knows about a batch, shared by New batch and Edit
+ * batch.
+ *
+ * Split out so the two cannot drift: a rule that only the creating form
+ * enforces is a rule an edit can walk straight past, and the database would
+ * then be the first thing to say no — after the dialog said yes.
+ */
+const batchFields = {
+  batchType: z.enum(BATCH_TYPE_VALUES, { error: "Pick a batch type." }),
 
     /**
      * The batch, picked from Admin → Products rather than typed.
@@ -114,8 +120,6 @@ export const newBatchSchema = z
      * second place a product name can be spelt, and the shift log resolves
      * entries against the catalogue, not against the board.
      */
-    productId: z.uuid("Pick the batch from the catalogue."),
-
     priority: z.enum(PRIORITIES),
     /** `YYYY-MM-DD`, the shape both the date input and Postgres speak. */
     dueDate: z.union([z.literal(""), z.iso.date()]).optional(),
@@ -152,8 +156,24 @@ export const newBatchSchema = z
     /** Bulk physically handed over, when it differs from what pack size implies. */
     bulkQtyReceived: optionalQty,
     market: z.string().trim().max(40).optional(),
-  })
-  .superRefine((values, ctx) => {
+};
+
+/**
+ * The cross-field rules, shared by both forms for the reason above. Each one
+ * mirrors a constraint the database also enforces, so a form that passes
+ * cannot fail at the insert.
+ */
+function refineBatch(
+  values: {
+    batchType: BatchType;
+    bulkUnit?: string;
+    packUnit?: string;
+    packSize?: number;
+    parentJobId?: string;
+    overagePct?: number;
+  },
+  ctx: z.RefinementCtx,
+) {
     // Overage is a manufacturing idea, and a combined batch manufactures too.
     // A packing run never declares one — the database refuses it outright
     // (`pipeline_jobs_overage_belongs`, migration 0032).
@@ -205,10 +225,41 @@ export const newBatchSchema = z
         message: "Pick what's being filled.",
       });
     }
-  });
+}
+
+/** New batch: the shared fields, plus the catalogue row it is raised for. */
+export const newBatchSchema = z
+  .object({
+    ...batchFields,
+    factoryId: z.uuid(),
+    /**
+     * The batch, picked from Admin → Products rather than typed.
+     *
+     * Everything identifying it — batch number, product name, code, work
+     * order, required quantity — is read back from that row, so this dialog
+     * carries only what the *pipeline* knows. A batch typed here would be a
+     * second place a product name can be spelt, and the shift log resolves
+     * entries against the catalogue, not against the board.
+     */
+    productId: z.uuid("Pick the batch from the catalogue."),
+  })
+  .superRefine(refineBatch);
+
+/**
+ * Edit batch: the same fields, for a job that already exists.
+ *
+ * There is no `productId` — which batch a card is for is not editable, and
+ * never was. Changing it would silently re-point every logged entry's meaning
+ * at a different product.
+ */
+export const editBatchSchema = z
+  .object({ ...batchFields })
+  .superRefine(refineBatch);
 
 export type NewBatchValues = z.input<typeof newBatchSchema>;
 export type NewBatchParsed = z.output<typeof newBatchSchema>;
+export type EditBatchValues = z.input<typeof editBatchSchema>;
+export type EditBatchParsed = z.output<typeof editBatchSchema>;
 
 /**
  * How much bulk a packing run needs: containers × units per container.
@@ -226,3 +277,99 @@ export function bulkNeeded(
   if (containers <= 0 || packSize <= 0) return null;
   return Math.ceil(containers * packSize);
 }
+
+/* ── Plan stages ─────────────────────────────────────────────────────────
+   The route of one batch: Dispensing 500 kg → Compression 210,000 tablets →
+   Coating 210,000 tablets → Packing 1,000 bottles. One row per stage that
+   produces something; downtime is never planned (migration 0033). */
+
+/**
+ * What a stage target can be counted in.
+ *
+ * Deliberately the union of the bulk and pack lists plus the room units: a
+ * plan crosses all three in four rows — kilos dispensed, tablets compressed,
+ * bottles packed — and a stage that cannot name its own unit is a number
+ * nobody can read back.
+ */
+export const STAGE_UNITS = [
+  "tablets",
+  "capsules",
+  "softgels",
+  "bottles",
+  "sachets",
+  "pouches",
+  "boxes",
+  "units",
+  "kg",
+  "litres",
+  "drums",
+  "containers",
+  "batches",
+] as const;
+
+export type StageUnit = (typeof STAGE_UNITS)[number];
+
+/**
+ * One stage of a batch's plan.
+ *
+ * `targetQty` is optional *here* and required to issue the batch — the two are
+ * different moments. A planner adds four stages and then fills in the numbers,
+ * and refusing the first of those would make the form impossible to use in the
+ * order people actually work.
+ */
+export const stageSchema = z.object({
+  processId: z.uuid("Pick the activity."),
+  /**
+   * The room this stage is planned to run in — the prototype's "assigned
+   * room". Optional: a plan is often written before the rooms are settled, and
+   * refusing the stage until one is chosen would push people to pick any room
+   * to get past the form. Advisory once set; the shift log records where the
+   * work actually happened and does not have to agree.
+   */
+  unitId: z.union([z.uuid(), z.literal("")]).optional(),
+  /**
+   * May this stage start before the one before it has finished?
+   *
+   * The prototype's `canRunParallel`. Three packing runs off one bulk start
+   * together, and labelling overlaps the packing feeding it — without this the
+   * only way to express that is to lie about the order, which moves the final
+   * tag and so changes which stage completes the order.
+   */
+  canRunParallel: z.boolean().optional(),
+  targetQty: optionalQty,
+  targetUnit: z.enum(STAGE_UNITS, { error: "Pick a unit." }),
+  /** "Packing 30's" — only needed when the batch runs the activity twice. */
+  label: z.string().trim().max(60, "Keep the label under 60 characters.").optional(),
+  /** The same distinction, where a plant uses work orders. */
+  workOrder: z.string().trim().max(40).optional(),
+  packSize: optionalQty,
+});
+
+export type StageValues = z.input<typeof stageSchema>;
+export type StageParsed = z.output<typeof stageSchema>;
+
+/**
+ * A supervisor's sign-off on a finished stage.
+ *
+ * No "signed off by" field, and its absence is the design — the same argument
+ * as `kaizenIdeaSchema` in the log's schemas. The person is signed in, so the
+ * name is already known; a text box for it can be left blank, misspelt, or
+ * filled in with somebody else's name, which turns the one piece of
+ * accountability that makes a sign-off mean anything into something the client
+ * asserts. The trigger stamps it from the session.
+ *
+ * A yield that isn't acceptable costs an explanation. "No" with no reason is
+ * an alarm nobody can act on, and it is the answer that matters most.
+ */
+export const stageSignOffSchema = z
+  .object({
+    yieldAcceptable: z.boolean({ error: "Say whether the yield is acceptable." }),
+    notes: z.string().trim().max(500, "Keep the note under 500 characters."),
+  })
+  .refine((v) => v.yieldAcceptable || v.notes.length >= 10, {
+    message: "Say what was wrong with the yield — this is the record of it.",
+    path: ["notes"],
+  });
+
+export type StageSignOffValues = z.input<typeof stageSignOffSchema>;
+export type StageSignOffParsed = z.output<typeof stageSignOffSchema>;

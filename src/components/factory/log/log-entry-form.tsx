@@ -61,6 +61,12 @@ import {
   findEquipment,
 } from "@/lib/factory/equipment-queries";
 import { actionKeys } from "@/lib/factory/action-queries";
+import {
+  batchStageKeys,
+  fetchFactoryStages,
+  stageName,
+  type BatchStage,
+} from "@/lib/factory/batch-stage-queries";
 import { fetchPipelineJobs, pipelineKeys } from "@/lib/factory/pipeline-queries";
 import { fetchProducts, productKeys } from "@/lib/factory/product-queries";
 import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
@@ -171,6 +177,13 @@ export function LogEntryForm({
   const { data: pipelineJobs = [] } = useQuery({
     queryKey: pipelineKeys.all(factoryId),
     queryFn: () => fetchPipelineJobs(factoryId),
+  });
+  // Every batch's plan. Needed for two things: the target this entry is
+  // measured against, and — where a batch runs one activity several times —
+  // asking which of them this entry belongs to.
+  const { data: allStages = [] } = useQuery({
+    queryKey: batchStageKeys.all(factoryId),
+    queryFn: () => fetchFactoryStages(factoryId),
   });
 
   const activeUnits = useMemo(
@@ -303,6 +316,7 @@ export function LogEntryForm({
   const [
     processId,
     batchNo,
+    batchStageId,
     equipmentNo,
     startTime,
     endTime,
@@ -319,6 +333,7 @@ export function LogEntryForm({
     name: [
       "processId",
       "batchNo",
+      "batchStageId",
       "equipmentNo",
       "startTime",
       "endTime",
@@ -397,6 +412,43 @@ export function LogEntryForm({
         : null,
     [pipelineJobs, product],
   );
+
+  /**
+   * The planned stages this batch has for the selected activity.
+   *
+   * Usually one, and then nothing is asked: the database resolves it. Several
+   * means the batch runs this activity more than once — Packing 30's, 60's and
+   * 120's — and the operator has to say which, or all three would pool into a
+   * single total that describes none of them.
+   */
+  const stageChoices = useMemo(() => {
+    if (!job || !processId) return [];
+    return allStages.filter(
+      (s) => s.job_id === job.id && s.process_id === processId,
+    );
+  }, [allStages, job, processId]);
+
+  const mustPickStage = stageChoices.length > 1;
+  /** The stage this entry will count towards, once it is known. */
+  const activeStage = useMemo(() => {
+    if (stageChoices.length === 1) return stageChoices[0];
+    return stageChoices.find((s) => s.id === batchStageId) ?? null;
+  }, [stageChoices, batchStageId]);
+
+  // A batch that has not been issued refuses producing entries at the database
+  // (migration 0033). Said here so the operator learns it while filling the
+  // form in, not from a failed submit.
+  const blockedByIssue = Boolean(
+    job && !job.issued_at && category !== "downtime",
+  );
+
+  // Clear a stage picked under a different activity — it would be validated
+  // against a control no longer on screen, and refused by the guard.
+  useEffect(() => {
+    if (batchStageId && !stageChoices.some((s) => s.id === batchStageId)) {
+      setValue("batchStageId", "");
+    }
+  }, [stageChoices, batchStageId, setValue]);
 
   // Accumulative total: everything already logged for this batch + activity,
   // across every shift — not just what's on screen.
@@ -494,6 +546,15 @@ export function LogEntryForm({
       await queryClient.invalidateQueries({
         queryKey: actionKeys.all(factoryId),
       });
+      // And the entry moved its stage's accumulated total, by the same route:
+      // `batch_stage_accumulate` recomputes it in the database, so the only
+      // thing to do here is stop trusting the copy we already have. Without
+      // this the stage progress bar on this very form stays where it was —
+      // the number is right in the database and stale on screen, which is the
+      // worst of both.
+      await queryClient.invalidateQueries({
+        queryKey: batchStageKeys.all(factoryId),
+      });
       toast.success(
         `Logged — ${entry.unit?.name ?? ""} · ${entry.process?.name ?? ""}` +
           (entry.duration_minutes
@@ -517,6 +578,10 @@ export function LogEntryForm({
         // of entries, and re-typing a six-digit batch number every hour is
         // how the wrong one gets typed.
         batchNo: keep.batchNo,
+        // The stage carries over with the batch and activity: a run of entries
+        // against Packing 30's is all the same stage, and re-picking it every
+        // hour is how the wrong one gets picked.
+        batchStageId: keep.batchStageId,
         equipmentNo: keep.equipmentNo,
         qtyUnit: keep.qtyUnit,
         speedType: keep.speedType,
@@ -787,6 +852,59 @@ export function LogEntryForm({
             runningTotal={runningTotal}
             job={job}
           />
+
+          {/* The batch has not been released to the floor. The database
+              refuses the entry (migration 0033); saying so here means the
+              operator learns it while filling the form in rather than from a
+              submit that fails after everything is typed. */}
+          {blockedByIssue && (
+            <p className="flex items-start gap-2 rounded-xl border border-warn-line bg-warn-tint px-3.5 py-2.5 text-xs text-warn-ink">
+              <Cog className="mt-px size-3.5 shrink-0" aria-hidden />
+              <span>
+                <strong className="font-semibold">
+                  Batch {batchNo} isn&rsquo;t issued for production yet.
+                </strong>{" "}
+                A manager plans its stages on the Pipeline and issues it. You
+                can still log downtime against it.
+              </span>
+            </p>
+          )}
+
+          {/* Asked only where the answer isn't already known: this batch runs
+              the selected activity more than once — three packing runs, or
+              three work orders — and without saying which, all of them would
+              pool into a single total that describes none of them. */}
+          {mustPickStage && (
+            <Field
+              label="Stage / work order"
+              note="this batch runs this activity more than once"
+              htmlFor="log-stage"
+              error={errors.batchStageId?.message}
+            >
+              <select
+                id="log-stage"
+                className={SELECT}
+                {...register("batchStageId")}
+              >
+                <option value="">Select…</option>
+                {stageChoices.map((stage) => (
+                  <option key={stage.id} value={stage.id}>
+                    {stageName(stage)}
+                    {stage.target_qty
+                      ? ` — ${Number(stage.target_qty).toLocaleString()} ${stage.target_unit}`
+                      : ""}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+
+          {/* The denominator the log has never had. Once a batch is planned,
+              the running total means something: 231,453 of 312,500, not
+              231,453 of nothing. */}
+          {activeStage && activeStage.target_qty && (
+            <StageProgress stage={activeStage} pending={thisQty} />
+          )}
         </section>
 
         {/* ── Output ───────────────────────────────────────────────────
@@ -875,6 +993,7 @@ export function LogEntryForm({
                 label="Actual qty produced"
                 htmlFor="log-qty"
                 error={errors.qty?.message}
+                note={qty === 0 ? "zero — nothing will be counted" : undefined}
               >
                 <input
                   id="log-qty"
@@ -1304,6 +1423,58 @@ function SlowReason({
         This is what the Pareto chart in OEE &amp; Downtime is built from — an
         unexplained slow run is a gap in the analysis later.
       </p>
+    </div>
+  );
+}
+
+/**
+ * How far through its planned target this stage is, counting what is being
+ * typed right now.
+ *
+ * The open entry is included on purpose: an operator about to file 5,000 needs
+ * to see it land, and a bar that only moves after the submit is a bar that
+ * answers the question too late to act on.
+ */
+function StageProgress({
+  stage,
+  pending,
+}: {
+  stage: BatchStage;
+  pending: number;
+}) {
+  const target = Number(stage.target_qty ?? 0);
+  const made = Number(stage.accumulated_qty ?? 0) + (pending || 0);
+  const pct = target > 0 ? Math.round((made / target) * 100) : 0;
+  const tone =
+    pct > 100
+      ? "var(--color-warn-deep)"
+      : pct >= 100
+        ? "var(--color-teal)"
+        : "var(--color-brand)";
+
+  return (
+    <div className="space-y-1 rounded-xl border border-line bg-sunken px-3.5 py-2.5">
+      <div className="flex items-baseline justify-between gap-2 text-[11px]">
+        <span className="font-medium text-ink-3">{stageName(stage)}</span>
+        <span className="font-mono text-ink-4">
+          {made.toLocaleString(undefined, { maximumFractionDigits: 2 })} /{" "}
+          {target.toLocaleString()} {stage.target_unit}
+          <span className="ml-1 font-semibold" style={{ color: tone }}>
+            {pct}%
+          </span>
+        </span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-line">
+        <div
+          className="h-full rounded-full transition-[width]"
+          style={{ width: `${Math.min(100, pct)}%`, background: tone }}
+        />
+      </div>
+      {pct >= 100 && (
+        <p className="text-[11px] font-medium" style={{ color: tone }}>
+          Stage target reached — a supervisor can sign it off on the Pipeline.
+        </p>
+      )}
     </div>
   );
 }

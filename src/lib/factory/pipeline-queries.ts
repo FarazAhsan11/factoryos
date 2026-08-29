@@ -1,5 +1,6 @@
 import type {
   BatchType,
+  EditBatchParsed,
   NewBatchParsed,
   Priority,
 } from "@/app/factory/[slug]/pipeline/schemas";
@@ -38,7 +39,7 @@ export interface PipelineJob {
   required_qty: number;
 
   unit_name: string | null;
-  /** Produced at the stage tagged `is_final_stage`, never summed across all. */
+  /** What the plan's last stage has made — the batch's completion (0033). */
   produced_qty: number;
   flagged_count: number;
 
@@ -69,6 +70,18 @@ export interface PipelineJob {
   allocated_qty: number | null;
   /** Bulk this packing run has drawn down. Null on anything but packing. */
   bulk_consumed: number | null;
+
+  /* ── Stage planning (0033) ─────────────────────────────────────────── */
+  /**
+   * When the batch was released to the floor. Null means the shift log will
+   * refuse producing entries against it — downtime is always accepted.
+   */
+  issued_at: string | null;
+  stage_count: number;
+  stages_complete: number;
+  /** What still stands between this plan and being issued. */
+  stages_without_target: number;
+  final_target_qty: number | null;
 }
 
 const COLUMNS = `
@@ -79,7 +92,9 @@ const COLUMNS = `
   batch_type, parent_job_id, bulk_unit, pack_size, pack_unit,
   bulk_qty_received, market, overage_pct, priority, due_date, notes,
   parent_batch_no, parent_product_name, child_count,
-  allocated_qty, bulk_consumed
+  allocated_qty, bulk_consumed,
+  issued_at, stage_count, stages_complete, stages_without_target,
+  final_target_qty
 `;
 
 export const pipelineKeys = {
@@ -254,6 +269,52 @@ export async function createBatchJob(
 }
 
 /**
+ * Changes what the pipeline knows about a batch already on the board.
+ *
+ * The path every batch written before migration 0031 needs: they were
+ * backfilled as `combined`, which is what they were, and without this there is
+ * no way to say that one of them is actually bulk with packing runs to come.
+ *
+ * The batch itself is not editable — no `product_id`. Which catalogue row a
+ * card is for is the thing every logged entry resolves through, and changing
+ * it would quietly re-point the meaning of work already recorded.
+ *
+ * The family rules are not re-checked here. `pipeline_jobs_family_guard`
+ * (0031) owns them and sees the whole picture — including the one this form
+ * cannot, that a manufacturing batch with packing children may not be re-typed
+ * out from under them.
+ */
+export async function updateBatchJob(
+  jobId: string,
+  values: EditBatchParsed,
+): Promise<void> {
+  const supabase = createClient();
+  const packing = values.batchType === "packing";
+  const manufacturing = values.batchType === "manufacturing";
+
+  const { error } = await supabase
+    .from("pipeline_jobs")
+    .update({
+      batch_type: values.batchType,
+      priority: values.priority,
+      due_date: values.dueDate || null,
+      notes: values.notes || null,
+      // Cleared when the type no longer owns them, so a batch switched from
+      // packing to combined stops claiming a parent's bulk.
+      parent_job_id: packing ? (values.parentJobId ?? null) : null,
+      pack_size: packing ? (values.packSize ?? null) : null,
+      pack_unit: packing ? (values.packUnit ?? null) : null,
+      bulk_qty_received: packing ? (values.bulkQtyReceived ?? null) : null,
+      market: packing ? values.market || null : null,
+      bulk_unit: manufacturing ? (values.bulkUnit ?? null) : null,
+      overage_pct: packing ? 0 : (values.overagePct ?? 0),
+    })
+    .eq("id", jobId);
+
+  if (error) throw new Error(error.message);
+}
+
+/**
  * Removes a job from the board.
  *
  * Only ever offered on a Planned card. Once work has been logged the job is
@@ -292,7 +353,6 @@ export interface JobEntry {
   process: {
     name: string;
     has_output: boolean;
-    is_final_stage: boolean;
   } | null;
   unit: { name: string } | null;
 }
@@ -304,7 +364,7 @@ export async function fetchJobEntries(productId: string): Promise<JobEntry[]> {
     .select(
       `id, log_date, shift, start_time, end_time, duration_minutes,
        qty, qty_rejected, action_flag, comment, amend_note, operators,
-       process:factory_processes ( name, has_output, is_final_stage ),
+       process:factory_processes ( name, has_output ),
        unit:factory_units ( name )`,
     )
     .eq("product_id", productId)
@@ -321,18 +381,17 @@ export interface ProcessTotal {
   rejected: number;
   entries: number;
   minutes: number;
-  isFinal: boolean;
 }
 
 /**
  * Per-stage totals, for the stages that produce something.
  *
- * This is the breakdown the card's single percentage can't show. The bar
- * tracks the final stage alone — deliberately, since every stage logs roughly
- * the same batch quantity and adding them up would treble it — but "0%" while
- * 5,000 have been encapsulated reads as broken until you can see where the
- * work actually is. Non-producing stages (Manning, Set Up) are excluded:
- * they store null quantities and would show as a row of dashes.
+ * What has actually been *logged*, grouped by activity — history, not a plan.
+ * The Stages tab beside it is the plan, with targets and progress against
+ * them; this one answers "where did the work go" for a batch whose plan was
+ * reconstructed, or whose entries predate it. Non-producing stages (Manning,
+ * Set Up) are excluded: they store null quantities and would show as a row of
+ * dashes.
  */
 export function totalsByProcess(entries: JobEntry[]): ProcessTotal[] {
   const map = new Map<string, ProcessTotal>();
@@ -345,7 +404,6 @@ export function totalsByProcess(entries: JobEntry[]): ProcessTotal[] {
       rejected: 0,
       entries: 0,
       minutes: 0,
-      isFinal: entry.process.is_final_stage,
     };
     row.qty += Number(entry.qty ?? 0);
     row.rejected += Number(entry.qty_rejected ?? 0);

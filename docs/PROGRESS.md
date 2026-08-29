@@ -255,6 +255,49 @@ is what finally retires `factory_processes.is_final_stage`.
 
 ---
 
+## 9c. Stage planning — migrations 0032, 0033
+
+**0032 — overage stops being decoration.** 0031 stored `overage_pct` and
+computed nothing from it. The over-production flag now measures against
+`required_qty × (1 + overage_pct/100)`, so a batch told to make 4% extra is not
+flagged for doing exactly that, and the overrun quantity counts from the
+allowance rather than the order. A flag that fires when the plan works
+correctly is a flag people learn to clear without reading. A packing run may
+not declare one — its bulk already carries the slack.
+
+**0033 — a batch is a route, not a number.** `batch_stages` holds one row per
+producing stage of one batch: target, unit, optional label or work order, and
+the accumulated total kept in step with the shift log by
+`batch_stage_accumulate`.
+
+- **The last stage is the final one**, derived from position by
+  `batch_stages_final_sync` rather than tagged. Reordering the plan moves it;
+  signing it off finishes the batch.
+- **The issue gate.** `issue_job()` refuses a batch whose plan is empty or
+  whose stages lack targets. `shift_log_stage_guard` then refuses *producing*
+  entries against an unissued batch and always accepts downtime — a room must
+  be able to account for its time whatever the paperwork says.
+- **Stage resolution.** An entry is matched to its stage automatically when the
+  batch runs that activity once. Where it runs it several times — Packing 30's
+  / 60's / 120's, or work orders 46000D/E/F — the entry must say which, which is
+  precisely where the old per-(batch, process) total pooled three runs into one
+  meaningless number. `accumulative` now partitions per stage.
+- **`factory_processes.is_final_stage` is gone**, with its partial unique index,
+  its produces-output check and `clear_other_final_stages`. One process per
+  plant could never describe a batch whose stages have their own targets, nor
+  one ending in three parallel packing runs.
+- Existing jobs are grandfathered: marked issued, with a plan reconstructed
+  from what was actually logged and targets left null — nobody can honestly say
+  what a batch that ran last month was aiming for.
+
+**UI.** A **Plan stages** dialog on every card (add, reorder, set targets,
+start, sign off, issue), a stage strip on the Kanban card, and in the shift log
+a per-stage progress bar plus the stage picker that appears only when it is
+needed. The three customer scenarios — one batch, child batches, work orders —
+all run on this one model.
+
+---
+
 ## 10. Next steps
 
 - **Actions** — `action_flag` is captured on every log entry but nothing consumes it yet; this is where a flagged entry becomes a tracked action item.

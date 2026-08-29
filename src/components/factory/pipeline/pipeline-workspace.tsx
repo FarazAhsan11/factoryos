@@ -8,9 +8,15 @@ import { toast } from "sonner";
 import { AdminTabs } from "@/components/factory/admin/admin-tabs";
 import { BatchFamilies } from "@/components/factory/pipeline/batch-families";
 import { JobDetailDialog } from "@/components/factory/pipeline/job-detail-dialog";
+import { EditBatchDialog } from "@/components/factory/pipeline/edit-batch-dialog";
+import { PlanStagesDialog } from "@/components/factory/pipeline/plan-stages-dialog";
 import { NewBatchDialog } from "@/components/factory/pipeline/new-batch-dialog";
 import { NewJobDialog } from "@/components/factory/pipeline/new-job-dialog";
 import { PipelineBoard } from "@/components/factory/pipeline/pipeline-board";
+import {
+  batchStageKeys,
+  fetchFactoryStages,
+} from "@/lib/factory/batch-stage-queries";
 import { PIPELINE_TABS } from "@/lib/factory/pipeline-tabs";
 import {
   deletePipelineJob,
@@ -20,7 +26,6 @@ import {
   type PipelineJob,
 } from "@/lib/factory/pipeline-queries";
 import { fetchProducts, productKeys } from "@/lib/factory/product-queries";
-import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
 
 /**
  * Pipeline → Kanban. The board of batches currently being worked.
@@ -52,6 +57,8 @@ export function PipelineWorkspace({
    */
   const [packingParent, setPackingParent] = useState<string | null>(null);
   const [newBatchOpen, setNewBatchOpen] = useState(false);
+  const [planJob, setPlanJob] = useState<PipelineJob | null>(null);
+  const [editJob, setEditJob] = useState<PipelineJob | null>(null);
 
   const {
     data: jobs = [],
@@ -84,16 +91,20 @@ export function PipelineWorkspace({
     queryKey: productKeys.all(factoryId),
     queryFn: () => fetchProducts(factoryId),
   });
-  const { data: processList = [] } = useQuery({
-    queryKey: setupKeys.all("factory_processes", factoryId),
-    queryFn: () => fetchSetupItems("factory_processes", factoryId),
+  // Every plan in the tenant, in one read. A card needs its own stages to draw
+  // the strip, and forty cards each fetching their own would be forty requests
+  // for what is one small table.
+  const { data: stages = [] } = useQuery({
+    queryKey: batchStageKeys.all(factoryId),
+    queryFn: () => fetchFactoryStages(factoryId),
   });
 
-  const refresh = useCallback(
-    () =>
+  const refresh = useCallback(async () => {
+    await Promise.all([
       queryClient.invalidateQueries({ queryKey: pipelineKeys.all(factoryId) }),
-    [queryClient, factoryId],
-  );
+      queryClient.invalidateQueries({ queryKey: batchStageKeys.all(factoryId) }),
+    ]);
+  }, [queryClient, factoryId]);
 
   /** Active batches with no job yet — exactly what the New Job modal offers. */
   const available = useMemo(() => {
@@ -101,12 +112,12 @@ export function PipelineWorkspace({
     return products.filter((p) => p.active && !taken.has(p.id));
   }, [products, jobs]);
 
-  // Without a final stage there is no measure of "done", so nothing ever
-  // leaves In Production. Said out loud rather than left as a board that
-  // quietly stops working — the fix is one click in Admin.
-  const hasFinalStage = useMemo(
-    () => processList.some((p) => p.flags.final),
-    [processList],
+  // Batches that cannot be logged against yet: planned, but never issued for
+  // production. Said out loud rather than left as an operator being refused at
+  // 6am for a planning step nobody told them about.
+  const unissued = useMemo(
+    () => jobs.filter((j) => j.status === "planned" && !j.issued_at),
+    [jobs],
   );
 
   const remove = useMutation({
@@ -172,14 +183,19 @@ export function PipelineWorkspace({
         onSelect={setTab}
       />
 
-      {!isPending && !hasFinalStage && jobs.length > 0 && (
+      {!isPending && unissued.length > 0 && (
         <div className="mb-4 flex shrink-0 items-start gap-2.5 rounded-xl border border-warn-line bg-warn-tint px-4 py-3 text-sm text-warn-ink shadow-[inset_0_1px_2px_rgb(180_83_9/0.06)]">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
           <p>
-            <strong className="font-semibold">No final stage set.</strong> Jobs
-            can&rsquo;t complete until one process is tagged{" "}
-            <strong className="font-semibold">Final</strong> in Admin &amp;
-            Settings → Processes — normally the last packing or labelling step.
+            <strong className="font-semibold">
+              {unissued.length} batch{unissued.length === 1 ? "" : "es"} not
+              issued yet.
+            </strong>{" "}
+            Nothing can be logged against{" "}
+            {unissued.length === 1 ? "it" : "them"} until{" "}
+            {unissued.length === 1 ? "its" : "their"} stages are planned and{" "}
+            {unissued.length === 1 ? "it is" : "they are"} issued for
+            production — open a card to do it. Downtime is always loggable.
           </p>
         </div>
       )}
@@ -217,9 +233,11 @@ export function PipelineWorkspace({
       ) : (
         <PipelineBoard
           jobs={jobs}
+          stages={stages}
           unitWord={units.singular}
           canManage={canManage}
           onOpen={setDetailJob}
+          onPlan={setPlanJob}
           onDelete={(job) => remove.mutate(job)}
         />
       )}
@@ -227,7 +245,35 @@ export function PipelineWorkspace({
       <JobDetailDialog
         job={detailJob}
         unitWord={units.singular}
+        canManage={canManage}
+        onPlan={(job) => {
+          // One dialog at a time: stacking the planner on top of the details
+          // leaves two backdrops and an Escape key that closes the wrong one.
+          setDetailJob(null);
+          setPlanJob(job);
+        }}
+        onEdit={(job) => {
+          setDetailJob(null);
+          setEditJob(job);
+        }}
         onClose={() => setDetailJob(null)}
+      />
+
+      <EditBatchDialog
+        job={editJob}
+        jobs={jobs}
+        onSaved={async () => {
+          setEditJob(null);
+          await refresh();
+        }}
+        onClose={() => setEditJob(null)}
+      />
+
+      <PlanStagesDialog
+        job={planJob}
+        factoryId={factoryId}
+        canManage={canManage}
+        onClose={() => setPlanJob(null)}
       />
     </div>
   );

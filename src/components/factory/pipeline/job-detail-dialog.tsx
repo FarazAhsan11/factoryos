@@ -2,7 +2,14 @@
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Factory, Layers, Loader2 } from "lucide-react";
+import {
+  AlertTriangle,
+  Factory,
+  Layers,
+  ListChecks,
+  Loader2,
+  Pencil,
+} from "lucide-react";
 
 import {
   Dialog,
@@ -50,11 +57,19 @@ function shortDate(iso: string) {
 export function JobDetailDialog({
   job,
   unitWord,
+  canManage,
+  onPlan,
+  onEdit,
   onClose,
 }: {
   /** Null closes the dialog; setting one opens it on that job. */
   job: PipelineJob | null;
   unitWord: string;
+  canManage: boolean;
+  /** Hands off to Plan stages — this dialog is where people click first. */
+  onPlan: (job: PipelineJob) => void;
+  /** Hands off to Edit batch — the type, the bulk parent, the pack size. */
+  onEdit: (job: PipelineJob) => void;
   onClose: () => void;
 }) {
   const [tab, setTab] = useState<Tab>("progress");
@@ -104,6 +119,69 @@ export function JobDetailDialog({
 
         {job && <FamilyPanel job={job} />}
 
+        {/* The way through to the planner.
+            Opening a card is what everyone does first, so this is where the
+            plan has to be reachable from — a small icon on the card was the
+            whole feature hidden behind 24 pixels. */}
+        {job && (
+          <div
+            className={cn(
+              "mx-5 mt-4 flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-xl border px-3.5 py-3",
+              job.issued_at
+                ? "border-line bg-surface"
+                : "border-warn-line bg-warn-tint",
+            )}
+          >
+            <div className="min-w-0">
+              <p
+                className={cn(
+                  "text-xs font-semibold",
+                  job.issued_at ? "text-ink-2" : "text-warn-ink",
+                )}
+              >
+                {job.issued_at
+                  ? `Plan — ${job.stages_complete} of ${job.stage_count} stage${job.stage_count === 1 ? "" : "s"} signed off`
+                  : job.stage_count === 0
+                    ? "No stages planned yet"
+                    : job.stages_without_target > 0
+                      ? `${job.stages_without_target} stage${job.stages_without_target === 1 ? "" : "s"} still need a target`
+                      : "Ready to issue for production"}
+              </p>
+              <p className="mt-0.5 text-[11px] text-ink-5">
+                {job.issued_at
+                  ? "Issued — operators can log against this batch."
+                  : "Nothing can be logged against this batch until it is issued. Downtime is always allowed."}
+              </p>
+            </div>
+            {canManage && (
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => onEdit(job)}
+                  title="Change the batch type, its bulk source, or how it is packed"
+                  className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border border-line bg-surface px-3.5 text-sm font-semibold text-ink-3 transition hover:border-ink-6 hover:text-ink"
+                >
+                  <Pencil className="size-4" />
+                  Edit batch
+                </button>
+              <button
+                type="button"
+                onClick={() => onPlan(job)}
+                className={cn(
+                  "inline-flex h-9 shrink-0 items-center gap-2 rounded-xl px-3.5 text-sm font-semibold transition",
+                  job.issued_at
+                    ? "border border-line bg-surface text-ink-3 hover:border-ink-6 hover:text-ink"
+                    : "bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] text-white shadow-brand hover:brightness-[1.06]",
+                )}
+              >
+                <ListChecks className="size-4" />
+                {job.issued_at ? "View plan" : "Plan stages"}
+              </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* The headline the card shows, restated with what it means — the
             single most confusing number in the module without it. Pinned
             above the tabs, because it is the answer whichever tab is open. */}
@@ -112,7 +190,7 @@ export function JobDetailDialog({
             <p className="text-xs font-medium text-ink-4">
               Batch completion
               <span className="ml-1 text-ink-5">
-                (measured at the final stage)
+                (the plan&rsquo;s last stage)
               </span>
             </p>
             <p className="font-mono text-sm font-semibold text-ink">
@@ -148,7 +226,7 @@ export function JobDetailDialog({
             onClick={() => setTab("progress")}
             Icon={Layers}
           >
-            By stage
+            Logged so far
           </TabButton>
           <TabButton
             active={tab === "rooms"}
@@ -186,11 +264,6 @@ export function JobDetailDialog({
                   >
                     <span className="min-w-0 flex-1 truncate text-sm text-ink">
                       {p.name}
-                      {p.isFinal && (
-                        <span className="ml-1.5 rounded-full bg-brand-soft px-1.5 py-0.5 text-[10px] font-semibold text-brand-deep ring-1 ring-brand-line">
-                          Final
-                        </span>
-                      )}
                       <span className="mt-0.5 block text-[11px] text-ink-5">
                         {p.entries} entr{p.entries === 1 ? "y" : "ies"}
                         {p.minutes > 0 && ` · ${formatMinutes(p.minutes)}`}
@@ -202,12 +275,7 @@ export function JobDetailDialog({
                         )}
                       </span>
                     </span>
-                    <span
-                      className={cn(
-                        "shrink-0 font-mono text-sm font-semibold",
-                        p.isFinal ? "text-brand" : "text-ink-3",
-                      )}
-                    >
+                    <span className="shrink-0 font-mono text-sm font-semibold text-ink-3">
                       {fmt(p.qty)}
                     </span>
                   </li>
@@ -361,8 +429,6 @@ function FamilyPanel({ job }: { job: PipelineJob }) {
   const remaining = bulkRemaining(job);
   const isPacking = job.batch_type === "packing";
 
-  if (job.batch_type === "combined" && !job.parent_batch_no) return null;
-  if (!allocation && !job.parent_batch_no && remaining === null) return null;
 
   return (
     <div className="mx-5 mt-4 shrink-0 space-y-2 rounded-xl border border-line bg-surface p-3.5">

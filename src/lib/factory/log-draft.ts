@@ -99,6 +99,7 @@ export function draftHasContent(values: Partial<LogEntryValues>): boolean {
       values.startTime ||
       values.endTime ||
       values.batchNo ||
+      values.batchStageId ||
       values.equipmentNo ||
       values.comment ||
       values.qty !== undefined ||

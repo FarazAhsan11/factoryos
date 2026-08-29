@@ -290,6 +290,18 @@ the accumulated total kept in step with the shift log by
   from what was actually logged and targets left null — nobody can honestly say
   what a batch that ran last month was aiming for.
 
+**0034, 0035 — two fixes and two missing fields.** `sequence_order` carried a
+column default, which Postgres applies *before* BEFORE triggers run, so the
+append logic never fired and every stage landed at position 1; the symptom hid
+behind a tie-break on `created_at`, which put the final tag in the right place
+anyway. The same migration closes a gap in `batch_stage_transition`: an update
+carrying `status = 'complete'` on an already-complete stage never reached the
+"already signed off" check, so the yield answer could be silently rewritten.
+`0035` restores two fields the prototype's stage form has and 0033 dropped —
+the **assigned room** (advisory: the log records where the work actually
+happened) and **can run in parallel**, without which a plan is strictly single
+file and three packing runs off one bulk cannot start together.
+
 **UI.** A **Plan stages** dialog on every card (add, reorder, set targets,
 start, sign off, issue), a stage strip on the Kanban card, and in the shift log
 a per-stage progress bar plus the stage picker that appears only when it is

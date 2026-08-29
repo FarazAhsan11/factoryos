@@ -276,6 +276,19 @@ export const logEntrySchema = z
     equipmentNo: z.string().trim().max(40).optional(),
 
     batchNo: z.string().trim().max(60).optional(),
+    /**
+     * Which planned stage this entry counts towards (migration 0033).
+     *
+     * Almost always absent, and that is correct: when a batch runs an activity
+     * once, the database resolves it from the batch and the activity alone.
+     * It is asked for only where a batch runs the same activity more than once
+     * — three packing runs, or three work orders under one batch number —
+     * which is exactly where the two would otherwise pool into one total.
+     */
+    batchStageId: z
+      .union([z.uuid(), z.literal("")])
+      .optional()
+      .transform((v) => (v ? v : undefined)),
     targetQty: optionalQty,
     qty: optionalQty,
     /**

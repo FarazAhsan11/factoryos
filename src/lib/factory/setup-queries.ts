@@ -44,21 +44,20 @@ export interface SetupItem {
  * Which columns, per table, back `SetupItem.flags` — neutral key → real
  * column.
  *
- * Processes have two left. `has_output` is gone from here on purpose: since
+ * Processes have one left. `has_output` is gone from here on purpose: since
  * migration 0030 it is *derived* from `category` by a database trigger, and
  * leaving it writable would let the client set a combination the trigger
  * immediately overwrites — a toggle that silently snaps back.
  *
- * `final` is different in kind from `machine` — it is a *choice between*
- * processes, not a property of one. At most one per factory may hold it,
- * enforced by a partial unique index, and setting it demotes the previous
- * holder through a trigger (migration 0016). That is why the client only ever
- * sends "make this one final" and never has to clear the other.
+ * `final` used to live here too — one process per factory tagged as the one
+ * whose output meant "the batch is done". Migration 0033 retired it: which
+ * stage finishes a batch is a fact about *that batch's plan*, not about the
+ * plant, and a single flag could not describe a batch ending in three parallel
+ * packing runs.
  */
 const FLAG_COLUMNS: Partial<Record<SetupTable, Record<string, string>>> = {
   factory_processes: {
     machine: "has_machine",
-    final: "is_final_stage",
   },
 };
 

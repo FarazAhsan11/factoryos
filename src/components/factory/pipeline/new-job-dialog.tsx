@@ -99,16 +99,20 @@ export function NewJobDialog({
 
   return (
     <>
+      {/* Secondary since batch families landed: New batch is the primary act
+          now, and this one is the bulk path — twenty already-catalogued
+          batches ticked off a list, which the typed form is the wrong shape
+          for. Two gradient buttons side by side would say they are equals. */}
       <button
         type="button"
         onClick={() => {
           reset();
           setOpen(true);
         }}
-        className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-3.5 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06]"
+        className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border border-line bg-surface px-3.5 text-sm font-semibold text-ink-3 shadow-[0_1px_2px_rgb(20_22_43/0.04)] transition hover:border-ink-6 hover:text-ink"
       >
         <Plus className="size-4" />
-        New job
+        From catalogue
       </button>
 
       <Dialog

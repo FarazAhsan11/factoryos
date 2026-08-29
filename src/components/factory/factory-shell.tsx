@@ -84,7 +84,7 @@ export function FactoryShell({
               viewport instead makes its own root `lg:min-h-0 lg:flex-1`, fills
               the space and scrolls internally. No prop, no route-sniffing —
               the page decides by how it sizes itself. */}
-          <main className="min-w-0 flex-1 px-6 py-8 lg:flex lg:min-h-0 lg:flex-col lg:overflow-y-auto print:overflow-visible print:px-0 print:py-0">
+          <main className="min-w-0 flex-1 px-6 py-5 lg:flex lg:min-h-0 lg:flex-col lg:overflow-y-auto print:overflow-visible print:px-0 print:py-0">
             {children}
           </main>
         </div>

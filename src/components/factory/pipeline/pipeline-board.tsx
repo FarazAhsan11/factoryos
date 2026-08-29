@@ -1,8 +1,14 @@
 "use client";
 
 import { useMemo } from "react";
-import { AlertTriangle, Inbox, Trash2 } from "lucide-react";
+import { AlertTriangle, Inbox, ListChecks, Trash2 } from "lucide-react";
 
+import {
+  BatchTypeBadge,
+  ParentBatchLink,
+} from "@/components/factory/pipeline/batch-type-badge";
+import { StageStrip } from "@/components/factory/pipeline/stage-strip";
+import type { BatchStage } from "@/lib/factory/batch-stage-queries";
 import {
   PIPELINE_COLUMNS,
   jobProgress,
@@ -30,18 +36,34 @@ function fmt(n: number) {
  */
 export function PipelineBoard({
   jobs,
+  stages,
   unitWord,
   canManage,
   onOpen,
+  onPlan,
   onDelete,
 }: {
   jobs: PipelineJob[];
+  /** Every plan in the tenant, so a card can draw its own without a fetch. */
+  stages: BatchStage[];
   unitWord: string;
   canManage: boolean;
   onOpen: (job: PipelineJob) => void;
+  onPlan: (job: PipelineJob) => void;
   /** Only ever called for a Planned job — see `deletePipelineJob`. */
   onDelete: (job: PipelineJob) => void;
 }) {
+  // Grouped once for the whole board rather than filtered per card, which
+  // would be a scan of every stage for every job on screen.
+  const stagesByJob = useMemo(() => {
+    const map = new Map<string, BatchStage[]>();
+    for (const stage of stages) {
+      const list = map.get(stage.job_id) ?? [];
+      list.push(stage);
+      map.set(stage.job_id, list);
+    }
+    return map;
+  }, [stages]);
   const byStatus = useMemo(() => {
     const map = new Map<PipelineStatus, PipelineJob[]>();
     for (const column of PIPELINE_COLUMNS) map.set(column.status, []);
@@ -97,6 +119,9 @@ export function PipelineBoard({
               ) : (
                 items.map((job) => (
                   <JobCard
+                    stages={stagesByJob.get(job.id) ?? []}
+                    canManage={canManage}
+                    onPlan={() => onPlan(job)}
                     key={job.id}
                     job={job}
                     accent={column.accent}
@@ -123,18 +148,25 @@ export function PipelineBoard({
 
 function JobCard({
   job,
+  stages,
   accent,
   unitWord,
+  canManage,
   onOpen,
+  onPlan,
   onDelete,
 }: {
   job: PipelineJob;
+  stages: BatchStage[];
   accent: string;
   unitWord: string;
+  canManage: boolean;
   onOpen: () => void;
+  onPlan: () => void;
   onDelete?: () => void;
 }) {
   const percent = jobProgress(job);
+  const needsPlanning = !job.issued_at;
 
   return (
     <article className="group relative overflow-hidden rounded-xl border border-line bg-surface shadow-[0_1px_2px_rgb(20_22_43/0.05)] transition hover:-translate-y-0.5 hover:border-line-strong hover:shadow-lift focus-within:border-brand focus-within:ring-4 focus-within:ring-brand/12">
@@ -145,6 +177,39 @@ function JobCard({
         className="absolute inset-y-0 left-0 w-1"
         style={{ background: accent }}
       />
+
+      {/* Same reason as Delete below: a button inside a button is invalid HTML
+          and the inner one stops being reachable by keyboard.
+
+          On an unissued batch this is a labelled button, not an icon. It was
+          an icon first, and that was wrong: planning is the thing standing
+          between this card and any work being logged against it, and hiding
+          it behind 24 unlabelled pixels meant people opened the card, found
+          the details dialog, and concluded the feature did not exist. */}
+      {canManage && needsPlanning && (
+        <button
+          type="button"
+          onClick={onPlan}
+          className="absolute right-1.5 bottom-1.5 z-10 inline-flex items-center gap-1 rounded-lg bg-warn-tint px-2 py-1 text-[10px] font-bold text-warn-ink ring-1 ring-warn-line transition hover:brightness-95"
+        >
+          <ListChecks className="size-3" />
+          Plan stages
+        </button>
+      )}
+      {canManage && !needsPlanning && (
+        <button
+          type="button"
+          onClick={onPlan}
+          title="View this batch's plan"
+          aria-label={`View the plan for batch ${job.batch_no}`}
+          className={cn(
+            "absolute right-1.5 z-10 grid size-6 place-items-center rounded-lg text-ink-6 opacity-0 transition hover:bg-sunken-2 hover:text-ink focus-visible:opacity-100 group-hover:opacity-100",
+            onDelete ? "top-8" : "top-1.5",
+          )}
+        >
+          <ListChecks className="size-3.5" />
+        </button>
+      )}
 
       {/* Delete sits outside the card's own button — nesting one button inside
           another is invalid HTML and the inner one stops being reachable by
@@ -168,7 +233,11 @@ function JobCard({
         type="button"
         onClick={onOpen}
         aria-label={`Open details for batch ${job.batch_no}, ${job.product_name}`}
-        className="block w-full cursor-pointer py-3 pr-3 pl-4 text-left outline-none"
+        className={cn(
+          "block w-full cursor-pointer py-3 pr-3 pl-4 text-left outline-none",
+          // Room for the labelled Plan stages button pinned bottom-right.
+          canManage && needsPlanning && "pb-9",
+        )}
       >
         <p className="pr-5">
           <span className="rounded-md bg-sunken-2 px-1.5 py-0.5 font-mono text-[10.5px] font-bold text-ink-4 ring-1 ring-line">
@@ -185,6 +254,26 @@ function JobCard({
           {job.product_name}
         </h3>
 
+        {/* What kind of batch, and whose bulk. A packing run and the bulk it
+            came out of are two cards in different columns with similar
+            numbers on them; without this the board cannot say which is which,
+            or that they are related at all. Combined is the overwhelming
+            majority and says nothing new, so it stays unbadged — a badge on
+            every card is a badge on none. */}
+        {job.batch_type !== "combined" && (
+          <p className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <BatchTypeBadge
+              type={job.batch_type}
+              detail={
+                job.pack_size
+                  ? `${fmt(job.pack_size)}${job.market ? ` · ${job.market}` : ""}`
+                  : undefined
+              }
+            />
+          </p>
+        )}
+        <ParentBatchLink batchNo={job.parent_batch_no} className="mt-1" />
+
         <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-ink-5">
           {job.unit_name ? (
             <span className="font-medium text-ink-4">{job.unit_name}</span>
@@ -199,11 +288,29 @@ function JobCard({
           )}
         </p>
 
+        {/* Where the batch is in its own route. Four pills say more than one
+            percentage can: which stage is running, which are done, and which
+            one will finish the order. */}
+        {stages.length > 0 && <StageStrip stages={stages} className="mt-2" />}
+
         {/* The hold's cause, not just its existence — "On hold" alone sends
             someone to the shift log to find out why. */}
         {job.status === "hold" && job.hold_reason && (
           <p className="mt-2 rounded-lg bg-warn-tint px-2 py-1 text-[11px] font-medium text-warn-ink ring-1 ring-warn-line">
             Held — {job.hold_reason.toLowerCase()} issue flagged
+          </p>
+        )}
+
+        {/* Nothing can be logged against this batch yet, and the operator who
+            finds that out is the one refused at 6am. Said on the card, where
+            the person who can fix it is looking. */}
+        {needsPlanning && (
+          <p className="mt-2 text-[11px] font-medium text-warn-ink">
+            {job.stage_count === 0
+              ? "Not issued — no stages planned"
+              : job.stages_without_target > 0
+                ? `Not issued — ${job.stages_without_target} stage${job.stages_without_target === 1 ? "" : "s"} without a target`
+                : "Not issued — ready to issue"}
           </p>
         )}
 

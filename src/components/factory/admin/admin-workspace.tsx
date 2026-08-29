@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Building2, Clock3, Cog, Flag, LayoutGrid, Wrench } from "lucide-react";
+import { Building2, Clock3, Cog, LayoutGrid, Wrench } from "lucide-react";
 
 import { PROCESS_CATEGORIES } from "@/app/factory/[slug]/log/schemas";
 import { AdminTabs } from "@/components/factory/admin/admin-tabs";
@@ -157,7 +157,7 @@ export function AdminWorkspace({
           <PanelHeader
             icon={Cog}
             title="Process stages"
-            description="What a room can be doing. A stage's type decides which shape the shift-log form takes, and the Final tag is what completes a pipeline job."
+            description="What a room can be doing. A stage's type decides which shape the shift-log form takes. Which stage completes a batch is set per batch, when its stages are planned on the Pipeline."
           />
           <SetupListManager
             table="factory_processes"
@@ -193,25 +193,6 @@ export function AdminWorkspace({
                 // the database forces the flag off for both (migration 0030),
                 // so offering the tick there would be a control that snaps back.
                 showFor: ["production"],
-              },
-              // Unlike the one above, this is a choice *between* stages: a
-              // batch is dispensed, encapsulated, sorted and packed, and each
-              // logs roughly the full quantity. Without naming which of them
-              // means "the batch is done", completion is unknowable — summing
-              // them finishes a job at a quarter of the work, and taking the
-              // largest finishes it when the first stage does.
-              {
-                key: "final",
-                label: "This is the final stage",
-                hint: "The stage whose output IS the finished batch — usually the last pack or label step. Pipeline jobs complete when it reaches the required quantity. Only one stage can hold this; ticking it here clears it from the other.",
-                on: "Final",
-                off: "Not final",
-                icon: Flag,
-                // Not downtime: the final stage is measured by what it
-                // produced, and downtime produces nothing — a job tagged that
-                // way would sit at 0 for ever with nothing explaining why. The
-                // constraint from 0016 refuses it outright.
-                showFor: ["preparatory", "production"],
               },
             ]}
           />

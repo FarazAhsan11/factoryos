@@ -23,6 +23,8 @@ export interface LogEntry {
   duration_minutes: number;
   equipment_no: string | null;
   batch_no: string | null;
+  /** The planned stage this counts towards, once resolved (0033). */
+  batch_stage_id: string | null;
   /** Null for an activity that produces nothing (Idle, Break, cleaning). */
   target_qty: number | null;
   qty: number | null;
@@ -58,7 +60,7 @@ export interface LogEntry {
 
 const COLUMNS = `
   id, unit_id, process_id, log_date, shift, start_time, end_time,
-  duration_minutes, equipment_no, batch_no,
+  duration_minutes, equipment_no, batch_no, batch_stage_id,
   target_qty, qty, qty_unit, qty_rejected,
   speed_unit, target_speed, actual_speed, slow_reason,
   operators, comment, action_flag,
@@ -83,9 +85,19 @@ export const logKeys = {
 
 export interface OverrunFlag {
   id: string;
-  /** How far past the work order this batch and activity has gone. */
+  /** Everything logged for this batch and activity, up to this entry. */
+  accumulative: number | null;
+  required_qty: number | null;
+  /** Required plus the batch's declared overage — the threshold crossed. */
+  allowed_qty: number | null;
+  overage_pct: number;
+  /**
+   * How far past its **allowance** this batch and activity has gone — the
+   * work order plus whatever overage was declared on the batch, not the work
+   * order alone (migration 0032).
+   */
   overrun_qty: number | null;
-  /** Over the requirement and nobody has said why yet. */
+  /** Over the allowance and nobody has said why yet. */
   needs_overrun_note: boolean;
   overrun_note: string | null;
   /** Who explained it, once someone has. */
@@ -114,7 +126,11 @@ export async function fetchOverrunFlags(
   const { data, error } = await supabase
     .from("shift_log_entries_expanded")
     .select(
-      "id, overrun_qty, needs_overrun_note, overrun_note, overrun_cleared_by_name",
+      // The three numbers behind the badge come with it: the explain dialog
+      // opens straight from the feed, and without them it could only say
+      // "over by 700" with nothing to measure that against.
+      "id, accumulative, required_qty, allowed_qty, overage_pct, " +
+        "overrun_qty, needs_overrun_note, overrun_note, overrun_cleared_by_name",
     )
     .eq("factory_id", factoryId)
     .eq("log_date", date);
@@ -247,6 +263,10 @@ export async function createLogEntry(
       equipment_no: machine ? values.equipmentNo || null : null,
       batch_no: values.batchNo || null,
       product_id: productId,
+      // Null is the normal answer — `shift_log_stage_guard` fills it in when
+      // the batch runs this activity once, and refuses the entry when it runs
+      // it several times without saying which. Downtime is forced null there.
+      batch_stage_id: values.batchStageId ?? null,
       // Quantities belong to activities that produce something. A break or an
       // idle period stores null, not 0 — otherwise a hundred legitimate zeroes
       // drag every output and quality average computed over them.

@@ -203,8 +203,10 @@ export function ActivityFeed({
             process_name: overrunTarget.process?.name ?? null,
             batch_no: overrunTarget.batch_no,
             product_name: overrunTarget.product?.name ?? null,
-            accumulative: null,
-            required_qty: null,
+            accumulative: overruns?.get(overrunTarget.id)?.accumulative ?? null,
+            required_qty: overruns?.get(overrunTarget.id)?.required_qty ?? null,
+            allowed_qty: overruns?.get(overrunTarget.id)?.allowed_qty ?? null,
+            overage_pct: overruns?.get(overrunTarget.id)?.overage_pct ?? 0,
             overrun_qty: overruns?.get(overrunTarget.id)?.overrun_qty ?? null,
             overrun_note: overruns?.get(overrunTarget.id)?.overrun_note ?? null,
           }

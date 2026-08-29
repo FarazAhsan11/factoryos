@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -55,7 +61,13 @@ import {
   findEquipment,
 } from "@/lib/factory/equipment-queries";
 import { actionKeys } from "@/lib/factory/action-queries";
-import { pipelineKeys } from "@/lib/factory/pipeline-queries";
+import {
+  batchStageKeys,
+  fetchFactoryStages,
+  stageName,
+  type BatchStage,
+} from "@/lib/factory/batch-stage-queries";
+import { fetchPipelineJobs, pipelineKeys } from "@/lib/factory/pipeline-queries";
 import { fetchProducts, productKeys } from "@/lib/factory/product-queries";
 import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
 import {
@@ -67,6 +79,11 @@ import {
   todayKey,
   type RunningShift,
 } from "@/lib/factory/shift-time-queries";
+import {
+  draftHasContent,
+  readLogDraft,
+  writeLogDraft,
+} from "@/lib/factory/log-draft";
 import {
   createLogEntry,
   durationMinutes,
@@ -154,6 +171,20 @@ export function LogEntryForm({
     queryKey: employeeKeys.all(factoryId),
     queryFn: () => fetchEmployees(factoryId),
   });
+  // The board, for the batch panel's family context — what kind of batch this
+  // is, whose bulk it draws on, and how much of it is left. Same cache key the
+  // Pipeline page uses, so arriving from there costs nothing.
+  const { data: pipelineJobs = [] } = useQuery({
+    queryKey: pipelineKeys.all(factoryId),
+    queryFn: () => fetchPipelineJobs(factoryId),
+  });
+  // Every batch's plan. Needed for two things: the target this entry is
+  // measured against, and — where a batch runs one activity several times —
+  // asking which of them this entry belongs to.
+  const { data: allStages = [] } = useQuery({
+    queryKey: batchStageKeys.all(factoryId),
+    queryFn: () => fetchFactoryStages(factoryId),
+  });
 
   const activeUnits = useMemo(
     () => unitList.filter((u) => u.active),
@@ -162,6 +193,24 @@ export function LogEntryForm({
   const activeProcesses = useMemo(
     () => processList.filter((p) => p.active),
     [processList],
+  );
+  /**
+   * The activity list, split under a heading per category — the prototype's
+   * grouped stage dropdown. With forty-odd stages on a real factory a flat
+   * list is unreadable, and the heading tells the operator which shape the
+   * form is about to take *before* they pick, not after.
+   *
+   * Grouped in `PROCESS_CATEGORIES` order (downtime → preparatory →
+   * production) rather than alphabetically, and empty groups are dropped so a
+   * factory that has no preparatory stages never shows a bare heading.
+   */
+  const processGroups = useMemo(
+    () =>
+      PROCESS_CATEGORIES.map((c) => ({
+        label: c.label,
+        items: activeProcesses.filter((p) => p.category === c.value),
+      })).filter((g) => g.items.length > 0),
+    [activeProcesses],
   );
 
   const {
@@ -196,6 +245,64 @@ export function LogEntryForm({
   });
 
   /**
+   * Restore whatever was typed last time, once, before anything else runs.
+   *
+   * A layout effect rather than an effect: this replaces every value in the
+   * form, and doing it after paint would show the operator an empty form that
+   * fills itself in a frame later. `reset` with `keepDefaultValues` so a later
+   * clear still returns to the real defaults, not to the restored draft.
+   */
+  const restored = useRef(false);
+  useLayoutEffect(() => {
+    if (restored.current) return;
+    restored.current = true;
+
+    const draft = readLogDraft(factoryId, userId);
+    if (!draft || !draftHasContent(draft)) return;
+
+    reset({ ...getValues(), ...draft, factoryId }, { keepDefaultValues: true });
+  }, [factoryId, userId, reset, getValues]);
+
+  /**
+   * Save what's on screen, on a timer.
+   *
+   * Polling `getValues()` rather than subscribing with `watch()`: the latter
+   * returns a fresh function on every render, which makes the React Compiler
+   * skip memoizing this whole component — an expensive trade for a form this
+   * long, to save a draft nobody is waiting on. Snapshotting also catches the
+   * changes a subscription would miss anyway: `setValue` from the Now buttons,
+   * the batch and equipment autofills, and the derived target.
+   *
+   * The write is skipped when nothing changed, so an idle form sitting open
+   * all shift costs one JSON.stringify every two seconds and no storage
+   * traffic at all.
+   */
+  const lastSaved = useRef<string>("");
+  useEffect(() => {
+    const save = () => {
+      const values = getValues();
+      const encoded = JSON.stringify(values);
+      if (encoded === lastSaved.current) return;
+      lastSaved.current = encoded;
+      writeLogDraft(factoryId, userId, values);
+    };
+
+    const timer = setInterval(save, 2000);
+    // A tablet being put down, or the tab being closed, is exactly when the
+    // draft matters most and is also the one moment the interval may not get
+    // to run again. `pagehide` fires where `beforeunload` is unreliable on
+    // mobile Safari.
+    window.addEventListener("pagehide", save);
+    document.addEventListener("visibilitychange", save);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("pagehide", save);
+      document.removeEventListener("visibilitychange", save);
+      save();
+    };
+  }, [getValues, factoryId, userId]);
+
+  /**
    * One row per person, added and removed on demand. Beyond the first they're
    * the exception, so the form opens with a single picker rather than a wall
    * of empty dropdowns.
@@ -209,6 +316,7 @@ export function LogEntryForm({
   const [
     processId,
     batchNo,
+    batchStageId,
     equipmentNo,
     startTime,
     endTime,
@@ -225,6 +333,7 @@ export function LogEntryForm({
     name: [
       "processId",
       "batchNo",
+      "batchStageId",
       "equipmentNo",
       "startTime",
       "endTime",
@@ -293,6 +402,53 @@ export function LogEntryForm({
     () => findEquipment(equipmentList, equipmentNo),
     [equipmentList, equipmentNo],
   );
+
+  // The batch's card, when it has one. Null is ordinary, not an error: a
+  // factory can log against catalogue batches it never puts on the board.
+  const job = useMemo(
+    () =>
+      product
+        ? (pipelineJobs.find((j) => j.product_id === product.id) ?? null)
+        : null,
+    [pipelineJobs, product],
+  );
+
+  /**
+   * The planned stages this batch has for the selected activity.
+   *
+   * Usually one, and then nothing is asked: the database resolves it. Several
+   * means the batch runs this activity more than once — Packing 30's, 60's and
+   * 120's — and the operator has to say which, or all three would pool into a
+   * single total that describes none of them.
+   */
+  const stageChoices = useMemo(() => {
+    if (!job || !processId) return [];
+    return allStages.filter(
+      (s) => s.job_id === job.id && s.process_id === processId,
+    );
+  }, [allStages, job, processId]);
+
+  const mustPickStage = stageChoices.length > 1;
+  /** The stage this entry will count towards, once it is known. */
+  const activeStage = useMemo(() => {
+    if (stageChoices.length === 1) return stageChoices[0];
+    return stageChoices.find((s) => s.id === batchStageId) ?? null;
+  }, [stageChoices, batchStageId]);
+
+  // A batch that has not been issued refuses producing entries at the database
+  // (migration 0033). Said here so the operator learns it while filling the
+  // form in, not from a failed submit.
+  const blockedByIssue = Boolean(
+    job && !job.issued_at && category !== "downtime",
+  );
+
+  // Clear a stage picked under a different activity — it would be validated
+  // against a control no longer on screen, and refused by the guard.
+  useEffect(() => {
+    if (batchStageId && !stageChoices.some((s) => s.id === batchStageId)) {
+      setValue("batchStageId", "");
+    }
+  }, [stageChoices, batchStageId, setValue]);
 
   // Accumulative total: everything already logged for this batch + activity,
   // across every shift — not just what's on screen.
@@ -390,6 +546,15 @@ export function LogEntryForm({
       await queryClient.invalidateQueries({
         queryKey: actionKeys.all(factoryId),
       });
+      // And the entry moved its stage's accumulated total, by the same route:
+      // `batch_stage_accumulate` recomputes it in the database, so the only
+      // thing to do here is stop trusting the copy we already have. Without
+      // this the stage progress bar on this very form stays where it was —
+      // the number is right in the database and stale on screen, which is the
+      // worst of both.
+      await queryClient.invalidateQueries({
+        queryKey: batchStageKeys.all(factoryId),
+      });
       toast.success(
         `Logged — ${entry.unit?.name ?? ""} · ${entry.process?.name ?? ""}` +
           (entry.duration_minutes
@@ -400,7 +565,7 @@ export function LogEntryForm({
       // Keep unit + activity: an operator stays in one room for a whole shift,
       // and the next entry starts where this one ended.
       const keep = getValues();
-      reset({
+      const carried: Partial<LogEntryValues> = {
         factoryId,
         unitId: keep.unitId,
         processId: keep.processId,
@@ -409,13 +574,34 @@ export function LogEntryForm({
         shift: keep.shift,
         startTime: keep.endTime,
         endTime: "",
+        // The room stays on the same batch and the same machine across a run
+        // of entries, and re-typing a six-digit batch number every hour is
+        // how the wrong one gets typed.
+        batchNo: keep.batchNo,
+        // The stage carries over with the batch and activity: a run of entries
+        // against Packing 30's is all the same stage, and re-picking it every
+        // hour is how the wrong one gets picked.
+        batchStageId: keep.batchStageId,
+        equipmentNo: keep.equipmentNo,
+        qtyUnit: keep.qtyUnit,
         speedType: keep.speedType,
         speedRate: keep.speedRate,
         targetSpeed: keep.targetSpeed,
         // The same people usually work the whole shift, so the whole list
         // carries over — including however many rows were added for it.
         operators: keep.operators,
-      });
+      };
+      // Everything NOT listed above is dropped on purpose. The quantities, the
+      // comment and the action flag describe the hour that was just filed; a
+      // carried-over 231,453 that the operator does not notice is a wrong
+      // entry that looks like a right one, and it cannot be deleted afterwards
+      // — only amended.
+      reset(carried);
+
+      // The filed entry is no longer a draft. Replacing it with what carried
+      // over (rather than deleting it) means a reload right after logging
+      // still opens on the room, batch and crew, exactly as the form does.
+      writeLogDraft(factoryId, userId, carried);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -457,7 +643,7 @@ export function LogEntryForm({
          scrolling past everything is how half-filled entries happen. */
       className="flex flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-card lg:h-full"
     >
-      <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-line-soft bg-surface px-5 py-3.5">
+      <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-line-soft bg-surface px-5 py-2.5">
         <h2 className="flex items-center gap-2 text-[15px] font-semibold text-ink">
           <span className="grid size-7 place-items-center rounded-lg bg-gradient-to-br from-brand-soft to-brand-line text-brand">
             <Plus className="size-4" />
@@ -519,14 +705,19 @@ export function LogEntryForm({
                 {...register("processId")}
               >
                 <option value="">Select…</option>
-                {/* Name only. The machine / output flags are configuration,
-                    not something the operator picks between — the form already
+                {/* Name only under a category heading. The machine / output
+                    flags stay out of it — they are configuration, not
+                    something the operator picks between, and the form already
                     shows their effect by revealing or hiding Speed and Output
                     the moment a stage is selected. */}
-                {activeProcesses.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
+                {processGroups.map((g) => (
+                  <optgroup key={g.label} label={g.label}>
+                    {g.items.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
             </Field>
@@ -659,7 +850,61 @@ export function LogEntryForm({
             query={(batchNo ?? "").trim()}
             product={product}
             runningTotal={runningTotal}
+            job={job}
           />
+
+          {/* The batch has not been released to the floor. The database
+              refuses the entry (migration 0033); saying so here means the
+              operator learns it while filling the form in rather than from a
+              submit that fails after everything is typed. */}
+          {blockedByIssue && (
+            <p className="flex items-start gap-2 rounded-xl border border-warn-line bg-warn-tint px-3.5 py-2.5 text-xs text-warn-ink">
+              <Cog className="mt-px size-3.5 shrink-0" aria-hidden />
+              <span>
+                <strong className="font-semibold">
+                  Batch {batchNo} isn&rsquo;t issued for production yet.
+                </strong>{" "}
+                A manager plans its stages on the Pipeline and issues it. You
+                can still log downtime against it.
+              </span>
+            </p>
+          )}
+
+          {/* Asked only where the answer isn't already known: this batch runs
+              the selected activity more than once — three packing runs, or
+              three work orders — and without saying which, all of them would
+              pool into a single total that describes none of them. */}
+          {mustPickStage && (
+            <Field
+              label="Stage / work order"
+              note="this batch runs this activity more than once"
+              htmlFor="log-stage"
+              error={errors.batchStageId?.message}
+            >
+              <select
+                id="log-stage"
+                className={SELECT}
+                {...register("batchStageId")}
+              >
+                <option value="">Select…</option>
+                {stageChoices.map((stage) => (
+                  <option key={stage.id} value={stage.id}>
+                    {stageName(stage)}
+                    {stage.target_qty
+                      ? ` — ${Number(stage.target_qty).toLocaleString()} ${stage.target_unit}`
+                      : ""}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+
+          {/* The denominator the log has never had. Once a batch is planned,
+              the running total means something: 231,453 of 312,500, not
+              231,453 of nothing. */}
+          {activeStage && activeStage.target_qty && (
+            <StageProgress stage={activeStage} pending={thisQty} />
+          )}
         </section>
 
         {/* ── Output ───────────────────────────────────────────────────
@@ -748,6 +993,7 @@ export function LogEntryForm({
                 label="Actual qty produced"
                 htmlFor="log-qty"
                 error={errors.qty?.message}
+                note={qty === 0 ? "zero — nothing will be counted" : undefined}
               >
                 <input
                   id="log-qty"
@@ -1012,21 +1258,25 @@ export function LogEntryForm({
       </div>
 
       {/* Pinned: the button belongs to the form, not to the bottom of the
-          scroll. The note sits beside it rather than under it so the footer
-          costs one row of height instead of two. */}
-      <footer className="shrink-0 border-t border-line-soft bg-gradient-to-b from-surface to-sunken p-4 sm:px-5">
+          scroll. The note sits beside the button rather than under it, so the
+          footer costs one row of height instead of two — every pixel it does
+          not take is a pixel the scrolling body gets. The button is sized to
+          its text: a full-width bar reads as a page action, and this one acts
+          on the card it sits in. It still goes full width on a phone, where
+          there is no second column to share the row with. */}
+      <footer className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-line-soft bg-gradient-to-b from-surface to-sunken px-4 py-3 sm:px-5">
+        <p className="flex items-center gap-1.5 text-[11px] text-ink-5">
+          <ShieldCheck className="size-3 shrink-0" aria-hidden />
+          Corrections are amendments, not deletes.
+        </p>
         <button
           type="submit"
           disabled={isSubmitting}
-          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] active:scale-[0.995] disabled:pointer-events-none disabled:opacity-70"
+          className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-7 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] active:scale-[0.995] disabled:pointer-events-none disabled:opacity-70 sm:w-auto"
         >
           {isSubmitting && <Loader2 className="size-4 animate-spin" />}
           {isSubmitting ? "Logging…" : "Log entry"}
         </button>
-        <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-[11px] text-ink-5">
-          <ShieldCheck className="size-3 shrink-0" aria-hidden />
-          Corrections are amendments, not deletes.
-        </p>
       </footer>
     </form>
   );
@@ -1173,6 +1423,58 @@ function SlowReason({
         This is what the Pareto chart in OEE &amp; Downtime is built from — an
         unexplained slow run is a gap in the analysis later.
       </p>
+    </div>
+  );
+}
+
+/**
+ * How far through its planned target this stage is, counting what is being
+ * typed right now.
+ *
+ * The open entry is included on purpose: an operator about to file 5,000 needs
+ * to see it land, and a bar that only moves after the submit is a bar that
+ * answers the question too late to act on.
+ */
+function StageProgress({
+  stage,
+  pending,
+}: {
+  stage: BatchStage;
+  pending: number;
+}) {
+  const target = Number(stage.target_qty ?? 0);
+  const made = Number(stage.accumulated_qty ?? 0) + (pending || 0);
+  const pct = target > 0 ? Math.round((made / target) * 100) : 0;
+  const tone =
+    pct > 100
+      ? "var(--color-warn-deep)"
+      : pct >= 100
+        ? "var(--color-teal)"
+        : "var(--color-brand)";
+
+  return (
+    <div className="space-y-1 rounded-xl border border-line bg-sunken px-3.5 py-2.5">
+      <div className="flex items-baseline justify-between gap-2 text-[11px]">
+        <span className="font-medium text-ink-3">{stageName(stage)}</span>
+        <span className="font-mono text-ink-4">
+          {made.toLocaleString(undefined, { maximumFractionDigits: 2 })} /{" "}
+          {target.toLocaleString()} {stage.target_unit}
+          <span className="ml-1 font-semibold" style={{ color: tone }}>
+            {pct}%
+          </span>
+        </span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-line">
+        <div
+          className="h-full rounded-full transition-[width]"
+          style={{ width: `${Math.min(100, pct)}%`, background: tone }}
+        />
+      </div>
+      {pct >= 100 && (
+        <p className="text-[11px] font-medium" style={{ color: tone }}>
+          Stage target reached — a supervisor can sign it off on the Pipeline.
+        </p>
+      )}
     </div>
   );
 }

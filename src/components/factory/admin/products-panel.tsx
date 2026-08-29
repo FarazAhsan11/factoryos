@@ -84,6 +84,24 @@ export function ProductsPanel({
     () => new Set(jobs.map((job) => job.product_id)),
     [jobs],
   );
+  /**
+   * Batches that were created as packing runs of another batch, and the bulk
+   * they came from.
+   *
+   * The New batch dialog writes a catalogue row and a pipeline card in one
+   * act (migration 0031), so 46001 can appear here without anyone having
+   * typed it on this screen. Saying where it came from is what stops the
+   * catalogue looking like it grew rows on its own.
+   */
+  const packingParent = useMemo(
+    () =>
+      new Map(
+        jobs
+          .filter((job) => job.parent_batch_no)
+          .map((job) => [job.product_id, job.parent_batch_no!]),
+      ),
+    [jobs],
+  );
 
   function refresh() {
     return queryClient.invalidateQueries({ queryKey });
@@ -287,6 +305,14 @@ export function ProductsPanel({
                       >
                         {product.name}
                       </span>
+                      {packingParent.has(product.id) && (
+                        <span
+                          className="ml-1.5 font-mono text-[10px] font-semibold text-brand"
+                          title={`Packing run of batch ${packingParent.get(product.id)}`}
+                        >
+                          ← {packingParent.get(product.id)}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 font-mono text-[13px] text-ink-4">
                       {product.work_order || "—"}

@@ -201,6 +201,115 @@ Tenant-gated placeholder: top bar with the factory logo/name + "Factory Admin" b
 
 ---
 
+## 9b. Batch families — migration 0031
+
+The pipeline learned what *kind* of batch it is looking at, and which batches
+belong together.
+
+**The problem.** A batch was one catalogue row, one card, one number. That
+describes a plant that manufactures and packs under a single batch number and
+nothing else. The customer whose packing runs carry their own numbers —
+46000 bulk, then 46001 / 46002 / 46003 filling 30s, 60s and 120s out of it —
+had no way to say so, so nothing could answer the question their planner
+actually asks: *is there enough bulk for all three packing runs?*
+
+**What landed.**
+
+- `pipeline_jobs.batch_type` — `manufacturing | packing | combined`. Combined
+  is the default and the backfill, because it is what every job written before
+  this already was.
+- `parent_job_id`, a self-FK with `on delete set null`. Taking a bulk card off
+  the board must not delete three real packing batches; a child that loses its
+  parent becomes "external bulk", which is a legitimate state.
+- The pack/bulk columns: `pack_size`, `pack_unit`, `bulk_unit`,
+  `bulk_qty_received`, `market`, `overage_pct`, plus `priority`, `due_date`,
+  `notes`. `rework_source_id` is there and unused — the type is deferred, and
+  leaving the column means adding it later reshapes no rows.
+- `pipeline_jobs_family_guard`, holding every rule a `check` cannot see across
+  rows: only a packing job has a parent, the parent is manufacturing and in the
+  same factory, one level deep, pack size required, and a parent may not be
+  re-typed while children draw on it.
+- `pipeline_jobs_expanded` gains the type, the parent's batch number,
+  `child_count`, `allocated_qty` (Σ children `required_qty × pack_size`) and
+  `bulk_consumed` (Σ entry qty × pack size).
+
+**What was deliberately not added.** `ordered_qty` and `bulk_target_qty`. The
+prototype carries both on the batch and both are already
+`factory_products.required_qty` — 210,000 tablets on the parent, 1,000 bottles
+on a child. A second copy would hand the overrun check (0023) and the
+allocation bar different numbers to disagree about.
+
+**UI.** A **New batch** dialog in two steps — the type cards first, because the
+answer changes what the second step asks for — and a **Batch families** tab
+beside the Kanban board. The batch itself is *picked from the catalogue*, never
+typed: Admin → Products owns the batch number, name, code, work order and
+required quantity, and the shift log resolves entries against that same row.
+The board's cards carry a type badge and a `← 46000 bulk` link, and the shift
+log's batch panel shows a packing run's bulk received / consumed / remaining
+and warns when it is still waiting on its parent.
+
+**Next.** Per-stage planning: a route on the product copied onto the batch,
+per-stage targets, an issue gate refusing producing entries against an
+unplanned batch, and completion re-based on the last stage of the plan — which
+is what finally retires `factory_processes.is_final_stage`.
+
+---
+
+## 9c. Stage planning — migrations 0032, 0033
+
+**0032 — overage stops being decoration.** 0031 stored `overage_pct` and
+computed nothing from it. The over-production flag now measures against
+`required_qty × (1 + overage_pct/100)`, so a batch told to make 4% extra is not
+flagged for doing exactly that, and the overrun quantity counts from the
+allowance rather than the order. A flag that fires when the plan works
+correctly is a flag people learn to clear without reading. A packing run may
+not declare one — its bulk already carries the slack.
+
+**0033 — a batch is a route, not a number.** `batch_stages` holds one row per
+producing stage of one batch: target, unit, optional label or work order, and
+the accumulated total kept in step with the shift log by
+`batch_stage_accumulate`.
+
+- **The last stage is the final one**, derived from position by
+  `batch_stages_final_sync` rather than tagged. Reordering the plan moves it;
+  signing it off finishes the batch.
+- **The issue gate.** `issue_job()` refuses a batch whose plan is empty or
+  whose stages lack targets. `shift_log_stage_guard` then refuses *producing*
+  entries against an unissued batch and always accepts downtime — a room must
+  be able to account for its time whatever the paperwork says.
+- **Stage resolution.** An entry is matched to its stage automatically when the
+  batch runs that activity once. Where it runs it several times — Packing 30's
+  / 60's / 120's, or work orders 46000D/E/F — the entry must say which, which is
+  precisely where the old per-(batch, process) total pooled three runs into one
+  meaningless number. `accumulative` now partitions per stage.
+- **`factory_processes.is_final_stage` is gone**, with its partial unique index,
+  its produces-output check and `clear_other_final_stages`. One process per
+  plant could never describe a batch whose stages have their own targets, nor
+  one ending in three parallel packing runs.
+- Existing jobs are grandfathered: marked issued, with a plan reconstructed
+  from what was actually logged and targets left null — nobody can honestly say
+  what a batch that ran last month was aiming for.
+
+**0034, 0035 — two fixes and two missing fields.** `sequence_order` carried a
+column default, which Postgres applies *before* BEFORE triggers run, so the
+append logic never fired and every stage landed at position 1; the symptom hid
+behind a tie-break on `created_at`, which put the final tag in the right place
+anyway. The same migration closes a gap in `batch_stage_transition`: an update
+carrying `status = 'complete'` on an already-complete stage never reached the
+"already signed off" check, so the yield answer could be silently rewritten.
+`0035` restores two fields the prototype's stage form has and 0033 dropped —
+the **assigned room** (advisory: the log records where the work actually
+happened) and **can run in parallel**, without which a plan is strictly single
+file and three packing runs off one bulk cannot start together.
+
+**UI.** A **Plan stages** dialog on every card (add, reorder, set targets,
+start, sign off, issue), a stage strip on the Kanban card, and in the shift log
+a per-stage progress bar plus the stage picker that appears only when it is
+needed. The three customer scenarios — one batch, child batches, work orders —
+all run on this one model.
+
+---
+
 ## 10. Next steps
 
 - **Actions** — `action_flag` is captured on every log entry but nothing consumes it yet; this is where a flagged entry becomes a tracked action item.

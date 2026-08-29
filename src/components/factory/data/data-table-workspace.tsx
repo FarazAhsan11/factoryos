@@ -333,6 +333,8 @@ export function DataTableWorkspace({
             product_name: overrunTarget.product_name,
             accumulative: overrunTarget.accumulative,
             required_qty: overrunTarget.required_qty,
+            allowed_qty: overrunTarget.allowed_qty,
+            overage_pct: overrunTarget.overage_pct,
             overrun_qty: overrunTarget.overrun_qty,
             overrun_note: overrunTarget.overrun_note,
           }

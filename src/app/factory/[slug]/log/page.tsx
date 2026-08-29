@@ -58,14 +58,15 @@ export default async function ShiftLogPage({
        on <main> in FactoryShell. The two panels below then have a real height
        to scroll inside, instead of one page scrollbar dragging both. */
     <div className="mx-auto flex w-full max-w-7xl flex-col lg:min-h-0 lg:flex-1">
-      <div className="mb-5 shrink-0">
-        <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-5">
-          Shift log
-        </p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">
+      {/* Compact on purpose. This page is a form that has to fit on one
+          screen without scrolling the entry out of reach, so the heading
+          block gives its height back to the panels below. The eyebrow is
+          gone with it — the sidebar already says which section this is. */}
+      <div className="mb-3 shrink-0">
+        <h1 className="text-xl font-semibold tracking-tight text-ink">
           Log production entry
         </h1>
-        <p className="mt-1 text-sm text-ink-4">
+        <p className="mt-0.5 text-[13px] text-ink-4">
           Entries are audit-protected — correct a mistake with an amendment,
           never a delete.
         </p>

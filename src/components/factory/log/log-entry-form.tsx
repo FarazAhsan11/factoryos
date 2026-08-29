@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -67,6 +73,11 @@ import {
   todayKey,
   type RunningShift,
 } from "@/lib/factory/shift-time-queries";
+import {
+  draftHasContent,
+  readLogDraft,
+  writeLogDraft,
+} from "@/lib/factory/log-draft";
 import {
   createLogEntry,
   durationMinutes,
@@ -163,6 +174,24 @@ export function LogEntryForm({
     () => processList.filter((p) => p.active),
     [processList],
   );
+  /**
+   * The activity list, split under a heading per category — the prototype's
+   * grouped stage dropdown. With forty-odd stages on a real factory a flat
+   * list is unreadable, and the heading tells the operator which shape the
+   * form is about to take *before* they pick, not after.
+   *
+   * Grouped in `PROCESS_CATEGORIES` order (downtime → preparatory →
+   * production) rather than alphabetically, and empty groups are dropped so a
+   * factory that has no preparatory stages never shows a bare heading.
+   */
+  const processGroups = useMemo(
+    () =>
+      PROCESS_CATEGORIES.map((c) => ({
+        label: c.label,
+        items: activeProcesses.filter((p) => p.category === c.value),
+      })).filter((g) => g.items.length > 0),
+    [activeProcesses],
+  );
 
   const {
     register,
@@ -194,6 +223,64 @@ export function LogEntryForm({
       hasMachine: false,
     },
   });
+
+  /**
+   * Restore whatever was typed last time, once, before anything else runs.
+   *
+   * A layout effect rather than an effect: this replaces every value in the
+   * form, and doing it after paint would show the operator an empty form that
+   * fills itself in a frame later. `reset` with `keepDefaultValues` so a later
+   * clear still returns to the real defaults, not to the restored draft.
+   */
+  const restored = useRef(false);
+  useLayoutEffect(() => {
+    if (restored.current) return;
+    restored.current = true;
+
+    const draft = readLogDraft(factoryId, userId);
+    if (!draft || !draftHasContent(draft)) return;
+
+    reset({ ...getValues(), ...draft, factoryId }, { keepDefaultValues: true });
+  }, [factoryId, userId, reset, getValues]);
+
+  /**
+   * Save what's on screen, on a timer.
+   *
+   * Polling `getValues()` rather than subscribing with `watch()`: the latter
+   * returns a fresh function on every render, which makes the React Compiler
+   * skip memoizing this whole component — an expensive trade for a form this
+   * long, to save a draft nobody is waiting on. Snapshotting also catches the
+   * changes a subscription would miss anyway: `setValue` from the Now buttons,
+   * the batch and equipment autofills, and the derived target.
+   *
+   * The write is skipped when nothing changed, so an idle form sitting open
+   * all shift costs one JSON.stringify every two seconds and no storage
+   * traffic at all.
+   */
+  const lastSaved = useRef<string>("");
+  useEffect(() => {
+    const save = () => {
+      const values = getValues();
+      const encoded = JSON.stringify(values);
+      if (encoded === lastSaved.current) return;
+      lastSaved.current = encoded;
+      writeLogDraft(factoryId, userId, values);
+    };
+
+    const timer = setInterval(save, 2000);
+    // A tablet being put down, or the tab being closed, is exactly when the
+    // draft matters most and is also the one moment the interval may not get
+    // to run again. `pagehide` fires where `beforeunload` is unreliable on
+    // mobile Safari.
+    window.addEventListener("pagehide", save);
+    document.addEventListener("visibilitychange", save);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("pagehide", save);
+      document.removeEventListener("visibilitychange", save);
+      save();
+    };
+  }, [getValues, factoryId, userId]);
 
   /**
    * One row per person, added and removed on demand. Beyond the first they're
@@ -400,7 +487,7 @@ export function LogEntryForm({
       // Keep unit + activity: an operator stays in one room for a whole shift,
       // and the next entry starts where this one ended.
       const keep = getValues();
-      reset({
+      const carried: Partial<LogEntryValues> = {
         factoryId,
         unitId: keep.unitId,
         processId: keep.processId,
@@ -409,13 +496,30 @@ export function LogEntryForm({
         shift: keep.shift,
         startTime: keep.endTime,
         endTime: "",
+        // The room stays on the same batch and the same machine across a run
+        // of entries, and re-typing a six-digit batch number every hour is
+        // how the wrong one gets typed.
+        batchNo: keep.batchNo,
+        equipmentNo: keep.equipmentNo,
+        qtyUnit: keep.qtyUnit,
         speedType: keep.speedType,
         speedRate: keep.speedRate,
         targetSpeed: keep.targetSpeed,
         // The same people usually work the whole shift, so the whole list
         // carries over — including however many rows were added for it.
         operators: keep.operators,
-      });
+      };
+      // Everything NOT listed above is dropped on purpose. The quantities, the
+      // comment and the action flag describe the hour that was just filed; a
+      // carried-over 231,453 that the operator does not notice is a wrong
+      // entry that looks like a right one, and it cannot be deleted afterwards
+      // — only amended.
+      reset(carried);
+
+      // The filed entry is no longer a draft. Replacing it with what carried
+      // over (rather than deleting it) means a reload right after logging
+      // still opens on the room, batch and crew, exactly as the form does.
+      writeLogDraft(factoryId, userId, carried);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -457,7 +561,7 @@ export function LogEntryForm({
          scrolling past everything is how half-filled entries happen. */
       className="flex flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-card lg:h-full"
     >
-      <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-line-soft bg-surface px-5 py-3.5">
+      <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-line-soft bg-surface px-5 py-2.5">
         <h2 className="flex items-center gap-2 text-[15px] font-semibold text-ink">
           <span className="grid size-7 place-items-center rounded-lg bg-gradient-to-br from-brand-soft to-brand-line text-brand">
             <Plus className="size-4" />
@@ -519,14 +623,19 @@ export function LogEntryForm({
                 {...register("processId")}
               >
                 <option value="">Select…</option>
-                {/* Name only. The machine / output flags are configuration,
-                    not something the operator picks between — the form already
+                {/* Name only under a category heading. The machine / output
+                    flags stay out of it — they are configuration, not
+                    something the operator picks between, and the form already
                     shows their effect by revealing or hiding Speed and Output
                     the moment a stage is selected. */}
-                {activeProcesses.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
+                {processGroups.map((g) => (
+                  <optgroup key={g.label} label={g.label}>
+                    {g.items.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
             </Field>
@@ -1012,21 +1121,25 @@ export function LogEntryForm({
       </div>
 
       {/* Pinned: the button belongs to the form, not to the bottom of the
-          scroll. The note sits beside it rather than under it so the footer
-          costs one row of height instead of two. */}
-      <footer className="shrink-0 border-t border-line-soft bg-gradient-to-b from-surface to-sunken p-4 sm:px-5">
+          scroll. The note sits beside the button rather than under it, so the
+          footer costs one row of height instead of two — every pixel it does
+          not take is a pixel the scrolling body gets. The button is sized to
+          its text: a full-width bar reads as a page action, and this one acts
+          on the card it sits in. It still goes full width on a phone, where
+          there is no second column to share the row with. */}
+      <footer className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-line-soft bg-gradient-to-b from-surface to-sunken px-4 py-3 sm:px-5">
+        <p className="flex items-center gap-1.5 text-[11px] text-ink-5">
+          <ShieldCheck className="size-3 shrink-0" aria-hidden />
+          Corrections are amendments, not deletes.
+        </p>
         <button
           type="submit"
           disabled={isSubmitting}
-          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] active:scale-[0.995] disabled:pointer-events-none disabled:opacity-70"
+          className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-7 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] active:scale-[0.995] disabled:pointer-events-none disabled:opacity-70 sm:w-auto"
         >
           {isSubmitting && <Loader2 className="size-4 animate-spin" />}
           {isSubmitting ? "Logging…" : "Log entry"}
         </button>
-        <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-[11px] text-ink-5">
-          <ShieldCheck className="size-3 shrink-0" aria-hidden />
-          Corrections are amendments, not deletes.
-        </p>
       </footer>
     </form>
   );

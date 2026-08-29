@@ -1,5 +1,5 @@
 // Seeds one factory's setup lists with the prototype's demo data:
-// 25 rooms, 25 process stages (machine flags set), 24 machines, 16 product batches.
+// 25 rooms, 41 process stages (machine flags set), 24 machines, 16 product batches.
 //
 // Idempotent: it reads what's already there and only inserts what's missing,
 // so re-running after adding a stage by hand is safe and won't duplicate.
@@ -77,6 +77,23 @@ const PROCESSES = [
   // Real production stages that happen to be done by hand.
   { name: "Sorting", category: "production", machine: false },
   { name: "Testing", category: "production", machine: false },
+  { name: "Polishing", category: "production", machine: true },
+  // The packing family (prototype v16's PROD_PACK_STAGES). Every one of them
+  // runs on a line against a speed, so they are production with a machine —
+  // "packing" is a place in the plant, not a different shape of record.
+  { name: "Capsule Fill", category: "production", machine: true },
+  { name: "Capsule Pack", category: "production", machine: true },
+  { name: "Tablet Fill", category: "production", machine: true },
+  { name: "Tablet Pack", category: "production", machine: true },
+  { name: "Powder Sachet Fill", category: "production", machine: true },
+  { name: "Powder Sachet Pack", category: "production", machine: true },
+  { name: "Liquid Sachet Fill", category: "production", machine: true },
+  { name: "Liquid Sachet Pack", category: "production", machine: true },
+  { name: "Pouches", category: "production", machine: true },
+  // Preparatory steps the room measures in its own units, not against a speed.
+  { name: "Milling", category: "preparatory" },
+  { name: "Granulation", category: "preparatory" },
+  { name: "Blending", category: "preparatory" },
   { name: "Reduced Speed", category: "downtime" },
   { name: "Document Recon", category: "downtime" },
   { name: "Prov. Clean", category: "downtime" },
@@ -84,6 +101,9 @@ const PROCESSES = [
   { name: "Maintenance", category: "downtime" },
   { name: "Quality Issue", category: "downtime" },
   { name: "Idle", category: "downtime" },
+  { name: "Break", category: "downtime" },
+  { name: "Waiting", category: "downtime" },
+  { name: "Cleaning", category: "downtime" },
   { name: "Ready", category: "downtime" },
 ];
 

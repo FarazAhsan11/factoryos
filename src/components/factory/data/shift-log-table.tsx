@@ -592,7 +592,14 @@ function Row({
         )}
         title={
           row.is_overrun
-            ? `${num(row.accumulative)} of ${num(row.required_qty)} required — over by ${num(row.overrun_qty)}`
+            ? // The allowance, when there is one, rather than the bare
+              // requirement: on a batch with declared overage those are two
+              // different numbers, and only the second explains the flag.
+              `${num(row.accumulative)} of ${num(row.required_qty)} required` +
+              (row.overage_pct > 0
+                ? ` +${row.overage_pct}% = ${num(row.allowed_qty)} allowed`
+                : "") +
+              ` — over by ${num(row.overrun_qty)}`
             : "Everything logged for this batch and activity, up to this entry"
         }
       >
@@ -691,7 +698,11 @@ function Row({
         {row.needs_overrun_note ? (
           <span
             className="ml-1 inline-block rounded-full bg-warn-soft px-2 py-0.5 text-[10px] font-bold text-warn-deep"
-            title={`Over the required quantity by ${num(row.overrun_qty)} — needs a manager's explanation`}
+            title={
+              row.overage_pct > 0
+                ? `Over the ${num(row.allowed_qty)} allowed (${num(row.required_qty)} +${row.overage_pct}% overage) by ${num(row.overrun_qty)} — needs a manager's explanation`
+                : `Over the required quantity by ${num(row.overrun_qty)} — needs a manager's explanation`
+            }
           >
             Attention
           </span>

@@ -31,6 +31,9 @@ export interface OverrunTarget {
   product_name: string | null;
   accumulative: number | null;
   required_qty: number | null;
+  /** Required plus the batch's declared overage — the threshold actually crossed. */
+  allowed_qty: number | null;
+  overage_pct: number;
   overrun_qty: number | null;
   overrun_note: string | null;
 }
@@ -39,9 +42,14 @@ export interface OverrunTarget {
  * Explain an overproduction, which is what clears its flag.
  *
  * The entry itself is untouched — the units were produced and the log says so.
- * What was missing is the reason there are more of them than the work order
- * asked for, and until a manager writes it down the entry carries a flag on
- * every screen that shows it.
+ * What was missing is the reason there are more of them than the batch was
+ * *allowed* to make, and until a manager writes it down the entry carries a
+ * flag on every screen that shows it.
+ *
+ * "Allowed" is the work order plus whatever overage the batch declared
+ * (migration 0032). A planner who says "make 4% extra" has already accounted
+ * for that 4%; asking them to account for it a second time, every entry, is
+ * what teaches everyone to clear these without reading them.
  *
  * Manager-only, and the check is not here: `shift_log_amend_guard` refuses the
  * write outright and stamps who explained it. This dialog is simply not
@@ -132,7 +140,19 @@ export function ExplainOverrunDialog({
               <span className="font-mono">{fmt(entry.accumulative)}</span>
               <span className="mx-1 text-ink-5">of</span>
               <span className="font-mono">{fmt(entry.required_qty)}</span>
+              <span className="ml-1 text-ink-4">required</span>
             </Row>
+            {/* Only when there is one. On a batch with no declared overage the
+                allowance and the requirement are the same number, and showing
+                it twice invites the reader to look for a difference. */}
+            {entry.overage_pct > 0 && (
+              <Row label="Allowed">
+                <span className="font-mono">{fmt(entry.allowed_qty)}</span>
+                <span className="ml-1 text-ink-4">
+                  (+{entry.overage_pct}% overage)
+                </span>
+              </Row>
+            )}
             <Row label="Over by">
               <span className="font-mono font-semibold text-warn-deep">
                 {fmt(entry.overrun_qty)}

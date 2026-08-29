@@ -57,6 +57,10 @@ export interface LogTableRow {
   /* Overproduction. All three are computed on read (migration 0023) — the
      stored half is `overrun_note`, the explanation that clears the flag. */
   required_qty: number | null;
+  /** What the batch was allowed to make: required plus its declared overage. */
+  allowed_qty: number | null;
+  /** The overage that widened it, as a percentage. 0 on most batches. */
+  overage_pct: number;
   is_overrun: boolean;
   overrun_qty: number | null;
   needs_overrun_note: boolean;
@@ -74,7 +78,8 @@ const COLUMNS = `
   speed_unit, target_speed, actual_speed, slow_reason,
   equipment_no, operators, operators_text, action_flag, comment,
   amended_at, amend_note, logged_by,
-  required_qty, is_overrun, overrun_qty, needs_overrun_note,
+  required_qty, allowed_qty, overage_pct,
+  is_overrun, overrun_qty, needs_overrun_note,
   overrun_note, overrun_cleared_at, overrun_cleared_by_name
 `;
 

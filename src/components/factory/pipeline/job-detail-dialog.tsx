@@ -11,7 +11,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { BatchTypeBadge } from "@/components/factory/pipeline/batch-type-badge";
 import {
+  allocationFor,
+  bulkRemaining,
   fetchJobEntries,
   jobProgress,
   totalsByProcess,
@@ -98,6 +101,8 @@ export function JobDetailDialog({
             {job?.unit_name && ` · currently in ${job.unit_name}`}
           </DialogDescription>
         </DialogHeader>
+
+        {job && <FamilyPanel job={job} />}
 
         {/* The headline the card shows, restated with what it means — the
             single most confusing number in the module without it. Pinned
@@ -340,5 +345,96 @@ function TabButton({
         </span>
       )}
     </button>
+  );
+}
+
+/**
+ * Where this batch sits in its family, when it is in one.
+ *
+ * Renders nothing for a combined batch with no relations — which is most of
+ * them — so the dialog gains a row only where there is something to say. For
+ * a packing run that is whose bulk it draws on and how much is left; for a
+ * manufacturing parent it is how much of its bulk has been claimed.
+ */
+function FamilyPanel({ job }: { job: PipelineJob }) {
+  const allocation = allocationFor(job);
+  const remaining = bulkRemaining(job);
+  const isPacking = job.batch_type === "packing";
+
+  if (job.batch_type === "combined" && !job.parent_batch_no) return null;
+  if (!allocation && !job.parent_batch_no && remaining === null) return null;
+
+  return (
+    <div className="mx-5 mt-4 shrink-0 space-y-2 rounded-xl border border-line bg-surface p-3.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <BatchTypeBadge
+          type={job.batch_type}
+          detail={
+            job.pack_size
+              ? `${fmt(job.pack_size)} per ${job.pack_unit ?? "container"}`
+              : undefined
+          }
+        />
+        {job.parent_batch_no && (
+          <span className="text-[11px] text-ink-4">
+            Bulk from{" "}
+            <span className="font-mono font-semibold text-brand">
+              {job.parent_batch_no}
+            </span>
+            {job.parent_product_name && ` — ${job.parent_product_name}`}
+          </span>
+        )}
+        {job.market && (
+          <span className="text-[11px] text-ink-5">{job.market}</span>
+        )}
+      </div>
+
+      {/* A parent's side of the family: what its packing runs have claimed. */}
+      {allocation && (
+        <div className="space-y-1">
+          <div className="flex items-baseline justify-between gap-3 text-[11px]">
+            <span className="text-ink-4">
+              Bulk allocated to {job.child_count} packing run
+              {job.child_count === 1 ? "" : "s"}
+            </span>
+            <span className="font-mono font-semibold text-ink">
+              {fmt(allocation.allocated)} / {fmt(allocation.target)}{" "}
+              {job.bulk_unit ?? "units"}
+            </span>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-sunken-2">
+            <div
+              className="h-full rounded-full"
+              style={{
+                width: `${Math.min(100, allocation.pct)}%`,
+                background: allocation.ok
+                  ? "var(--color-brand)"
+                  : "var(--color-danger)",
+              }}
+            />
+          </div>
+          {!allocation.ok && (
+            <p className="text-[11px] font-medium text-warn-ink">
+              ⚠ The packing runs ask for more bulk than this batch will make.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* A child's side: what it has drawn down of what it was given. */}
+      {isPacking && remaining !== null && (
+        <p className="text-[11px] text-ink-4">
+          Bulk{" "}
+          <span className="font-mono text-ink">
+            {fmt(job.bulk_consumed)} / {fmt(job.bulk_qty_received)}
+          </span>{" "}
+          consumed ·{" "}
+          <span className="font-mono font-semibold text-teal">
+            {fmt(remaining)}
+          </span>{" "}
+          remaining
+        </p>
+      )}
+    </div>
   );
 }

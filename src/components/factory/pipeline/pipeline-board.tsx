@@ -4,6 +4,10 @@ import { useMemo } from "react";
 import { AlertTriangle, Inbox, Trash2 } from "lucide-react";
 
 import {
+  BatchTypeBadge,
+  ParentBatchLink,
+} from "@/components/factory/pipeline/batch-type-badge";
+import {
   PIPELINE_COLUMNS,
   jobProgress,
   type PipelineJob,
@@ -184,6 +188,26 @@ function JobCard({
         <h3 className="mt-1.5 text-[13px] leading-snug font-semibold break-words text-ink transition group-hover:text-brand-deep">
           {job.product_name}
         </h3>
+
+        {/* What kind of batch, and whose bulk. A packing run and the bulk it
+            came out of are two cards in different columns with similar
+            numbers on them; without this the board cannot say which is which,
+            or that they are related at all. Combined is the overwhelming
+            majority and says nothing new, so it stays unbadged — a badge on
+            every card is a badge on none. */}
+        {job.batch_type !== "combined" && (
+          <p className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <BatchTypeBadge
+              type={job.batch_type}
+              detail={
+                job.pack_size
+                  ? `${fmt(job.pack_size)}${job.market ? ` · ${job.market}` : ""}`
+                  : undefined
+              }
+            />
+          </p>
+        )}
+        <ParentBatchLink batchNo={job.parent_batch_no} className="mt-1" />
 
         <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-ink-5">
           {job.unit_name ? (

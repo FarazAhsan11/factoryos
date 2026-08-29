@@ -5,9 +5,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, LayoutGrid } from "lucide-react";
 import { toast } from "sonner";
 
+import { AdminTabs } from "@/components/factory/admin/admin-tabs";
+import { BatchFamilies } from "@/components/factory/pipeline/batch-families";
 import { JobDetailDialog } from "@/components/factory/pipeline/job-detail-dialog";
+import { NewBatchDialog } from "@/components/factory/pipeline/new-batch-dialog";
 import { NewJobDialog } from "@/components/factory/pipeline/new-job-dialog";
 import { PipelineBoard } from "@/components/factory/pipeline/pipeline-board";
+import { PIPELINE_TABS } from "@/lib/factory/pipeline-tabs";
 import {
   deletePipelineJob,
   fetchPipelineJobs,
@@ -39,6 +43,15 @@ export function PipelineWorkspace({
 }) {
   const queryClient = useQueryClient();
   const [detailJob, setDetailJob] = useState<PipelineJob | null>(null);
+  const [tab, setTab] = useState("board");
+  /**
+   * The families view opens New batch itself, pre-set to Packing with the
+   * parent filled — the prototype's `quickAddPackingFor`. Held here rather
+   * than inside the families view so there is one dialog on the page, not one
+   * per family card.
+   */
+  const [packingParent, setPackingParent] = useState<string | null>(null);
+  const [newBatchOpen, setNewBatchOpen] = useState(false);
 
   const {
     data: jobs = [],
@@ -122,14 +135,42 @@ export function PipelineWorkspace({
         </div>
 
         {canManage && (
-          <NewJobDialog
-            factoryId={factoryId}
-            userId={userId}
-            available={available}
-            onCreated={refresh}
-          />
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {/* Secondary, and kept: picking twenty already-catalogued batches
+                off a list is still the fastest way to fill the board, and the
+                typed form is the wrong shape for it. */}
+            <NewJobDialog
+              factoryId={factoryId}
+              userId={userId}
+              available={available}
+              onCreated={refresh}
+            />
+            <NewBatchDialog
+              factoryId={factoryId}
+              userId={userId}
+              products={products}
+              jobs={jobs}
+              open={newBatchOpen}
+              onOpenChange={(open) => {
+                setNewBatchOpen(open);
+                // The preset only belongs to the run that opened it — leaving
+                // it set would make the next New batch open on Packing under
+                // a parent nobody chose.
+                if (!open) setPackingParent(null);
+              }}
+              presetParentId={packingParent}
+              onCreated={refresh}
+            />
+          </div>
         )}
       </div>
+
+      <AdminTabs
+        tabs={PIPELINE_TABS}
+        active={tab}
+        label="Pipeline views"
+        onSelect={setTab}
+      />
 
       {!isPending && !hasFinalStage && jobs.length > 0 && (
         <div className="mb-4 flex shrink-0 items-start gap-2.5 rounded-xl border border-warn-line bg-warn-tint px-4 py-3 text-sm text-warn-ink shadow-[inset_0_1px_2px_rgb(180_83_9/0.06)]">
@@ -159,10 +200,20 @@ export function PipelineWorkspace({
           </p>
           <p className="mt-1 text-xs text-ink-5">
             {canManage
-              ? "Use New job to start tracking batches from the catalogue."
+              ? "Use New batch to raise one, or From catalogue to pick several."
               : "A manager adds batches from the product catalogue."}
           </p>
         </div>
+      ) : tab === "families" ? (
+        <BatchFamilies
+          jobs={jobs}
+          canManage={canManage}
+          onOpen={setDetailJob}
+          onAddPacking={(parentId) => {
+            setPackingParent(parentId);
+            setNewBatchOpen(true);
+          }}
+        />
       ) : (
         <PipelineBoard
           jobs={jobs}

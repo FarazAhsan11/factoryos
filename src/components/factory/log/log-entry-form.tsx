@@ -61,7 +61,7 @@ import {
   findEquipment,
 } from "@/lib/factory/equipment-queries";
 import { actionKeys } from "@/lib/factory/action-queries";
-import { pipelineKeys } from "@/lib/factory/pipeline-queries";
+import { fetchPipelineJobs, pipelineKeys } from "@/lib/factory/pipeline-queries";
 import { fetchProducts, productKeys } from "@/lib/factory/product-queries";
 import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
 import {
@@ -164,6 +164,13 @@ export function LogEntryForm({
   const { data: employees = [] } = useQuery({
     queryKey: employeeKeys.all(factoryId),
     queryFn: () => fetchEmployees(factoryId),
+  });
+  // The board, for the batch panel's family context — what kind of batch this
+  // is, whose bulk it draws on, and how much of it is left. Same cache key the
+  // Pipeline page uses, so arriving from there costs nothing.
+  const { data: pipelineJobs = [] } = useQuery({
+    queryKey: pipelineKeys.all(factoryId),
+    queryFn: () => fetchPipelineJobs(factoryId),
   });
 
   const activeUnits = useMemo(
@@ -379,6 +386,16 @@ export function LogEntryForm({
   const equipment = useMemo(
     () => findEquipment(equipmentList, equipmentNo),
     [equipmentList, equipmentNo],
+  );
+
+  // The batch's card, when it has one. Null is ordinary, not an error: a
+  // factory can log against catalogue batches it never puts on the board.
+  const job = useMemo(
+    () =>
+      product
+        ? (pipelineJobs.find((j) => j.product_id === product.id) ?? null)
+        : null,
+    [pipelineJobs, product],
   );
 
   // Accumulative total: everything already logged for this batch + activity,
@@ -768,6 +785,7 @@ export function LogEntryForm({
             query={(batchNo ?? "").trim()}
             product={product}
             runningTotal={runningTotal}
+            job={job}
           />
         </section>
 

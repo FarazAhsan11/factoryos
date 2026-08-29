@@ -201,6 +201,60 @@ Tenant-gated placeholder: top bar with the factory logo/name + "Factory Admin" b
 
 ---
 
+## 9b. Batch families — migration 0031
+
+The pipeline learned what *kind* of batch it is looking at, and which batches
+belong together.
+
+**The problem.** A batch was one catalogue row, one card, one number. That
+describes a plant that manufactures and packs under a single batch number and
+nothing else. The customer whose packing runs carry their own numbers —
+46000 bulk, then 46001 / 46002 / 46003 filling 30s, 60s and 120s out of it —
+had no way to say so, so nothing could answer the question their planner
+actually asks: *is there enough bulk for all three packing runs?*
+
+**What landed.**
+
+- `pipeline_jobs.batch_type` — `manufacturing | packing | combined`. Combined
+  is the default and the backfill, because it is what every job written before
+  this already was.
+- `parent_job_id`, a self-FK with `on delete set null`. Taking a bulk card off
+  the board must not delete three real packing batches; a child that loses its
+  parent becomes "external bulk", which is a legitimate state.
+- The pack/bulk columns: `pack_size`, `pack_unit`, `bulk_unit`,
+  `bulk_qty_received`, `market`, `overage_pct`, plus `priority`, `due_date`,
+  `notes`. `rework_source_id` is there and unused — the type is deferred, and
+  leaving the column means adding it later reshapes no rows.
+- `pipeline_jobs_family_guard`, holding every rule a `check` cannot see across
+  rows: only a packing job has a parent, the parent is manufacturing and in the
+  same factory, one level deep, pack size required, and a parent may not be
+  re-typed while children draw on it.
+- `pipeline_jobs_expanded` gains the type, the parent's batch number,
+  `child_count`, `allocated_qty` (Σ children `required_qty × pack_size`) and
+  `bulk_consumed` (Σ entry qty × pack size).
+
+**What was deliberately not added.** `ordered_qty` and `bulk_target_qty`. The
+prototype carries both on the batch and both are already
+`factory_products.required_qty` — 210,000 tablets on the parent, 1,000 bottles
+on a child. A second copy would hand the overrun check (0023) and the
+allocation bar different numbers to disagree about.
+
+**UI.** A **New batch** dialog in two steps — the type cards first, because the
+answer changes what the second step asks for — and a **Batch families** tab
+beside the Kanban board. The batch itself is *picked from the catalogue*, never
+typed: Admin → Products owns the batch number, name, code, work order and
+required quantity, and the shift log resolves entries against that same row.
+The board's cards carry a type badge and a `← 46000 bulk` link, and the shift
+log's batch panel shows a packing run's bulk received / consumed / remaining
+and warns when it is still waiting on its parent.
+
+**Next.** Per-stage planning: a route on the product copied onto the batch,
+per-stage targets, an issue gate refusing producing entries against an
+unplanned batch, and completion re-based on the last stage of the plan — which
+is what finally retires `factory_processes.is_final_stage`.
+
+---
+
 ## 10. Next steps
 
 - **Actions** — `action_flag` is captured on every log entry but nothing consumes it yet; this is where a flagged entry becomes a tracked action item.

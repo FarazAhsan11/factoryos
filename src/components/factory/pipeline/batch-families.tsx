@@ -238,15 +238,23 @@ function FamilyGroup({
                   Bulk allocation
                 </span>
                 <span className="font-mono text-ink-4">
-                  {fmt(allocation.allocated)} / {fmt(allocation.target)}{" "}
+                  {fmt(allocation.allocated)} / {fmt(allocation.allowance)}{" "}
                   {parent.bulk_unit ?? "units"} ({allocation.pct}%)
+                  <span className="text-ink-5">
+                    {" · "}
+                    {allocation.fromActual
+                      ? "actually made"
+                      : allocation.allowance > allocation.target
+                        ? `target +${parent.overage_pct}%`
+                        : "bulk target"}
+                  </span>
                 </span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-line">
                 <div
                   className="h-full rounded-full transition-[width]"
                   style={{
-                    width: `${Math.min(100, allocation.pct)}%`,
+                    width: `${allocation.barPct}%`,
                     background: allocation.ok
                       ? "var(--color-brand)"
                       : "var(--color-danger)",
@@ -262,8 +270,12 @@ function FamilyGroup({
                 )}
               >
                 {allocation.ok
-                  ? "✓ Bulk sufficient"
-                  : `⚠ Allocated exceeds bulk target by ${fmt(allocation.allocated - allocation.target)}`}
+                  ? allocation.fromActual
+                    ? `✓ Bulk sufficient — measured against the ${fmt(allocation.allowance)} actually made`
+                    : allocation.allocated > allocation.target
+                      ? `✓ Bulk sufficient — within the +${parent.overage_pct}% overage`
+                      : "✓ Bulk sufficient"
+                  : `⚠ Allocated exceeds the available bulk by ${fmt(allocation.over)}`}
               </p>
             </div>
           )}

@@ -46,6 +46,7 @@ import {
   swapStageOrder,
   updateBatchStage,
   type BatchStage,
+  plannedOverOrder,
 } from "@/lib/factory/batch-stage-queries";
 import { pipelineKeys, type PipelineJob } from "@/lib/factory/pipeline-queries";
 import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
@@ -162,6 +163,18 @@ export function PlanStagesDialog({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  /**
+   * Does this plan set out to make more than was ordered?
+   *
+   * Said here because here is the only place the two numbers meet. Warned,
+   * never blocked — a plant does sometimes plan extra on purpose, and the
+   * declared overage is already subtracted before anything is said.
+   */
+  const overOrder = useMemo(
+    () => plannedOverOrder(stages, job?.required_qty, job?.overage_pct),
+    [stages, job?.required_qty, job?.overage_pct],
+  );
+
   /** The room being picked in the inline edit row, alongside the target. */
   const [editRoom, setEditRoom] = useState<string>("");
   /**
@@ -262,6 +275,25 @@ export function PlanStagesDialog({
               </p>
             )}
           </div>
+
+          {/* The plan aims past the order. Not a refusal: the number that
+              matters is on screen, and whoever set it can decide whether the
+              order quantity is stale or a target is wrong. */}
+          {overOrder && overOrder.over > 0 && (
+            <p className="mx-5 mt-2.5 shrink-0 rounded-xl border border-warn-line bg-warn-tint px-3.5 py-2.5 text-xs text-warn-ink">
+              <strong className="font-semibold">
+                This plan makes {fmt(overOrder.planned)} against an order of{" "}
+                {fmt(Number(job?.required_qty ?? 0))}
+                {Number(job?.overage_pct ?? 0) > 0
+                  ? ` (+${job?.overage_pct}% = ${fmt(overOrder.allowed)} allowed)`
+                  : ""}
+                .
+              </strong>{" "}
+              {fmt(overOrder.over)} more than permitted. Correct a stage target,
+              or raise the required quantity in Admin &amp; Settings → Products
+              if the order really is larger.
+            </p>
+          )}
 
           <div className="scrollbar-slim min-h-0 flex-1 space-y-2.5 overflow-y-auto px-5 py-4">
             {isPending ? (

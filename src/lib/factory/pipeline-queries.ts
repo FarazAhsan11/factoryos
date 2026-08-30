@@ -511,10 +511,33 @@ export interface Allocation {
   allocated: number;
   /** The parent's own required quantity — the bulk it will produce. */
   target: number;
-  /** 0–110, clamped so an over-allocated bar still renders as a bar. */
+  /**
+   * What the children may actually claim: the greater of what the parent was
+   * planned to make (target + declared overage) and what it has actually
+   * made.
+   *
+   * Two readings of one question, and which is right depends on whether the
+   * bulk exists yet. Before it runs, the plan is all there is — the same
+   * allowance the shift log's over-production check uses (0032), so 4% means
+   * one thing in both places. Once it has run, the drum holds what it holds:
+   * a batch planned at 100,000 that made 120,000 has 120,000 to give away,
+   * and reporting a 16,000 shortfall against bulk sitting on a pallet is the
+   * kind of false alarm that teaches planners to ignore the bar.
+   *
+   * Never *below* the plan: a batch half way through has not lost the bulk it
+   * has yet to make.
+   */
+  allowance: number;
+  /** True when `allowance` came from real output rather than from the plan. */
+  fromActual: boolean;
+  /** The true percentage of the target claimed — uncapped, so it can read 120. */
   pct: number;
-  /** False once the children ask for more bulk than the parent will make. */
+  /** Width for the bar, 0–100. The number to show is `pct`. */
+  barPct: number;
+  /** False once the children claim more bulk than the parent is allowed to give. */
   ok: boolean;
+  /** How far past the allowance, or 0. The number that needs an explanation. */
+  over: number;
 }
 
 /**
@@ -533,11 +556,21 @@ export function allocationFor(parent: PipelineJob): Allocation | null {
   const allocated = Number(parent.allocated_qty ?? 0);
   if (!target || parent.allocated_qty === null) return null;
 
+  // Floored for the same reason 0032 floors it: half a tablet of headroom
+  // should not decide whether a planner has to account for an overrun.
+  const planned = Math.floor(target * (1 + Number(parent.overage_pct ?? 0) / 100));
+  const made = Number(parent.produced_qty ?? 0);
+  const allowance = Math.max(planned, made);
+
   return {
     allocated,
     target,
-    pct: Math.min(110, Math.round((allocated / target) * 100)),
-    ok: allocated <= target,
+    allowance,
+    fromActual: made > planned,
+    pct: Math.round((allocated / allowance) * 100),
+    barPct: Math.min(100, Math.round((allocated / allowance) * 100)),
+    ok: allocated <= allowance,
+    over: Math.max(0, allocated - allowance),
   };
 }
 

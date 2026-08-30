@@ -46,6 +46,7 @@ import {
   swapStageOrder,
   updateBatchStage,
   type BatchStage,
+  plannedOverOrder,
 } from "@/lib/factory/batch-stage-queries";
 import { pipelineKeys, type PipelineJob } from "@/lib/factory/pipeline-queries";
 import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
@@ -143,11 +144,18 @@ export function PlanStagesDialog({
       id,
       target,
       unitId,
+      parallel,
     }: {
       id: string;
       target: number;
       unitId: string | null;
-    }) => updateBatchStage(id, { target_qty: target, unit_id: unitId }),
+      parallel: boolean;
+    }) =>
+      updateBatchStage(id, {
+        target_qty: target,
+        unit_id: unitId,
+        can_run_parallel: parallel,
+      }),
     onSuccess: async () => {
       setEditing(null);
       await refresh();
@@ -155,8 +163,29 @@ export function PlanStagesDialog({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  /**
+   * Does this plan set out to make more than was ordered?
+   *
+   * Said here because here is the only place the two numbers meet. Warned,
+   * never blocked — a plant does sometimes plan extra on purpose, and the
+   * declared overage is already subtracted before anything is said.
+   */
+  const overOrder = useMemo(
+    () => plannedOverOrder(stages, job?.required_qty, job?.overage_pct),
+    [stages, job?.required_qty, job?.overage_pct],
+  );
+
   /** The room being picked in the inline edit row, alongside the target. */
   const [editRoom, setEditRoom] = useState<string>("");
+  /**
+   * Whether the stage being edited may overlap the one before it.
+   *
+   * Editable after the fact, not only when the stage is added: a plan is
+   * rewritten as a batch is scheduled, and the one route out of a wrong answer
+   * used to be deleting the stage and re-adding it — impossible once anything
+   * has been logged against it (`batch_stages_guard_delete`).
+   */
+  const [editParallel, setEditParallel] = useState(false);
 
   const move = useMutation({
     mutationFn: ({ a, b }: { a: BatchStage; b: BatchStage }) =>
@@ -239,13 +268,32 @@ export function PlanStagesDialog({
                 {stages.length === 0
                   ? "Add every stage that produces something, give each a target, then issue the batch."
                   : missing.length > 0
-                    ? `${missing.length} stage${missing.length === 1 ? "" : "s"} still need a target: ${missing.map(stageName).join(", ")}.`
+                    ? `${missing.length} stage${missing.length === 1 ? " still needs" : "s still need"} a target: ${missing.map(stageName).join(", ")}.`
                     : "Every stage has a target — this batch is ready to issue."}{" "}
                 Producing entries are refused until it is; downtime is always
                 allowed.
               </p>
             )}
           </div>
+
+          {/* The plan aims past the order. Not a refusal: the number that
+              matters is on screen, and whoever set it can decide whether the
+              order quantity is stale or a target is wrong. */}
+          {overOrder && overOrder.over > 0 && (
+            <p className="mx-5 mt-2.5 shrink-0 rounded-xl border border-warn-line bg-warn-tint px-3.5 py-2.5 text-xs text-warn-ink">
+              <strong className="font-semibold">
+                This plan makes {fmt(overOrder.planned)} against an order of{" "}
+                {fmt(Number(job?.required_qty ?? 0))}
+                {Number(job?.overage_pct ?? 0) > 0
+                  ? ` (+${job?.overage_pct}% = ${fmt(overOrder.allowed)} allowed)`
+                  : ""}
+                .
+              </strong>{" "}
+              {fmt(overOrder.over)} more than permitted. Correct a stage target,
+              or raise the required quantity in Admin &amp; Settings → Products
+              if the order really is larger.
+            </p>
+          )}
 
           <div className="scrollbar-slim min-h-0 flex-1 space-y-2.5 overflow-y-auto px-5 py-4">
             {isPending ? (
@@ -273,10 +321,13 @@ export function PlanStagesDialog({
                   rooms={rooms}
                   editRoom={editRoom}
                   onEditRoom={setEditRoom}
+                  editParallel={editParallel}
+                  onEditParallel={setEditParallel}
                   onBeginEdit={() => {
                     setEditing(stage.id);
                     setEditQty(stage.target_qty ? String(stage.target_qty) : "");
                     setEditRoom(stage.unit_id ?? "");
+                    setEditParallel(stage.can_run_parallel);
                   }}
                   onCancelEdit={() => setEditing(null)}
                   onSaveEdit={() => {
@@ -289,6 +340,7 @@ export function PlanStagesDialog({
                       id: stage.id,
                       target: value,
                       unitId: editRoom || null,
+                      parallel: editParallel,
                     });
                   }}
                   onMoveUp={
@@ -373,6 +425,8 @@ function StageRow({
   rooms,
   editRoom,
   onEditRoom,
+  editParallel,
+  onEditParallel,
   onBeginEdit,
   onCancelEdit,
   onSaveEdit,
@@ -392,6 +446,8 @@ function StageRow({
   rooms: { id: string; name: string }[];
   editRoom: string;
   onEditRoom: (v: string) => void;
+  editParallel: boolean;
+  onEditParallel: (v: boolean) => void;
   onBeginEdit: () => void;
   onCancelEdit: () => void;
   onSaveEdit: () => void;
@@ -541,6 +597,19 @@ function StageRow({
                   </option>
                 ))}
               </select>
+              {/* Meaningless on the first stage, which has nothing before
+                  it to overlap and is startable regardless. */}
+              {index > 0 && (
+                <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-ink-4">
+                  <input
+                    type="checkbox"
+                    checked={editParallel}
+                    onChange={(e) => onEditParallel(e.target.checked)}
+                    className="size-3.5 accent-[var(--color-brand)]"
+                  />
+                  Can run in parallel with the stage before it
+                </label>
+              )}
               <SmallButton onClick={onSaveEdit} primary>
                 Save
               </SmallButton>
@@ -549,7 +618,7 @@ function StageRow({
           ) : (
             <>
               <SmallButton onClick={onBeginEdit}>
-                {stage.target_qty ? "Edit target & room" : "Set target & room"}
+                {stage.target_qty ? "Edit stage" : "Set target & room"}
               </SmallButton>
               {stage.status === "pending" && canStart && (
                 <SmallButton onClick={onStart}>

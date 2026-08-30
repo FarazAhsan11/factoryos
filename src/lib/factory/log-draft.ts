@@ -58,10 +58,35 @@ export function readLogDraft(
       clearLogDraft(factoryId, userId);
       return null;
     }
-    return parsed.values;
+    return sanitise(parsed.values);
   } catch {
     return null;
   }
+}
+
+/**
+ * Strips the nulls a round-trip through JSON leaves behind.
+ *
+ * An empty number input registered with `valueAsNumber` holds **NaN**, and
+ * `JSON.stringify(NaN)` writes `null`. Restored as-is, every unfilled quantity
+ * comes back as a null the schema has no branch for, and the form refuses to
+ * submit — pointing at a field the current shape may not even render. Dropping
+ * the key is the honest restore: it was never recorded.
+ *
+ * Applied on **both** sides. On write so nothing new is stored this way, and
+ * on read so a draft already sitting in someone's browser heals itself rather
+ * than waiting out its twelve hours.
+ */
+function sanitise(
+  values: Partial<LogEntryValues>,
+): Partial<LogEntryValues> {
+  const clean: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(values)) {
+    if (v === null) continue;
+    if (typeof v === "number" && Number.isNaN(v)) continue;
+    clean[k] = v;
+  }
+  return clean as Partial<LogEntryValues>;
 }
 
 export function writeLogDraft(
@@ -70,7 +95,7 @@ export function writeLogDraft(
   values: Partial<LogEntryValues>,
 ): void {
   try {
-    const payload: Stored = { savedAt: Date.now(), values };
+    const payload: Stored = { savedAt: Date.now(), values: sanitise(values) };
     window.localStorage.setItem(key(factoryId, userId), JSON.stringify(payload));
   } catch {
     // Quota, private mode, disabled storage — the form still works without it.

@@ -312,3 +312,54 @@ export function stageIsNext(stages: BatchStage[], index: number): boolean {
 export function stagesWithoutTarget(stages: BatchStage[]): BatchStage[] {
   return stages.filter((s) => !s.target_qty || s.target_qty <= 0);
 }
+
+/**
+ * The stages that together finish a batch — the client's copy of
+ * `batch_final_group()` (migration 0036).
+ *
+ * The last stage, plus every stage contiguously before it marked as able to
+ * run in parallel. One row for a single-file plan; all three for a tail of
+ * packing runs that start together.
+ *
+ * Expects `stages` in plan order, which is how `fetchBatchStages` returns
+ * them.
+ */
+export function finalStageGroup(stages: BatchStage[]): BatchStage[] {
+  if (stages.length === 0) return [];
+
+  const group = [stages[stages.length - 1]];
+  for (let i = stages.length - 1; i > 0; i--) {
+    if (!group[group.length - 1].can_run_parallel) break;
+    group.push(stages[i - 1]);
+  }
+  return group.reverse();
+}
+
+/**
+ * How far a plan's finish overshoots what was actually ordered, or 0.
+ *
+ * The one place the order quantity and the plan's targets meet. Nothing else
+ * compares them: the over-production flag measures each entry against *its
+ * stage's* target, and `issue_job()` only asks that every stage has one — so
+ * a plan that quietly authorises 20% extra is agreed with by every check
+ * downstream, because the plan is what they all read.
+ *
+ * Measured against the order plus its declared overage, like every other
+ * tolerance in the app (0032).
+ */
+export function plannedOverOrder(
+  stages: BatchStage[],
+  requiredQty: number | null | undefined,
+  overagePct: number | null | undefined,
+): { planned: number; allowed: number; over: number } | null {
+  const ordered = Number(requiredQty ?? 0);
+  if (!ordered) return null;
+
+  const group = finalStageGroup(stages);
+  if (group.length === 0 || group.some((s) => !s.target_qty)) return null;
+
+  const planned = group.reduce((sum, s) => sum + Number(s.target_qty ?? 0), 0);
+  const allowed = Math.floor(ordered * (1 + Number(overagePct ?? 0) / 100));
+
+  return { planned, allowed, over: Math.max(0, planned - allowed) };
+}

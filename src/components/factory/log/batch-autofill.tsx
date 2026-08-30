@@ -1,7 +1,7 @@
 "use client";
 
 import { BatchTypeBadge } from "@/components/factory/pipeline/batch-type-badge";
-import { bulkRemaining, type PipelineJob } from "@/lib/factory/pipeline-queries";
+import { bulkRemaining, type PipelineJob, packUnitSingular } from "@/lib/factory/pipeline-queries";
 import type { Product } from "@/lib/factory/product-queries";
 import { cn } from "@/lib/utils";
 
@@ -51,7 +51,27 @@ export function BatchAutofill({
   }
 
   const required = product.required_qty;
-  const pct = required > 0 ? Math.round((runningTotal / required) * 100) : null;
+
+  /**
+   * Batch-level progress, drawn **only for a batch with no plan**.
+   *
+   * A planned batch shows a bar per stage instead — against that stage's own
+   * target, in that stage's own unit — which is the question an operator
+   * filling this form actually has. A single order-level number cannot be
+   * right beside it: dividing a stage total by the order quantity mixes units
+   * (60 kg dispensed is not 60 of 100,000 tablets), and reading the plan's
+   * last stage alone reports 0% on a batch whose parallel packing runs are
+   * half done.
+   *
+   * Unplanned batches have no stage bar, so the per-activity total against the
+   * required quantity stays the best available answer — and is what every
+   * entry showed before stage planning landed.
+   */
+  const planned = Boolean(job && job.stage_count > 0);
+  const pct =
+    !planned && required > 0
+      ? Math.round((runningTotal / required) * 100)
+      : null;
   const capped = pct === null ? 0 : Math.min(100, pct);
   const tone =
     pct === null
@@ -80,7 +100,7 @@ export function BatchAutofill({
             type={job.batch_type}
             detail={
               job.pack_size
-                ? `${fmt(job.pack_size)} per ${job.pack_unit ?? "container"}${job.market ? ` · ${job.market}` : ""}`
+                ? `${fmt(job.pack_size)} per ${packUnitSingular(job.pack_unit)}${job.market ? ` · ${job.market}` : ""}`
                 : undefined
             }
           />

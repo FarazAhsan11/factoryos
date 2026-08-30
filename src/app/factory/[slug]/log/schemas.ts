@@ -260,9 +260,17 @@ export function operatorsRequired(category: ProcessCategory): boolean {
 
 /** An optional number field: "" means "not recorded", not 0. */
 const optionalQty = z
-  .union([z.number(), z.nan()])
+  // `null` is in the union for one reason: the draft in localStorage. An empty
+  // number input registered with `valueAsNumber` holds NaN, and
+  // `JSON.stringify(NaN)` is `null` — so a restored draft feeds nulls into
+  // every unfilled quantity. Without this the form refuses to submit with
+  // "expected number, received null", against a field the current shape does
+  // not even render.
+  .union([z.number(), z.nan(), z.null()])
   .optional()
-  .transform((v) => (v === undefined || Number.isNaN(v) ? undefined : v))
+  .transform((v) =>
+    v === undefined || v === null || Number.isNaN(v) ? undefined : v,
+  )
   .refine((v) => v === undefined || v >= 0, "Enter a positive number.");
 
 export const logEntrySchema = z

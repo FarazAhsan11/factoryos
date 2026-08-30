@@ -862,7 +862,8 @@ export function LogEntryForm({
               <Cog className="mt-px size-3.5 shrink-0" aria-hidden />
               <span>
                 <strong className="font-semibold">
-                  Batch {batchNo} isn&rsquo;t issued for production yet.
+                  Batch {batchNo}{" "}
+                  <span>isn&rsquo;t issued for production yet.</span>
                 </strong>{" "}
                 A manager plans its stages on the Pipeline and issues it. You
                 can still log downtime against it.

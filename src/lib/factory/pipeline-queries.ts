@@ -552,3 +552,16 @@ export function bulkRemaining(job: PipelineJob): number | null {
   if (job.bulk_qty_received === null || job.bulk_consumed === null) return null;
   return Math.max(0, Number(job.bulk_qty_received) - Number(job.bulk_consumed));
 }
+
+/**
+ * "bottles" → "bottle", for the `30 per bottle` phrasing.
+ *
+ * The pack unit is stored plural because that is how it reads everywhere else
+ * — "1,000 bottles" — but "30 per bottles" is wrong in the one place the unit
+ * is used distributively. A trailing "s" is the whole rule: every value in
+ * `PACK_UNITS` is a regular plural.
+ */
+export function packUnitSingular(unit: string | null | undefined): string {
+  const value = (unit ?? "container").trim();
+  return value.endsWith("s") ? value.slice(0, -1) : value;
+}

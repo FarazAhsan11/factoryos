@@ -143,11 +143,18 @@ export function PlanStagesDialog({
       id,
       target,
       unitId,
+      parallel,
     }: {
       id: string;
       target: number;
       unitId: string | null;
-    }) => updateBatchStage(id, { target_qty: target, unit_id: unitId }),
+      parallel: boolean;
+    }) =>
+      updateBatchStage(id, {
+        target_qty: target,
+        unit_id: unitId,
+        can_run_parallel: parallel,
+      }),
     onSuccess: async () => {
       setEditing(null);
       await refresh();
@@ -157,6 +164,15 @@ export function PlanStagesDialog({
 
   /** The room being picked in the inline edit row, alongside the target. */
   const [editRoom, setEditRoom] = useState<string>("");
+  /**
+   * Whether the stage being edited may overlap the one before it.
+   *
+   * Editable after the fact, not only when the stage is added: a plan is
+   * rewritten as a batch is scheduled, and the one route out of a wrong answer
+   * used to be deleting the stage and re-adding it — impossible once anything
+   * has been logged against it (`batch_stages_guard_delete`).
+   */
+  const [editParallel, setEditParallel] = useState(false);
 
   const move = useMutation({
     mutationFn: ({ a, b }: { a: BatchStage; b: BatchStage }) =>
@@ -239,7 +255,7 @@ export function PlanStagesDialog({
                 {stages.length === 0
                   ? "Add every stage that produces something, give each a target, then issue the batch."
                   : missing.length > 0
-                    ? `${missing.length} stage${missing.length === 1 ? "" : "s"} still need a target: ${missing.map(stageName).join(", ")}.`
+                    ? `${missing.length} stage${missing.length === 1 ? " still needs" : "s still need"} a target: ${missing.map(stageName).join(", ")}.`
                     : "Every stage has a target — this batch is ready to issue."}{" "}
                 Producing entries are refused until it is; downtime is always
                 allowed.
@@ -273,10 +289,13 @@ export function PlanStagesDialog({
                   rooms={rooms}
                   editRoom={editRoom}
                   onEditRoom={setEditRoom}
+                  editParallel={editParallel}
+                  onEditParallel={setEditParallel}
                   onBeginEdit={() => {
                     setEditing(stage.id);
                     setEditQty(stage.target_qty ? String(stage.target_qty) : "");
                     setEditRoom(stage.unit_id ?? "");
+                    setEditParallel(stage.can_run_parallel);
                   }}
                   onCancelEdit={() => setEditing(null)}
                   onSaveEdit={() => {
@@ -289,6 +308,7 @@ export function PlanStagesDialog({
                       id: stage.id,
                       target: value,
                       unitId: editRoom || null,
+                      parallel: editParallel,
                     });
                   }}
                   onMoveUp={
@@ -373,6 +393,8 @@ function StageRow({
   rooms,
   editRoom,
   onEditRoom,
+  editParallel,
+  onEditParallel,
   onBeginEdit,
   onCancelEdit,
   onSaveEdit,
@@ -392,6 +414,8 @@ function StageRow({
   rooms: { id: string; name: string }[];
   editRoom: string;
   onEditRoom: (v: string) => void;
+  editParallel: boolean;
+  onEditParallel: (v: boolean) => void;
   onBeginEdit: () => void;
   onCancelEdit: () => void;
   onSaveEdit: () => void;
@@ -541,6 +565,19 @@ function StageRow({
                   </option>
                 ))}
               </select>
+              {/* Meaningless on the first stage, which has nothing before
+                  it to overlap and is startable regardless. */}
+              {index > 0 && (
+                <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-ink-4">
+                  <input
+                    type="checkbox"
+                    checked={editParallel}
+                    onChange={(e) => onEditParallel(e.target.checked)}
+                    className="size-3.5 accent-[var(--color-brand)]"
+                  />
+                  Can run in parallel with the stage before it
+                </label>
+              )}
               <SmallButton onClick={onSaveEdit} primary>
                 Save
               </SmallButton>
@@ -549,7 +586,7 @@ function StageRow({
           ) : (
             <>
               <SmallButton onClick={onBeginEdit}>
-                {stage.target_qty ? "Edit target & room" : "Set target & room"}
+                {stage.target_qty ? "Edit stage" : "Set target & room"}
               </SmallButton>
               {stage.status === "pending" && canStart && (
                 <SmallButton onClick={onStart}>

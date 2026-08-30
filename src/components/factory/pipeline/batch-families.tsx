@@ -8,8 +8,7 @@ import {
   PIPELINE_COLUMNS,
   allocationFor,
   familiesFrom,
-  type PipelineJob,
-} from "@/lib/factory/pipeline-queries";
+  type PipelineJob, packUnitSingular } from "@/lib/factory/pipeline-queries";
 import { cn } from "@/lib/utils";
 
 function fmt(n: number) {
@@ -325,7 +324,7 @@ function PackingChildRow({
           </span>
           {job.pack_size && (
             <span className="text-[10px] text-ink-5">
-              {fmt(job.pack_size)} per {job.pack_unit ?? "container"}
+              {fmt(job.pack_size)} per {packUnitSingular(job.pack_unit)}
               {job.market && ` · ${job.market}`}
             </span>
           )}

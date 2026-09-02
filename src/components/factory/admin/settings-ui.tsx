@@ -15,9 +15,6 @@ import { cn } from "@/lib/utils";
 export const FIELD =
   "h-10 w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)] outline-none transition placeholder:text-placeholder hover:border-line-strong focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12 disabled:cursor-not-allowed disabled:bg-sunken disabled:opacity-70";
 
-/** Same control, plus our own chevron — see `.select-chevron`. */
-export const SELECT = `${FIELD} select-chevron`;
-
 export const AREA =
   "w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)] outline-none transition placeholder:text-placeholder hover:border-line-strong focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12 disabled:cursor-not-allowed disabled:bg-sunken disabled:opacity-70";
 

@@ -15,6 +15,7 @@ import {
   type OverrunFlag,
 } from "@/lib/factory/shift-log-queries";
 import { todayKey } from "@/lib/factory/shift-time-queries";
+import { SelectField } from "@/components/ui/select-field";
 import { cn } from "@/lib/utils";
 
 /** Colour-codes a row the way the prototype's feed dots do. */
@@ -121,19 +122,18 @@ export function ActivityFeed({
 
       {unitNames.length > 1 && (
         <div className="shrink-0 border-b border-line-soft bg-sunken px-4 py-2.5">
-          <select
+          <SelectField
             value={unitFilter}
-            onChange={(e) => setUnitFilter(e.target.value)}
-            aria-label={`Filter by ${units.singular.toLowerCase()}`}
-            className="select-chevron h-9 w-full rounded-lg border border-line bg-surface px-2.5 text-xs font-medium text-ink outline-none transition hover:border-ink-6 focus:border-brand focus:ring-4 focus:ring-brand/12"
-          >
-            <option value="all">All {units.plural.toLowerCase()}</option>
-            {unitNames.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
+            onChange={setUnitFilter}
+            ariaLabel={`Filter by ${units.singular.toLowerCase()}`}
+            searchPlaceholder={`${units.singular} name…`}
+            emptyMessage={`No ${units.singular.toLowerCase()} matches that.`}
+            options={[
+              { value: "all", label: `All ${units.plural.toLowerCase()}` },
+              ...unitNames.map((name) => ({ value: name, label: name })),
+            ]}
+            className="h-9 rounded-lg px-2.5 text-xs font-medium"
+          />
         </div>
       )}
 

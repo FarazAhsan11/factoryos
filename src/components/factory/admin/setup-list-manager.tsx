@@ -23,6 +23,7 @@ import {
   type SetupItem,
   type SetupTable,
 } from "@/lib/factory/setup-queries";
+import { SelectField } from "@/components/ui/select-field";
 import { cn } from "@/lib/utils";
 
 import {
@@ -510,23 +511,19 @@ export function SetupListManager({
                         made for the first time. */}
                     {categoryList.length > 0 &&
                       (canManage ? (
-                        <select
+                        <SelectField
                           value={item.category ?? ""}
-                          onChange={(e) =>
-                            setCategory.mutate({
-                              id: item.id,
-                              category: e.target.value,
-                            })
+                          onChange={(category) =>
+                            setCategory.mutate({ id: item.id, category })
                           }
-                          aria-label={`${categoryLabel} of ${item.name}`}
-                          className="select-chevron h-7 shrink-0 rounded-full border border-line bg-sunken py-0 pr-6 pl-2.5 text-[11px] font-semibold text-ink-3 outline-none transition hover:border-line-strong focus:border-brand focus:ring-4 focus:ring-brand/12"
-                        >
-                          {categoryList.map((c) => (
-                            <option key={c.value} value={c.value}>
-                              {c.label}
-                            </option>
-                          ))}
-                        </select>
+                          ariaLabel={`${categoryLabel} of ${item.name}`}
+                          options={categoryList.map((c) => ({
+                            value: c.value,
+                            label: c.label,
+                            hint: c.hint,
+                          }))}
+                          className="h-7 w-auto shrink-0 rounded-full bg-sunken py-0 pr-2 pl-2.5 text-[11px] font-semibold text-ink-3"
+                        />
                       ) : (
                         <span className="shrink-0 rounded-full bg-sunken-2 px-2 py-0.5 text-[11px] font-medium text-ink-3">
                           {categoryList.find((c) => c.value === item.category)

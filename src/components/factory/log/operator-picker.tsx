@@ -8,6 +8,7 @@ import type {
   LogEntryValues,
 } from "@/app/factory/[slug]/log/schemas";
 import { CONTROL, Field } from "@/components/factory/log/log-fields";
+import { SelectField } from "@/components/ui/select-field";
 import type { Employee } from "@/lib/factory/employee-queries";
 import type { RunningShift } from "@/lib/factory/shift-time-queries";
 import { cn } from "@/lib/utils";
@@ -84,47 +85,59 @@ export function OperatorPicker({
       action={action}
       error={fieldState.error?.message}
     >
-      <select
-        className={CONTROL}
+      {/* On a producing or machine activity every row that exists is
+          required — an unwanted one is removed, not left blank. On waiting
+          time it may simply be left here, and the entry files without it. */}
+      <SelectField
+        ariaLabel={label}
         value={selectValue}
-        onChange={(e) => {
-          if (e.target.value === OTHER) {
+        onChange={(next) => {
+          if (next === OTHER) {
             setFreeText(true);
             field.onChange("");
             return;
           }
           setFreeText(false);
-          field.onChange(e.target.value);
+          field.onChange(next);
         }}
         onBlur={field.onBlur}
-        aria-label={label}
-      >
-        {/* On a producing or machine activity every row that exists is
-            required — an unwanted one is removed, not left blank. On waiting
-            time it may simply be left here, and the entry files without it. */}
-        <option value="">Select…</option>
-        {onShift.length > 0 && (
-          <optgroup label={`On ${shift} shift`}>
-            {[...onShift]
-              .sort((a, b) => a.localeCompare(b))
-              .map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-          </optgroup>
-        )}
-        {others.length > 0 && (
-          <optgroup label="Other staff">
-            {others.map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </optgroup>
-        )}
-        <option value={OTHER}>Not on the list…</option>
-      </select>
+        clearable
+        ariaInvalid={Boolean(fieldState.error)}
+        // A roster of forty is exactly the list the search box is for, and
+        // "Not on the list" is the last row rather than a group of its own —
+        // it is an escape hatch, not a third category of person.
+        searchPlaceholder="Name…"
+        emptyMessage="Nobody on the roster matches that."
+        groups={[
+          ...(onShift.length > 0
+            ? [
+                {
+                  label: `On ${shift} shift`,
+                  options: [...onShift]
+                    .sort((a, b) => a.localeCompare(b))
+                    .map((n) => ({ value: n, label: n })),
+                },
+              ]
+            : []),
+          ...(others.length > 0
+            ? [
+                {
+                  label: "Other staff",
+                  options: others.map((n) => ({ value: n, label: n })),
+                },
+              ]
+            : []),
+          // Headless, so it reads as a footer to the roster rather than a
+          // third category of person — and pinned, because typing a name the
+          // roster doesn't have is exactly when it is needed.
+          {
+            label: "",
+            options: [
+              { value: OTHER, label: "Not on the list…", pinned: true },
+            ],
+          },
+        ]}
+      />
 
       {freeText && (
         <input

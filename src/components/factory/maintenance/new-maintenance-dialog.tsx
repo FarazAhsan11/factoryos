@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, useWatch } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { Loader2, Plus, Wrench } from "lucide-react";
 import { toast } from "sonner";
 
@@ -25,13 +25,11 @@ import {
 } from "@/lib/factory/maintenance-queries";
 import { fetchProducts, productKeys } from "@/lib/factory/product-queries";
 import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
+import { SelectField } from "@/components/ui/select-field";
 import { cn } from "@/lib/utils";
 
 const CONTROL =
   "h-10 w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)] outline-none transition placeholder:text-placeholder hover:border-line-strong focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12";
-
-/** Same control, plus our own chevron — see `.select-chevron`. */
-const SELECT = CONTROL + " select-chevron";
 
 const EMPTY: MaintenanceRequestValues = {
   equipmentNo: "",
@@ -185,42 +183,57 @@ export function NewMaintenanceDialog({
                   htmlFor="mr-unit"
                   note="(optional)"
                 >
-                  <select
-                    id="mr-unit"
-                    className={SELECT}
-                    {...register("unitId")}
-                  >
-                    <option value="">
-                      Not {unitWord.toLowerCase()}-specific
-                    </option>
-                    {activeUnits.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name}
-                      </option>
-                    ))}
-                  </select>
+                  <Controller
+                    name="unitId"
+                    control={control}
+                    render={({ field }) => (
+                      <SelectField
+                        id="mr-unit"
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        // A utility fault belongs to no one room, which is an
+                        // answer rather than an unfilled field.
+                        clearable
+                        clearLabel={`Not ${unitWord.toLowerCase()}-specific`}
+                        placeholder={`Not ${unitWord.toLowerCase()}-specific`}
+                        searchPlaceholder={`${unitWord} name…`}
+                        options={activeUnits.map((u) => ({
+                          value: u.id,
+                          label: u.name,
+                        }))}
+                      />
+                    )}
+                  />
                 </Field>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label="Department needed" htmlFor="mr-dept">
-                  <select
-                    id="mr-dept"
-                    className={SELECT}
-                    disabled={activeDepartments.length === 0}
-                    {...register("departmentId")}
-                  >
-                    <option value="">
-                      {activeDepartments.length === 0
-                        ? "None set up yet"
-                        : "Select department…"}
-                    </option>
-                    {activeDepartments.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name}
-                      </option>
-                    ))}
-                  </select>
+                  <Controller
+                    name="departmentId"
+                    control={control}
+                    render={({ field }) => (
+                      <SelectField
+                        id="mr-dept"
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        ariaInvalid={Boolean(errors.departmentId)}
+                        disabled={activeDepartments.length === 0}
+                        clearable
+                        placeholder={
+                          activeDepartments.length === 0
+                            ? "None set up yet"
+                            : "Select department…"
+                        }
+                        options={activeDepartments.map((d) => ({
+                          value: d.id,
+                          label: d.name,
+                        }))}
+                      />
+                    )}
+                  />
                   {/* Says where the list comes from rather than silently
                     offering an empty dropdown — the fix is one tab away. */}
                   {activeDepartments.length === 0 && (
@@ -231,17 +244,23 @@ export function NewMaintenanceDialog({
                 </Field>
 
                 <Field label="Priority" htmlFor="mr-priority">
-                  <select
-                    id="mr-priority"
-                    className={SELECT}
-                    {...register("priority")}
-                  >
-                    {MAINTENANCE_PRIORITIES.map((p) => (
-                      <option key={p.value} value={p.value}>
-                        {p.label} — {p.hint}
-                      </option>
-                    ))}
-                  </select>
+                  <Controller
+                    name="priority"
+                    control={control}
+                    render={({ field }) => (
+                      <SelectField
+                        id="mr-priority"
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        options={MAINTENANCE_PRIORITIES.map((p) => ({
+                          value: p.value,
+                          label: p.label,
+                          meta: p.hint,
+                        }))}
+                      />
+                    )}
+                  />
                 </Field>
               </div>
 
@@ -299,23 +318,29 @@ export function NewMaintenanceDialog({
                   htmlFor="mr-initiating"
                   note="(optional)"
                 >
-                  <select
-                    id="mr-initiating"
-                    className={SELECT}
-                    disabled={activeDepartments.length === 0}
-                    {...register("initiatingDepartmentId")}
-                  >
-                    <option value="">
-                      {activeDepartments.length === 0
-                        ? "None set up yet"
-                        : "Select department…"}
-                    </option>
-                    {activeDepartments.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name}
-                      </option>
-                    ))}
-                  </select>
+                  <Controller
+                    name="initiatingDepartmentId"
+                    control={control}
+                    render={({ field }) => (
+                      <SelectField
+                        id="mr-initiating"
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        disabled={activeDepartments.length === 0}
+                        clearable
+                        placeholder={
+                          activeDepartments.length === 0
+                            ? "None set up yet"
+                            : "Select department…"
+                        }
+                        options={activeDepartments.map((d) => ({
+                          value: d.id,
+                          label: d.name,
+                        }))}
+                      />
+                    )}
+                  />
                 </Field>
               </div>
             </div>

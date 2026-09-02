@@ -31,6 +31,7 @@ import {
   PANEL,
   PanelHeader,
 } from "@/components/factory/admin/settings-ui";
+import { SelectField } from "@/components/ui/select-field";
 import { cn } from "@/lib/utils";
 
 const STATUS: Record<EmployeeStatus, { label: string; className: string }> = {
@@ -212,23 +213,21 @@ export function EmployeesPanel({
                     <td className="px-4 py-3 text-ink-4">{person.email}</td>
                     <td className="px-4 py-3">
                       {isAdmin && assignable ? (
-                        <select
+                        <SelectField
                           value={person.role}
-                          aria-label={`Role for ${person.email}`}
-                          onChange={(e) =>
+                          ariaLabel={`Role for ${person.email}`}
+                          onChange={(role) =>
                             edit.mutate({
                               profileId: person.id,
-                              role: e.target.value as AssignableRole,
+                              role: role as AssignableRole,
                             })
                           }
-                          className="h-8 rounded-lg border border-line bg-surface px-2 text-sm text-ink outline-none transition focus:border-brand"
-                        >
-                          {ASSIGNABLE_ROLES.map((role) => (
-                            <option key={role} value={role}>
-                              {ROLE_LABELS[role]}
-                            </option>
-                          ))}
-                        </select>
+                          options={ASSIGNABLE_ROLES.map((role) => ({
+                            value: role,
+                            label: ROLE_LABELS[role],
+                          }))}
+                          className="h-8 w-36 rounded-lg px-2"
+                        />
                       ) : (
                         <span className="text-ink-3">
                           {ROLE_LABELS[person.role] ?? person.role}
@@ -237,23 +236,21 @@ export function EmployeesPanel({
                     </td>
                     <td className="px-4 py-3">
                       {isAdmin ? (
-                        <select
+                        <SelectField
                           value={person.default_shift}
-                          aria-label={`Default shift for ${person.email}`}
-                          onChange={(e) =>
+                          ariaLabel={`Default shift for ${person.email}`}
+                          onChange={(defaultShift) =>
                             edit.mutate({
                               profileId: person.id,
-                              defaultShift: e.target.value as ShiftSlot,
+                              defaultShift: defaultShift as ShiftSlot,
                             })
                           }
-                          className="h-8 rounded-lg border border-line bg-surface px-2 text-sm text-ink outline-none transition focus:border-brand"
-                        >
-                          {SHIFT_SLOTS.map((shift) => (
-                            <option key={shift} value={shift}>
-                              {SHIFT_LABELS[shift]}
-                            </option>
-                          ))}
-                        </select>
+                          options={SHIFT_SLOTS.map((shift) => ({
+                            value: shift,
+                            label: SHIFT_LABELS[shift],
+                          }))}
+                          className="h-8 w-36 rounded-lg px-2"
+                        />
                       ) : (
                         <span className="text-ink-3">
                           {SHIFT_LABELS[person.default_shift] ??

@@ -49,11 +49,11 @@ import {
   FieldRow,
   MONO,
   SECTION,
-  SELECT,
   SectionTitle,
 } from "@/components/factory/log/log-fields";
 import { OperatorPicker } from "@/components/factory/log/operator-picker";
 import { TimeField } from "@/components/ui/date-picker";
+import { SelectField } from "@/components/ui/select-field";
 import { employeeKeys, fetchEmployees } from "@/lib/factory/employee-queries";
 import {
   equipmentKeys,
@@ -685,41 +685,58 @@ export function LogEntryForm({
               htmlFor="log-unit"
               error={errors.unitId?.message}
             >
-              <select id="log-unit" className={SELECT} {...register("unitId")}>
-                <option value="">Select…</option>
-                {activeUnits.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                  </option>
-                ))}
-              </select>
+              <Controller
+                name="unitId"
+                control={control}
+                render={({ field }) => (
+                  <SelectField
+                    id="log-unit"
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    ariaInvalid={Boolean(errors.unitId)}
+                    searchPlaceholder={`${units.singular} name…`}
+                    emptyMessage={`No ${units.singular.toLowerCase()} matches that.`}
+                    options={activeUnits.map((u) => ({
+                      value: u.id,
+                      label: u.name,
+                    }))}
+                  />
+                )}
+              />
             </Field>
             <Field
               label="Activity / stage"
               htmlFor="log-process"
               error={errors.processId?.message}
             >
-              <select
-                id="log-process"
-                className={SELECT}
-                {...register("processId")}
-              >
-                <option value="">Select…</option>
-                {/* Name only under a category heading. The machine / output
-                    flags stay out of it — they are configuration, not
-                    something the operator picks between, and the form already
-                    shows their effect by revealing or hiding Speed and Output
-                    the moment a stage is selected. */}
-                {processGroups.map((g) => (
-                  <optgroup key={g.label} label={g.label}>
-                    {g.items.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
+              {/* Name only under a category heading. The machine / output
+                  flags stay out of it — they are configuration, not something
+                  the operator picks between, and the form already shows their
+                  effect by revealing or hiding Speed and Output the moment a
+                  stage is selected. */}
+              <Controller
+                name="processId"
+                control={control}
+                render={({ field }) => (
+                  <SelectField
+                    id="log-process"
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    ariaInvalid={Boolean(errors.processId)}
+                    searchPlaceholder="Activity name…"
+                    emptyMessage="No activity matches that."
+                    groups={processGroups.map((g) => ({
+                      label: g.label,
+                      options: g.items.map((proc) => ({
+                        value: proc.id,
+                        label: proc.name,
+                      })),
+                    }))}
+                  />
+                )}
+              />
             </Field>
             {/* Read-only: the start and end times already say which shift this
                 was, so asking again would only invite the two to disagree. */}
@@ -882,21 +899,26 @@ export function LogEntryForm({
               htmlFor="log-stage"
               error={errors.batchStageId?.message}
             >
-              <select
-                id="log-stage"
-                className={SELECT}
-                {...register("batchStageId")}
-              >
-                <option value="">Select…</option>
-                {stageChoices.map((stage) => (
-                  <option key={stage.id} value={stage.id}>
-                    {stageName(stage)}
-                    {stage.target_qty
-                      ? ` — ${Number(stage.target_qty).toLocaleString()} ${stage.target_unit}`
-                      : ""}
-                  </option>
-                ))}
-              </select>
+              <Controller
+                name="batchStageId"
+                control={control}
+                render={({ field }) => (
+                  <SelectField
+                    id="log-stage"
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    ariaInvalid={Boolean(errors.batchStageId)}
+                    options={stageChoices.map((stage) => ({
+                      value: stage.id,
+                      label: stageName(stage),
+                      meta: stage.target_qty
+                        ? `${Number(stage.target_qty).toLocaleString()} ${stage.target_unit}`
+                        : undefined,
+                    }))}
+                  />
+                )}
+              />
             </Field>
           )}
 
@@ -932,19 +954,27 @@ export function LogEntryForm({
                 />
                 {/* The unit is half the measurement, not a decoration: "3"
                     with no unit is not something anyone can read back. */}
-                <select
-                  id="log-qty-unit"
-                  aria-label="Unit"
-                  className={cn(SELECT, "w-36 shrink-0")}
-                  {...register("qtyUnit")}
-                >
-                  <option value="">Unit…</option>
-                  {QTY_UNITS.map((unit) => (
-                    <option key={unit} value={unit}>
-                      {unit}
-                    </option>
-                  ))}
-                </select>
+                <Controller
+                  name="qtyUnit"
+                  control={control}
+                  render={({ field }) => (
+                    <SelectField
+                      id="log-qty-unit"
+                      ariaLabel="Unit"
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      ariaInvalid={Boolean(errors.qtyUnit)}
+                      placeholder="Unit…"
+                      clearable
+                      options={QTY_UNITS.map((unit) => ({
+                        value: unit,
+                        label: unit,
+                      }))}
+                      className="w-36 shrink-0"
+                    />
+                  )}
+                />
               </div>
             </Field>
 
@@ -1069,17 +1099,23 @@ export function LogEntryForm({
             <FieldRow>
               <Field label="Speed unit" htmlFor="log-speed-type">
                 <div className="flex gap-1.5">
-                  <select
-                    id="log-speed-type"
-                    className={cn(SELECT, "flex-1")}
-                    {...register("speedType")}
-                  >
-                    {SPEED_TYPES.map((type) => (
-                      <option key={type.value} value={type.value}>
-                        {type.label}
-                      </option>
-                    ))}
-                  </select>
+                  <Controller
+                    name="speedType"
+                    control={control}
+                    render={({ field }) => (
+                      <SelectField
+                        id="log-speed-type"
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        options={SPEED_TYPES.map((type) => ({
+                          value: type.value,
+                          label: type.label,
+                        }))}
+                        className="flex-1"
+                      />
+                    )}
+                  />
                   {/* RPM and Batches already carry their own period, so the
                       rate choice would be meaningless for them. */}
                   {speedTypeTakesRate(speedType ?? "") && (
@@ -1122,12 +1158,25 @@ export function LogEntryForm({
             </FieldRow>
 
             <SlowReason control={control} error={errors.slowReason?.message}>
-              <select className={SELECT} {...register("slowReason")}>
-                <option value="">Select reason…</option>
-                {SLOW_REASONS.map((reason) => (
-                  <option key={reason}>{reason}</option>
-                ))}
-              </select>
+              <Controller
+                name="slowReason"
+                control={control}
+                render={({ field }) => (
+                  <SelectField
+                    ariaLabel="Reason it ran slow"
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    ariaInvalid={Boolean(errors.slowReason)}
+                    placeholder="Select reason…"
+                    clearable
+                    options={SLOW_REASONS.map((reason) => ({
+                      value: reason,
+                      label: reason,
+                    }))}
+                  />
+                )}
+              />
             </SlowReason>
           </section>
         )}
@@ -1239,18 +1288,28 @@ export function LogEntryForm({
                   htmlFor="log-flag"
                   error={errors.actionFlag?.message}
                 >
-                  <select
-                    id="log-flag"
-                    className={SELECT}
-                    {...register("actionFlag")}
-                  >
-                    <option value="">No — routine entry</option>
-                    {ACTION_FLAGS.map((flag) => (
-                      <option key={flag} value={flag}>
-                        {ACTION_FLAG_LABELS[flag]}
-                      </option>
-                    ))}
-                  </select>
+                  <Controller
+                    name="actionFlag"
+                    control={control}
+                    render={({ field }) => (
+                      <SelectField
+                        id="log-flag"
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        ariaInvalid={Boolean(errors.actionFlag)}
+                        // "Routine" is the answer for most entries, not an
+                        // unfilled field — so it stays a named row.
+                        clearable
+                        clearLabel="No — routine entry"
+                        placeholder="No — routine entry"
+                        options={ACTION_FLAGS.map((flag) => ({
+                          value: flag,
+                          label: ACTION_FLAG_LABELS[flag],
+                        }))}
+                      />
+                    )}
+                  />
                 </Field>
               )}
             </section>

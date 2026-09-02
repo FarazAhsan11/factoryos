@@ -1,6 +1,6 @@
 "use client";
 
-import { useForm, useWatch } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Lightbulb, Loader2, UserRound } from "lucide-react";
@@ -16,10 +16,9 @@ import {
   kaizenKeys,
   submitKaizenIdea,
 } from "@/lib/factory/kaizen-queries";
+import { SelectField } from "@/components/ui/select-field";
 import { cn } from "@/lib/utils";
 
-const FIELD =
-  "select-chevron h-11 w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-ink shadow-[0_1px_2px_rgba(20,22,43,0.04)] outline-none transition placeholder:text-placeholder hover:border-ink-6 focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12";
 const LABEL =
   "block text-[11px] font-bold uppercase tracking-[0.06em] text-ink-2";
 
@@ -148,26 +147,46 @@ export function KaizenForm({
             <label htmlFor="k-category" className={LABEL}>
               Category
             </label>
-            <select id="k-category" className={FIELD} {...register("category")}>
-              {KAIZEN_CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
+            <Controller
+              name="category"
+              control={control}
+              render={({ field }) => (
+                <SelectField
+                  id="k-category"
+                  className="h-11"
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  options={KAIZEN_CATEGORIES.map((c) => ({
+                    value: c,
+                    label: c,
+                  }))}
+                />
+              )}
+            />
           </div>
 
           <div className="space-y-1.5">
             <label htmlFor="k-impact" className={LABEL}>
               Expected effort
             </label>
-            <select id="k-impact" className={FIELD} {...register("impact")}>
-              {KAIZEN_IMPACTS.map((i) => (
-                <option key={i.value} value={i.value}>
-                  {i.label}
-                </option>
-              ))}
-            </select>
+            <Controller
+              name="impact"
+              control={control}
+              render={({ field }) => (
+                <SelectField
+                  id="k-impact"
+                  className="h-11"
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  options={KAIZEN_IMPACTS.map((i) => ({
+                    value: i.value,
+                    label: i.label,
+                  }))}
+                />
+              )}
+            />
           </div>
         </div>
 

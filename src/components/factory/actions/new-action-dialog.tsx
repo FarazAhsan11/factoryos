@@ -23,13 +23,11 @@ import { BatchSummary } from "@/components/factory/batch/batch-summary";
 import { DateTimeField } from "@/components/ui/date-picker";
 import { fetchProducts, productKeys } from "@/lib/factory/product-queries";
 import type { SetupItem } from "@/lib/factory/setup-queries";
+import { SelectField } from "@/components/ui/select-field";
 import { cn } from "@/lib/utils";
 
 const CONTROL =
   "h-10 w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)] outline-none transition placeholder:text-placeholder hover:border-line-strong focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12";
-
-/** Same control, plus our own chevron — see `.select-chevron`. */
-const SELECT = CONTROL + " select-chevron";
 
 const EMPTY: NewActionValues = {
   title: "",
@@ -148,55 +146,48 @@ export function NewActionDialog({
 
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Room / unit" htmlFor="na-unit" note="(optional)">
-                <select
+                <SelectField
                   id="na-unit"
                   value={values.unitId}
-                  onChange={(e) => set("unitId", e.target.value)}
-                  className={SELECT}
-                >
-                  <option value="">Factory-wide</option>
-                  {units
+                  onChange={(unitId) => set("unitId", unitId)}
+                  // An issue that belongs to no one room is a real answer —
+                  // a plant-wide procedure, a supplier — not a blank field.
+                  clearable
+                  clearLabel="Factory-wide"
+                  placeholder="Factory-wide"
+                  options={units
                     .filter((u) => u.active)
-                    .map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name}
-                      </option>
-                    ))}
-                </select>
+                    .map((u) => ({ value: u.id, label: u.name }))}
+                />
               </Field>
 
               <Field label="Category" htmlFor="na-category">
-                <select
+                <SelectField
                   id="na-category"
                   value={values.category}
-                  onChange={(e) => set("category", e.target.value)}
-                  className={SELECT}
-                >
-                  {ACTION_CATEGORIES.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(category) => set("category", category)}
+                  options={ACTION_CATEGORIES.map((c) => ({
+                    value: c,
+                    label: c,
+                  }))}
+                />
               </Field>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Priority" htmlFor="na-priority">
-                <select
+                <SelectField
                   id="na-priority"
                   value={values.priority}
-                  onChange={(e) =>
-                    set("priority", e.target.value as ActionPriority)
+                  onChange={(priority) =>
+                    set("priority", priority as ActionPriority)
                   }
-                  className={SELECT}
-                >
-                  {ACTION_PRIORITIES.map((p) => (
-                    <option key={p.value} value={p.value}>
-                      {p.label} — due within {p.within}
-                    </option>
-                  ))}
-                </select>
+                  options={ACTION_PRIORITIES.map((p) => ({
+                    value: p.value,
+                    label: p.label,
+                    meta: `due within ${p.within}`,
+                  }))}
+                />
               </Field>
 
               <Field label="Assign to" htmlFor="na-assignee" note="(optional)">

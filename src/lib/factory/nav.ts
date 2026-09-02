@@ -1,6 +1,7 @@
 import {
   Activity,
   BarChart3,
+  Boxes,
   ClipboardList,
   LayoutGrid,
   ListPlus,
@@ -74,6 +75,16 @@ export const FACTORY_NAV: NavSection[] = [
         label: "Data table",
         icon: Table2,
         roles: ALL,
+        ready: true,
+      },
+      // The three registers the floor reads names from — machines, people,
+      // catalogue. They used to sit at the end of the Admin strip, which
+      // buried day-to-day records under one-time configuration.
+      {
+        href: "/resources",
+        label: "Resources",
+        icon: Boxes,
+        roles: MANAGER_UP,
         ready: true,
       },
     ],

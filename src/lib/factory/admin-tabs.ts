@@ -17,9 +17,6 @@ export const ADMIN_TABS: AdminTab[] = [
   { value: "units", label: "Units", ready: true },
   { value: "processes", label: "Processes", ready: true },
   { value: "departments", label: "Departments", ready: true },
-  { value: "equipment", label: "Equipment", ready: true },
-  { value: "employees", label: "Employees", ready: true },
-  { value: "products", label: "Products", ready: true },
   { value: "shift-times", label: "Shift times", ready: true },
 ];
 

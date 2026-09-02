@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { useController, type Control, type FieldPath } from "react-hook-form";
+import {
+  useController,
+  type Control,
+  type FieldPath,
+  type FieldValues,
+} from "react-hook-form";
 
-import type {
-  LogEntryParsed,
-  LogEntryValues,
-} from "@/app/factory/[slug]/log/schemas";
 import { CONTROL, Field } from "@/components/factory/log/log-fields";
 import { SelectField } from "@/components/ui/select-field";
 import type { Employee } from "@/lib/factory/employee-queries";
@@ -29,7 +30,11 @@ export function employeeName(employee: Employee): string {
  * removed. That's also why "Not on the list" stays available — cover staff and
  * contractors work real shifts without ever having a login.
  */
-export function OperatorPicker({
+export function OperatorPicker<
+  TValues extends FieldValues,
+  TName extends FieldPath<TValues>,
+  TParsed,
+>({
   control,
   name,
   label,
@@ -40,8 +45,16 @@ export function OperatorPicker({
   shift,
   exclude,
 }: {
-  control: Control<LogEntryValues, unknown, LogEntryParsed>;
-  name: Extract<FieldPath<LogEntryValues>, `operators.${number}.name`>;
+  /**
+   * Generic over the form it belongs to rather than tied to `LogEntryValues`:
+   * the shift report's edit dialog is the same fields plus an amendment note,
+   * and pinning the picker to one of the two schemas would mean a second copy
+   * of the roster, the on-shift grouping and the "Not on the list…" escape
+   * hatch — three behaviours that must not drift between filing an entry and
+   * correcting one.
+   */
+  control: Control<TValues, unknown, TParsed>;
+  name: TName;
   label: string;
   note?: string;
   /** Marks the field as skippable — set for waiting-time activities. */
@@ -53,7 +66,10 @@ export function OperatorPicker({
   /** Names already chosen in the other rows, so nobody is picked twice. */
   exclude?: string[];
 }) {
-  const { field, fieldState } = useController({ control, name });
+  const { field, fieldState } = useController<TValues, TName, TParsed>({
+    control,
+    name,
+  });
   const value = (field.value as string | undefined) ?? "";
 
   const taken = new Set(exclude ?? []);

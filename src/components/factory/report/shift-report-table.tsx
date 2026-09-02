@@ -1,6 +1,6 @@
 "use client";
 
-import { Flag } from "lucide-react";
+import { Flag, PenLine } from "lucide-react";
 
 import {
   formatQty,
@@ -24,9 +24,19 @@ import { cn } from "@/lib/utils";
 export function ShiftReportTable({
   rooms,
   unitWord,
+  onEdit,
+  canEdit,
 }: {
   rooms: ShiftReportRoom[];
   unitWord: string;
+  /**
+   * Opens the correction dialog on one entry. Reading the sheet is when a
+   * supervisor notices a wrong figure, so the fix starts on the row they are
+   * already looking at rather than a page away in the entry feed.
+   */
+  onEdit: (entry: ShiftReportRow) => void;
+  /** Their own entry, or a manager's — the same rule RLS enforces on the write. */
+  canEdit: (entry: ShiftReportRow) => boolean;
 }) {
   return (
     /* Its own scroll box on screen so the sticky header holds and the summary
@@ -39,6 +49,13 @@ export function ShiftReportTable({
           {/* The colour is on the row, but the stickiness has to be on the
               cells: `position: sticky` on a `<tr>` is ignored outside Firefox. */}
           <tr className="text-white print:bg-surface print:text-black">
+            {/* The edit column is leftmost so it is reachable without
+                scrolling a sixteen-column sheet sideways, and it carries no
+                heading: an icon column labelled "Edit" spends a header on
+                something the icon already says. */}
+            <Th className="w-9 print:hidden">
+              <span className="sr-only">Correct entry</span>
+            </Th>
             <Th>{unitWord}</Th>
             <Th>Status / stage</Th>
             <Th>EQ no.</Th>
@@ -63,7 +80,12 @@ export function ShiftReportTable({
             room.entries.length === 0 ? (
               <IdleRow key={room.unitId} room={room} />
             ) : (
-              <RoomBlock key={room.unitId} room={room} />
+              <RoomBlock
+                key={room.unitId}
+                room={room}
+                onEdit={onEdit}
+                canEdit={canEdit}
+              />
             ),
           )}
         </tbody>
@@ -86,7 +108,7 @@ function IdleRow({ room }: { room: ShiftReportRoom }) {
        separate invitations to look for a number, and there is none to find —
        the answer is the status, and it fits in a sentence. */
     <tr className="border-t border-line-soft bg-sunken/60 print:bg-surface">
-      <td colSpan={16} className="px-3 py-2">
+      <td colSpan={17} className="px-3 py-2">
         <div className="flex flex-wrap items-center gap-2.5">
           <span className="text-[12px] font-semibold text-ink-3">
             {room.name}
@@ -110,14 +132,22 @@ function IdleRow({ room }: { room: ShiftReportRoom }) {
   );
 }
 
-function RoomBlock({ room }: { room: ShiftReportRoom }) {
+function RoomBlock({
+  room,
+  onEdit,
+  canEdit,
+}: {
+  room: ShiftReportRoom;
+  onEdit: (entry: ShiftReportRow) => void;
+  canEdit: (entry: ShiftReportRow) => boolean;
+}) {
   return (
     <>
       {/* A titled band opening each room, with what the room did on the
           right — the one figure a supervisor wants before reading the rows
           underneath it. */}
       <tr className="border-t border-line bg-sunken print:bg-sunken">
-        <td colSpan={16} className="px-3 py-2">
+        <td colSpan={17} className="px-3 py-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.07em] text-ink">
               <span
@@ -141,7 +171,14 @@ function RoomBlock({ room }: { room: ShiftReportRoom }) {
         </td>
       </tr>
       {room.entries.map((entry, i) => (
-        <EntryRow key={entry.id} entry={entry} first={i === 0} room={room} />
+        <EntryRow
+          key={entry.id}
+          entry={entry}
+          first={i === 0}
+          room={room}
+          onEdit={onEdit}
+          canEdit={canEdit(entry)}
+        />
       ))}
     </>
   );
@@ -151,10 +188,14 @@ function EntryRow({
   entry,
   first,
   room,
+  onEdit,
+  canEdit,
 }: {
   entry: ShiftReportRow;
   first: boolean;
   room: ShiftReportRoom;
+  onEdit: (entry: ShiftReportRow) => void;
+  canEdit: boolean;
 }) {
   const pct = progressPct(entry);
   const operators = entry.operators?.filter(Boolean).join(", ");
@@ -166,12 +207,38 @@ function EntryRow({
   return (
     <tr
       className={cn(
-        "border-t border-line-soft align-top transition-colors",
+        "group border-t border-line-soft align-top transition-colors",
         entry.action_flag
           ? "bg-danger-soft print:bg-danger-soft"
           : "hover:bg-brand-soft/40 print:hover:bg-transparent",
       )}
     >
+      {/* Dimmed until the row is hovered or the button is focused, so a sheet
+          of forty rows isn't forty pencils competing with the numbers — but
+          never hidden, because a control that only exists on hover cannot be
+          found on a tablet. */}
+      <Td className="w-9 print:hidden">
+        {canEdit ? (
+          <button
+            type="button"
+            onClick={() => onEdit(entry)}
+            title="Correct this entry"
+            aria-label={`Correct the ${entry.process_name ?? "entry"} entry in ${room.name}`}
+            className="grid size-6 place-items-center rounded-lg text-ink-6 opacity-60 transition group-hover:opacity-100 hover:bg-brand-soft hover:text-brand focus-visible:opacity-100 focus-visible:ring-3 focus-visible:ring-brand/25 focus-visible:outline-none"
+          >
+            <PenLine className="size-3.5" aria-hidden />
+          </button>
+        ) : (
+          <span
+            title="Only the operator who filed this entry, or a manager, can correct it"
+            className="grid size-6 place-items-center text-ink-6/40"
+            aria-hidden
+          >
+            <PenLine className="size-3.5" />
+          </span>
+        )}
+      </Td>
+
       <Td className="text-[11px] text-ink-5">{first ? room.name : ""}</Td>
 
       <Td>
@@ -273,9 +340,11 @@ function EntryRow({
 function Th({
   children,
   align = "left",
+  className,
 }: {
   children: React.ReactNode;
   align?: "left" | "right";
+  className?: string;
 }) {
   return (
     <th
@@ -287,6 +356,7 @@ function Th({
         "bg-[linear-gradient(180deg,var(--color-ink)_0%,#1d2140_100%)] text-white/85",
         "print:static print:bg-surface print:text-black",
         align === "right" ? "text-right" : "text-left",
+        className,
       )}
     >
       {children}

@@ -117,6 +117,8 @@ export function LogWorkspace({
           factoryId={factoryId}
           factoryName={factoryName}
           units={units}
+          userId={userId}
+          canManage={canManage}
         />
       )}
     </div>

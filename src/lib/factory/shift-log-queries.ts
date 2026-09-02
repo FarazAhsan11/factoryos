@@ -1,5 +1,6 @@
 import {
   composeSpeedUnit,
+  type EditEntryParsed,
   type LogEntryParsed,
 } from "@/app/factory/[slug]/log/schemas";
 import { createClient } from "@/lib/supabase/client";
@@ -220,20 +221,21 @@ export function formatMinutes(mins: number): string {
   return m ? `${h}h ${m}min` : `${h}h`;
 }
 
-export async function createLogEntry(
-  values: LogEntryParsed,
-  loggedBy: string,
-  logDate: string,
+/**
+ * Builds the column set a shift-log entry stores, from what a form produced.
+ *
+ * The three shapes decided by the stage's category (migration 0030) are
+ * applied **here** rather than trusted from the form, because a field the
+ * current shape doesn't render may still hold a value typed under a previous
+ * one — switch from Encapsulation to a tea break with a quantity already
+ * entered and, without these gates, the break gets filed carrying it. That is
+ * true of a correction as much as of a new entry, which is why the insert and
+ * the update read from one function instead of two copies that can drift.
+ */
+export function entryColumns(
+  values: LogEntryParsed | EditEntryParsed,
   productId: string | null,
-): Promise<LogEntry> {
-  const supabase = createClient();
-  /**
-   * The three shapes, decided by the stage's category (migration 0030) and
-   * applied *here* rather than trusted from the form. A field the current
-   * shape doesn't render may still hold a value typed under a previous one —
-   * switch from Encapsulation to a tea break with a quantity already entered
-   * and, without these gates, the break gets filed carrying it.
-   */
+) {
   const production = values.category === "production";
   const preparatory = values.category === "preparatory";
   const output = production || preparatory;
@@ -241,65 +243,142 @@ export async function createLogEntry(
   // 0030 trigger both force hasMachine false elsewhere, so this is belt and
   // braces on a column that feeds OEE.
   const machine = production && values.hasMachine;
-  // "Caps" + "hr" → "Caps/hr"; RPM and Batches carry no rate.
+  // "Caps" + "hr" -> "Caps/hr"; RPM and Batches carry no rate.
   const speedUnit = values.speedType
     ? composeSpeedUnit(values.speedType, values.speedRate ?? "hr")
     : null;
+
+  return {
+    unit_id: values.unitId,
+    process_id: values.processId,
+    shift: values.shift,
+    start_time: values.startTime,
+    end_time: values.endTime,
+    duration_minutes: durationMinutes(values.startTime, values.endTime),
+    // Equipment belongs to a machine stage, same rule as speed below. Without
+    // this, typing an equipment number and then switching to a manual
+    // activity files a manual entry carrying kit it never touched.
+    equipment_no: machine ? values.equipmentNo || null : null,
+    batch_no: values.batchNo || null,
+    product_id: productId,
+    // Quantities belong to activities that produce something. A break or an
+    // idle period stores null, not 0 — otherwise a hundred legitimate zeroes
+    // drag every output and quality average computed over them.
+    // A shift target is speed x duration, so only a production stage has one.
+    // A preparatory stage has no target speed to derive it from.
+    target_qty: production ? (values.targetQty ?? null) : null,
+    qty: output ? (values.qty ?? null) : null,
+    // The unit half of a preparatory measurement — "3" alone is not something
+    // anyone can read back. Production measures in whatever `speed_unit`
+    // counts, so it stores null rather than repeating itself.
+    qty_unit: preparatory ? (values.qtyUnit ?? null) : null,
+    // Rejects are the one quantity left blankable, and blank means zero here
+    // rather than unknown: on a production stage, "none were rejected" is a
+    // real measurement. Null would drop the entry out of the quality rate's
+    // denominator and quietly flatter it. A preparatory stage isn't asked at
+    // all, so null there is the truth — not "none".
+    qty_rejected: production ? (values.qtyRejected ?? 0) : null,
+    // Speed belongs to machine processes only — a manual entry stores null
+    // rather than zeroes, so OEE can tell "not applicable" from "stopped".
+    speed_unit: machine ? speedUnit : null,
+    target_speed: machine ? (values.targetSpeed ?? null) : null,
+    actual_speed: machine ? (values.actualSpeed ?? null) : null,
+    slow_reason: machine ? values.slowReason || null : null,
+    // Trimmed, de-duplicated and stripped of blanks by the schema. Empty on a
+    // waiting-time activity, which the column allows — its only constraint is
+    // a ceiling of 20, never a floor.
+    operators: values.operators,
+    comment: values.comment || null,
+    // Downtime records the time and nothing else — an issue raised off one is
+    // a deliberate act in Issues & CAPAs, not a side effect of the form still
+    // holding a flag picked before the activity changed.
+    action_flag:
+      values.category === "downtime" ? null : (values.actionFlag ?? null),
+  };
+}
+
+/**
+ * Rewrites a filed entry, and records why.
+ *
+ * The other kind of amendment. `amendLogEntry` attaches a note beside numbers
+ * that stay as they were; this one changes them — which is what a supervisor
+ * reading the shift report actually needs when a room typed 200 where it made
+ * 2,000, because a note explaining that the figure is wrong still leaves every
+ * total downstream reading the wrong figure.
+ *
+ * Nothing here stamps who or when, and nothing here checks standing:
+ * `shift_log_amend_guard` refuses the update outright without a note, stamps
+ * `amended_at` / `amended_by` from the session, and forces `factory_id`,
+ * `logged_by` and `created_at` back to their originals whatever this sends.
+ * RLS decides who may amend at all — the author, or a manager. The rules this
+ * function looks like it is missing are enforced a layer below, where a future
+ * caller cannot skip them.
+ *
+ * `batch_stage_id` is sent explicitly rather than left alone, and that is
+ * load-bearing: `shift_log_stage_guard` returns early on an update whose stage
+ * is unchanged, so an entry moved to a different batch or activity would keep
+ * pointing at the stage it used to belong to. The caller resolves it the same
+ * way the entry form does.
+ *
+ * The note **appends**. `amend_note` is one column and the guard re-stamps
+ * `amended_at` on every write, so appending is what keeps the earlier
+ * correction readable instead of silently replacing the record of it.
+ */
+export async function updateLogEntry(
+  entryId: string,
+  values: EditEntryParsed,
+  productId: string | null,
+  batchStageId: string | null,
+  existingNote: string | null,
+): Promise<void> {
+  const supabase = createClient();
+  const stamp = new Date().toISOString().slice(0, 10);
+  const entry = `[${stamp}] ${values.note.trim()}`;
+
+  const { error } = await supabase
+    .from("shift_log_entries")
+    .update({
+      ...entryColumns(values, productId),
+      // Downtime is forced null by the guard; everywhere else this is either
+      // the stage the caller resolved or null, which asks the guard to resolve
+      // it again from the batch and activity.
+      batch_stage_id: values.category === "downtime" ? null : batchStageId,
+      amend_note: existingNote
+        ? `${existingNote}
+${entry}`
+        : entry,
+    })
+    .eq("id", entryId);
+
+  if (error) {
+    // An RLS refusal surfaces as a 42501 rather than a 403, so the generic
+    // message would read as a bug rather than a permission problem.
+    throw new Error(
+      error.code === "42501"
+        ? "You can only correct your own entries, unless you're a manager."
+        : error.message,
+    );
+  }
+}
+
+export async function createLogEntry(
+  values: LogEntryParsed,
+  loggedBy: string,
+  logDate: string,
+  productId: string | null,
+): Promise<LogEntry> {
+  const supabase = createClient();
 
   const { data, error } = await supabase
     .from("shift_log_entries")
     .insert({
       factory_id: values.factoryId,
-      unit_id: values.unitId,
-      process_id: values.processId,
       log_date: logDate,
-      shift: values.shift,
-      start_time: values.startTime,
-      end_time: values.endTime,
-      duration_minutes: durationMinutes(values.startTime, values.endTime),
-      // Equipment belongs to a machine stage, same rule as speed below. Without
-      // this, typing an equipment number and then switching to a manual
-      // activity files a manual entry carrying kit it never touched.
-      equipment_no: machine ? values.equipmentNo || null : null,
-      batch_no: values.batchNo || null,
-      product_id: productId,
+      ...entryColumns(values, productId),
       // Null is the normal answer — `shift_log_stage_guard` fills it in when
       // the batch runs this activity once, and refuses the entry when it runs
       // it several times without saying which. Downtime is forced null there.
       batch_stage_id: values.batchStageId ?? null,
-      // Quantities belong to activities that produce something. A break or an
-      // idle period stores null, not 0 — otherwise a hundred legitimate zeroes
-      // drag every output and quality average computed over them.
-      // A shift target is speed × duration, so only a production stage has
-      // one. A preparatory stage has no target speed to derive it from.
-      target_qty: production ? (values.targetQty ?? null) : null,
-      qty: output ? (values.qty ?? null) : null,
-      // The unit half of a preparatory measurement — "3" alone is not
-      // something anyone can read back. Production measures in whatever
-      // `speed_unit` counts, so it stores null rather than repeating itself.
-      qty_unit: preparatory ? (values.qtyUnit ?? null) : null,
-      // Rejects are the one quantity left blankable, and blank means zero here
-      // rather than unknown: on a production stage, "none were rejected" is a
-      // real measurement. Null would drop the entry out of the quality rate's
-      // denominator and quietly flatter it. A preparatory stage isn't asked at
-      // all, so null there is the truth — not "none".
-      qty_rejected: production ? (values.qtyRejected ?? 0) : null,
-      // Speed belongs to machine processes only — a manual entry stores null
-      // rather than zeroes, so OEE can tell "not applicable" from "stopped".
-      speed_unit: machine ? speedUnit : null,
-      target_speed: machine ? (values.targetSpeed ?? null) : null,
-      actual_speed: machine ? (values.actualSpeed ?? null) : null,
-      slow_reason: machine ? values.slowReason || null : null,
-      // Trimmed, de-duplicated and stripped of blanks by the schema. Empty on
-      // a waiting-time activity, which the column allows — its only constraint
-      // is a ceiling of 20, never a floor.
-      operators: values.operators,
-      comment: values.comment || null,
-      // Downtime records the time and nothing else — an issue raised off one
-      // is a deliberate act in Issues & CAPAs, not a side effect of the form
-      // still holding a flag picked before the activity changed.
-      action_flag:
-        values.category === "downtime" ? null : (values.actionFlag ?? null),
       logged_by: loggedBy,
     })
     .select(COLUMNS)

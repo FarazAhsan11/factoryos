@@ -20,12 +20,24 @@ export interface ShiftReportRow {
   id: string;
   unit_id: string;
   unit_name: string | null;
+  process_id: string;
   process_name: string | null;
+  /** downtime | preparatory | production — which shape the entry was filed in. */
+  process_category: string | null;
+  /** Whether the activity runs on a machine, so speed and equipment apply. */
+  has_machine: boolean | null;
   equipment_no: string | null;
+  log_date: string;
+  shift: string;
+  start_time: string | null;
+  end_time: string | null;
   duration_minutes: number;
+  product_id: string | null;
   product_name: string | null;
   product_code: string | null;
   batch_no: string | null;
+  /** Which planned stage it counts towards, where the batch has a plan (0033). */
+  batch_stage_id: string | null;
   target_qty: number | null;
   qty: number | null;
   /** What `qty` counts in on a preparatory entry (drums, kg…). */
@@ -40,14 +52,27 @@ export interface ShiftReportRow {
   actual_speed: number | null;
   action_flag: string | null;
   created_at: string;
+  /** Who filed it — decides, with the viewer's role, whether they may correct it. */
+  logged_by: string | null;
+  amended_at: string | null;
+  amend_note: string | null;
 }
 
+/**
+ * Wider than the sheet renders, and deliberately so. Since the report's rows
+ * are editable, each one has to carry everything the correction dialog opens
+ * on — the activity and its category, the times, the stage, who filed it —
+ * because the alternative is a second round-trip per row the moment somebody
+ * clicks Edit, against a slice that was already fetched whole.
+ */
 const COLUMNS = `
-  id, unit_id, unit_name, process_name, equipment_no, duration_minutes,
-  product_name, product_code, batch_no,
-  target_qty, qty, qty_unit, qty_rejected, accumulative,
+  id, unit_id, unit_name, process_id, process_name, process_category,
+  has_machine, equipment_no, log_date, shift, start_time, end_time,
+  duration_minutes, product_id, product_name, product_code, batch_no,
+  batch_stage_id, target_qty, qty, qty_unit, qty_rejected, accumulative,
   operators, comment, slow_reason,
-  speed_unit, target_speed, actual_speed, action_flag, created_at
+  speed_unit, target_speed, actual_speed, action_flag, created_at,
+  logged_by, amended_at, amend_note
 `;
 
 export const shiftReportKeys = {

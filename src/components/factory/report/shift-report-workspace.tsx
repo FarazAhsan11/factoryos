@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Download, Moon, Printer, Sun } from "lucide-react";
 import { toast } from "sonner";
 
+import { EditEntryDialog } from "@/components/factory/report/edit-entry-dialog";
 import { ShiftReportHeader } from "@/components/factory/report/shift-report-header";
 import { ShiftReportSummary } from "@/components/factory/report/shift-report-summary";
 import { ShiftReportTable } from "@/components/factory/report/shift-report-table";
@@ -25,6 +26,7 @@ import {
   summarise,
   todayISO,
   type IdleStatus,
+  type ShiftReportRow,
 } from "@/lib/factory/shift-report-queries";
 import {
   fetchShiftTimes,
@@ -55,13 +57,27 @@ export function ShiftReportWorkspace({
   factoryId,
   factoryName,
   units,
+  userId,
+  canManage,
 }: {
   factoryId: string;
   factoryName: string;
   units: { singular: string; plural: string };
+  /** The viewer, so a row they filed themselves is one they may correct. */
+  userId: string;
+  /** Manager and up may correct anybody's entry — the rule RLS enforces. */
+  canManage: boolean;
 }) {
   const [date, setDate] = useState(todayISO);
   const [shift, setShift] = useState<RunningShift>("morning");
+  /**
+   * The row the correction dialog is open on.
+   *
+   * The sheet is where a wrong figure gets noticed — the whole point of
+   * printing every room side by side — so the fix starts here rather than
+   * sending someone back to the entry feed to hunt for the row again.
+   */
+  const [editing, setEditing] = useState<ShiftReportRow | null>(null);
 
   const {
     data: entries = [],
@@ -115,6 +131,16 @@ export function ShiftReportWorkspace({
   );
 
   const totals = useMemo(() => summarise(entries), [entries]);
+
+  /**
+   * Who may correct which row. The same rule the `shift_log_amend` policy
+   * enforces on the write — stated here only so a supervisor is not offered a
+   * pencil that fails, never so the check lives in the browser.
+   */
+  const canEdit = useCallback(
+    (entry: ShiftReportRow) => canManage || entry.logged_by === userId,
+    [canManage, userId],
+  );
 
   function exportCsv() {
     if (rooms.length === 0) {
@@ -218,7 +244,12 @@ export function ShiftReportWorkspace({
             </div>
           ) : (
             <>
-              <ShiftReportTable rooms={rooms} unitWord={units.singular} />
+              <ShiftReportTable
+                rooms={rooms}
+                unitWord={units.singular}
+                onEdit={setEditing}
+                canEdit={canEdit}
+              />
               {totals.entries === 0 && (
                 <p className="shrink-0 border-t border-line bg-sunken px-4 py-2.5 text-center text-xs text-ink-5 print:hidden">
                   Nothing was logged on this shift — every{" "}
@@ -229,6 +260,17 @@ export function ShiftReportWorkspace({
           )}
         </div>
       )}
+
+      {/* Keyed to the sheet on screen, so saving refreshes the day and shift
+          being read rather than whichever one the cache happens to hold. */}
+      <EditEntryDialog
+        entry={editing}
+        factoryId={factoryId}
+        date={date}
+        shift={shift}
+        units={units}
+        onClose={() => setEditing(null)}
+      />
     </div>
   );
 }

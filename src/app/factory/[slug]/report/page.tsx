@@ -1,34 +1,18 @@
-import type { Metadata } from "next";
-
-import { ShiftReportWorkspace } from "@/components/factory/report/shift-report-workspace";
-import { getFactoryContext, unitWords } from "@/lib/factory/context";
-
-export const metadata: Metadata = {
-  title: "Shift report · FactoryOS",
-};
+import { redirect } from "next/navigation";
 
 /**
- * Shift Report — the whole floor for one shift, on one sheet.
+ * The Shift report's old home.
  *
- * Supervisor and up, matching the nav: this is the handover document, and it
- * shows every room's output side by side rather than the operator's own
- * entries.
+ * It is the shift log's second tab now — reading the sheet and correcting an
+ * entry are the same job, done minutes apart, and they used to be two clicks
+ * and a page load away from each other. This is kept so printed sheets,
+ * bookmarks and anything that linked here still land on it.
  */
-export default async function ShiftReportPage({
+export default async function ShiftReportRedirect({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const { factory } = await getFactoryContext(slug);
-
-  return (
-    <div className="mx-auto w-full max-w-[1400px] lg:flex lg:min-h-0 lg:flex-1 lg:flex-col print:block">
-      <ShiftReportWorkspace
-        factoryId={factory.id}
-        factoryName={factory.name}
-        units={unitWords(factory)}
-      />
-    </div>
-  );
+  redirect(`/factory/${slug}/log?tab=report`);
 }

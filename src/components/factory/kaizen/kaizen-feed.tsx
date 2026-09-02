@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Lightbulb } from "lucide-react";
 
-import { KaizenReviewDialog } from "@/components/factory/log/kaizen-review-dialog";
+import { KaizenReviewDialog } from "@/components/factory/kaizen/kaizen-review-dialog";
 import {
   FILTER_LABELS,
   IMPACT_LABELS,

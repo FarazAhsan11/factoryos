@@ -29,24 +29,10 @@ export default async function ShiftLogPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // The Kaizen form shows who an idea will be credited to instead of asking
-  // for a name. Read here rather than in the client so the panel doesn't
-  // render "Submitted as …" empty for a moment on every open.
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, email")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  const userName =
-    profile?.full_name?.trim() ||
-    profile?.email?.split("@")[0] ||
-    "your account";
-
-  // Wider than `canManage` on purpose: reviewing improvement ideas is the
-  // supervisor's job, and routing every one through an admin is how a queue
-  // stops moving. Mirrors `can_review_factory()` in migration 0019, which is
-  // what actually enforces it.
+  // Decides whether the Shift report tab exists at all: the report is the
+  // handover document — every room side by side rather than the operator's
+  // own entries — so it stays supervisor and up, exactly as it was when it
+  // had its own nav item.
   const canReview =
     role === "super_admin" ||
     role === "admin" ||
@@ -55,29 +41,19 @@ export default async function ShiftLogPage({
 
   return (
     /* Fills the shell's frame rather than growing the document — see the note
-       on <main> in FactoryShell. The two panels below then have a real height
-       to scroll inside, instead of one page scrollbar dragging both. */
-    <div className="mx-auto flex w-full max-w-7xl flex-col lg:min-h-0 lg:flex-1">
-      {/* Compact on purpose. This page is a form that has to fit on one
-          screen without scrolling the entry out of reach, so the heading
-          block gives its height back to the panels below. The eyebrow is
-          gone with it — the sidebar already says which section this is. */}
-      <div className="mb-3 shrink-0">
-        <h1 className="text-xl font-semibold tracking-tight text-ink">
-          Log production entry
-        </h1>
-        <p className="mt-0.5 text-[13px] text-ink-4">
-          Entries are audit-protected — correct a mistake with an amendment,
-          never a delete.
-        </p>
-      </div>
+       on <main> in FactoryShell. The panels below then have a real height to
+       scroll inside, instead of one page scrollbar dragging both.
 
+       There is no heading: the tab strip is the first thing on the screen,
+       and the max width lives in the workspace because it belongs to the open
+       tab, which a tab switch never comes back here to change. */
+    <div className="flex w-full flex-col lg:min-h-0 lg:flex-1">
       <LogWorkspace
         factoryId={factory.id}
+        factoryName={factory.name}
         userId={user.id}
-        userName={userName}
         units={unitWords(factory)}
-        initialTab={resolveLogTab(tab)}
+        initialTab={resolveLogTab(tab, canReview)}
         canManage={canManage}
         canReview={canReview}
       />

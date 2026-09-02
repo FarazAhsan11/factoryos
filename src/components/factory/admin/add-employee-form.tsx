@@ -1,6 +1,6 @@
 "use client";
 
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
@@ -15,7 +15,8 @@ import {
   type AddEmployeeValues,
 } from "@/app/factory/[slug]/admin/schemas";
 
-import { FIELD, SELECT } from "@/components/factory/admin/settings-ui";
+import { FIELD } from "@/components/factory/admin/settings-ui";
+import { SelectField } from "@/components/ui/select-field";
 const LABEL = "text-xs font-medium text-ink-3";
 
 /**
@@ -31,6 +32,7 @@ export function AddEmployeeForm({
 }) {
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
@@ -107,30 +109,44 @@ export function AddEmployeeForm({
           <label htmlFor="emp-role" className={LABEL}>
             Role
           </label>
-          <select id="emp-role" className={SELECT} {...register("role")}>
-            {ASSIGNABLE_ROLES.map((role) => (
-              <option key={role} value={role}>
-                {ROLE_LABELS[role]}
-              </option>
-            ))}
-          </select>
+          <Controller
+            name="role"
+            control={control}
+            render={({ field }) => (
+              <SelectField
+                id="emp-role"
+                value={field.value ?? ""}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                options={ASSIGNABLE_ROLES.map((role) => ({
+                  value: role,
+                  label: ROLE_LABELS[role],
+                }))}
+              />
+            )}
+          />
         </div>
 
         <div className="space-y-1.5">
           <label htmlFor="emp-shift" className={LABEL}>
             Default shift
           </label>
-          <select
-            id="emp-shift"
-            className={SELECT}
-            {...register("defaultShift")}
-          >
-            {SHIFT_SLOTS.map((shift) => (
-              <option key={shift} value={shift}>
-                {SHIFT_LABELS[shift]}
-              </option>
-            ))}
-          </select>
+          <Controller
+            name="defaultShift"
+            control={control}
+            render={({ field }) => (
+              <SelectField
+                id="emp-shift"
+                value={field.value ?? ""}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                options={SHIFT_SLOTS.map((shift) => ({
+                  value: shift,
+                  label: SHIFT_LABELS[shift],
+                }))}
+              />
+            )}
+          />
         </div>
 
         <button

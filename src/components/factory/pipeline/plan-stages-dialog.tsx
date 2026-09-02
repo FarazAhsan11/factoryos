@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -48,6 +48,7 @@ import {
   type BatchStage,
   plannedOverOrder,
 } from "@/lib/factory/batch-stage-queries";
+import { SelectField } from "@/components/ui/select-field";
 import { pipelineKeys, type PipelineJob } from "@/lib/factory/pipeline-queries";
 import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
 import { cn } from "@/lib/utils";
@@ -584,19 +585,16 @@ function StageRow({
                 placeholder="e.g. 210000"
                 className={cn(FIELD, MONO, "w-32")}
               />
-              <select
-                aria-label="Assigned room"
+              <SelectField
+                ariaLabel="Assigned room"
                 value={editRoom}
-                onChange={(e) => onEditRoom(e.target.value)}
-                className={cn(FIELD, "w-40")}
-              >
-                <option value="">No room</option>
-                {rooms.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
+                onChange={onEditRoom}
+                clearable
+                clearLabel="No room"
+                placeholder="No room"
+                options={rooms.map((r) => ({ value: r.id, label: r.name }))}
+                className="w-40"
+              />
               {/* Meaningless on the first stage, which has nothing before
                   it to overlap and is startable regardless. */}
               {index > 0 && (
@@ -652,6 +650,7 @@ function AddStageForm({
 }) {
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
@@ -692,27 +691,47 @@ function AddStageForm({
           <label htmlFor="st-process" className={LABEL}>
             Activity
           </label>
-          <select id="st-process" className={FIELD} {...register("processId")}>
-            <option value="">Select…</option>
-            {processes.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          <Controller
+            name="processId"
+            control={control}
+            render={({ field }) => (
+              <SelectField
+                id="st-process"
+                value={field.value ?? ""}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                ariaInvalid={Boolean(errors.processId)}
+                searchPlaceholder="Activity name…"
+                emptyMessage="No activity matches that."
+                options={processes.map((proc) => ({
+                  value: proc.id,
+                  label: proc.name,
+                  meta: proc.category ?? undefined,
+                }))}
+              />
+            )}
+          />
         </div>
         <div className="space-y-1">
           <label htmlFor="st-room" className={LABEL}>
             Assigned room
           </label>
-          <select id="st-room" className={FIELD} {...register("unitId")}>
-            <option value="">Not assigned yet</option>
-            {rooms.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-              </option>
-            ))}
-          </select>
+          <Controller
+            name="unitId"
+            control={control}
+            render={({ field }) => (
+              <SelectField
+                id="st-room"
+                value={field.value ?? ""}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                clearable
+                clearLabel="Not assigned yet"
+                placeholder="Not assigned yet"
+                options={rooms.map((r) => ({ value: r.id, label: r.name }))}
+              />
+            )}
+          />
         </div>
       </div>
 
@@ -735,13 +754,19 @@ function AddStageForm({
           <label htmlFor="st-unit" className={LABEL}>
             Unit
           </label>
-          <select id="st-unit" className={FIELD} {...register("targetUnit")}>
-            {STAGE_UNITS.map((u) => (
-              <option key={u} value={u}>
-                {u}
-              </option>
-            ))}
-          </select>
+          <Controller
+            name="targetUnit"
+            control={control}
+            render={({ field }) => (
+              <SelectField
+                id="st-unit"
+                value={field.value ?? ""}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                options={STAGE_UNITS.map((u) => ({ value: u, label: u }))}
+              />
+            )}
+          />
         </div>
       </div>
 

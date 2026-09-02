@@ -11,9 +11,6 @@ import { cn } from "@/lib/utils";
 export const CONTROL =
   "h-11 w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-ink shadow-[0_1px_2px_rgba(20,22,43,0.04)] outline-none transition placeholder:text-placeholder hover:border-ink-6 focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12 disabled:cursor-not-allowed disabled:opacity-60";
 
-/** A select is a control plus our own chevron — see `.select-chevron`. */
-export const SELECT = `${CONTROL} select-chevron`;
-
 export const MONO = "font-mono text-[13px]";
 
 /**

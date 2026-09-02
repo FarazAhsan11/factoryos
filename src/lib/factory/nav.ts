@@ -1,7 +1,8 @@
 import {
   Activity,
   BarChart3,
-  ClipboardList,
+  Boxes,
+  Lightbulb,
   LayoutGrid,
   ListPlus,
   Settings,
@@ -76,6 +77,16 @@ export const FACTORY_NAV: NavSection[] = [
         roles: ALL,
         ready: true,
       },
+      // The three registers the floor reads names from — machines, people,
+      // catalogue. They used to sit at the end of the Admin strip, which
+      // buried day-to-day records under one-time configuration.
+      {
+        href: "/resources",
+        label: "Resources",
+        icon: Boxes,
+        roles: MANAGER_UP,
+        ready: true,
+      },
     ],
   },
   {
@@ -100,11 +111,16 @@ export const FACTORY_NAV: NavSection[] = [
   {
     label: "Analytics",
     items: [
+      // Where Shift report used to be. The report moved into the shift log's
+      // second tab — reading the sheet and correcting an entry are the same
+      // job, minutes apart — and Kaizen came out of that tab to here, because
+      // an improvement idea is not something anyone has while filing a
+      // downtime record. Everyone may raise one; review is supervisor and up.
       {
-        href: "/report",
-        label: "Shift report",
-        icon: ClipboardList,
-        roles: SUPERVISOR_UP,
+        href: "/kaizen",
+        label: "Kaizen",
+        icon: Lightbulb,
+        roles: ALL,
         ready: true,
       },
       {

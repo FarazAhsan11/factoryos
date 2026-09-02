@@ -32,6 +32,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { DateField } from "@/components/ui/date-picker";
+import { SelectField } from "@/components/ui/select-field";
 import { createBatchJob, type PipelineJob } from "@/lib/factory/pipeline-queries";
 import type { Product } from "@/lib/factory/product-queries";
 import { cn } from "@/lib/utils";
@@ -290,19 +291,31 @@ export function NewBatchDialog({
                   htmlFor="nb-product"
                   error={errors.productId?.message}
                 >
-                  <select
-                    id="nb-product"
-                    className={FIELD}
-                    aria-invalid={Boolean(errors.productId)}
-                    {...register("productId")}
-                  >
-                    <option value="">Select a batch…</option>
-                    {available.map((product) => (
-                      <option key={product.id} value={product.id}>
-                        {product.batch_no} — {product.name}
-                      </option>
-                    ))}
-                  </select>
+                  <Controller
+                    name="productId"
+                    control={control}
+                    render={({ field }) => (
+                      <SelectField
+                        id="nb-product"
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        ariaInvalid={Boolean(errors.productId)}
+                        placeholder="Select a batch…"
+                        // The catalogue runs to hundreds of rows, so this is
+                        // the picker the search box exists for. The code and
+                        // work order are searchable through `meta` even
+                        // though the row shows only the number and the name.
+                        searchPlaceholder="Batch number, code or product…"
+                        emptyMessage="No batch matches that."
+                        options={available.map((product) => ({
+                          value: product.id,
+                          label: `${product.batch_no} — ${product.name}`,
+                          meta: product.code || product.work_order || undefined,
+                        }))}
+                      />
+                    )}
+                  />
                 </Field>
 
                 {/* Read back, never re-typed. The catalogue owns the batch
@@ -356,17 +369,22 @@ export function NewBatchDialog({
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Field label="Priority" htmlFor="nb-priority">
-                    <select
-                      id="nb-priority"
-                      className={FIELD}
-                      {...register("priority")}
-                    >
-                      {PRIORITIES.map((p) => (
-                        <option key={p} value={p}>
-                          {PRIORITY_LABELS[p]}
-                        </option>
-                      ))}
-                    </select>
+                    <Controller
+                      name="priority"
+                      control={control}
+                      render={({ field }) => (
+                        <SelectField
+                          id="nb-priority"
+                          value={field.value ?? ""}
+                          onChange={field.onChange}
+                          onBlur={field.onBlur}
+                          options={PRIORITIES.map((p) => ({
+                            value: p,
+                            label: PRIORITY_LABELS[p],
+                          }))}
+                        />
+                      )}
+                    />
                   </Field>
                   <Field
                     label="Due date"
@@ -421,18 +439,23 @@ export function NewBatchDialog({
                       htmlFor="nb-bulk-unit"
                       error={errors.bulkUnit?.message}
                     >
-                      <select
-                        id="nb-bulk-unit"
-                        className={FIELD}
-                        {...register("bulkUnit")}
-                      >
-                        <option value="">Select…</option>
-                        {BULK_UNITS.map((unit) => (
-                          <option key={unit} value={unit}>
-                            {unit}
-                          </option>
-                        ))}
-                      </select>
+                      <Controller
+                        name="bulkUnit"
+                        control={control}
+                        render={({ field }) => (
+                          <SelectField
+                            id="nb-bulk-unit"
+                            value={field.value ?? ""}
+                            onChange={field.onChange}
+                            onBlur={field.onBlur}
+                            clearable
+                            options={BULK_UNITS.map((unit) => ({
+                              value: unit,
+                              label: unit,
+                            }))}
+                          />
+                        )}
+                      />
                     </Field>
                     <Field
                       label="Overage %"
@@ -507,18 +530,30 @@ export function NewBatchDialog({
                     htmlFor="nb-parent"
                     error={errors.parentJobId?.message}
                   >
-                    <select
-                      id="nb-parent"
-                      className={FIELD}
-                      {...register("parentJobId")}
-                    >
-                      <option value="">No parent — external bulk</option>
-                      {bulkSources.map((job) => (
-                        <option key={job.id} value={job.id}>
-                          {job.batch_no} — {job.product_name}
-                        </option>
-                      ))}
-                    </select>
+                    <Controller
+                      name="parentJobId"
+                      control={control}
+                      render={({ field }) => (
+                        <SelectField
+                          id="nb-parent"
+                          value={field.value ?? ""}
+                          onChange={field.onChange}
+                          onBlur={field.onBlur}
+                          // Not a placeholder: drawing bulk from outside the
+                          // plant is a real answer, so it stays a named row.
+                          clearable
+                          clearLabel="No parent — external bulk"
+                          placeholder="No parent — external bulk"
+                          searchPlaceholder="Batch number or product…"
+                          emptyMessage="No manufacturing batch matches that."
+                          options={bulkSources.map((job) => ({
+                            value: job.id,
+                            label: `${job.batch_no} — ${job.product_name}`,
+                            meta: job.bulk_unit ?? undefined,
+                          }))}
+                        />
+                      )}
+                    />
                   </Field>
                   {/* An empty list looks like a broken control otherwise: the
                       only option is "external bulk" and nothing says why. */}
@@ -552,18 +587,23 @@ export function NewBatchDialog({
                       htmlFor="nb-pack-unit"
                       error={errors.packUnit?.message}
                     >
-                      <select
-                        id="nb-pack-unit"
-                        className={FIELD}
-                        {...register("packUnit")}
-                      >
-                        <option value="">Select…</option>
-                        {PACK_UNITS.map((unit) => (
-                          <option key={unit} value={unit}>
-                            {unit}
-                          </option>
-                        ))}
-                      </select>
+                      <Controller
+                        name="packUnit"
+                        control={control}
+                        render={({ field }) => (
+                          <SelectField
+                            id="nb-pack-unit"
+                            value={field.value ?? ""}
+                            onChange={field.onChange}
+                            onBlur={field.onBlur}
+                            clearable
+                            options={PACK_UNITS.map((unit) => ({
+                              value: unit,
+                              label: unit,
+                            }))}
+                          />
+                        )}
+                      />
                     </Field>
                     <Field
                       label="Market"

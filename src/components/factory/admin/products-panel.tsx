@@ -2,7 +2,15 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarPlus, Check, Package, Search, Trash2, X } from "lucide-react";
+import {
+  CalendarPlus,
+  Check,
+  CheckCircle2,
+  Package,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -33,6 +41,29 @@ import {
 } from "@/components/factory/admin/settings-ui";
 import { cn } from "@/lib/utils";
 
+/**
+ * The two halves of the catalogue.
+ *
+ * "Finished" is read from the pipeline, not from the row's own Active /
+ * Retired chip — retiring is a manual act about whether the shift log may
+ * still name a batch, while finishing is what the board says happened to it.
+ * A batch can be finished and still active, or retired without ever running.
+ */
+type Scope = "open" | "finished";
+
+const SCOPES: { value: Scope; label: string; hint: string }[] = [
+  {
+    value: "open",
+    label: "Open",
+    hint: "Batches not yet planned, plus everything the board is still carrying — planned, in production or on hold.",
+  },
+  {
+    value: "finished",
+    label: "Finished",
+    hint: "Batches whose every pipeline job has been signed off.",
+  },
+];
+
 /** 540000 → "540,000"; 2.85 stays "2.85". */
 function formatQty(qty: number) {
   return qty.toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -53,6 +84,7 @@ export function ProductsPanel({
   const queryClient = useQueryClient();
   const queryKey = productKeys.all(factoryId);
   const [search, setSearch] = useState("");
+  const [scope, setScope] = useState<Scope>("open");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editQty, setEditQty] = useState("");
   const [editingDateId, setEditingDateId] = useState<string | null>(null);
@@ -101,6 +133,40 @@ export function ProductsPanel({
           .map((job) => [job.product_id, job.parent_batch_no!]),
       ),
     [jobs],
+  );
+
+  /**
+   * Which batches the board has signed off.
+   *
+   * A batch counts as finished only when it has at least one pipeline job and
+   * *every* one of them is finished — a batch run as three work orders is not
+   * done because the first one is. A batch with no job at all hasn't been
+   * planned yet, which is the other half of the Open pill, not this one.
+   */
+  const finished = useMemo(() => {
+    const done = new Map<string, boolean>();
+    for (const job of jobs) {
+      done.set(
+        job.product_id,
+        (done.get(job.product_id) ?? true) && job.status === "finished",
+      );
+    }
+    return new Set(
+      [...done].filter(([, complete]) => complete).map(([id]) => id),
+    );
+  }, [jobs]);
+
+  /* The catalogue grows monotonically — every batch ever made stays in it, so
+     by the second month the rows anyone actually works with are outnumbered by
+     history. The pills split it on the one fact that decides that: whether the
+     board is still carrying the batch. */
+  const scoped = useMemo(
+    () => products.filter((p) => finished.has(p.id) === (scope === "finished")),
+    [products, finished, scope],
+  );
+  const finishedCount = useMemo(
+    () => products.filter((p) => finished.has(p.id)).length,
+    [products, finished],
   );
 
   function refresh() {
@@ -160,13 +226,13 @@ export function ProductsPanel({
   // the list is already loaded and cached.
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return products;
-    return products.filter((p) =>
+    if (!term) return scoped;
+    return scoped.filter((p) =>
       [p.batch_no, p.code, p.name, p.work_order]
         .filter(Boolean)
         .some((field) => field!.toLowerCase().includes(term)),
     );
-  }, [products, search]);
+  }, [scoped, search]);
 
   function saveQty(product: Product) {
     const value = Number(editQty);
@@ -234,15 +300,55 @@ export function ProductsPanel({
       {/* Import moved up beside the title — it is a second way to fill the
           catalogue, not a field of the Add form and not a sibling of search. */}
       {products.length > 0 && (
-        <div className="relative">
-          <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-ink-5" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by batch, code or product name…"
-            aria-label="Search the catalogue"
-            className={cn(FIELD, "pr-3.5 pl-10")}
-          />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          {/* Which half of the catalogue is on screen. Not a tab strip: it
+              filters one table rather than swapping panels, so the search box
+              beside it keeps applying to whatever is showing. */}
+          <div className="flex shrink-0 gap-1.5">
+            {SCOPES.map((option) => {
+              const on = scope === option.value;
+              const count =
+                option.value === "finished"
+                  ? finishedCount
+                  : products.length - finishedCount;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setScope(option.value)}
+                  aria-pressed={on}
+                  title={option.hint}
+                  className={cn(
+                    "shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition",
+                    on
+                      ? "border-brand bg-brand text-white shadow-brand-sm"
+                      : "border-line bg-surface text-ink-3 hover:border-ink-6 hover:text-ink",
+                  )}
+                >
+                  {option.label}
+                  <span
+                    className={cn(
+                      "ml-1.5 font-bold tabular-nums",
+                      on ? "text-white/70" : "text-ink-5",
+                    )}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-ink-5" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by batch, code or product name…"
+              aria-label="Search the catalogue"
+              className={cn(FIELD, "pr-3.5 pl-10")}
+            />
+          </div>
         </div>
       )}
 
@@ -262,8 +368,32 @@ export function ProductsPanel({
               : "A manager fills the catalogue."
           }
         />
+      ) : scoped.length === 0 ? (
+        // An empty pill is not an empty catalogue — say which one is empty,
+        // or the screen reads as "your products are gone".
+        <EmptyState
+          icon={scope === "finished" ? CheckCircle2 : Package}
+          title={
+            scope === "finished"
+              ? "No finished batches yet."
+              : "Every batch in the catalogue is finished."
+          }
+          hint={
+            scope === "finished"
+              ? "A batch lands here once every pipeline job against it is signed off."
+              : "Add a batch above, or switch to Finished to see the completed ones."
+          }
+        />
       ) : visible.length === 0 ? (
-        <EmptyState icon={Search} title={`Nothing matches “${search}”.`} />
+        <EmptyState
+          icon={Search}
+          title={`Nothing matches “${search}”.`}
+          hint={
+            scope === "finished"
+              ? "Only finished batches are being searched."
+              : "Only open batches are being searched — try the Finished pill."
+          }
+        />
       ) : (
         <div className={cn(PANEL, "overflow-x-auto")}>
           <table className="w-full min-w-[860px] text-sm">

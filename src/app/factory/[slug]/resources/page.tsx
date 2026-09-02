@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
-import { AdminWorkspace } from "@/components/factory/admin/admin-workspace";
-import { resolveAdminTab } from "@/lib/factory/admin-tabs";
-import { getFactoryContext, unitWords } from "@/lib/factory/context";
+import { ResourcesWorkspace } from "@/components/factory/resources/resources-workspace";
+import { getFactoryContext } from "@/lib/factory/context";
+import { resolveResourceTab } from "@/lib/factory/resource-tabs";
 
 export const metadata: Metadata = {
-  title: "Admin & Settings · FactoryOS",
+  title: "Resources · FactoryOS",
 };
 
-export default async function FactoryAdminPage({
+export default async function FactoryResourcesPage({
   params,
   searchParams,
 }: {
@@ -18,12 +18,12 @@ export default async function FactoryAdminPage({
 }) {
   const { slug } = await params;
   const { tab } = await searchParams;
-  const { factory, canManage } = await getFactoryContext(slug);
+  const { role, factory, canManage } = await getFactoryContext(slug);
 
-  // Admin & Settings is manager-and-up; anyone else goes back to their board.
+  // Same gate the three panels had under Admin — manager and up.
   if (!canManage) redirect(`/factory/${slug}`);
 
-  const initialTab = resolveAdminTab(tab);
+  const initialTab = resolveResourceTab(tab);
 
   return (
     /* Fills the workspace frame from `lg` up rather than growing the page —
@@ -32,20 +32,20 @@ export default async function FactoryAdminPage({
     <div className="mx-auto flex w-full max-w-5xl flex-col lg:min-h-0 lg:flex-1">
       <div className="mb-5 shrink-0">
         <p className="text-[11px] font-bold tracking-[0.09em] text-ink-5 uppercase">
-          Setup
+          Production
         </p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">
-          Admin &amp; configuration
+          Resources
         </h1>
         <p className="mt-1 text-sm text-ink-4">
-          The vocabulary and targets every other module reads.
+          The machines, the people and the catalogue every other module names.
         </p>
       </div>
 
-      <AdminWorkspace
-        factory={factory}
+      <ResourcesWorkspace
+        factoryId={factory.id}
         canManage={canManage}
-        units={unitWords(factory)}
+        isAdmin={role === "admin" || role === "super_admin"}
         initialTab={initialTab}
       />
     </div>

@@ -14,6 +14,7 @@ export function AdminTabs({
   label = "Admin sections",
   onSelect,
   onPrefetch,
+  className,
 }: {
   tabs: AdminTab[];
   active: string;
@@ -21,6 +22,7 @@ export function AdminTabs({
   label?: string;
   onSelect: (value: string) => void;
   onPrefetch?: (value: string) => void;
+  className?: string;
 }) {
   return (
     <div
@@ -28,7 +30,10 @@ export function AdminTabs({
       aria-label={label}
       /* `w-fit`: a segmented control is as wide as its segments. Stretched
          across the page it read as a toolbar with a gap in it. */
-      className="scrollbar-slim mb-5 flex w-fit max-w-full shrink-0 gap-1 overflow-x-auto rounded-xl border border-line bg-sunken-2 p-1"
+      className={cn(
+        "scrollbar-slim mb-5 flex w-fit max-w-full shrink-0 gap-1 overflow-x-auto rounded-xl border border-line bg-sunken-2 p-1",
+        className,
+      )}
     >
       {tabs.map((tab) =>
         tab.ready ? (

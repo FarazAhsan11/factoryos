@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Search } from "lucide-react";
 
 import { DateField } from "@/components/ui/date-picker";
+import { SelectField } from "@/components/ui/select-field";
 
 import { ACTION_FLAGS } from "@/app/factory/[slug]/log/schemas";
 import type { SetupItem } from "@/lib/factory/setup-queries";
@@ -13,8 +14,8 @@ import { cn } from "@/lib/utils";
 const FILTER_CONTROL =
   "h-9 w-full rounded-lg border border-line bg-surface px-2.5 text-xs font-medium text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)] outline-none transition placeholder:font-normal placeholder:text-placeholder hover:border-line-strong focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12";
 
-/** Same control, plus our own chevron — see `.select-chevron`. */
-const FILTER_SELECT = FILTER_CONTROL + " select-chevron";
+/** The filter row's dropdowns run smaller than a form's. */
+const FILTER_SIZE = "h-9 rounded-lg px-2.5 text-xs font-medium";
 
 const FILTER_LABEL =
   "block text-[10px] font-bold uppercase tracking-[0.07em] text-ink-4";
@@ -120,69 +121,71 @@ export function DataTableFilters({
       </Group>
 
       <Group label="Shift" htmlFor="dt-shift">
-        <select
+        <SelectField
           id="dt-shift"
-          className={FILTER_SELECT}
           value={filters.shift}
-          onChange={(e) =>
-            onChange({ shift: e.target.value as LogTableFilters["shift"] })
+          onChange={(shift) =>
+            onChange({ shift: shift as LogTableFilters["shift"] })
           }
-        >
-          <option value="all">All shifts</option>
-          <option value="morning">☀ Morning</option>
-          <option value="afternoon">🌙 Afternoon</option>
-        </select>
+          options={[
+            { value: "all", label: "All shifts" },
+            { value: "morning", label: "☀ Morning" },
+            { value: "afternoon", label: "🌙 Afternoon" },
+          ]}
+          className={FILTER_SIZE}
+        />
       </Group>
 
       <Group label={`${unitWord} / Unit`} htmlFor="dt-unit">
-        <select
+        <SelectField
           id="dt-unit"
-          className={FILTER_SELECT}
           value={filters.unitId}
-          onChange={(e) => onChange({ unitId: e.target.value })}
-        >
-          <option value="all">All {unitWord.toLowerCase()}s</option>
-          {units.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.name}
-              {u.active ? "" : " (retired)"}
-            </option>
-          ))}
-        </select>
+          onChange={(unitId) => onChange({ unitId })}
+          searchPlaceholder={`${unitWord} name…`}
+          emptyMessage={`No ${unitWord.toLowerCase()} matches that.`}
+          options={[
+            { value: "all", label: `All ${unitWord.toLowerCase()}s` },
+            ...units.map((u) => ({
+              value: u.id,
+              label: u.name,
+              meta: u.active ? undefined : "retired",
+            })),
+          ]}
+          className={FILTER_SIZE}
+        />
       </Group>
 
       <Group label="Activity / Stage" htmlFor="dt-process">
-        <select
+        <SelectField
           id="dt-process"
-          className={FILTER_SELECT}
           value={filters.processId}
-          onChange={(e) => onChange({ processId: e.target.value })}
-        >
-          <option value="all">All stages</option>
-          {processes.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-              {p.active ? "" : " (retired)"}
-            </option>
-          ))}
-        </select>
+          onChange={(processId) => onChange({ processId })}
+          searchPlaceholder="Stage name…"
+          emptyMessage="No stage matches that."
+          options={[
+            { value: "all", label: "All stages" },
+            ...processes.map((p) => ({
+              value: p.id,
+              label: p.name,
+              meta: p.active ? undefined : "retired",
+            })),
+          ]}
+          className={FILTER_SIZE}
+        />
       </Group>
 
       <Group label="Flag" htmlFor="dt-flag">
-        <select
+        <SelectField
           id="dt-flag"
-          className={FILTER_SELECT}
           value={filters.flag}
-          onChange={(e) => onChange({ flag: e.target.value })}
-        >
-          <option value="all">All entries</option>
-          <option value="flagged">Flagged only</option>
-          {ACTION_FLAGS.map((flag) => (
-            <option key={flag} value={flag}>
-              {flag}
-            </option>
-          ))}
-        </select>
+          onChange={(flag) => onChange({ flag })}
+          options={[
+            { value: "all", label: "All entries" },
+            { value: "flagged", label: "Flagged only" },
+            ...ACTION_FLAGS.map((flag) => ({ value: flag, label: flag })),
+          ]}
+          className={FILTER_SIZE}
+        />
       </Group>
 
       {/* Short label, long placeholder: the detail belongs in the box, where

@@ -2,6 +2,7 @@
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
+import { SelectField } from "@/components/ui/select-field";
 import { PAGE_SIZES } from "@/lib/factory/shift-log-table-queries";
 import { cn } from "@/lib/utils";
 
@@ -62,18 +63,16 @@ export function TablePagination({
         <label htmlFor="dt-page-size" className="sr-only">
           Rows per page
         </label>
-        <select
+        <SelectField
           id="dt-page-size"
-          className="select-chevron h-8 rounded-lg border border-line bg-surface px-2 text-xs font-medium text-ink outline-none transition hover:border-line-strong focus:border-brand focus:ring-4 focus:ring-brand/12"
-          value={pageSize}
-          onChange={(e) => onPageSizeChange(Number(e.target.value))}
-        >
-          {PAGE_SIZES.map((size) => (
-            <option key={size} value={size}>
-              {size} rows
-            </option>
-          ))}
-        </select>
+          value={String(pageSize)}
+          onChange={(size) => onPageSizeChange(Number(size))}
+          options={PAGE_SIZES.map((size) => ({
+            value: String(size),
+            label: `${size} rows`,
+          }))}
+          className="h-8 w-28 rounded-lg px-2 text-xs font-medium"
+        />
         <span aria-live="polite" className="tabular-nums">
           {total === 0
             ? "No rows"

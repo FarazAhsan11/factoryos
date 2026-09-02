@@ -225,27 +225,6 @@
 }
 
 /**
- * Native selects draw their own arrow, and every browser draws a different
- * one — a grey wedge in Chrome, a black triangle in Firefox, nothing at all
- * on some Linux themes. This replaces it with the same chevron the rest of
- * the app uses, so a select and an input read as the same family of control.
- */
-@layer utilities {
-  .select-chevron {
-    appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2394A3B8' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 8 4 4 4-4'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 0.7rem center;
-    background-size: 1.1rem;
-    padding-right: 2.25rem;
-  }
-
-  .select-chevron::-ms-expand {
-    display: none;
-  }
-}
-
-/**
  * A scrollbar that doesn't shout. The workspace rail and other panes scroll
  * inside a bounded box, and the OS default there is a wide grey slab that
  * reads as part of the design. This is the same scrollbar, thinned to a

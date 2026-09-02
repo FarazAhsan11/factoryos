@@ -27,6 +27,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { DateField } from "@/components/ui/date-picker";
+import { SelectField } from "@/components/ui/select-field";
 import {
   updateBatchJob,
   type PipelineJob,
@@ -261,18 +262,23 @@ export function EditBatchDialog({
                     htmlFor="eb-bulk-unit"
                     error={errors.bulkUnit?.message}
                   >
-                    <select
-                      id="eb-bulk-unit"
-                      className={FIELD}
-                      {...register("bulkUnit")}
-                    >
-                      <option value="">Select…</option>
-                      {BULK_UNITS.map((unit) => (
-                        <option key={unit} value={unit}>
-                          {unit}
-                        </option>
-                      ))}
-                    </select>
+                    <Controller
+                      name="bulkUnit"
+                      control={control}
+                      render={({ field }) => (
+                        <SelectField
+                          id="eb-bulk-unit"
+                          value={field.value ?? ""}
+                          onChange={field.onChange}
+                          onBlur={field.onBlur}
+                          clearable
+                          options={BULK_UNITS.map((unit) => ({
+                            value: unit,
+                            label: unit,
+                          }))}
+                        />
+                      )}
+                    />
                   </Field>
                   <Field
                     label="Overage %"
@@ -333,18 +339,31 @@ export function EditBatchDialog({
                   htmlFor="eb-parent"
                   error={errors.parentJobId?.message}
                 >
-                  <select
-                    id="eb-parent"
-                    className={FIELD}
-                    {...register("parentJobId")}
-                  >
-                    <option value="">No parent — external bulk</option>
-                    {bulkSources.map((source) => (
-                      <option key={source.id} value={source.id}>
-                        {source.batch_no} — {source.product_name}
-                      </option>
-                    ))}
-                  </select>
+                  <Controller
+                    name="parentJobId"
+                    control={control}
+                    render={({ field }) => (
+                      <SelectField
+                        id="eb-parent"
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        // Drawing bulk from outside the plant is a real
+                        // answer, not an unfilled field — so it keeps a named
+                        // row rather than becoming a placeholder.
+                        clearable
+                        clearLabel="No parent — external bulk"
+                        placeholder="No parent — external bulk"
+                        searchPlaceholder="Batch number or product…"
+                        emptyMessage="No manufacturing batch matches that."
+                        options={bulkSources.map((source) => ({
+                          value: source.id,
+                          label: `${source.batch_no} — ${source.product_name}`,
+                          meta: source.bulk_unit ?? undefined,
+                        }))}
+                      />
+                    )}
+                  />
                 </Field>
                 {bulkSources.length === 0 && (
                   <p className="mt-1.5 text-[11px] text-ink-5">
@@ -375,18 +394,23 @@ export function EditBatchDialog({
                     htmlFor="eb-pack-unit"
                     error={errors.packUnit?.message}
                   >
-                    <select
-                      id="eb-pack-unit"
-                      className={FIELD}
-                      {...register("packUnit")}
-                    >
-                      <option value="">Select…</option>
-                      {PACK_UNITS.map((unit) => (
-                        <option key={unit} value={unit}>
-                          {unit}
-                        </option>
-                      ))}
-                    </select>
+                    <Controller
+                      name="packUnit"
+                      control={control}
+                      render={({ field }) => (
+                        <SelectField
+                          id="eb-pack-unit"
+                          value={field.value ?? ""}
+                          onChange={field.onChange}
+                          onBlur={field.onBlur}
+                          clearable
+                          options={PACK_UNITS.map((unit) => ({
+                            value: unit,
+                            label: unit,
+                          }))}
+                        />
+                      )}
+                    />
                   </Field>
                   <Field
                     label="Market"
@@ -437,17 +461,22 @@ export function EditBatchDialog({
 
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Priority" htmlFor="eb-priority">
-                <select
-                  id="eb-priority"
-                  className={FIELD}
-                  {...register("priority")}
-                >
-                  {PRIORITIES.map((p) => (
-                    <option key={p} value={p}>
-                      {PRIORITY_LABELS[p]}
-                    </option>
-                  ))}
-                </select>
+                <Controller
+                  name="priority"
+                  control={control}
+                  render={({ field }) => (
+                    <SelectField
+                      id="eb-priority"
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      options={PRIORITIES.map((p) => ({
+                        value: p,
+                        label: PRIORITY_LABELS[p],
+                      }))}
+                    />
+                  )}
+                />
               </Field>
               <Field
                 label="Due date"

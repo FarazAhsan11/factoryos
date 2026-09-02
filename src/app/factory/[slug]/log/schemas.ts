@@ -130,6 +130,25 @@ export function composeSpeedUnit(type: string, rate: SpeedRate): string {
 }
 
 /**
+ * The inverse: `"Caps/hr"` → `{ type: "Caps", rate: "hr" }`.
+ *
+ * Needed because what's *stored* is the composed string, and the correction
+ * dialog has to reopen the two controls that produced it. An unrecognised or
+ * missing unit falls back to the form's own defaults rather than to nothing —
+ * an empty speed-type dropdown on an entry that plainly has a speed reads as
+ * data loss.
+ */
+export function decomposeSpeedUnit(unit: string | null | undefined): {
+  type: SpeedType;
+  rate: SpeedRate;
+} {
+  const [rawType, rawRate] = (unit ?? "").split("/");
+  const type =
+    SPEED_TYPES.find((t) => t.value === rawType)?.value ?? ("RPM" as SpeedType);
+  return { type, rate: rawRate === "min" ? "min" : "hr" };
+}
+
+/**
  * What this entry *should* have produced: target speed × the time it ran.
  * 60 minutes at 10/min is 600; the same 10 read as /hr is 10.
  *
@@ -273,164 +292,202 @@ const optionalQty = z
   )
   .refine((v) => v === undefined || v >= 0, "Enter a positive number.");
 
+/**
+ * The fields a shift-log entry is made of, as a plain shape.
+ *
+ * A shape rather than a finished schema because two forms are built from it:
+ * the entry form, and the **edit** dialog on the shift report, which is the
+ * same record plus the amendment note that filing a correction costs. Zod
+ * refuses to extend an object that already carries refinements, and splitting
+ * the shape from the rules is what lets both schemas share one definition of
+ * each — a field that drifted between the two would be a rule the correction
+ * path quietly skipped.
+ */
+export const logEntryShape = {
+  factoryId: z.uuid(),
+  unitId: z.uuid("Select a unit."),
+  processId: z.uuid("Select an activity."),
+  shift: z.enum(["morning", "afternoon"]),
+  startTime: clockTime,
+  endTime: clockTime,
+  equipmentNo: z.string().trim().max(40).optional(),
+
+  batchNo: z.string().trim().max(60).optional(),
+  /**
+   * Which planned stage this entry counts towards (migration 0033).
+   *
+   * Almost always absent, and that is correct: when a batch runs an activity
+   * once, the database resolves it from the batch and the activity alone.
+   * It is asked for only where a batch runs the same activity more than once
+   * — three packing runs, or three work orders under one batch number —
+   * which is exactly where the two would otherwise pool into one total.
+   */
+  batchStageId: z
+    .union([z.uuid(), z.literal("")])
+    .optional()
+    .transform((v) => (v ? v : undefined)),
+  targetQty: optionalQty,
+  qty: optionalQty,
+  /**
+   * What `qty` is counted in — preparatory stages only. "" is the unset
+   * state a registered `<select>` submits, and it has to parse for the same
+   * reason `actionFlag` does; the rule below is what makes it required
+   * where it matters.
+   */
+  qtyUnit: z
+    .union([z.enum(QTY_UNITS), z.literal("")])
+    .optional()
+    .transform((v) => (v ? v : undefined)),
+  qtyRejected: optionalQty,
+
+  speedType: z.string().trim().max(20).optional(),
+  speedRate: z.enum(["min", "hr"]).optional(),
+  targetSpeed: optionalQty,
+  actualSpeed: optionalQty,
+  slowReason: z.string().trim().max(120).optional(),
+
+  operators: operatorList,
+  comment: z.string().trim().max(500).optional(),
+  /**
+   * "" is the "No — routine entry" option, and it has to parse. A bare
+   * `z.enum(...).optional()` rejects it — `optional` means *absent*, and a
+   * registered `<select>` submits an empty string, not `undefined`. That put
+   * the form in a state where the default option failed validation against a
+   * field with no visible error, so the submit button appeared dead until you
+   * picked something else.
+   */
+  actionFlag: z
+    .union([z.enum(ACTION_FLAGS), z.literal("")])
+    .optional()
+    .transform((v) => (v ? v : undefined)),
+
+  /**
+   * Mirrors the selected stage's `category`, so the rules below can see
+   * which of the three shapes the form is currently in.
+   */
+  category: z.enum(PROCESS_CATEGORY_VALUES, {
+    error: "Select an activity.",
+  }),
+  /**
+   * Mirrors `has_machine` — meaningful on a production stage only, where it
+   * decides whether equipment and speed are recorded. Forced false for the
+   * other two categories by the database trigger in 0030, and by the form.
+   */
+  hasMachine: z.boolean(),
+};
+
+/** What the shape parses to — the argument the cross-field rules below see. */
+type LogEntryFields = z.output<z.ZodObject<typeof logEntryShape>>;
+
+/**
+ * The cross-field rules. None of them fit on a single field: every one reads
+ * the category to know which of the three shapes the form is currently in.
+ *
+ * Shared by `logEntrySchema` and `editEntrySchema` so an amendment is held to
+ * exactly the standard the original entry was — an edit that could file a
+ * production entry with no quantity, or a slow run with no reason, would be a
+ * way of writing rows the form itself refuses to create.
+ */
+function applyLogEntryRules(
+  values: LogEntryFields,
+  ctx: z.core.$RefinementCtx,
+) {
+  // Who did the work — required unless this is downtime. The issue is
+  // pinned to the first picker rather than the array, so it renders inline
+  // on the control the operator has to act on.
+  if (operatorsRequired(values.category) && values.operators.length === 0) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["operators", 0, "name"],
+      message: OPERATOR_REQUIRED,
+    });
+  }
+
+  // Downtime records time, not measurements. Nothing below applies, and the
+  // form renders none of those fields — so returning here isn't just an
+  // optimisation, it stops a stale value left over from a previous category
+  // being validated against a control that is no longer on screen.
+  if (values.category === "downtime") return;
+
+  // A preparatory or production stage exists to produce something, so the
+  // quantity it produced isn't optional — a blank there is an unfinished
+  // entry, not a measurement. It stays `optionalQty` at the field level
+  // because the *same* field must be absent on downtime; only this rule
+  // knows which shape the form is currently in.
+  //
+  // `targetQty` is deliberately NOT required alongside it. It is derived
+  // from target speed × duration and never typed, so there are entries for
+  // which no target exists — an RPM-rated machine, a preparatory stage, a
+  // Quick entry with no speed recorded. Demanding one would block those
+  // outright; storing null says "no target applies", which is the truth and
+  // keeps it out of every average.
+  if (values.qty === undefined) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["qty"],
+      message: "Enter how much this activity produced.",
+    });
+  }
+
+  // A preparatory quantity without its unit is not a measurement — 3 of
+  // what? Production doesn't ask: its unit is the speed unit, and the
+  // number is whatever that counts.
+  if (values.category === "preparatory") {
+    if (!values.qtyUnit) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["qtyUnit"],
+        message: "Pick what this is measured in.",
+      });
+    }
+    return;
+  }
+
+  // ── Production only, from here ──────────────────────────────────────
+
+  // Rejects can't exceed what was produced — a data-entry slip worth
+  // catching before it skews the quality rate.
+  if (
+    values.qty !== undefined &&
+    values.qtyRejected !== undefined &&
+    values.qtyRejected > values.qty
+  ) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["qtyRejected"],
+      message: "Rejects can't exceed the quantity produced.",
+    });
+  }
+
+  if (!values.hasMachine) return;
+
+  // Running below target is allowed — running below target *silently* isn't.
+  const { targetSpeed, actualSpeed, slowReason } = values;
+  const isSlow =
+    targetSpeed !== undefined &&
+    actualSpeed !== undefined &&
+    targetSpeed > 0 &&
+    actualSpeed < targetSpeed;
+  if (isSlow && !slowReason) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["slowReason"],
+      message: "Select a reason — this feeds the OEE Pareto chart.",
+    });
+  }
+}
+
 export const logEntrySchema = z
-  .object({
-    factoryId: z.uuid(),
-    unitId: z.uuid("Select a unit."),
-    processId: z.uuid("Select an activity."),
-    shift: z.enum(["morning", "afternoon"]),
-    startTime: clockTime,
-    endTime: clockTime,
-    equipmentNo: z.string().trim().max(40).optional(),
+  .object(logEntryShape)
+  .superRefine(applyLogEntryRules);
 
-    batchNo: z.string().trim().max(60).optional(),
-    /**
-     * Which planned stage this entry counts towards (migration 0033).
-     *
-     * Almost always absent, and that is correct: when a batch runs an activity
-     * once, the database resolves it from the batch and the activity alone.
-     * It is asked for only where a batch runs the same activity more than once
-     * — three packing runs, or three work orders under one batch number —
-     * which is exactly where the two would otherwise pool into one total.
-     */
-    batchStageId: z
-      .union([z.uuid(), z.literal("")])
-      .optional()
-      .transform((v) => (v ? v : undefined)),
-    targetQty: optionalQty,
-    qty: optionalQty,
-    /**
-     * What `qty` is counted in — preparatory stages only. "" is the unset
-     * state a registered `<select>` submits, and it has to parse for the same
-     * reason `actionFlag` does; the rule below is what makes it required
-     * where it matters.
-     */
-    qtyUnit: z
-      .union([z.enum(QTY_UNITS), z.literal("")])
-      .optional()
-      .transform((v) => (v ? v : undefined)),
-    qtyRejected: optionalQty,
-
-    speedType: z.string().trim().max(20).optional(),
-    speedRate: z.enum(["min", "hr"]).optional(),
-    targetSpeed: optionalQty,
-    actualSpeed: optionalQty,
-    slowReason: z.string().trim().max(120).optional(),
-
-    operators: operatorList,
-    comment: z.string().trim().max(500).optional(),
-    /**
-     * "" is the "No — routine entry" option, and it has to parse. A bare
-     * `z.enum(...).optional()` rejects it — `optional` means *absent*, and a
-     * registered `<select>` submits an empty string, not `undefined`. That put
-     * the form in a state where the default option failed validation against a
-     * field with no visible error, so the submit button appeared dead until you
-     * picked something else.
-     */
-    actionFlag: z
-      .union([z.enum(ACTION_FLAGS), z.literal("")])
-      .optional()
-      .transform((v) => (v ? v : undefined)),
-
-    /**
-     * Mirrors the selected stage's `category`, so the rules below can see
-     * which of the three shapes the form is currently in.
-     */
-    category: z.enum(PROCESS_CATEGORY_VALUES, {
-      error: "Select an activity.",
-    }),
-    /**
-     * Mirrors `has_machine` — meaningful on a production stage only, where it
-     * decides whether equipment and speed are recorded. Forced false for the
-     * other two categories by the database trigger in 0030, and by the form.
-     */
-    hasMachine: z.boolean(),
-  })
-  .superRefine((values, ctx) => {
-    // Who did the work — required unless this is downtime. The issue is
-    // pinned to the first picker rather than the array, so it renders inline
-    // on the control the operator has to act on.
-    if (operatorsRequired(values.category) && values.operators.length === 0) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["operators", 0, "name"],
-        message: OPERATOR_REQUIRED,
-      });
-    }
-
-    // Downtime records time, not measurements. Nothing below applies, and the
-    // form renders none of those fields — so returning here isn't just an
-    // optimisation, it stops a stale value left over from a previous category
-    // being validated against a control that is no longer on screen.
-    if (values.category === "downtime") return;
-
-    // A preparatory or production stage exists to produce something, so the
-    // quantity it produced isn't optional — a blank there is an unfinished
-    // entry, not a measurement. It stays `optionalQty` at the field level
-    // because the *same* field must be absent on downtime; only this rule
-    // knows which shape the form is currently in.
-    //
-    // `targetQty` is deliberately NOT required alongside it. It is derived
-    // from target speed × duration and never typed, so there are entries for
-    // which no target exists — an RPM-rated machine, a preparatory stage, a
-    // Quick entry with no speed recorded. Demanding one would block those
-    // outright; storing null says "no target applies", which is the truth and
-    // keeps it out of every average.
-    if (values.qty === undefined) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["qty"],
-        message: "Enter how much this activity produced.",
-      });
-    }
-
-    // A preparatory quantity without its unit is not a measurement — 3 of
-    // what? Production doesn't ask: its unit is the speed unit, and the
-    // number is whatever that counts.
-    if (values.category === "preparatory") {
-      if (!values.qtyUnit) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["qtyUnit"],
-          message: "Pick what this is measured in.",
-        });
-      }
-      return;
-    }
-
-    // ── Production only, from here ──────────────────────────────────────
-
-    // Rejects can't exceed what was produced — a data-entry slip worth
-    // catching before it skews the quality rate.
-    if (
-      values.qty !== undefined &&
-      values.qtyRejected !== undefined &&
-      values.qtyRejected > values.qty
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["qtyRejected"],
-        message: "Rejects can't exceed the quantity produced.",
-      });
-    }
-
-    if (!values.hasMachine) return;
-
-    // Running below target is allowed — running below target *silently* isn't.
-    const { targetSpeed, actualSpeed, slowReason } = values;
-    const isSlow =
-      targetSpeed !== undefined &&
-      actualSpeed !== undefined &&
-      targetSpeed > 0 &&
-      actualSpeed < targetSpeed;
-    if (isSlow && !slowReason) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["slowReason"],
-        message: "Select a reason — this feeds the OEE Pareto chart.",
-      });
-    }
-  });
+/**
+ * The same fields with no rules attached — used to read a half-filled form
+ * without judging it. The correction dialog parses against this to show what
+ * it is about to change; the finished write still goes through
+ * `editEntrySchema`, which is where the rules live.
+ */
+export const logEntryFieldsSchema = z.object(logEntryShape);
 
 export type LogEntryValues = z.input<typeof logEntrySchema>;
 export type LogEntryParsed = z.output<typeof logEntrySchema>;
@@ -454,6 +511,36 @@ export const amendEntrySchema = z.object({
 });
 
 export type AmendEntryValues = z.infer<typeof amendEntrySchema>;
+
+/**
+ * A **correction** to a filed entry — the shift report's edit dialog.
+ *
+ * Every field the entry form asks for, plus the note that filing the change
+ * costs. The two are the same record held to the same rules (see
+ * `applyLogEntryRules`), which is the point: a correction that could file a
+ * production entry with no quantity would be a way of writing rows the form
+ * itself refuses to create.
+ *
+ * The note is not decoration and is not optional. `shift_log_amend_guard`
+ * (migration 0011) refuses any update to a filed entry without one and stamps
+ * `amended_at` / `amended_by` from the session — so the real enforcement is a
+ * layer below this, and the same minimum length applies for the same reason
+ * it does on `amendEntrySchema`: the numbers on the row are about to change,
+ * and this text is the only record of what they used to say and why.
+ */
+export const editEntrySchema = z
+  .object({
+    ...logEntryShape,
+    note: z
+      .string()
+      .trim()
+      .min(10, "Say what was wrong and what you corrected.")
+      .max(500, "Keep the note under 500 characters."),
+  })
+  .superRefine(applyLogEntryRules);
+
+export type EditEntryValues = z.input<typeof editEntrySchema>;
+export type EditEntryParsed = z.output<typeof editEntrySchema>;
 
 /**
  * Why a batch produced more than its work order required.

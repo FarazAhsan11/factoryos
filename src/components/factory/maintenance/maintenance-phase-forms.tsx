@@ -3,6 +3,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
+  Controller,
   useForm,
   useWatch,
   type FieldValues,
@@ -30,6 +31,7 @@ import {
   type MaintenanceRequest,
 } from "@/lib/factory/maintenance-queries";
 import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
+import { SelectField } from "@/components/ui/select-field";
 import { cn } from "@/lib/utils";
 
 const CONTROL =
@@ -124,6 +126,7 @@ function AssignForm({
 
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<MaintenanceAssignValues>({
@@ -169,14 +172,22 @@ function AssignForm({
       </Field>
 
       <Field label="Department" error={errors.departmentId?.message}>
-        <select {...register("departmentId")} className={CONTROL}>
-          <option value="">Select a department…</option>
-          {active.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.name}
-            </option>
-          ))}
-        </select>
+        <Controller
+          name="departmentId"
+          control={control}
+          render={({ field }) => (
+            <SelectField
+              value={field.value ?? ""}
+              onChange={field.onChange}
+              onBlur={field.onBlur}
+              ariaLabel="Department"
+              ariaInvalid={Boolean(errors.departmentId)}
+              clearable
+              placeholder="Select a department…"
+              options={active.map((d) => ({ value: d.id, label: d.name }))}
+            />
+          )}
+        />
         {active.length === 0 && (
           <p className="text-xs text-warn-deep">
             No departments set up yet — add them in Admin → Departments.

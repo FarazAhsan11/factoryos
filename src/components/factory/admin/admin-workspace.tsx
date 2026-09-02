@@ -8,16 +8,10 @@ import { PROCESS_CATEGORIES } from "@/app/factory/[slug]/log/schemas";
 import { AdminTabs } from "@/components/factory/admin/admin-tabs";
 import { CompanySettingsForm } from "@/components/factory/admin/company-settings-form";
 import { SetupListManager } from "@/components/factory/admin/setup-list-manager";
-import { EmployeesPanel } from "@/components/factory/admin/employees-panel";
-import { EquipmentPanel } from "@/components/factory/admin/equipment-panel";
-import { ProductsPanel } from "@/components/factory/admin/products-panel";
 import { ShiftTimesForm } from "@/components/factory/admin/shift-times-form";
 import { PanelHeader } from "@/components/factory/admin/settings-ui";
 import { ADMIN_TABS, TAB_TABLE } from "@/lib/factory/admin-tabs";
 import type { FactoryContext } from "@/lib/factory/context";
-import { employeeKeys, fetchEmployees } from "@/lib/factory/employee-queries";
-import { equipmentKeys, fetchEquipment } from "@/lib/factory/equipment-queries";
-import { fetchProducts, productKeys } from "@/lib/factory/product-queries";
 import {
   fetchShiftTimes,
   shiftTimeKeys,
@@ -33,14 +27,11 @@ import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
 export function AdminWorkspace({
   factory,
   canManage,
-  isAdmin,
   units,
   initialTab,
 }: {
   factory: FactoryContext["factory"];
   canManage: boolean;
-  /** Narrower than canManage: only an admin may add or remove people. */
-  isAdmin: boolean;
   units: { singular: string; plural: string };
   initialTab: string;
 }) {
@@ -49,27 +40,6 @@ export function AdminWorkspace({
 
   const prefetch = useCallback(
     (value: string) => {
-      if (value === "employees") {
-        queryClient.prefetchQuery({
-          queryKey: employeeKeys.all(factory.id),
-          queryFn: () => fetchEmployees(factory.id),
-        });
-        return;
-      }
-      if (value === "equipment") {
-        queryClient.prefetchQuery({
-          queryKey: equipmentKeys.all(factory.id),
-          queryFn: () => fetchEquipment(factory.id),
-        });
-        return;
-      }
-      if (value === "products") {
-        queryClient.prefetchQuery({
-          queryKey: productKeys.all(factory.id),
-          queryFn: () => fetchProducts(factory.id),
-        });
-        return;
-      }
       if (value === "shift-times") {
         queryClient.prefetchQuery({
           queryKey: shiftTimeKeys.all(factory.id),
@@ -196,21 +166,6 @@ export function AdminWorkspace({
               },
             ]}
           />
-        </Panel>
-
-        {/* The machine register. A pair — the number painted on the asset and
-          the name people call it by — which is why it isn't a SetupListManager
-          list: the shift log types the number and reads back the name. */}
-        <Panel active={tab === "equipment"} lazy>
-          <EquipmentPanel factoryId={factory.id} canManage={canManage} />
-        </Panel>
-
-        <Panel active={tab === "employees"} lazy>
-          <EmployeesPanel factoryId={factory.id} isAdmin={isAdmin} />
-        </Panel>
-
-        <Panel active={tab === "products"} lazy>
-          <ProductsPanel factoryId={factory.id} canManage={canManage} />
         </Panel>
 
         <Panel active={tab === "shift-times"} lazy>

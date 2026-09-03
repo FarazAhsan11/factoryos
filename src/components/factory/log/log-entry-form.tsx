@@ -625,7 +625,14 @@ export function LogEntryForm({
   return (
     <form
       onSubmit={handleSubmit(
-        (values) => submit.mutateAsync(values),
+        /* `mutateAsync`, so `formState.isSubmitting` stays
+                 true for the round trip — and `.catch`, because the promise it
+                 rejects with is one `onError` has already reported. Left
+                 uncaught it surfaces a second time as an unhandled rejection,
+                 which in dev is the full-screen Next.js error overlay. The
+                 database refusing an entry is an ordinary answer here — an
+                 unissued batch, a stage over its tolerance — not a crash. */
+        (values) => submit.mutateAsync(values).catch(() => {}),
         // A silent no-op is the worst failure this form can have: the operator
         // presses Log entry, nothing happens, and there is nothing on screen to
         // read. Any field whose error isn't rendered — or is inside a section

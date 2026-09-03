@@ -136,7 +136,13 @@ export function AmendEntryDialog({
         )}
 
         <form
-          onSubmit={handleSubmit((values) => amend.mutateAsync(values))}
+          onSubmit={handleSubmit((values) =>
+            // Reported by `onError`; the rejection would otherwise surface
+            // again as an unhandled promise. An amendment the shift log
+            // refuses — a quantity that puts its stage over tolerance — is an
+            // answer, not a crash.
+            amend.mutateAsync(values).catch(() => {}),
+          )}
           className="space-y-3"
         >
           <div className="space-y-1.5">

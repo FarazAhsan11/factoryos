@@ -38,6 +38,25 @@ export interface BatchStage {
   target_qty: number | null;
   target_unit: string;
   pack_size: number | null;
+  /* ── Tolerance (0037) ───────────────────────────────────────────────── */
+  /** This stage's own tolerance. Null — the usual case — inherits the batch's. */
+  tolerance_pct: number | null;
+  /** The one actually enforced: this stage's, or the batch's. */
+  effective_tolerance_pct: number;
+  /**
+   * The most that may be logged against this stage — target plus tolerance.
+   * Null when the stage has no target yet, which is also when it cannot be
+   * issued. Computed in the view by `batch_stage_allowed_qty`, never here, so
+   * the number drawn and the number the trigger refuses on are the same one.
+   */
+  allowed_qty: number | null;
+  /**
+   * Already past the ceiling. Unreachable through the form — the shift log
+   * refuses the entry that would do it — but reachable by lowering a target or
+   * a tolerance under entries already filed, which is exactly when a progress
+   * bar has to say so instead of quietly reading 106%.
+   */
+  is_over_tolerance: boolean;
   /** Good units logged against this stage — rejects already subtracted. */
   accumulated_qty: number;
   status: StageStatus;
@@ -66,6 +85,7 @@ const COLUMNS = `
   target_qty, target_unit, pack_size, accumulated_qty, status, is_final,
   can_run_parallel, started_at, completed_at, yield_pct, yield_acceptable,
   yield_notes, previous_target_qty, created_at,
+  tolerance_pct, effective_tolerance_pct, allowed_qty, is_over_tolerance,
   process_name, process_category, unit_name, completed_by_name
 `;
 
@@ -136,6 +156,9 @@ export async function createBatchStage(
       target_qty: values.targetQty ?? null,
       target_unit: values.targetUnit,
       pack_size: values.packSize ?? null,
+      // Null, not 0: null inherits the batch's tolerance, and 0 would silently
+      // pin every stage to its exact target the moment one was planned.
+      tolerance_pct: values.tolerancePct ?? null,
       // Left unset so the database appends it — `batch_stages_validate` puts
       // the row at the end, which is also what makes it the new final stage.
     })
@@ -171,6 +194,7 @@ export async function updateBatchStage(
       | "target_qty"
       | "target_unit"
       | "pack_size"
+      | "tolerance_pct"
       | "unit_id"
       | "can_run_parallel"
     >
@@ -270,6 +294,37 @@ export async function issueJob(jobId: string): Promise<string> {
 }
 
 /* ── Derived reads ──────────────────────────────────────────────────────── */
+
+/**
+ * The ceiling this stage may not be logged past, or null when it has no target
+ * to measure by.
+ *
+ * Reads the view's `allowed_qty` rather than recomputing target × tolerance:
+ * the trigger that refuses an entry uses `batch_stage_allowed_qty`, and a
+ * second implementation here would eventually round differently and draw a
+ * limit the log does not actually enforce.
+ */
+export function stageCeiling(stage: BatchStage): number | null {
+  const allowed = stage.allowed_qty;
+  return allowed === null || allowed === undefined ? null : Number(allowed);
+}
+
+/**
+ * Is this stage over its ceiling once `pending` is added?
+ *
+ * `pending` is what is being typed into the shift log right now and not yet
+ * filed — the whole point of drawing this before the submit is that the entry
+ * can still be corrected. Zero for anywhere the question is about what has
+ * already been logged.
+ */
+export function stageIsOverTolerance(
+  stage: BatchStage,
+  pending = 0,
+): boolean {
+  const ceiling = stageCeiling(stage);
+  if (ceiling === null) return false;
+  return Number(stage.accumulated_qty ?? 0) + pending > ceiling;
+}
 
 /** How far through a stage is, or null when it has no target to measure by. */
 export function stageProgress(stage: BatchStage): number | null {

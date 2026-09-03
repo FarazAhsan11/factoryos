@@ -367,6 +367,42 @@ export function NewBatchDialog({
                   </p>
                 )}
 
+
+                {/* ── Tolerance ──────────────────────────────────────────
+                    Sits with priority and the due date rather than in a type
+                    section, because unlike overage it belongs to every batch
+                    type: a packing stage has a target like any other, and 600
+                    bottles against a 500-bottle run is the same mistake as 26
+                    kg against a 20 kg mix.
+
+                    Worth the sentence underneath. This dialog now carries two
+                    percentages, and the difference between them is the whole
+                    point: overage is extra deliberately *made* and raises a
+                    flag; tolerance is how far past a stage's plan an entry may
+                    be *recorded*, and it stops the entry. */}
+                <Field
+                  label="Stage tolerance %"
+                  note="how far past a planned stage the log will accept"
+                  optional
+                  htmlFor="nb-tolerance"
+                  error={errors.tolerancePct?.message}
+                >
+                  <input
+                    id="nb-tolerance"
+                    type="number"
+                    step="any"
+                    min={0}
+                    max={100}
+                    placeholder="e.g. 5"
+                    className={cn(FIELD, MONO, "sm:max-w-[12rem]")}
+                    {...register("tolerancePct", { valueAsNumber: true })}
+                  />
+                </Field>
+                {/* Outside the Field, like OverageNote: the inline error
+                    belongs directly under the input, and the explanation
+                    under both. */}
+                <ToleranceNote control={control} />
+
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Field label="Priority" htmlFor="nb-priority">
                     <Controller
@@ -714,6 +750,7 @@ function emptyValues(factoryId: string): NewBatchValues {
     notes: "",
     bulkUnit: "",
     overagePct: undefined,
+    tolerancePct: undefined,
     parentJobId: "",
     packSize: undefined,
     packUnit: "",
@@ -822,6 +859,49 @@ function Row({
  * people's screens — the operator who gets flagged is not the planner who
  * typed the 4.
  */
+/**
+ * What the tolerance will actually do, in the batch's own terms.
+ *
+ * Spelt out because this dialog carries two percentages and they are one word
+ * apart: overage is extra deliberately *made* against the work order and
+ * raises a flag a manager clears; tolerance is how far past a single stage's
+ * plan an entry may be *recorded*, and it refuses the entry outright. Someone
+ * setting one while meaning the other gets a plant that either blocks nothing
+ * or blocks everything.
+ */
+function ToleranceNote({
+  control,
+}: {
+  control: Control<NewBatchValues, unknown, NewBatchParsed>;
+}) {
+  const pct = useWatch({ control, name: "tolerancePct" });
+  const value = typeof pct === "number" && !Number.isNaN(pct) ? pct : 0;
+
+  if (!value) {
+    return (
+      <p className="mt-2.5 text-[11px] leading-snug text-ink-4">
+        Left blank, every stage is held to its target exactly — an entry taking
+        a 20&nbsp;kg mixing stage past 20&nbsp;kg is refused. Set a few percent
+        if your rooms weigh and count with any slack.
+      </p>
+    );
+  }
+
+  return (
+    <p className="mt-2.5 text-[11px] leading-snug text-ink-4">
+      Each planned stage will accept up to{" "}
+      <strong className="font-semibold text-ink-2">its target +{value}%</strong>{" "}
+      — a stage planned for 20&nbsp;kg takes{" "}
+      <strong className="font-mono font-semibold text-ink-2">
+        {fmt(Math.round(20 * (1 + value / 100) * 100) / 100)}&nbsp;kg
+      </strong>
+      . An entry that would push it past that is refused, and the stage&rsquo;s
+      progress bar in the shift log turns red. A manager can raise the stage
+      target or its own tolerance on the plan.
+    </p>
+  );
+}
+
 function OverageNote({
   control,
   required,

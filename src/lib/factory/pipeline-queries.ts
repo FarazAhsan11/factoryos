@@ -54,6 +54,16 @@ export interface PipelineJob {
   bulk_qty_received: number | null;
   market: string | null;
   overage_pct: number;
+  /**
+   * How far past a planned stage's target the shift log will accept before it
+   * refuses the entry (migration 0037). Inherited by every stage in the plan
+   * that has not overridden it.
+   *
+   * Not `overage_pct` under another name: that is extra this batch means to
+   * make, measured against the whole work order, and it raises a flag. This is
+   * a bound on what may be *recorded* against one stage, and it blocks.
+   */
+  tolerance_pct: number;
   priority: Priority;
   due_date: string | null;
   notes: string | null;
@@ -90,7 +100,7 @@ const COLUMNS = `
   batch_no, product_code, product_name, required_qty,
   unit_name, produced_qty, flagged_count,
   batch_type, parent_job_id, bulk_unit, pack_size, pack_unit,
-  bulk_qty_received, market, overage_pct, priority, due_date, notes,
+  bulk_qty_received, market, overage_pct, tolerance_pct, priority, due_date, notes,
   parent_batch_no, parent_product_name, child_count,
   allocated_qty, bulk_consumed,
   issued_at, stage_count, stages_complete, stages_without_target,
@@ -252,6 +262,10 @@ export async function createBatchJob(
       // Anything that manufactures may declare one; a packing run may not, and
       // `pipeline_jobs_overage_belongs` (0032) refuses it if this ever slips.
       overage_pct: packing ? 0 : (values.overagePct ?? 0),
+      // Unlike overage, every batch type carries one: a packing stage has a
+      // target like any other, and 600 bottles against a 500-bottle run is the
+      // same mistake as 26 kg against a 20 kg mix.
+      tolerance_pct: values.tolerancePct ?? 0,
     })
     .select("id")
     .single();
@@ -308,6 +322,7 @@ export async function updateBatchJob(
       market: packing ? values.market || null : null,
       bulk_unit: manufacturing ? (values.bulkUnit ?? null) : null,
       overage_pct: packing ? 0 : (values.overagePct ?? 0),
+      tolerance_pct: values.tolerancePct ?? 0,
     })
     .eq("id", jobId);
 

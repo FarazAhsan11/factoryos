@@ -515,7 +515,9 @@ function EditEntryForm({
   return (
     <form
       onSubmit={handleSubmit(
-        (parsed) => save.mutateAsync(parsed),
+        // Reported by `onError`; catching keeps the refusal from surfacing a
+        // second time as an unhandled rejection.
+        (parsed) => save.mutateAsync(parsed).catch(() => {}),
         // A silent no-op is the worst failure a form this tall can have. Any
         // error whose field is off screen — inside a section the current
         // category has hidden — gets said out loud here.

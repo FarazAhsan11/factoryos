@@ -104,6 +104,7 @@ export function EditBatchDialog({
       notes: job.notes ?? "",
       bulkUnit: (job.bulk_unit ?? "") as EditBatchValues["bulkUnit"],
       overagePct: job.overage_pct ? Number(job.overage_pct) : undefined,
+      tolerancePct: job.tolerance_pct ? Number(job.tolerance_pct) : undefined,
       parentJobId: job.parent_job_id ?? "",
       packSize: job.pack_size ? Number(job.pack_size) : undefined,
       packUnit: (job.pack_unit ?? "") as EditBatchValues["packUnit"],
@@ -459,6 +460,36 @@ export function EditBatchDialog({
               </TypeSection>
             )}
 
+            {/* Outside the type sections, unlike overage: every batch type
+                has planned stages, so every batch type has a ceiling the log
+                enforces against them. Editable after the fact on purpose —
+                raising it is the sanctioned way past a refusal, and it leaves
+                a record here rather than an amendment on someone's entry. */}
+            <Field
+              label="Stage tolerance %"
+              note="how far past a planned stage the log will accept"
+              optional
+              htmlFor="eb-tolerance"
+              error={errors.tolerancePct?.message}
+            >
+              <input
+                id="eb-tolerance"
+                type="number"
+                step="any"
+                min={0}
+                max={100}
+                placeholder="e.g. 5"
+                className={cn(FIELD, MONO, "sm:max-w-[12rem]")}
+                {...register("tolerancePct", { valueAsNumber: true })}
+              />
+              <p className="mt-2.5 text-[11px] leading-snug text-ink-4">
+                Applies to every stage in this batch&rsquo;s plan that
+                hasn&rsquo;t been given its own. A stage already past the new
+                ceiling isn&rsquo;t unwound — entries already filed stay — but
+                its progress bar turns red until the plan agrees with them.
+              </p>
+            </Field>
+
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Priority" htmlFor="eb-priority">
                 <Controller
@@ -546,6 +577,7 @@ function emptyValues(): EditBatchValues {
     notes: "",
     bulkUnit: "",
     overagePct: undefined,
+    tolerancePct: undefined,
     parentJobId: "",
     packSize: undefined,
     packUnit: "",

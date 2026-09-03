@@ -100,6 +100,18 @@ const optionalQty = z
   .refine((v) => v === undefined || v >= 0, "Enter a positive number.");
 
 /**
+ * An optional percentage. Mirrors the 0..100 checks the database carries on
+ * both tolerance columns (`pipeline_jobs_tolerance_range`,
+ * `batch_stages_tolerance_range`, migration 0037) — a tolerance over 100% says
+ * a stage may produce more than twice its target, which is not a tolerance but
+ * a target nobody wrote down.
+ */
+const optionalPct = optionalQty.refine(
+  (v) => v === undefined || v <= 100,
+  "A tolerance is a few percent, not more than 100.",
+);
+
+/**
  * Everything the *pipeline* knows about a batch, shared by New batch and Edit
  * batch.
  *
@@ -141,6 +153,26 @@ const batchFields = {
      * packing run, which fills what it was given.
      */
     overagePct: optionalQty,
+
+    /* ── Every batch type ──────────────────────────────────────────────── */
+    /**
+     * How far past a planned stage's target the shift log will accept before
+     * it refuses the entry (migration 0037).
+     *
+     * Not a second name for `overagePct`, and the two are worth keeping
+     * straight because they sit in the same dialog:
+     *
+     *   Overage    Extra this batch deliberately *makes*, against the whole
+     *              work order. Widens the over-production flag's threshold and
+     *              asks for a sentence when crossed. Manufacturing only.
+     *   Tolerance  How far past *one stage's* target an entry may be recorded.
+     *              Blocks the write. Every batch type — a packing stage has a
+     *              target like any other.
+     *
+     * Lives on the batch and is inherited by every stage in its plan; a stage
+     * that needs its own overrides it on the Pipeline.
+     */
+    tolerancePct: optionalPct,
 
     /* ── Packing ───────────────────────────────────────────────────────── */
     /** "" is "no parent — external bulk", which is a real answer. */
@@ -338,6 +370,15 @@ export const stageSchema = z.object({
   canRunParallel: z.boolean().optional(),
   targetQty: optionalQty,
   targetUnit: z.enum(STAGE_UNITS, { error: "Pick a unit." }),
+  /**
+   * This stage's own tolerance, overriding the batch's.
+   *
+   * Left empty — the ordinary case — the stage inherits `tolerance_pct` from
+   * its batch. Worth overriding where one stage is genuinely looser or tighter
+   * than the rest of the route: a dispensing step weighed on a floor scale
+   * against a compression step counted by the machine.
+   */
+  tolerancePct: optionalPct,
   /** "Packing 30's" — only needed when the batch runs the activity twice. */
   label: z.string().trim().max(60, "Keep the label under 60 characters.").optional(),
   /** The same distinction, where a plant uses work orders. */

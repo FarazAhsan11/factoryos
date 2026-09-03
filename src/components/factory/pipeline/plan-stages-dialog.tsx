@@ -41,6 +41,7 @@ import {
   issueJob,
   stageIsNext,
   stageName,
+  stageCeiling,
   stageProgress,
   stagesWithoutTarget,
   swapStageOrder,
@@ -146,16 +147,22 @@ export function PlanStagesDialog({
       target,
       unitId,
       parallel,
+      tolerance,
     }: {
       id: string;
       target: number;
       unitId: string | null;
       parallel: boolean;
+      tolerance: number | null;
     }) =>
       updateBatchStage(id, {
         target_qty: target,
         unit_id: unitId,
         can_run_parallel: parallel,
+        // Null, not 0 — null means "whatever the batch says", and 0 means
+        // "exactly the target, whatever the batch says". Clearing the box has
+        // to give back the first.
+        tolerance_pct: tolerance,
       }),
     onSuccess: async () => {
       setEditing(null);
@@ -187,6 +194,15 @@ export function PlanStagesDialog({
    * has been logged against it (`batch_stages_guard_delete`).
    */
   const [editParallel, setEditParallel] = useState(false);
+
+  /**
+   * This stage's own tolerance while it is being edited, as typed.
+   *
+   * Kept as a string rather than a number because "" is a meaningful answer
+   * here and `Number("")` is 0 — the difference between inheriting the
+   * batch's tolerance and pinning the stage to its exact target.
+   */
+  const [editTolerance, setEditTolerance] = useState("");
 
   const move = useMutation({
     mutationFn: ({ a, b }: { a: BatchStage; b: BatchStage }) =>
@@ -324,11 +340,18 @@ export function PlanStagesDialog({
                   onEditRoom={setEditRoom}
                   editParallel={editParallel}
                   onEditParallel={setEditParallel}
+                  editTolerance={editTolerance}
+                  onEditTolerance={setEditTolerance}
                   onBeginEdit={() => {
                     setEditing(stage.id);
                     setEditQty(stage.target_qty ? String(stage.target_qty) : "");
                     setEditRoom(stage.unit_id ?? "");
                     setEditParallel(stage.can_run_parallel);
+                    setEditTolerance(
+                      stage.tolerance_pct === null
+                        ? ""
+                        : String(stage.tolerance_pct),
+                    );
                   }}
                   onCancelEdit={() => setEditing(null)}
                   onSaveEdit={() => {
@@ -337,11 +360,25 @@ export function PlanStagesDialog({
                       toast.error("Enter a target above zero.");
                       return;
                     }
+                    const typed = editTolerance.trim();
+                    const tolerance = typed === "" ? null : Number(typed);
+                    if (
+                      tolerance !== null &&
+                      (Number.isNaN(tolerance) ||
+                        tolerance < 0 ||
+                        tolerance > 100)
+                    ) {
+                      toast.error(
+                        "A tolerance is a percentage between 0 and 100 — leave it blank to use the batch's.",
+                      );
+                      return;
+                    }
                     patch.mutate({
                       id: stage.id,
                       target: value,
                       unitId: editRoom || null,
                       parallel: editParallel,
+                      tolerance,
                     });
                   }}
                   onMoveUp={
@@ -428,6 +465,8 @@ function StageRow({
   onEditRoom,
   editParallel,
   onEditParallel,
+  editTolerance,
+  onEditTolerance,
   onBeginEdit,
   onCancelEdit,
   onSaveEdit,
@@ -449,6 +488,8 @@ function StageRow({
   onEditRoom: (v: string) => void;
   editParallel: boolean;
   onEditParallel: (v: boolean) => void;
+  editTolerance: string;
+  onEditTolerance: (v: string) => void;
   onBeginEdit: () => void;
   onCancelEdit: () => void;
   onSaveEdit: () => void;
@@ -461,6 +502,16 @@ function StageRow({
   const style = STATUS_STYLE[stage.status];
   const Icon = style.icon;
   const pct = stageProgress(stage);
+  const ceiling = stageCeiling(stage);
+  /**
+   * Past what the shift log will accept against this stage.
+   *
+   * Not reachable by logging — the entry that would do it is refused — so
+   * seeing this means the plan was tightened under entries already filed.
+   * Which is exactly when it has to be visible: the bar would otherwise read
+   * a contented 106%.
+   */
+  const over = stage.is_over_tolerance;
   const done = stage.status === "complete";
   const started = Boolean(stage.started_at) || Number(stage.accumulated_qty) > 0;
 
@@ -496,6 +547,15 @@ function StageRow({
               {stage.target_qty
                 ? ` · target ${fmt(stage.target_qty)} ${stage.target_unit}`
                 : " · no target set"}
+              {/* The ceiling, not the percentage: "up to 21 kg" is the number
+                  an operator is actually held to, and "+5%" makes them do the
+                  arithmetic the log already did. The percentage comes along
+                  only to say where the ceiling came from. */}
+              {ceiling !== null && stage.effective_tolerance_pct > 0
+                ? ` · accepts up to ${fmt(ceiling)} (+${stage.effective_tolerance_pct}%${
+                    stage.tolerance_pct === null ? "" : ", this stage"
+                  })`
+                : ""}
               {stage.pack_size ? ` · ${fmt(stage.pack_size)} per pack` : ""}
               {stage.can_run_parallel ? " · runs in parallel" : ""}
             </p>
@@ -529,8 +589,11 @@ function StageRow({
               className="h-full rounded-full transition-[width] duration-500"
               style={{
                 width: `${Math.min(100, pct)}%`,
-                background:
-                  pct >= 100 ? "var(--color-teal)" : "var(--color-brand)",
+                background: over
+                  ? "var(--color-danger)"
+                  : pct >= 100
+                    ? "var(--color-teal)"
+                    : "var(--color-brand)",
               }}
             />
           </div>
@@ -540,12 +603,23 @@ function StageRow({
             <span
               className="ml-1 font-semibold"
               style={{
-                color: pct >= 100 ? "var(--color-teal)" : "var(--color-brand)",
+                color: over
+                  ? "var(--color-danger)"
+                  : pct >= 100
+                    ? "var(--color-teal)"
+                    : "var(--color-brand)",
               }}
             >
               {pct}%
             </span>
           </p>
+          {over && ceiling !== null && (
+            <p className="text-[11px] font-medium text-danger-deep">
+              Past the {fmt(ceiling)} {stage.target_unit} this stage accepts.
+              Entries already filed stay; raise the target or this stage&rsquo;s
+              tolerance to make the plan agree with them.
+            </p>
+          )}
         </div>
       )}
 
@@ -597,6 +671,28 @@ function StageRow({
               />
               {/* Meaningless on the first stage, which has nothing before
                   it to overlap and is startable regardless. */}
+              {/* Blank inherits the batch's, which is what almost every
+                  stage wants. Worth overriding where one step is genuinely
+                  looser than the route around it — a floor scale against a
+                  machine counter. */}
+              <label className="flex items-center gap-1.5 text-[11px] text-ink-4">
+                <span className="whitespace-nowrap">Tolerance</span>
+                <input
+                  type="number"
+                  step="any"
+                  min={0}
+                  max={100}
+                  value={editTolerance}
+                  onChange={(e) => onEditTolerance(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") onSaveEdit();
+                    if (e.key === "Escape") onCancelEdit();
+                  }}
+                  placeholder={`${stage.effective_tolerance_pct}%`}
+                  title="Blank uses the batch's tolerance"
+                  className={cn(FIELD, MONO, "w-20")}
+                />
+              </label>
               {index > 0 && (
                 <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-ink-4">
                   <input

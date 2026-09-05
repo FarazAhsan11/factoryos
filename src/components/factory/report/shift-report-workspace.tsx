@@ -241,6 +241,13 @@ export function ShiftReportWorkspace({
                 unitWord={units.singular}
                 onEdit={setEditing}
                 canEdit={canEdit}
+                factoryId={factoryId}
+                userId={userId}
+                // The sheet on screen, not today: a row added to a past shift
+                // is filed against that shift, which is the whole reason for
+                // being able to add one from here.
+                date={date}
+                shift={shift}
               />
               {totals.entries === 0 && (
                 <p className="shrink-0 border-t border-line bg-sunken px-4 py-2.5 text-center text-xs text-ink-5 print:hidden">

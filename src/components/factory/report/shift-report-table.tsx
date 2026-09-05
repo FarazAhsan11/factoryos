@@ -1,6 +1,7 @@
 "use client";
 
-import { Flag, PenLine } from "lucide-react";
+import { useState } from "react";
+import { Flag, PenLine, Plus } from "lucide-react";
 
 import {
   formatQty,
@@ -9,6 +10,8 @@ import {
   type ShiftReportRoom,
   type ShiftReportRow,
 } from "@/lib/factory/shift-report-queries";
+import { NewEntryRow } from "@/components/factory/report/new-entry-row";
+import type { RunningShift } from "@/lib/factory/shift-time-queries";
 import { cn } from "@/lib/utils";
 
 /**
@@ -26,9 +29,19 @@ export function ShiftReportTable({
   unitWord,
   onEdit,
   canEdit,
+  factoryId,
+  userId,
+  date,
+  shift,
 }: {
   rooms: ShiftReportRoom[];
   unitWord: string;
+  factoryId: string;
+  /** The viewer, who is also the author of any row added here. */
+  userId: string;
+  /** The sheet's date and shift — what a row added here is filed against. */
+  date: string;
+  shift: RunningShift;
   /**
    * Opens the correction dialog on one entry. Reading the sheet is when a
    * supervisor notices a wrong figure, so the fix starts on the row they are
@@ -38,6 +51,12 @@ export function ShiftReportTable({
   /** Their own entry, or a manager's — the same rule RLS enforces on the write. */
   canEdit: (entry: ShiftReportRow) => boolean;
 }) {
+  /**
+   * The room a new row is open on, if any. One at a time: two half-typed rows
+   * on one sheet is two ways to lose the other.
+   */
+  const [adding, setAdding] = useState<string | null>(null);
+
   return (
     /* Its own scroll box on screen so the sticky header holds and the summary
        strip stays put; on paper the box is undone entirely — a printed sheet
@@ -105,7 +124,13 @@ export function ShiftReportTable({
             <Th>Batch</Th>
             <Th align="right">Shift qty</Th>
             <Th align="right">Accumulative</Th>
-            <Th align="right">Required</Th>
+            {/* Not "Required": this column holds the entry own target_qty —
+                speed times how long it ran, what this shift was expected to
+                make — and "Required qty" everywhere else in FactoryOS means
+                the batch order quantity. One word made a handover sheet read
+                as "this batch needs 10,000" where it said "this shift was
+                expected to make 10,000". Named as the log form names it. */}
+            <Th align="right">Shift target</Th>
             <Th>Progress</Th>
             <Th align="right">Rejected</Th>
             <Th>Operators</Th>
@@ -116,21 +141,101 @@ export function ShiftReportTable({
         </thead>
 
         <tbody>
-          {rooms.map((room) =>
-            room.entries.length === 0 ? (
-              <IdleRow key={room.unitId} room={room} />
-            ) : (
-              <RoomBlock
-                key={room.unitId}
-                room={room}
-                onEdit={onEdit}
-                canEdit={canEdit}
-              />
-            ),
-          )}
+          {rooms.map((room) => (
+            <RoomRows
+              key={room.unitId}
+              room={room}
+              onEdit={onEdit}
+              canEdit={canEdit}
+              adding={adding === room.unitId}
+              onAdd={() => setAdding(room.unitId)}
+              onDoneAdding={() => setAdding(null)}
+              factoryId={factoryId}
+              userId={userId}
+              date={date}
+              shift={shift}
+            />
+          ))}
         </tbody>
       </table>
     </div>
+  );
+}
+
+/**
+ * One room's place on the sheet: its heading or its idle line, its entries,
+ * and — while it is open — the row being typed into it.
+ *
+ * A room with entries and a room without were two different rows before this,
+ * and the `+` has to sit on both: an entry missed in a room that logged
+ * nothing is exactly the one worth catching.
+ */
+function RoomRows({
+  room,
+  onEdit,
+  canEdit,
+  adding,
+  onAdd,
+  onDoneAdding,
+  factoryId,
+  userId,
+  date,
+  shift,
+}: {
+  room: ShiftReportRoom;
+  onEdit: (entry: ShiftReportRow) => void;
+  canEdit: (entry: ShiftReportRow) => boolean;
+  adding: boolean;
+  onAdd: () => void;
+  onDoneAdding: () => void;
+  factoryId: string;
+  userId: string;
+  date: string;
+  shift: RunningShift;
+}) {
+  return (
+    <>
+      {room.entries.length === 0 ? (
+        <IdleRow room={room} onAdd={onAdd} />
+      ) : (
+        <RoomBlock
+          room={room}
+          onEdit={onEdit}
+          canEdit={canEdit}
+          onAdd={onAdd}
+        />
+      )}
+      {adding && (
+        <NewEntryRow
+          factoryId={factoryId}
+          userId={userId}
+          date={date}
+          shift={shift}
+          unit={{ id: room.unitId, name: room.name }}
+          onDone={onDoneAdding}
+        />
+      )}
+    </>
+  );
+}
+
+/**
+ * Adds a row to this room. Quiet until the room is hovered, like the pencil
+ * on an entry — a sheet of twenty rooms must not be twenty invitations to
+ * type — but never hidden, because a control that only exists on hover cannot
+ * be found on a tablet.
+ */
+function AddButton({ room, onAdd }: { room: string; onAdd: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onAdd}
+      title={`Add an entry for ${room}`}
+      className="inline-flex h-6 items-center gap-1 rounded-md border border-line bg-surface px-1.5 text-[10px] font-semibold text-ink-5 opacity-70 transition group-hover/room:opacity-100 hover:border-brand hover:bg-brand-tint hover:text-brand focus-visible:opacity-100 print:hidden"
+    >
+      <Plus className="size-3" aria-hidden />
+      Add entry
+    </button>
   );
 }
 
@@ -141,7 +246,13 @@ export function ShiftReportTable({
  * 7?", and the blank row is the answer. Its status comes from the pipeline
  * board: a room holding a batch is not the same as a room standing ready.
  */
-function IdleRow({ room }: { room: ShiftReportRoom }) {
+function IdleRow({
+  room,
+  onAdd,
+}: {
+  room: ShiftReportRoom;
+  onAdd: () => void;
+}) {
   const held = room.idleStatus === "HOLD";
   return (
     /* Three cells, not one spanning cell.
@@ -157,7 +268,7 @@ function IdleRow({ room }: { room: ShiftReportRoom }) {
        Still not fourteen em-dashes: the dashes were fourteen separate
        invitations to look for a number, and there is none to find — the answer
        is the status, and it fits in a sentence. */
-    <tr className="border-t border-line-soft bg-sunken/60 print:bg-surface">
+    <tr className="group/room border-t border-line-soft bg-sunken/60 print:bg-surface">
       <td className="print:hidden" />
       <Td className="text-[12px] font-semibold text-ink-3" title={room.name}>
         {room.name}
@@ -177,6 +288,7 @@ function IdleRow({ room }: { room: ShiftReportRoom }) {
           <span className="text-[11px] text-ink-5">
             Nothing logged this shift.
           </span>
+          <AddButton room={room.name} onAdd={onAdd} />
         </div>
       </td>
     </tr>
@@ -187,10 +299,12 @@ function RoomBlock({
   room,
   onEdit,
   canEdit,
+  onAdd,
 }: {
   room: ShiftReportRoom;
   onEdit: (entry: ShiftReportRow) => void;
   canEdit: (entry: ShiftReportRow) => boolean;
+  onAdd: () => void;
 }) {
   return (
     <>
@@ -203,7 +317,7 @@ function RoomBlock({
           SPEED and TARGET SPEED, where it read as those columns' values for
           this row. Nothing that is not a column's value may sit under that
           column's heading. */}
-      <tr className="border-t border-line bg-sunken print:bg-sunken">
+      <tr className="group/room border-t border-line bg-sunken print:bg-sunken">
         {/* An empty cell for the edit column, so the band's title starts where
             the Room column starts rather than at the table's edge. */}
         <td className="print:hidden" />
@@ -227,6 +341,7 @@ function RoomBlock({
                 </span>
               )}
             </span>
+            <AddButton room={room.name} onAdd={onAdd} />
           </div>
         </td>
       </tr>

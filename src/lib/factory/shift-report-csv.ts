@@ -26,7 +26,9 @@ const HEADERS = [
   "Batch",
   "Shift qty",
   "Accumulative",
-  "Required",
+  // The entry own target_qty (speed x duration), not the batch order
+  // quantity — named as the sheet and the log form name it.
+  "Shift target",
   "Progress %",
   "Rejected",
   "Operators",

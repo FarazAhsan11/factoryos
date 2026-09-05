@@ -54,7 +54,11 @@ import {
   logKeys,
 } from "@/lib/factory/shift-log-queries";
 import { shiftReportKeys } from "@/lib/factory/shift-report-queries";
-import type { RunningShift } from "@/lib/factory/shift-time-queries";
+import {
+  fetchShiftTimes,
+  shiftTimeKeys,
+  type RunningShift,
+} from "@/lib/factory/shift-time-queries";
 import { cn } from "@/lib/utils";
 
 /**
@@ -86,10 +90,16 @@ export function NewEntryRow({
   date,
   shift,
   unit,
+  canManage,
   onDone,
 }: {
   factoryId: string;
   userId: string;
+  /**
+   * Manager and up. Only decides how wide the two clocks open — see
+   * `clockWindow`. Everyone who can reach this sheet may add a row.
+   */
+  canManage: boolean;
   /** The report's date — what the entry is filed against, not today. */
   date: string;
   /** The report's shift, fixed: the row was added to this sheet. */
@@ -195,6 +205,10 @@ export function NewEntryRow({
   const { data: allStages = [], isPending: stagesPending } = useQuery({
     queryKey: batchStageKeys.all(factoryId),
     queryFn: () => fetchFactoryStages(factoryId),
+  });
+  const { data: shiftTimes } = useQuery({
+    queryKey: shiftTimeKeys.all(factoryId),
+    queryFn: () => fetchShiftTimes(factoryId),
   });
 
   const activeProcesses = useMemo(
@@ -378,6 +392,25 @@ export function NewEntryRow({
     !Number.isNaN(actualSpeed) &&
     targetSpeed > 0 &&
     actualSpeed < targetSpeed;
+
+  /**
+   * How wide the two clocks open — the same rule the shift log applies.
+   *
+   * An operator gets the shift this sheet is for and nothing else: the row is
+   * being added to a named shift, so a time outside it is a slip rather than a
+   * choice. Manager and up keep the full day, because correcting somebody
+   * else's shift is the job this sheet exists for.
+   */
+  const clockWindow = useMemo(() => {
+    if (canManage || !shiftTimes) return null;
+    const clock = shiftTimes[shift];
+    if (!clock?.startTime || !clock?.endTime) return null;
+    return {
+      from: clock.startTime,
+      to: clock.endTime,
+      note: `${shift === "morning" ? "Morning" : "Afternoon"} shift · ${clock.startTime} – ${clock.endTime}`,
+    };
+  }, [canManage, shiftTimes, shift]);
 
   const needsOperators = operatorsRequired(
     (category as ProcessCategory) ?? "production",
@@ -752,6 +785,9 @@ export function NewEntryRow({
                     onChange={field.onChange}
                     ariaLabel="Activity start"
                     ariaInvalid={Boolean(errors.startTime)}
+                    from={clockWindow?.from}
+                    to={clockWindow?.to}
+                    windowNote={clockWindow?.note}
                     className="h-8 w-28 text-[11px]"
                   />
                 )}
@@ -767,6 +803,9 @@ export function NewEntryRow({
                     onChange={field.onChange}
                     ariaLabel="Activity end"
                     ariaInvalid={Boolean(errors.endTime)}
+                    from={clockWindow?.from}
+                    to={clockWindow?.to}
+                    windowNote={clockWindow?.note}
                     className="h-8 w-28 text-[11px]"
                   />
                 )}

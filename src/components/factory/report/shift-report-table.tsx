@@ -29,6 +29,7 @@ export function ShiftReportTable({
   unitWord,
   onEdit,
   canEdit,
+  canManage,
   factoryId,
   userId,
   date,
@@ -37,6 +38,8 @@ export function ShiftReportTable({
   rooms: ShiftReportRoom[];
   unitWord: string;
   factoryId: string;
+  /** Manager and up — decides how wide a new row's clocks open. */
+  canManage: boolean;
   /** The viewer, who is also the author of any row added here. */
   userId: string;
   /** The sheet's date and shift — what a row added here is filed against. */
@@ -147,6 +150,7 @@ export function ShiftReportTable({
               room={room}
               onEdit={onEdit}
               canEdit={canEdit}
+              canManage={canManage}
               adding={adding === room.unitId}
               onAdd={() => setAdding(room.unitId)}
               onDoneAdding={() => setAdding(null)}
@@ -174,6 +178,7 @@ function RoomRows({
   room,
   onEdit,
   canEdit,
+  canManage,
   adding,
   onAdd,
   onDoneAdding,
@@ -185,6 +190,7 @@ function RoomRows({
   room: ShiftReportRoom;
   onEdit: (entry: ShiftReportRow) => void;
   canEdit: (entry: ShiftReportRow) => boolean;
+  canManage: boolean;
   adding: boolean;
   onAdd: () => void;
   onDoneAdding: () => void;
@@ -212,6 +218,7 @@ function RoomRows({
           date={date}
           shift={shift}
           unit={{ id: room.unitId, name: room.name }}
+          canManage={canManage}
           onDone={onDoneAdding}
         />
       )}

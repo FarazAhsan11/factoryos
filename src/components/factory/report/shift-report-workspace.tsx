@@ -241,6 +241,7 @@ export function ShiftReportWorkspace({
                 unitWord={units.singular}
                 onEdit={setEditing}
                 canEdit={canEdit}
+                canManage={canManage}
                 factoryId={factoryId}
                 userId={userId}
                 // The sheet on screen, not today: a row added to a past shift

@@ -116,10 +116,16 @@ export function LogEntryForm({
   factoryId,
   userId,
   units,
+  canManage,
 }: {
   factoryId: string;
   userId: string;
   units: { singular: string; plural: string };
+  /**
+   * Manager and up. Only used to decide how wide the clocks open: everyone
+   * files the same entry, and nothing here is a permission — RLS is.
+   */
+  canManage: boolean;
 }) {
   const queryClient = useQueryClient();
   const [quick, setQuick] = useState(false);
@@ -605,6 +611,47 @@ export function LogEntryForm({
    * Null means the inputs don't support a target (see `targetQtyFromSpeed`),
    * and the field falls back to being typed.
    */
+  /**
+   * How wide the two clocks open.
+   *
+   * An operator logs the shift they are on, so the picker offers that shift
+   * and nothing else — the 03:00 that turns a 40-minute run into a nine-hour
+   * one is a slip nobody catches until the OEE figures are wrong, and the
+   * cheapest place to stop it is a list it is not on. Manager and up keep the
+   * full day: they correct other people's shifts, and a handover filed at
+   * 23:58 for the shift that ended at 23:00 is theirs to enter.
+   *
+   * It narrows the control, never the schema. The window is a factory setting
+   * that changes, and a rule enforced here that the database does not know
+   * about would refuse entries nobody could explain.
+   */
+  const clockWindow = useMemo(() => {
+    if (canManage || !shiftTimes || !shift) return null;
+    const clock = shiftTimes[shift];
+    if (!clock?.startTime || !clock?.endTime) return null;
+    return {
+      from: clock.startTime,
+      to: clock.endTime,
+      note: `${shift === "morning" ? "Morning" : "Afternoon"} shift · ${clock.startTime} – ${clock.endTime}`,
+    };
+  }, [canManage, shiftTimes, shift]);
+
+  /**
+   * Whether "Now" is a legal answer.
+   *
+   * The button beside each picker writes the wall clock straight into the
+   * field, so leaving it live while the picker refuses the same value would
+   * be a way round the window sitting right next to it.
+   */
+  const nowAllowed = useMemo(() => {
+    if (!clockWindow) return true;
+    const at = clockNow();
+    const mins = (t: string) =>
+      Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+    const [a, b, n] = [mins(clockWindow.from), mins(clockWindow.to), mins(at)];
+    return a > b ? n >= a || n <= b : n >= a && n <= b;
+  }, [clockWindow]);
+
   const derivedTarget = targetQtyFromSpeed(
     speedType,
     speedRate,
@@ -894,11 +941,17 @@ export function LogEntryForm({
                       id="log-start"
                       value={field.value ?? ""}
                       onChange={field.onChange}
+                      from={clockWindow?.from}
+                      to={clockWindow?.to}
+                      windowNote={clockWindow?.note}
                       className="h-11 flex-1"
                     />
                   )}
                 />
-                <NowButton onClick={() => setValue("startTime", clockNow())} />
+                <NowButton
+                  disabled={!nowAllowed}
+                  onClick={() => setValue("startTime", clockNow())}
+                />
               </div>
             </Field>
             <Field
@@ -915,11 +968,17 @@ export function LogEntryForm({
                       id="log-end"
                       value={field.value ?? ""}
                       onChange={field.onChange}
+                      from={clockWindow?.from}
+                      to={clockWindow?.to}
+                      windowNote={clockWindow?.note}
                       className="h-11 flex-1"
                     />
                   )}
                 />
-                <NowButton onClick={() => setValue("endTime", clockNow())} />
+                <NowButton
+                  disabled={!nowAllowed}
+                  onClick={() => setValue("endTime", clockNow())}
+                />
               </div>
             </Field>
             <Field label="Duration" note="(auto)">
@@ -1596,13 +1655,21 @@ function CategoryBadge({ category }: { category?: string }) {
   );
 }
 
-function NowButton({ onClick }: { onClick: () => void }) {
+function NowButton({
+  onClick,
+  disabled,
+}: {
+  onClick: () => void;
+  /** The clock is outside the window this field is held to. */
+  disabled?: boolean;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
-      title="Set to now"
-      className="h-11 shrink-0 rounded-xl border border-brand-line bg-brand-tint px-3 text-xs font-semibold text-brand transition hover:border-brand hover:bg-brand-soft active:scale-95"
+      disabled={disabled}
+      title={disabled ? "The clock is outside your shift" : "Set to now"}
+      className="h-11 shrink-0 rounded-xl border border-brand-line bg-brand-tint px-3 text-xs font-semibold text-brand transition hover:border-brand hover:bg-brand-soft active:scale-95 disabled:pointer-events-none disabled:opacity-40"
     >
       Now
     </button>

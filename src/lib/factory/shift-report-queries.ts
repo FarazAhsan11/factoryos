@@ -204,14 +204,36 @@ export function todayISO(): string {
   return new Date(now.getTime() - offset).toISOString().slice(0, 10);
 }
 
-/** "30 Jun 2026" — the date as it should read on a printed sheet. */
+/**
+ * "30 Jun 2026" — the date as it should read on a printed sheet.
+ *
+ * Assembled by hand rather than through toLocaleDateString. The locale
+ * argument was undefined, which means *the environment*: Node renders the
+ * server pass in its own locale and the browser re-renders in the users, so
+ * a sheet dated "Sep 5, 2026" on the server became "5 Sept 2026" on the
+ * client and React reported a hydration mismatch on that very text node. A
+ * fixed month table is the same three letters everywhere, which is also what
+ * a document that gets printed and filed wants.
+ */
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
 export function formatReportDate(iso: string): string {
   const [y, m, d] = iso.split("-").map(Number);
-  return new Date(y, (m ?? 1) - 1, d ?? 1).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  const month = MONTHS[(m ?? 1) - 1] ?? MONTHS[0];
+  return `${d ?? 1} ${month} ${y}`;
 }
 
 /** 95 → "1.6h". Minutes under an hour keep their own unit. */

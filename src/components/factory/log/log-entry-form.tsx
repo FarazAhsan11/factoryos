@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -14,6 +8,7 @@ import {
   Boxes,
   Cog,
   Gauge,
+  TriangleAlert,
   Loader2,
   MapPin,
   MessageSquareText,
@@ -52,6 +47,7 @@ import {
   SectionTitle,
 } from "@/components/factory/log/log-fields";
 import { OperatorPicker } from "@/components/factory/log/operator-picker";
+import { StageProgress } from "@/components/factory/log/stage-progress";
 import { TimeField } from "@/components/ui/date-picker";
 import { SelectField } from "@/components/ui/select-field";
 import { employeeKeys, fetchEmployees } from "@/lib/factory/employee-queries";
@@ -64,12 +60,12 @@ import { actionKeys } from "@/lib/factory/action-queries";
 import {
   batchStageKeys,
   fetchFactoryStages,
-  stageCeiling,
-  stageIsOverTolerance,
   stageName,
-  type BatchStage,
 } from "@/lib/factory/batch-stage-queries";
-import { fetchPipelineJobs, pipelineKeys } from "@/lib/factory/pipeline-queries";
+import {
+  fetchPipelineJobs,
+  pipelineKeys,
+} from "@/lib/factory/pipeline-queries";
 import { fetchProducts, productKeys } from "@/lib/factory/product-queries";
 import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
 import {
@@ -120,10 +116,16 @@ export function LogEntryForm({
   factoryId,
   userId,
   units,
+  canManage,
 }: {
   factoryId: string;
   userId: string;
   units: { singular: string; plural: string };
+  /**
+   * Manager and up. Only used to decide how wide the clocks open: everyone
+   * files the same entry, and nothing here is a permission — RLS is.
+   */
+  canManage: boolean;
 }) {
   const queryClient = useQueryClient();
   const [quick, setQuick] = useState(false);
@@ -155,7 +157,7 @@ export function LogEntryForm({
     queryKey: setupKeys.all("factory_processes", factoryId),
     queryFn: () => fetchSetupItems("factory_processes", factoryId),
   });
-  const { data: products = [] } = useQuery({
+  const { data: products = [], isPending: productsPending } = useQuery({
     queryKey: productKeys.all(factoryId),
     queryFn: () => fetchProducts(factoryId),
   });
@@ -176,14 +178,14 @@ export function LogEntryForm({
   // The board, for the batch panel's family context — what kind of batch this
   // is, whose bulk it draws on, and how much of it is left. Same cache key the
   // Pipeline page uses, so arriving from there costs nothing.
-  const { data: pipelineJobs = [] } = useQuery({
+  const { data: pipelineJobs = [], isPending: jobsPending } = useQuery({
     queryKey: pipelineKeys.all(factoryId),
     queryFn: () => fetchPipelineJobs(factoryId),
   });
   // Every batch's plan. Needed for two things: the target this entry is
   // measured against, and — where a batch runs one activity several times —
   // asking which of them this entry belongs to.
-  const { data: allStages = [] } = useQuery({
+  const { data: allStages = [], isPending: stagesPending } = useQuery({
     queryKey: batchStageKeys.all(factoryId),
     queryFn: () => fetchFactoryStages(factoryId),
   });
@@ -278,6 +280,11 @@ export function LogEntryForm({
    * The write is skipped when nothing changed, so an idle form sitting open
    * all shift costs one JSON.stringify every two seconds and no storage
    * traffic at all.
+   *
+   * What is passed here is not what gets stored: `writeLogDraft` drops the
+   * quantity produced, which belongs to the hour being filed and to no later
+   * one. Passing the whole form and letting the draft decide keeps that rule
+   * in one place rather than at every call site.
    */
   const lastSaved = useRef<string>("");
   useEffect(() => {
@@ -380,6 +387,12 @@ export function LogEntryForm({
    * hidden, instead of leaving a control that would remove a required field.
    */
   const quickOn = quick && !isDowntime;
+  /**
+   * Whether the equipment number is asked for at all — machine activities
+   * only, and not in Quick mode. Named because it now decides a column in the
+   * Batch section rather than a section of its own.
+   */
+  const showEquipment = hasMachine && !quickOn;
 
   // Once the factory's clock arrives, start the entry at the running shift's
   // start time — the operator usually just adjusts it. Strictly once, so a
@@ -405,8 +418,8 @@ export function LogEntryForm({
     [equipmentList, equipmentNo],
   );
 
-  // The batch's card, when it has one. Null is ordinary, not an error: a
-  // factory can log against catalogue batches it never puts on the board.
+  // The batch's card. Null is a refusal, not an ordinary state: since 0038 a
+  // producing entry against a batch with no card is rejected by the database.
   const job = useMemo(
     () =>
       product
@@ -437,12 +450,104 @@ export function LogEntryForm({
     return stageChoices.find((s) => s.id === batchStageId) ?? null;
   }, [stageChoices, batchStageId]);
 
-  // A batch that has not been issued refuses producing entries at the database
-  // (migration 0033). Said here so the operator learns it while filling the
-  // form in, not from a failed submit.
-  const blockedByIssue = Boolean(
-    job && !job.issued_at && category !== "downtime",
-  );
+  /**
+   * Why the database will refuse this entry, when it will.
+   *
+   * The four rules of `shift_log_stage_guard` (0033, tightened in 0038), in
+   * the order it applies them: the batch number must name a product, that
+   * product must be on the board, the card must be issued, and the activity
+   * must be in the plan. Said here so the operator learns it while filling the
+   * form in rather than from a submit that fails after everything is typed.
+   *
+   * The button stays enabled regardless. This is a courtesy reading of a
+   * cached board, and a batch issued a moment ago on somebody else's screen
+   * must not be un-loggable here because a query has not refetched — the
+   * database is the authority on all four.
+   */
+  const batchBlock = useMemo(() => {
+    // Say nothing until the registers this reads have arrived; every check
+    // below would otherwise read an empty list as a missing batch.
+    if (productsPending || jobsPending) return null;
+
+    const typed = (batchNo ?? "").trim();
+
+    // Downtime answers to rules 1 and 2, and only when it names a batch —
+    // time is lost between batches as often as during one. Not to 3 or 4:
+    // time lost to a setup delay belongs to a batch that is on the board and
+    // not yet issued, and no downtime activity appears in any plan, so either
+    // would refuse every downtime entry there is.
+    if (category === "downtime") {
+      if (!typed) return null;
+      if (!product) {
+        return {
+          head: `No batch ${typed} in the product register.`,
+          body: "Check the number, or have it added under Resources → Products.",
+        };
+      }
+      if (!job) {
+        return {
+          head: `Batch ${typed} isn't on the production board.`,
+          body: "Leave the number blank, or have the batch added on the Pipeline before charging time to it.",
+        };
+      }
+      return null;
+    }
+
+    if (!typed) {
+      return {
+        head: "This entry needs a batch number.",
+        body: "It's what the work is counted against.",
+      };
+    }
+    if (!product) {
+      return {
+        head: `No batch ${typed} in the product register.`,
+        body: "Check the number, or have it added under Resources → Products.",
+      };
+    }
+    if (!job) {
+      return {
+        head: `Batch ${typed} isn't on the production board.`,
+        body: "A manager adds it on the Pipeline, plans its stages and issues it before work can be logged against it.",
+      };
+    }
+    if (!job.issued_at) {
+      return {
+        head: `Batch ${typed} isn't issued for production yet.`,
+        body: "A manager plans its stages on the Pipeline and issues it. You can still log downtime against it.",
+      };
+    }
+    if (processId && !stagesPending && stageChoices.length === 0) {
+      return {
+        head: `This activity isn't in batch ${typed}'s plan.`,
+        body: "A manager adds it to the plan on the Pipeline. Only planned stages can be logged against.",
+      };
+    }
+    return null;
+  }, [
+    category,
+    productsPending,
+    jobsPending,
+    stagesPending,
+    batchNo,
+    product,
+    job,
+    processId,
+    stageChoices,
+  ]);
+
+  /**
+   * Whether to draw the resolved-batch card.
+   *
+   * Drawn when the batch resolved, and otherwise only when nothing is being
+   * refused — which leaves exactly one unresolved case still showing it: a
+   * downtime entry with the batch left blank, where the card's neutral "type
+   * a batch number" hint is the right thing to say. Its other unresolved
+   * states are the same facts `batchBlock` states below it, in the colour of
+   * a problem and with the fix attached; printing both left the operator
+   * reading one sentence twice in two voices.
+   */
+  const showBatchCard = Boolean(product) || !batchBlock;
 
   // Clear a stage picked under a different activity — it would be validated
   // against a control no longer on screen, and refused by the guard.
@@ -506,6 +611,47 @@ export function LogEntryForm({
    * Null means the inputs don't support a target (see `targetQtyFromSpeed`),
    * and the field falls back to being typed.
    */
+  /**
+   * How wide the two clocks open.
+   *
+   * An operator logs the shift they are on, so the picker offers that shift
+   * and nothing else — the 03:00 that turns a 40-minute run into a nine-hour
+   * one is a slip nobody catches until the OEE figures are wrong, and the
+   * cheapest place to stop it is a list it is not on. Manager and up keep the
+   * full day: they correct other people's shifts, and a handover filed at
+   * 23:58 for the shift that ended at 23:00 is theirs to enter.
+   *
+   * It narrows the control, never the schema. The window is a factory setting
+   * that changes, and a rule enforced here that the database does not know
+   * about would refuse entries nobody could explain.
+   */
+  const clockWindow = useMemo(() => {
+    if (canManage || !shiftTimes || !shift) return null;
+    const clock = shiftTimes[shift];
+    if (!clock?.startTime || !clock?.endTime) return null;
+    return {
+      from: clock.startTime,
+      to: clock.endTime,
+      note: `${shift === "morning" ? "Morning" : "Afternoon"} shift · ${clock.startTime} – ${clock.endTime}`,
+    };
+  }, [canManage, shiftTimes, shift]);
+
+  /**
+   * Whether "Now" is a legal answer.
+   *
+   * The button beside each picker writes the wall clock straight into the
+   * field, so leaving it live while the picker refuses the same value would
+   * be a way round the window sitting right next to it.
+   */
+  const nowAllowed = useMemo(() => {
+    if (!clockWindow) return true;
+    const at = clockNow();
+    const mins = (t: string) =>
+      Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+    const [a, b, n] = [mins(clockWindow.from), mins(clockWindow.to), mins(at)];
+    return a > b ? n >= a || n <= b : n >= a && n <= b;
+  }, [clockWindow]);
+
   const derivedTarget = targetQtyFromSpeed(
     speedType,
     speedRate,
@@ -592,12 +738,38 @@ export function LogEntryForm({
         // The same people usually work the whole shift, so the whole list
         // carries over — including however many rows were added for it.
         operators: keep.operators,
+
+        /* ── Cleared, and cleared *explicitly* ───────────────────────
+           These describe the hour that was just filed: a carried-over
+           231,453 the operator does not notice is a wrong entry that looks
+           like a right one, and it cannot be deleted afterwards — only
+           amended.
+
+           Named with `null` rather than left out, which is the whole point.
+           Omitting a key does NOT clear its input: `reset()` empties
+           `_fields`, every input re-registers, and `updateValidAndValue`
+           takes the branch for an undefined value — which *reads the DOM
+           into form state* instead of writing form state to the DOM. The
+           element is never remounted, so it still shows what was typed, and
+           RHF then adopts that number straight back. A field given `null`
+           takes the other branch and the input is set to "".
+
+           `null` and not "": these are `valueAsNumber` inputs, and RHF maps
+           "" to NaN but null back to null — which `optionalQty` already
+           accepts and folds to undefined. Nothing here can reach the
+           database as a 0.
+
+           Only the inputs registered with `register` need this. The
+           Controller-driven ones (action flag, slow reason) render from form
+           state and clear on their own. */
+        targetQty: null,
+        qty: null,
+        qtyRejected: null,
+        actualSpeed: null,
+        comment: "",
+        actionFlag: "",
+        slowReason: "",
       };
-      // Everything NOT listed above is dropped on purpose. The quantities, the
-      // comment and the action flag describe the hour that was just filed; a
-      // carried-over 231,453 that the operator does not notice is a wrong
-      // entry that looks like a right one, and it cannot be deleted afterwards
-      // — only amended.
       reset(carried);
 
       // The filed entry is no longer a draft. Replacing it with what carried
@@ -688,7 +860,7 @@ export function LogEntryForm({
         {/* ── Where & when ─────────────────────────────────────────── */}
         <section className={SECTION}>
           <SectionTitle icon={MapPin}>Where &amp; when</SectionTitle>
-          <FieldRow cols={3}>
+          <FieldRow cols={2}>
             <Field
               label={units.singular}
               htmlFor="log-unit"
@@ -747,18 +919,6 @@ export function LogEntryForm({
                 )}
               />
             </Field>
-            {/* Read-only: the start and end times already say which shift this
-                was, so asking again would only invite the two to disagree. */}
-            <Field label="Shift" note="(auto)">
-              <output
-                className={cn(
-                  CONTROL,
-                  "flex items-center font-medium capitalize text-ink",
-                )}
-              >
-                {shift ?? "—"}
-              </output>
-            </Field>
           </FieldRow>
 
           {/* Says out loud which of the three shapes is on screen. Without it
@@ -781,11 +941,17 @@ export function LogEntryForm({
                       id="log-start"
                       value={field.value ?? ""}
                       onChange={field.onChange}
+                      from={clockWindow?.from}
+                      to={clockWindow?.to}
+                      windowNote={clockWindow?.note}
                       className="h-11 flex-1"
                     />
                   )}
                 />
-                <NowButton onClick={() => setValue("startTime", clockNow())} />
+                <NowButton
+                  disabled={!nowAllowed}
+                  onClick={() => setValue("startTime", clockNow())}
+                />
               </div>
             </Field>
             <Field
@@ -802,11 +968,17 @@ export function LogEntryForm({
                       id="log-end"
                       value={field.value ?? ""}
                       onChange={field.onChange}
+                      from={clockWindow?.from}
+                      to={clockWindow?.to}
+                      windowNote={clockWindow?.note}
                       className="h-11 flex-1"
                     />
                   )}
                 />
-                <NowButton onClick={() => setValue("endTime", clockNow())} />
+                <NowButton
+                  disabled={!nowAllowed}
+                  onClick={() => setValue("endTime", clockNow())}
+                />
               </div>
             </Field>
             <Field label="Duration" note="(auto)">
@@ -823,18 +995,49 @@ export function LogEntryForm({
           </FieldRow>
         </section>
 
-        {/* Equipment belongs to machine activities — a manual stage has none,
-            and neither preparatory nor downtime is ever one. */}
-        {hasMachine && !quickOn && (
-          <section className={SECTION}>
-            <SectionTitle icon={Cog}>Equipment</SectionTitle>
+        {/* ── Batch & equipment ─────────────────────────────────────
+            One section, because both are the same job: type a number, the
+            register hands back what it means. They were two stacked cards
+            holding one short field each, which cost a scroll to answer two
+            questions an operator answers in the same breath.
+
+            Equipment belongs to machine activities only — a manual stage has
+            none, and neither preparatory nor downtime is ever one — so the
+            row is one column wide as often as two. */}
+        <section className={cn(SECTION, "space-y-3")}>
+          <SectionTitle
+            icon={Package}
+            hint={
+              showEquipment
+                ? "→ auto-fills product & machine"
+                : "→ auto-fills product details"
+            }
+          >
+            {showEquipment ? "Batch & equipment" : "Batch"}
+          </SectionTitle>
+
+          <FieldRow cols={2}>
             <Field
-              label="Equipment no."
-              optional
-              htmlFor="log-equipment"
-              error={errors.equipmentNo?.message}
+              label="Batch number"
+              optional={isDowntime}
+              htmlFor="log-batch"
+              error={errors.batchNo?.message}
             >
-              <div className="space-y-2">
+              <input
+                id="log-batch"
+                className={cn(CONTROL, MONO)}
+                placeholder="e.g. 46004, 45972…"
+                autoComplete="off"
+                {...register("batchNo")}
+              />
+            </Field>
+            {showEquipment && (
+              <Field
+                label="Equipment no."
+                optional
+                htmlFor="log-equipment"
+                error={errors.equipmentNo?.message}
+              >
                 <input
                   id="log-equipment"
                   className={cn(CONTROL, MONO)}
@@ -842,59 +1045,68 @@ export function LogEntryForm({
                   autoComplete="off"
                   {...register("equipmentNo")}
                 />
-                {/* Resolved out of Admin → Equipment: the operator types the
-                  number off the machine, the register supplies the name. */}
+              </Field>
+            )}
+          </FieldRow>
+
+          {/* What the two numbers resolved to, laid out under the fields they
+              answer for: the machine beside the batch, not a scroll below it.
+              The machine chip is one line and the batch card is many, so they
+              are top-aligned rather than stretched — a half-empty column is
+              better than a chip inflated to match a card. */}
+          <div
+            className={cn(
+              "grid items-start gap-3",
+              showEquipment && "sm:grid-cols-2",
+            )}
+          >
+            {/* Only once the batch resolves. Its unresolved states — nothing
+                typed, nothing matched — are exactly what the refusal note
+                below now says, at greater length and in the colour of a
+                problem; printing both left the operator reading the same
+                sentence twice in two voices. */}
+            {showBatchCard && (
+              <BatchAutofill
+                query={(batchNo ?? "").trim()}
+                product={product}
+                runningTotal={runningTotal}
+                job={job}
+              />
+            )}
+            {/* Resolved out of Admin → Equipment: the operator types the
+                number off the machine, the register supplies the name. Held
+                in its own column even when the batch card isn't drawn, so the
+                machine never slides under the batch field. */}
+            {showEquipment && (
+              <div className={cn(!showBatchCard && "sm:col-start-2")}>
                 <EquipmentAutofill
                   query={(equipmentNo ?? "").trim()}
                   equipment={equipment}
                 />
               </div>
-            </Field>
-          </section>
-        )}
+            )}
+          </div>
 
-        {/* ── Batch ────────────────────────────────────────────────── */}
-        <section className={cn(SECTION, "space-y-2.5")}>
-          <SectionTitle icon={Package} hint="→ auto-fills product details">
-            Batch
-          </SectionTitle>
-          <Field
-            label="Batch number"
-            optional
-            htmlFor="log-batch"
-            error={errors.batchNo?.message}
-          >
-            <input
-              id="log-batch"
-              className={cn(CONTROL, MONO)}
-              placeholder="e.g. 46004, 45972…"
-              autoComplete="off"
-              {...register("batchNo")}
-            />
-          </Field>
-          <BatchAutofill
-            query={(batchNo ?? "").trim()}
-            product={product}
-            runningTotal={runningTotal}
-            job={job}
-          />
-
-          {/* The batch has not been released to the floor. The database
-              refuses the entry (migration 0033); saying so here means the
-              operator learns it while filling the form in rather than from a
-              submit that fails after everything is typed. */}
-          {blockedByIssue && (
-            <p className="flex items-start gap-2 rounded-xl border border-warn-line bg-warn-tint px-3.5 py-2.5 text-xs text-warn-ink">
-              <Cog className="mt-px size-3.5 shrink-0" aria-hidden />
-              <span>
-                <strong className="font-semibold">
-                  Batch {batchNo}{" "}
-                  <span>isn&rsquo;t issued for production yet.</span>
-                </strong>{" "}
-                A manager plans its stages on the Pipeline and issues it. You
-                can still log downtime against it.
+          {/* The entry will be refused, and why. One note for all four rules
+              of the gate — they are answered in order, so only ever one can
+              be the reason, and four separate panels would read as four
+              separate problems. Given its own line under both columns: it is
+              about the entry, not about either field. */}
+          {batchBlock && (
+            <div className="flex items-start gap-2.5 rounded-xl border border-warn-line bg-warn-tint px-3.5 py-3">
+              <span
+                aria-hidden
+                className="mt-px grid size-5 shrink-0 place-items-center rounded-md bg-warn-line/50 text-warn-ink"
+              >
+                <TriangleAlert className="size-3" />
               </span>
-            </p>
+              <span className="min-w-0 text-xs leading-relaxed text-warn-ink">
+                <strong className="block font-semibold">
+                  {batchBlock.head}
+                </strong>
+                <span className="text-warn-ink/85">{batchBlock.body}</span>
+              </span>
+            </div>
           )}
 
           {/* Asked only where the answer isn't already known: this batch runs
@@ -995,91 +1207,6 @@ export function LogEntryForm({
                     maximumFractionDigits: 2,
                   })}
                 </span>
-              </p>
-            )}
-          </section>
-        )}
-
-        {isProduction && (
-          <section className={SECTION}>
-            <SectionTitle icon={Boxes}>Output</SectionTitle>
-            <FieldRow>
-              <Field
-                label="Shift target qty"
-                note="(auto)"
-                htmlFor="log-target-qty"
-                error={errors.targetQty?.message}
-              >
-                <input
-                  id="log-target-qty"
-                  type="number"
-                  step="any"
-                  min={0}
-                  // Read-only rather than disabled: a disabled input is skipped
-                  // by form serialisation and drops out of the tab order, and
-                  // the operator still needs to see and copy the number.
-                  readOnly
-                  tabIndex={-1}
-                  className={cn(
-                    CONTROL,
-                    MONO,
-                    "cursor-default border-brand-line bg-brand-tint font-semibold text-brand shadow-none focus:border-brand-line focus:bg-brand-tint focus:ring-0",
-                  )}
-                  placeholder="Set a target speed"
-                  {...register("targetQty", { valueAsNumber: true })}
-                />
-              </Field>
-              <Field
-                label="Actual qty produced"
-                htmlFor="log-qty"
-                error={errors.qty?.message}
-                note={qty === 0 ? "zero — nothing will be counted" : undefined}
-              >
-                <input
-                  id="log-qty"
-                  type="number"
-                  step="any"
-                  min={0}
-                  className={cn(CONTROL, MONO)}
-                  placeholder="e.g. 231453"
-                  {...register("qty", { valueAsNumber: true })}
-                />
-              </Field>
-              <Field
-                label="Qty rejected"
-                note="/ rework — blank counts as none"
-                htmlFor="log-rejected"
-                error={errors.qtyRejected?.message}
-              >
-                <input
-                  id="log-rejected"
-                  type="number"
-                  step="any"
-                  min={0}
-                  className={cn(CONTROL, MONO)}
-                  placeholder="e.g. 1240"
-                  {...register("qtyRejected", { valueAsNumber: true })}
-                />
-              </Field>
-            </FieldRow>
-
-            {product && (
-              <p className="mt-2 text-[11px] text-ink-4">
-                Accumulative for this batch &amp; activity:{" "}
-                <span className="font-mono font-semibold text-teal">
-                  {runningTotal.toLocaleString(undefined, {
-                    maximumFractionDigits: 2,
-                  })}
-                </span>{" "}
-                {previousQty > 0 && (
-                  <>
-                    (previously{" "}
-                    {previousQty.toLocaleString(undefined, {
-                      maximumFractionDigits: 2,
-                    })}
-                    )
-                  </>
-                )}
               </p>
             )}
           </section>
@@ -1187,6 +1314,97 @@ export function LogEntryForm({
                 )}
               />
             </SlowReason>
+          </section>
+        )}
+
+        {/* ── Output — after Speed on purpose ──────────────────────
+            The shift target is speed × duration: it is *derived* from the card
+            above, and reading a target before the numbers it comes from is
+            what made "Set a target speed" look like an error rather than an
+            instruction. Fill the speed in, and the target is already there
+            when the eye arrives. */}
+        {isProduction && (
+          <section className={SECTION}>
+            <SectionTitle icon={Boxes}>Output</SectionTitle>
+            <FieldRow>
+              <Field
+                label="Shift target qty"
+                note="(auto)"
+                htmlFor="log-target-qty"
+                error={errors.targetQty?.message}
+              >
+                <input
+                  id="log-target-qty"
+                  type="number"
+                  step="any"
+                  min={0}
+                  // Read-only rather than disabled: a disabled input is skipped
+                  // by form serialisation and drops out of the tab order, and
+                  // the operator still needs to see and copy the number.
+                  readOnly
+                  tabIndex={-1}
+                  className={cn(
+                    CONTROL,
+                    MONO,
+                    "cursor-default border-brand-line bg-brand-tint font-semibold text-brand shadow-none focus:border-brand-line focus:bg-brand-tint focus:ring-0",
+                  )}
+                  placeholder="Set a target speed"
+                  {...register("targetQty", { valueAsNumber: true })}
+                />
+              </Field>
+              <Field
+                label="Actual qty produced"
+                htmlFor="log-qty"
+                error={errors.qty?.message}
+                note={qty === 0 ? "zero — nothing will be counted" : undefined}
+              >
+                <input
+                  id="log-qty"
+                  type="number"
+                  step="any"
+                  min={0}
+                  className={cn(CONTROL, MONO)}
+                  placeholder="e.g. 231453"
+                  {...register("qty", { valueAsNumber: true })}
+                />
+              </Field>
+              <Field
+                label="Qty rejected"
+                note="/ rework — blank counts as none"
+                htmlFor="log-rejected"
+                error={errors.qtyRejected?.message}
+              >
+                <input
+                  id="log-rejected"
+                  type="number"
+                  step="any"
+                  min={0}
+                  className={cn(CONTROL, MONO)}
+                  placeholder="e.g. 1240"
+                  {...register("qtyRejected", { valueAsNumber: true })}
+                />
+              </Field>
+            </FieldRow>
+
+            {product && (
+              <p className="mt-2 text-[11px] text-ink-4">
+                Accumulative for this batch &amp; activity:{" "}
+                <span className="font-mono font-semibold text-teal">
+                  {runningTotal.toLocaleString(undefined, {
+                    maximumFractionDigits: 2,
+                  })}
+                </span>{" "}
+                {previousQty > 0 && (
+                  <>
+                    (previously{" "}
+                    {previousQty.toLocaleString(undefined, {
+                      maximumFractionDigits: 2,
+                    })}
+                    )
+                  </>
+                )}
+              </p>
+            )}
           </section>
         )}
 
@@ -1437,13 +1655,21 @@ function CategoryBadge({ category }: { category?: string }) {
   );
 }
 
-function NowButton({ onClick }: { onClick: () => void }) {
+function NowButton({
+  onClick,
+  disabled,
+}: {
+  onClick: () => void;
+  /** The clock is outside the window this field is held to. */
+  disabled?: boolean;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
-      title="Set to now"
-      className="h-11 shrink-0 rounded-xl border border-brand-line bg-brand-tint px-3 text-xs font-semibold text-brand transition hover:border-brand hover:bg-brand-soft active:scale-95"
+      disabled={disabled}
+      title={disabled ? "The clock is outside your shift" : "Set to now"}
+      className="h-11 shrink-0 rounded-xl border border-brand-line bg-brand-tint px-3 text-xs font-semibold text-brand transition hover:border-brand hover:bg-brand-soft active:scale-95 disabled:pointer-events-none disabled:opacity-40"
     >
       Now
     </button>
@@ -1492,96 +1718,6 @@ function SlowReason({
         This is what the Pareto chart in OEE &amp; Downtime is built from — an
         unexplained slow run is a gap in the analysis later.
       </p>
-    </div>
-  );
-}
-
-/**
- * How far through its planned target this stage is, counting what is being
- * typed right now.
- *
- * The open entry is included on purpose: an operator about to file 5,000 needs
- * to see it land, and a bar that only moves after the submit is a bar that
- * answers the question too late to act on.
- *
- * That is also what makes the red state worth drawing. Since migration 0037 a
- * stage has a ceiling — its target plus the batch's tolerance — and the shift
- * log *refuses* an entry that would cross it. Reading the refusal off a failed
- * submit, after the whole form is typed, is the worst moment to learn it; the
- * bar turns red as the quantity is entered, with the ceiling and the overshoot
- * named, so the number can be corrected before anyone presses save.
- */
-function StageProgress({
-  stage,
-  pending,
-}: {
-  stage: BatchStage;
-  pending: number;
-}) {
-  const target = Number(stage.target_qty ?? 0);
-  const made = Number(stage.accumulated_qty ?? 0) + (pending || 0);
-  const pct = target > 0 ? Math.round((made / target) * 100) : 0;
-
-  const ceiling = stageCeiling(stage);
-  /** Would this entry, as typed, be refused? */
-  const over = stageIsOverTolerance(stage, pending || 0);
-  /** By how much — the number that has to come off before this can be filed. */
-  const excess = over && ceiling !== null ? made - ceiling : 0;
-
-  const tone = over
-    ? "var(--color-danger)"
-    : pct >= 100
-      ? "var(--color-teal)"
-      : "var(--color-brand)";
-
-  return (
-    <div
-      className={cn(
-        "space-y-1 rounded-xl border px-3.5 py-2.5",
-        over ? "border-danger-line bg-danger-tint" : "border-line bg-sunken",
-      )}
-    >
-      <div className="flex items-baseline justify-between gap-2 text-[11px]">
-        <span className="font-medium text-ink-3">{stageName(stage)}</span>
-        <span className="font-mono text-ink-4">
-          {made.toLocaleString(undefined, { maximumFractionDigits: 2 })} /{" "}
-          {target.toLocaleString()} {stage.target_unit}
-          <span className="ml-1 font-semibold" style={{ color: tone }}>
-            {pct}%
-          </span>
-        </span>
-      </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-line">
-        <div
-          className="h-full rounded-full transition-[width]"
-          style={{ width: `${Math.min(100, pct)}%`, background: tone }}
-        />
-      </div>
-
-      {/* Red first: an entry that will be refused is more urgent news than a
-          target that has been reached, and on an over-tolerance entry both are
-          true at once. */}
-      {over && ceiling !== null ? (
-        <p className="text-[11px] font-medium text-danger-deep">
-          Over what this stage accepts by{" "}
-          <strong className="font-mono font-semibold">
-            {excess.toLocaleString(undefined, { maximumFractionDigits: 2 })}{" "}
-            {stage.target_unit}
-          </strong>
-          . It is planned for {target.toLocaleString()} {stage.target_unit}
-          {stage.effective_tolerance_pct > 0
-            ? ` +${stage.effective_tolerance_pct}%, so ${ceiling.toLocaleString()} ${stage.target_unit} is the most that can be logged`
-            : " with no tolerance, so that is the most that can be logged"}
-          . This entry won&rsquo;t be saved until the quantity comes down, or a
-          manager changes the plan on the Pipeline.
-        </p>
-      ) : (
-        pct >= 100 && (
-          <p className="text-[11px] font-medium" style={{ color: tone }}>
-            Stage target reached — a supervisor can sign it off on the Pipeline.
-          </p>
-        )
-      )}
     </div>
   );
 }

@@ -897,7 +897,8 @@ function ToleranceNote({
       </strong>
       . An entry that would push it past that is refused, and the stage&rsquo;s
       progress bar in the shift log turns red. A manager can raise the stage
-      target or its own tolerance on the plan.
+      target on the plan, or this tolerance on the batch — it is set once here
+      and every stage of the plan inherits it.
     </p>
   );
 }

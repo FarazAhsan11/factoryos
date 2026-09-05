@@ -157,59 +157,51 @@ export function ShiftReportWorkspace({
   return (
     <div className="lg:flex lg:min-h-0 lg:flex-1 lg:flex-col print:block">
       {/* The controls are the one part of the page that has no business on
-          paper — you cannot press a button on a printed sheet. */}
-      <div className="mb-4 flex shrink-0 flex-wrap items-start justify-between gap-3 print:hidden">
-        <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-5">
-            Production floor
-          </p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">
-            Shift report
-          </h1>
-          <p className="mt-1 text-sm text-ink-4">
-            One shift, every {units.singular.toLowerCase()}, on one sheet —
-            written to be printed and handed over.
-          </p>
-        </div>
+          paper — you cannot press a button on a printed sheet.
 
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Never blank: a report with no date is not a document, so
+          They sit alone on this row now. The page heading above them — a
+          kicker, a title and a sentence of blurb — is gone: the tab strip
+          already says Shift report and the sheet's own masthead says which
+          factory, shift and date, so ninety vertical pixels were spent
+          repeating what the same screen says twice more. The table is what
+          people came for, and that height belongs to it. */}
+      <div className="mb-3 flex shrink-0 flex-wrap items-center justify-end gap-2 print:hidden">
+        {/* Never blank: a report with no date is not a document, so
               clearing falls back to today rather than to nothing. */}
-          <DateField
-            value={date}
-            max={todayISO()}
-            onChange={(next) => setDate(next || todayISO())}
-            ariaLabel="Report date"
-            className="h-9 w-[11.5rem] shadow-soft"
+        <DateField
+          value={date}
+          max={todayISO()}
+          onChange={(next) => setDate(next || todayISO())}
+          ariaLabel="Report date"
+          className="h-9 w-[11.5rem] shadow-soft"
+        />
+
+        <div className="flex overflow-hidden rounded-xl border border-line shadow-soft">
+          <ShiftButton
+            active={shift === "morning"}
+            onClick={() => setShift("morning")}
+            icon={<Sun className="size-3.5" />}
+            label="Morning"
           />
-
-          <div className="flex overflow-hidden rounded-xl border border-line shadow-soft">
-            <ShiftButton
-              active={shift === "morning"}
-              onClick={() => setShift("morning")}
-              icon={<Sun className="size-3.5" />}
-              label="Morning"
-            />
-            <ShiftButton
-              active={shift === "afternoon"}
-              onClick={() => setShift("afternoon")}
-              icon={<Moon className="size-3.5" />}
-              label="Afternoon"
-            />
-          </div>
-
-          <Ghost onClick={exportCsv} icon={<Download className="size-3.5" />}>
-            Export
-          </Ghost>
-          <button
-            type="button"
-            onClick={() => window.print()}
-            className="ml-1 inline-flex h-9 items-center gap-1.5 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-3.5 text-xs font-semibold text-white shadow-brand transition hover:brightness-[1.06] active:scale-[0.98]"
-          >
-            <Printer className="size-3.5" />
-            Print
-          </button>
+          <ShiftButton
+            active={shift === "afternoon"}
+            onClick={() => setShift("afternoon")}
+            icon={<Moon className="size-3.5" />}
+            label="Afternoon"
+          />
         </div>
+
+        <Ghost onClick={exportCsv} icon={<Download className="size-3.5" />}>
+          Export
+        </Ghost>
+        <button
+          type="button"
+          onClick={() => window.print()}
+          className="ml-1 inline-flex h-9 items-center gap-1.5 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-3.5 text-xs font-semibold text-white shadow-brand transition hover:brightness-[1.06] active:scale-[0.98]"
+        >
+          <Printer className="size-3.5" />
+          Print
+        </button>
       </div>
 
       {isError ? (
@@ -249,6 +241,14 @@ export function ShiftReportWorkspace({
                 unitWord={units.singular}
                 onEdit={setEditing}
                 canEdit={canEdit}
+                canManage={canManage}
+                factoryId={factoryId}
+                userId={userId}
+                // The sheet on screen, not today: a row added to a past shift
+                // is filed against that shift, which is the whole reason for
+                // being able to add one from here.
+                date={date}
+                shift={shift}
               />
               {totals.entries === 0 && (
                 <p className="shrink-0 border-t border-line bg-sunken px-4 py-2.5 text-center text-xs text-ink-5 print:hidden">

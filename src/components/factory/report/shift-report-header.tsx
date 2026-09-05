@@ -40,7 +40,7 @@ export function ShiftReportHeader({
   return (
     <header
       className={cn(
-        "flex shrink-0 flex-wrap items-center justify-between gap-x-6 gap-y-4 border-b border-line px-5 py-4",
+        "flex shrink-0 flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-line px-5 py-3",
         // A whisper of the shift's own colour across the top of the sheet —
         // enough to tell a morning report from an afternoon one at a glance
         // on a desk, not enough to survive as ink on a photocopier.
@@ -50,18 +50,18 @@ export function ShiftReportHeader({
         "print:rounded-none print:bg-none print:px-0",
       )}
     >
-      <div className="flex items-center gap-3.5">
+      <div className="flex items-center gap-3">
         <span
           aria-hidden
           className={cn(
-            "grid size-11 shrink-0 place-items-center rounded-2xl ring-1",
+            "grid size-9 shrink-0 place-items-center rounded-xl ring-1",
             morning
               ? "bg-warn-soft text-warn-deep ring-warn-line"
               : "bg-brand-soft text-brand-deep ring-brand-line",
             "print:hidden",
           )}
         >
-          {morning ? <Sun className="size-5" /> : <Moon className="size-5" />}
+          {morning ? <Sun className="size-4" /> : <Moon className="size-4" />}
         </span>
 
         <div>
@@ -110,7 +110,7 @@ function Fact({
     <div className="flex items-center gap-2">
       <span
         aria-hidden
-        className="grid size-7 shrink-0 place-items-center rounded-lg bg-surface text-ink-5 ring-1 ring-line print:hidden"
+        className="grid size-6 shrink-0 place-items-center rounded-lg bg-surface text-ink-5 ring-1 ring-line print:hidden"
       >
         <Icon className="size-3.5" />
       </span>

@@ -409,6 +409,22 @@ function applyLogEntryRules(
   // being validated against a control that is no longer on screen.
   if (values.category === "downtime") return;
 
+  // A producing entry has to name its batch: the number is what resolves it
+  // to a planned stage, and the work is counted against that stage. An entry
+  // naming none belongs to nothing, and since 0038 the database refuses it
+  // outright rather than filing it unattached.
+  //
+  // Downtime is exempt — it returns above. Time is lost between batches as
+  // often as during one, and there is then nothing to name; a number typed on
+  // a downtime entry is still checked, but by the database, not here.
+  if (!values.batchNo?.trim()) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["batchNo"],
+      message: "Enter the batch this work was for.",
+    });
+  }
+
   // A preparatory or production stage exists to produce something, so the
   // quantity it produced isn't optional — a blank there is an unfinished
   // entry, not a measurement. It stays `optionalQty` at the field level

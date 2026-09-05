@@ -98,7 +98,12 @@ export function LogWorkspace({
         )}
       >
         <div className="min-w-0 lg:min-h-0">
-          <LogEntryForm factoryId={factoryId} userId={userId} units={units} />
+          <LogEntryForm
+            factoryId={factoryId}
+            userId={userId}
+            units={units}
+            canManage={canManage}
+          />
         </div>
 
         <ActivityFeed

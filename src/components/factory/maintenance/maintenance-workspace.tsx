@@ -260,7 +260,14 @@ export function MaintenanceWorkspace({
   );
 }
 
-function RequestRow({
+/**
+ * One request, as a card.
+ *
+ * Exported because the batch record shows the same cards under its
+ * Maintenance tab. A second card built to look like this one would drift the
+ * first time a status pill or a downtime rule changed.
+ */
+export function RequestRow({
   request,
   unitWord,
   onOpen,

@@ -60,13 +60,33 @@ function sameDay(a: Date, b: Date): boolean {
   );
 }
 
-/** "28 Aug 2026" — the year kept, because these are records people file. */
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+/**
+ * "28 Aug 2026" — the year kept, because these are records people file.
+ *
+ * Built from a fixed month table rather than toLocaleDateString(undefined).
+ * An undefined locale means *the environment*, and the trigger renders on the
+ * server before it renders in the browser: Node formatted "Sep 5, 2026" where
+ * the browser formatted "5 Sept 2026", and React reported the hydration
+ * mismatch against this span. Every other date in the app that survives a
+ * server pass is written the same way.
+ */
 function longDate(date: Date): string {
-  return date.toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  return `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
 }
 
 /**
@@ -543,12 +563,25 @@ function NumberColumn({
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const MINUTES = Array.from({ length: 60 }, (_, i) => i);
 
+/** "HH:MM" → minutes since midnight, or null if it isn't one. */
+function toMinutes(clock: string | undefined): number | null {
+  const m = /^(\d{1,2}):(\d{2})/.exec(clock ?? "");
+  if (!m) return null;
+  const mins = Number(m[1]) * 60 + Number(m[2]);
+  return mins >= 0 && mins < 1440 ? mins : null;
+}
+
 /**
  * A 24-hour time field. Emits `HH:mm`, or `""` when cleared.
  *
  * Minutes run one by one rather than in five-minute steps: an activity that
  * started at 15:07 started at 15:07, and a picker that can only say 15:05 is
  * a picker that quietly falsifies a duration.
+ *
+ * `from` and `to` narrow it to a window — the hours outside are not listed at
+ * all, and the minutes of a boundary hour are cut to the part that falls
+ * inside. A window that runs past midnight (22:00 → 06:00) is understood as
+ * one, not as an empty range.
  */
 export function TimeField({
   id,
@@ -559,6 +592,9 @@ export function TimeField({
   className,
   ariaLabel,
   ariaInvalid,
+  from,
+  to,
+  windowNote,
 }: {
   id?: string;
   value: string;
@@ -568,6 +604,12 @@ export function TimeField({
   className?: string;
   ariaLabel?: string;
   ariaInvalid?: boolean;
+  /** Earliest selectable time, "HH:MM". Both ends or neither. */
+  from?: string;
+  /** Latest selectable time, "HH:MM", inclusive. */
+  to?: string;
+  /** Why the list is short — shown in the popup above the columns. */
+  windowNote?: string;
 }) {
   const [open, setOpen] = useState(false);
   const match = /^(\d{1,2}):(\d{2})/.exec(value ?? "");
@@ -577,6 +619,40 @@ export function TimeField({
     onChange(
       `${String(h ?? 0).padStart(2, "0")}:${String(m ?? 0).padStart(2, "0")}`,
     );
+
+  /**
+   * The window, as minutes since midnight — or null, meaning the whole day.
+   *
+   * Both ends or neither: half a window is a rule nobody can state, and
+   * silently treating a missing end as midnight would cut a night shift in
+   * half at exactly the point it is busiest.
+   */
+  const fromMin = toMinutes(from);
+  const toMin = toMinutes(to);
+  const bounded = fromMin !== null && toMin !== null;
+  /** 22:00 → 06:00 is a window, not an empty range. */
+  const wraps = bounded && fromMin > toMin;
+
+  const inWindow = (mins: number) =>
+    !bounded ||
+    (wraps
+      ? mins >= fromMin! || mins <= toMin!
+      : mins >= fromMin! && mins <= toMin!);
+
+  // An hour is offered when any minute of it falls inside — the boundary hours
+  // are then cut down by the minute column rather than dropped whole.
+  const hours = bounded
+    ? HOURS.filter((h) => MINUTES.some((m) => inWindow(h * 60 + m)))
+    : HOURS;
+  const minutes =
+    bounded && hour !== null
+      ? MINUTES.filter((m) => inWindow(hour * 60 + m))
+      : MINUTES;
+
+  // "Now" outside the window would write a time the window forbids, so it is
+  // offered only when it is a legal answer.
+  const now = new Date();
+  const nowAllowed = inWindow(now.getHours() * 60 + now.getMinutes());
 
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
@@ -619,16 +695,33 @@ export function TimeField({
       <Popover.Portal>
         <Popover.Positioner sideOffset={6} align="start" className="z-50">
           <Popover.Popup className={cn(POPUP, "w-56")}>
+            {/* Said, not just enforced: a picker that silently offers eight
+                hours out of twenty-four looks broken until you know why. */}
+            {bounded && windowNote && (
+              <p className="mb-2 rounded-lg bg-sunken px-2 py-1.5 text-[10.5px] leading-snug font-medium text-ink-4">
+                {windowNote}
+              </p>
+            )}
             <div className="flex gap-2">
               <NumberColumn
                 label="Hour"
-                values={HOURS}
+                values={hours}
                 active={hour}
-                onPick={(h) => set(h, minute)}
+                onPick={(h) => {
+                  // Moving to a boundary hour can strand the minute outside
+                  // the window — 15:47 in a shift ending 15:15. Pull it back
+                  // to the nearest legal minute of the hour it just landed in.
+                  const legal = MINUTES.filter((m) => inWindow(h * 60 + m));
+                  const keep =
+                    minute !== null && legal.includes(minute)
+                      ? minute
+                      : (legal[0] ?? 0);
+                  set(h, keep);
+                }}
               />
               <NumberColumn
                 label="Min"
-                values={MINUTES}
+                values={minutes}
                 active={minute}
                 onPick={(m) => set(hour, m)}
               />
@@ -637,12 +730,16 @@ export function TimeField({
             <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-line-soft pt-2.5">
               <button
                 type="button"
+                disabled={!nowAllowed}
+                title={
+                  nowAllowed ? undefined : "The clock is outside this window"
+                }
                 onClick={() => {
-                  const now = new Date();
-                  set(now.getHours(), now.getMinutes());
+                  const at = new Date();
+                  set(at.getHours(), at.getMinutes());
                   setOpen(false);
                 }}
-                className="rounded-lg px-2 py-1 text-xs font-semibold text-brand transition hover:bg-brand-soft"
+                className="rounded-lg px-2 py-1 text-xs font-semibold text-brand transition hover:bg-brand-soft disabled:pointer-events-none disabled:opacity-40"
               >
                 Now
               </button>

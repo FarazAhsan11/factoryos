@@ -110,12 +110,22 @@ export function NewEntryRow({
 }) {
   const queryClient = useQueryClient();
   const [operatorsOpen, setOperatorsOpen] = useState(false);
+  /**
+   * How many entries this open row has filed.
+   *
+   * Only to name the button that closes it: after the first save the row is
+   * no longer a half-typed thing to abandon, it is a run being continued, and
+   * "Cancel" reads as though it would undo what has already been logged.
+   */
+  const [logged, setLogged] = useState(0);
 
   const {
     control,
     register,
     handleSubmit,
     setValue,
+    getValues,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<LogEntryValues, unknown, LogEntryParsed>({
     resolver: zodResolver(logEntrySchema),
@@ -445,7 +455,57 @@ export function NewEntryRow({
         }),
       ]);
       toast.success(`Logged — ${unit.name}`);
-      onDone();
+
+      /* ── The row stays open, carrying the run forward ────────────────
+         A room logs an hour at a time against the same batch, the same
+         activity and the same crew, and closing the row after each one would
+         mean re-answering all of that every hour. What carries over is what is
+         still true of the next entry; what is cleared is what described the
+         hour just filed. Identical to the shift log's own rule, because it is
+         the same run of entries either way.
+
+         The cleared fields are named with `null` rather than left out. Leaving
+         a key out does NOT clear its input: `reset` empties RHF's field map,
+         every input re-registers, and a field with no value takes the branch
+         that *reads the DOM into form state* instead of writing form state to
+         the DOM — so the old quantity would come straight back and be adopted
+         as the new one. */
+      const keep = getValues();
+      reset({
+        factoryId,
+        unitId: unit.id,
+        shift,
+        processId: keep.processId,
+        category: keep.category,
+        hasMachine: keep.hasMachine,
+        // The next entry starts where this one ended.
+        startTime: keep.endTime,
+        endTime: "",
+        // The room stays on the same batch, stage and machine across a run,
+        // and re-typing a six-digit batch number every hour is how the wrong
+        // one gets typed.
+        batchNo: keep.batchNo,
+        batchStageId: keep.batchStageId,
+        equipmentNo: keep.equipmentNo,
+        qtyUnit: keep.qtyUnit,
+        speedType: keep.speedType,
+        speedRate: keep.speedRate,
+        targetSpeed: keep.targetSpeed,
+        // The same people usually work the whole shift.
+        operators: keep.operators,
+        // Cleared: these described the hour that was just filed. A
+        // carried-over quantity nobody notices is a wrong entry that looks
+        // like a right one, and it cannot be deleted afterwards — only
+        // amended.
+        targetQty: null,
+        qty: null,
+        qtyRejected: null,
+        actualSpeed: null,
+        comment: "",
+        actionFlag: "",
+        slowReason: "",
+      });
+      setLogged((n) => n + 1);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -957,12 +1017,17 @@ export function NewEntryRow({
             )}
 
             <div className="ml-auto flex items-center gap-2">
+              {logged > 0 && (
+                <span className="text-[11px] font-medium text-teal-deep">
+                  {logged} logged
+                </span>
+              )}
               <button
                 type="button"
                 onClick={onDone}
                 className="inline-flex h-8 items-center gap-1 rounded-lg border border-line bg-surface px-2.5 text-[11px] font-semibold text-ink-4 transition hover:text-ink"
               >
-                <X className="size-3" /> Cancel
+                <X className="size-3" /> {logged > 0 ? "Done" : "Cancel"}
               </button>
               <button
                 type="button"
@@ -971,7 +1036,11 @@ export function NewEntryRow({
                 className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-3.5 text-[11px] font-semibold text-white shadow-brand transition hover:brightness-[1.06] disabled:opacity-70"
               >
                 {isSubmitting && <Loader2 className="size-3 animate-spin" />}
-                {isSubmitting ? "Logging…" : "Log entry"}
+                {isSubmitting
+                  ? "Logging…"
+                  : logged > 0
+                    ? "Log next"
+                    : "Log entry"}
               </button>
             </div>
           </div>

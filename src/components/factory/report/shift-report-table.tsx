@@ -268,9 +268,9 @@ function IdleRow({
        Still not fourteen em-dashes: the dashes were fourteen separate
        invitations to look for a number, and there is none to find — the answer
        is the status, and it fits in a sentence. */
-    <tr className="group/room border-t border-line-soft bg-sunken/60 print:bg-surface">
+    <tr className="group/room border-t border-line-soft bg-sunken-2/70 print:bg-surface">
       <td className="print:hidden" />
-      <Td className="text-[12px] font-semibold text-ink-3" title={room.name}>
+      <Td className="text-[12px] font-medium text-ink-4" title={room.name}>
         {room.name}
       </Td>
       <td colSpan={15} className="px-3 py-2">
@@ -317,7 +317,7 @@ function RoomBlock({
           SPEED and TARGET SPEED, where it read as those columns' values for
           this row. Nothing that is not a column's value may sit under that
           column's heading. */}
-      <tr className="group/room border-t border-line bg-sunken print:bg-sunken">
+      <tr className="group/room border-t border-line bg-sunken-2 print:bg-sunken">
         {/* An empty cell for the edit column, so the band's title starts where
             the Room column starts rather than at the table's edge. */}
         <td className="print:hidden" />
@@ -383,16 +383,36 @@ function EntryRow({
     <tr
       className={cn(
         "group border-t border-line-soft align-middle transition-colors",
+        // Three backgrounds, three kinds of row, darkest to lightest: the
+        // room band, then a room that logged nothing, then this — a real
+        // entry, on white. They were all within a few percent of each other,
+        // which left a filed entry looking like a placeholder for one.
         entry.action_flag
           ? "bg-danger-soft print:bg-danger-soft"
-          : "hover:bg-brand-soft/40 print:hover:bg-transparent",
+          : "bg-surface hover:bg-brand-soft/40 print:hover:bg-transparent",
       )}
     >
-      {/* Dimmed until the row is hovered or the button is focused, so a sheet
-          of forty rows isn't forty pencils competing with the numbers — but
-          never hidden, because a control that only exists on hover cannot be
-          found on a tablet. */}
-      <Td className="print:hidden">
+      {/* Carries the row spine as well as the pencil.
+
+          Three near-identical greys were never going to answer "is this an
+          entry or an empty room?" — the palette's steps are eight shades
+          apart and the sheet is read at arm length. A solid bar down the left
+          of every filed row does answer it, the same way the activity feed's
+          spine does, and it takes its colour from the row: red where the entry
+          is flagged, brand where it is ordinary.
+
+          The pencil itself is dimmed until the row is hovered or the button is
+          focused, so a sheet of forty rows isn't forty pencils competing with
+          the numbers — but never hidden, because a control that only exists on
+          hover cannot be found on a tablet. */}
+      <Td
+        className={cn(
+          "print:hidden",
+          entry.action_flag
+            ? "shadow-[inset_4px_0_0_0_var(--color-danger)]"
+            : "shadow-[inset_4px_0_0_0_var(--color-brand)]",
+        )}
+      >
         {canEdit ? (
           <button
             type="button"

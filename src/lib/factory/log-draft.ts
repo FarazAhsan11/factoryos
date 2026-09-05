@@ -9,12 +9,32 @@ import type { LogEntryValues } from "@/app/factory/[slug]/log/schemas";
  * an operator file a thinner entry next time — so the draft survives the page,
  * and only a successful submit clears it.
  *
+ * With one exception: the quantity produced is never written here at all. See
+ * `NEVER_STORED`.
+ *
  * Local, not a table: it is unvalidated, half-typed, per-device text that no
  * other user has any business reading, and round-tripping every keystroke
  * through Postgres would buy nothing. It never leaves the browser.
  */
 
 const VERSION = 1;
+
+/**
+ * Fields the draft never keeps, however much else it keeps.
+ *
+ * `qty` — the quantity this entry produced — is the one number on the form
+ * that belongs to a single hour and to nothing else. Everything else the draft
+ * restores is context that is still true after a reload: the room, the batch,
+ * the machine, the crew. A quantity is not: it was typed against one activity
+ * in one hour, and offering it again on the next form is a wrong entry that
+ * looks exactly like a right one — filed, audit-protected, and correctable
+ * only by amendment.
+ *
+ * Stripped in `sanitise`, which runs on write *and* on read, so a quantity
+ * already sitting in someone's browser is dropped the next time the form
+ * opens rather than waiting out its twelve hours.
+ */
+const NEVER_STORED = new Set<string>(["qty"]);
 
 /**
  * Per factory *and* per user, because a shared floor tablet is signed in and
@@ -65,7 +85,10 @@ export function readLogDraft(
 }
 
 /**
- * Strips the nulls a round-trip through JSON leaves behind.
+ * Strips the fields a draft must not carry, and the nulls a round-trip
+ * through JSON leaves behind.
+ *
+ * The first is `NEVER_STORED` — see above.
  *
  * An empty number input registered with `valueAsNumber` holds **NaN**, and
  * `JSON.stringify(NaN)` writes `null`. Restored as-is, every unfilled quantity
@@ -82,6 +105,7 @@ function sanitise(
 ): Partial<LogEntryValues> {
   const clean: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(values)) {
+    if (NEVER_STORED.has(k)) continue;
     if (v === null) continue;
     if (typeof v === "number" && Number.isNaN(v)) continue;
     clean[k] = v;
@@ -127,7 +151,9 @@ export function draftHasContent(values: Partial<LogEntryValues>): boolean {
       values.batchStageId ||
       values.equipmentNo ||
       values.comment ||
-      values.qty !== undefined ||
+      // `qty` is deliberately absent: it is never stored (see NEVER_STORED),
+      // so asking after it here could only ever read a stale draft written
+      // before that rule existed.
       values.operators?.some((o) => o?.name),
   );
 }

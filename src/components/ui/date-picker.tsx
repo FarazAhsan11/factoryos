@@ -60,13 +60,33 @@ function sameDay(a: Date, b: Date): boolean {
   );
 }
 
-/** "28 Aug 2026" — the year kept, because these are records people file. */
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+/**
+ * "28 Aug 2026" — the year kept, because these are records people file.
+ *
+ * Built from a fixed month table rather than toLocaleDateString(undefined).
+ * An undefined locale means *the environment*, and the trigger renders on the
+ * server before it renders in the browser: Node formatted "Sep 5, 2026" where
+ * the browser formatted "5 Sept 2026", and React reported the hydration
+ * mismatch against this span. Every other date in the app that survives a
+ * server pass is written the same way.
+ */
 function longDate(date: Date): string {
-  return date.toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  return `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
 }
 
 /**

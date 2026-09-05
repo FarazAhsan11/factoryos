@@ -44,7 +44,47 @@ export function ShiftReportTable({
        has no scrollbar, and clipping the report to one viewport would lose
        every room past the first dozen. */
     <div className="scrollbar-slim overflow-auto lg:min-h-0 lg:flex-1 print:block print:overflow-visible">
-      <table className="w-full min-w-[1180px] border-collapse text-[12px]">
+      {/* `table-fixed`, with every column given a width in pixels.
+
+          Three approaches were tried here and two were wrong. Auto layout
+          sized each column to whatever happened to be in it, so no heading sat
+          over its own figures and the grid moved as the shift filled up.
+          Percentage widths fixed the grid but sized the columns to the table
+          instead of to their contents, which left headings too narrow to hold
+          their own words — first clipped to "ACCUMU…", then, once wrapping was
+          allowed, split down the middle into "REQUIRE / D".
+
+          Pixels sized to the longest word each column has to hold is the
+          answer. Seventeen columns of real words do not fit a laptop, and
+          pretending otherwise is what broke the headings; the sheet is wider
+          than the window and scrolls, which is what a wide sheet does. Headings
+          still wrap at spaces — "TARGET / SPEED" — but never inside a word. */}
+      <table className="w-full min-w-[1614px] table-fixed border-collapse text-[12px]">
+        <colgroup>
+          {/* The edit column. Not hidden here for print — `display:none` on a
+              `<col>` is not honoured the way it is on a cell, and the `th`/`td`
+              already carry `print:hidden`. */}
+          <col className="w-[34px]" />
+          <col className="w-[84px]" />
+          <col className="w-[110px]" />
+          <col className="w-[76px]" />
+          <col className="w-[88px]" />
+          <col className="w-[140px]" />
+          <col className="w-[74px]" />
+          <col className="w-[80px]" />
+          <col className="w-[92px]" />
+          {/* "ACCUMULATIVE" is the longest unbreakable word on the sheet, and
+              this column is sized to it rather than the other way round. */}
+          <col className="w-[118px]" />
+          <col className="w-[90px]" />
+          <col className="w-[96px]" />
+          <col className="w-[90px]" />
+          <col className="w-[110px]" />
+          <col className="w-[140px]" />
+          <col className="w-[96px]" />
+          <col className="w-[96px]" />
+        </colgroup>
+
         <thead>
           {/* The colour is on the row, but the stickiness has to be on the
               cells: `position: sticky` on a `<tr>` is ignored outside Firefox. */}
@@ -53,7 +93,7 @@ export function ShiftReportTable({
                 scrolling a sixteen-column sheet sideways, and it carries no
                 heading: an icon column labelled "Edit" spends a header on
                 something the icon already says. */}
-            <Th className="w-9 print:hidden">
+            <Th className="print:hidden">
               <span className="sr-only">Correct entry</span>
             </Th>
             <Th>{unitWord}</Th>
@@ -104,18 +144,29 @@ export function ShiftReportTable({
 function IdleRow({ room }: { room: ShiftReportRoom }) {
   const held = room.idleStatus === "HOLD";
   return (
-    /* One spanning cell, not fourteen em-dashes. The dashes were fourteen
-       separate invitations to look for a number, and there is none to find —
-       the answer is the status, and it fits in a sentence. */
+    /* Three cells, not one spanning cell.
+
+       It was a single `colSpan={17}` and that is what put the room name at the
+       left edge of the table while the ROOM heading sat 46px further in, over
+       the column it names — the complaint that read as "the columns do not line
+       up" was this row ignoring the columns entirely. The name now sits in the
+       Room column and the status in Status / stage, where their headings are;
+       only the message spans, because there is nothing to put under the other
+       fourteen headings.
+
+       Still not fourteen em-dashes: the dashes were fourteen separate
+       invitations to look for a number, and there is none to find — the answer
+       is the status, and it fits in a sentence. */
     <tr className="border-t border-line-soft bg-sunken/60 print:bg-surface">
-      <td colSpan={17} className="px-3 py-2">
+      <td className="print:hidden" />
+      <Td className="text-[12px] font-semibold text-ink-3" title={room.name}>
+        {room.name}
+      </Td>
+      <td colSpan={15} className="px-3 py-2">
         <div className="flex flex-wrap items-center gap-2.5">
-          <span className="text-[12px] font-semibold text-ink-3">
-            {room.name}
-          </span>
           <span
             className={cn(
-              "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.07em] ring-1",
+              "rounded-full px-2 py-0.5 text-[10px] font-bold tracking-[0.07em] uppercase ring-1",
               held
                 ? "bg-warn-soft text-warn-deep ring-warn-line"
                 : "bg-sunken-2 text-ink-4 ring-line",
@@ -143,12 +194,21 @@ function RoomBlock({
 }) {
   return (
     <>
-      {/* A titled band opening each room, with what the room did on the
-          right — the one figure a supervisor wants before reading the rows
-          underneath it. */}
+      {/* A titled band opening each room, with what the room did beside the
+          name — the one figure a supervisor wants before reading the rows
+          underneath it.
+
+          Beside it, not opposite it. The band spans the sheet, so pushing its
+          summary to the far edge parked "1 entry · 200 produced" underneath
+          SPEED and TARGET SPEED, where it read as those columns' values for
+          this row. Nothing that is not a column's value may sit under that
+          column's heading. */}
       <tr className="border-t border-line bg-sunken print:bg-sunken">
-        <td colSpan={17} className="px-3 py-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
+        {/* An empty cell for the edit column, so the band's title starts where
+            the Room column starts rather than at the table's edge. */}
+        <td className="print:hidden" />
+        <td colSpan={16} className="px-3 py-2">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.07em] text-ink">
               <span
                 aria-hidden
@@ -207,7 +267,7 @@ function EntryRow({
   return (
     <tr
       className={cn(
-        "group border-t border-line-soft align-top transition-colors",
+        "group border-t border-line-soft align-middle transition-colors",
         entry.action_flag
           ? "bg-danger-soft print:bg-danger-soft"
           : "hover:bg-brand-soft/40 print:hover:bg-transparent",
@@ -217,7 +277,7 @@ function EntryRow({
           of forty rows isn't forty pencils competing with the numbers — but
           never hidden, because a control that only exists on hover cannot be
           found on a tablet. */}
-      <Td className="w-9 print:hidden">
+      <Td className="print:hidden">
         {canEdit ? (
           <button
             type="button"
@@ -239,7 +299,16 @@ function EntryRow({
         )}
       </Td>
 
-      <Td className="text-[11px] text-ink-5">{first ? room.name : ""}</Td>
+      {/* Named once per room — the band above carries it, and repeating it
+          down every row of a nine-entry block is noise. Kept as a column all
+          the same: it is what the CSV export and the printed sheet are read
+          by, where there are no bands to look up to. */}
+      <Td
+        className="text-[11px] text-ink-5"
+        title={first ? room.name : undefined}
+      >
+        {first ? room.name : ""}
+      </Td>
 
       <Td>
         <span className="font-medium text-ink">
@@ -258,9 +327,7 @@ function EntryRow({
         {formatRunTime(entry.duration_minutes)}
       </Td>
 
-      <Td className="max-w-[150px] truncate" title={entry.product_name ?? ""}>
-        {entry.product_name ?? "—"}
-      </Td>
+      <Td title={entry.product_name ?? ""}>{entry.product_name ?? "—"}</Td>
       <Td className="font-mono text-[11px]">{entry.product_code || "—"}</Td>
       <Td className="font-mono text-[11px]">{entry.batch_no || "—"}</Td>
 
@@ -318,12 +385,8 @@ function EntryRow({
         {formatQty(entry.qty_rejected)}
       </Td>
 
-      <Td className="max-w-[130px] truncate" title={operators}>
-        {operators || "—"}
-      </Td>
-      <Td className="max-w-[160px] truncate" title={remark ?? ""}>
-        {remark || "—"}
-      </Td>
+      <Td title={operators}>{operators || "—"}</Td>
+      <Td title={remark ?? ""}>{remark || "—"}</Td>
 
       <Td align="right" className="font-mono">
         {entry.actual_speed
@@ -349,7 +412,12 @@ function Th({
   return (
     <th
       className={cn(
-        "sticky top-0 z-10 whitespace-nowrap px-3 py-2.5 text-[10px] font-bold uppercase tracking-[0.08em]",
+        // Wraps at spaces, never inside a word, and never truncated. A
+        // heading clipped to "ACCUMU…" names nothing, and one split into
+        // "REQUIRE / D" is worse — it reads as a typo in a document people
+        // sign. `break-normal` is what forbids the second; the column widths
+        // above are what make the first unnecessary.
+        "sticky top-0 z-10 px-3 py-2 text-[10px] leading-tight font-bold tracking-[0.06em] break-normal uppercase",
         // A deep indigo band rather than flat near-black: it belongs to the
         // same family as everything else on the page, and the gradient keeps
         // a sixteen-column header from reading as a solid bar of ink.
@@ -379,8 +447,12 @@ function Td({
     <td
       title={title}
       className={cn(
-        "px-3 py-2.5 text-ink-2",
-        align === "right" ? "text-right" : "text-left",
+        // `truncate` on every cell, because fixed layout does not shrink a
+        // column to fit its contents — without it a long product name pushes
+        // its own text under the neighbouring column instead of ending in an
+        // ellipsis. The full string stays in the cell's `title`.
+        "truncate px-3 py-2 text-ink-2",
+        align === "right" ? "text-right tabular-nums" : "text-left",
         className,
       )}
     >

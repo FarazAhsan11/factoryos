@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ClipboardList } from "lucide-react";
+import { ClipboardList, Cog, Users } from "lucide-react";
 
 import { AmendEntryDialog } from "@/components/factory/data/amend-entry-dialog";
 import { ExplainOverrunDialog } from "@/components/factory/data/explain-overrun-dialog";
@@ -239,72 +239,203 @@ function FeedRow({
       ? Math.round((entry.actual_speed / entry.target_speed) * 100)
       : null;
 
+  const produced = Number(entry.qty ?? 0);
+  const rejected = Number(entry.qty_rejected ?? 0);
+  const hasStats = produced > 0 || rejected > 0 || Boolean(entry.target_speed);
+  const people = entry.operators?.length ? entry.operators.join(" / ") : null;
+
   return (
     /* A card with a coloured spine rather than a dot in a list. The dot was
        two pixels of the only thing that says at a glance whether an entry is
-       routine, rejected or flagged; the spine says it from across the room. */
-    <li className="group relative overflow-hidden rounded-xl border border-line-soft bg-surface py-2.5 pr-2.5 pl-4 transition hover:border-line-strong hover:shadow-lift">
+       routine, rejected or flagged; the spine says it from across the room.
+
+       Inside, four bands in a fixed order — when, what, how much, who — so a
+       supervisor scanning the column reads down the same place in every card
+       instead of hunting through a sentence. It used to be one run-on line
+       (room, activity, product, quantity and every badge), which wrapped
+       differently in every card and buried the number that matters. */
+    <li className="group relative overflow-hidden rounded-xl border border-line-soft bg-surface py-2.5 pr-2.5 pl-3.5 transition hover:border-line-strong hover:shadow-lift">
       <span
         className="absolute inset-y-0 left-0 w-1"
         style={{ background: tone(entry) }}
         aria-hidden
       />
-      <div className="flex gap-2">
-        <div className="min-w-0 flex-1 space-y-0.5">
-          <p className="text-[13px] leading-snug break-words text-ink">
-            <strong className="font-semibold">{entry.unit?.name ?? "—"}</strong>
-            {" — "}
-            {entry.process?.name ?? "—"}
-            {entry.product && (
-              <span className="text-ink-4"> · {entry.product.name}</span>
-            )}
-            {Number(entry.qty ?? 0) > 0 && (
-              <span className="font-semibold text-brand">
-                {" "}
-                {/* A preparatory stage counts in drums or kg, not units —
-                  printing "units" against 3 drums is a wrong number, not a
-                  vague one. Production carries no qty_unit and falls back. */}
-                {fmt(entry.qty)} {entry.qty_unit ?? "units"}
-              </span>
-            )}
-            {entry.action_flag && (
-              <span className="ml-1.5 rounded-full bg-danger-soft px-1.5 py-0.5 text-[9.5px] font-semibold text-danger-deep">
-                {entry.action_flag}
-              </span>
-            )}
-            {/* Clickable for a manager, because the feed is where a supervisor
+
+      {/* ── When, and what needs attention ─────────────────────────────
+          The clock leads because the feed is read in time order, and the
+          badges sit opposite it on the same line, so a flagged entry is
+          visible without reading a word of the card. */}
+      <div className="flex items-start justify-between gap-2">
+        <p className="min-w-0 font-mono text-[11px] font-medium tracking-tight text-ink-4">
+          {entry.start_time?.slice(0, 5) ?? "—"}
+          {entry.end_time && ` → ${entry.end_time.slice(0, 5)}`}
+          {entry.duration_minutes > 0 && (
+            <span className="text-ink-5">
+              {" · "}
+              {formatMinutes(entry.duration_minutes)}
+            </span>
+          )}
+        </p>
+
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+          {entry.action_flag && (
+            <span className={cn(BADGE, "bg-danger-soft text-danger-deep")}>
+              {entry.action_flag}
+            </span>
+          )}
+          {/* Clickable for a manager, because the feed is where a supervisor
               is actually looking when the overrun lands — making them go to
               the data table to clear it is how a flag gets ignored. */}
-            {overrun?.needs_overrun_note &&
-              (canExplainOverrun ? (
-                <button
-                  type="button"
-                  onClick={onExplainOverrun}
-                  title={`Over the required quantity by ${fmt(overrun.overrun_qty)} — tap to explain`}
-                  className="ml-1.5 rounded-full bg-warn-soft px-1.5 py-0.5 text-[9.5px] font-bold text-warn-deep transition hover:bg-warn-line"
-                >
-                  Attention · +{fmt(overrun.overrun_qty)}
-                </button>
-              ) : (
-                <span
-                  title={`Over the required quantity by ${fmt(overrun.overrun_qty)} — a manager has to explain it`}
-                  className="ml-1.5 rounded-full bg-warn-soft px-1.5 py-0.5 text-[9.5px] font-bold text-warn-deep"
-                >
-                  Attention · +{fmt(overrun.overrun_qty)}
-                </span>
-              ))}
-            {entry.amended_at && (
-              <span className="ml-1.5 rounded-full bg-sunken-2 px-1.5 py-0.5 text-[9.5px] font-semibold text-ink-3">
-                Amended
+          {overrun?.needs_overrun_note &&
+            (canExplainOverrun ? (
+              <button
+                type="button"
+                onClick={onExplainOverrun}
+                title={`Over the required quantity by ${fmt(overrun.overrun_qty)} — tap to explain`}
+                className={cn(
+                  BADGE,
+                  "bg-warn-soft text-warn-deep transition hover:bg-warn-line",
+                )}
+              >
+                Attention · +{fmt(overrun.overrun_qty)}
+              </button>
+            ) : (
+              <span
+                title={`Over the required quantity by ${fmt(overrun.overrun_qty)} — a manager has to explain it`}
+                className={cn(BADGE, "bg-warn-soft text-warn-deep")}
+              >
+                Attention · +{fmt(overrun.overrun_qty)}
               </span>
-            )}
-          </p>
+            ))}
+          {entry.amended_at && (
+            <span className={cn(BADGE, "bg-sunken-2 text-ink-3")}>Amended</span>
+          )}
+          {canAmend && (
+            <button
+              type="button"
+              onClick={onAmend}
+              title="Attach a correction note — the original entry is preserved"
+              className="rounded-md border border-line bg-surface px-1.5 py-0.5 text-[9.5px] font-semibold text-ink-5 opacity-0 transition hover:border-warn-deep hover:bg-warn-tint hover:text-warn-deep focus-visible:opacity-100 group-hover:opacity-100"
+            >
+              Amend
+            </button>
+          )}
+        </div>
+      </div>
 
+      {/* ── What ───────────────────────────────────────────────────────
+          Room and activity on one line, the batch under it. Two lines rather
+          than one sentence: the product name is the longest string on the
+          card and used to push the activity onto a line by itself, which read
+          as two different things. */}
+      <p className="mt-1 text-[13px] leading-snug font-semibold break-words text-ink">
+        {entry.unit?.name ?? "—"}
+        <span className="font-normal text-ink-4"> · </span>
+        {entry.process?.name ?? "—"}
+      </p>
+      {(entry.batch_no || entry.product) && (
+        <p className="mt-0.5 line-clamp-2 text-[11.5px] leading-snug break-words text-ink-4">
+          {entry.batch_no && (
+            <span className="font-mono font-medium text-ink-3">
+              {entry.batch_no}
+            </span>
+          )}
+          {entry.batch_no && entry.product && " · "}
+          {entry.product?.name}
+        </p>
+      )}
+
+      {/* ── How much ───────────────────────────────────────────────────
+          Numbers in labelled tiles instead of inline in a sentence, so the
+          quantity, the rejects and the speed line up down the column and can
+          be compared card to card by looking rather than by reading. */}
+      {hasStats && (
+        <dl className="mt-2 flex flex-wrap gap-1.5">
+          {produced > 0 && (
+            <Stat
+              label="Output"
+              /* A preparatory stage counts in drums or kg, not units —
+                 printing "units" against 3 drums is a wrong number, not a
+                 vague one. Production carries no qty_unit and falls back. */
+              value={`${fmt(entry.qty)} ${entry.qty_unit ?? "units"}`}
+              tone="text-brand"
+            />
+          )}
+          {rejected > 0 && (
+            <Stat
+              label="Rejected"
+              value={fmt(entry.qty_rejected)}
+              tone="text-danger-deep"
+            />
+          )}
+          {entry.target_speed ? (
+            <Stat
+              label={`Speed${entry.speed_unit ? ` · ${entry.speed_unit}` : ""}`}
+              value={`${entry.actual_speed ?? "—"} / ${entry.target_speed}`}
+              suffix={
+                perf !== null ? (
+                  <span
+                    className={cn(
+                      "font-semibold",
+                      perf >= 90
+                        ? "text-teal"
+                        : perf >= 70
+                          ? "text-warn"
+                          : "text-danger",
+                    )}
+                  >
+                    {perf}%
+                  </span>
+                ) : null
+              }
+            />
+          ) : null}
+        </dl>
+      )}
+
+      {/* ── Who, and on what ───────────────────────────────────────────
+          The people and the machine, last: needed to follow an entry up,
+          never the reason anyone stops at one. */}
+      {(people || entry.equipment_no) && (
+        <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-ink-5">
+          {people && (
+            <span className="inline-flex min-w-0 items-center gap-1">
+              <Users className="size-3 shrink-0 text-ink-6" aria-hidden />
+              <span className="truncate">{people}</span>
+            </span>
+          )}
+          {people && entry.equipment_no && (
+            <span className="text-ink-6" aria-hidden>
+              ·
+            </span>
+          )}
+          {entry.equipment_no && (
+            <span className="inline-flex items-center gap-1 font-mono">
+              <Cog className="size-3 shrink-0 text-ink-6" aria-hidden />
+              {entry.equipment_no}
+            </span>
+          )}
+        </p>
+      )}
+
+      {/* ── What was said about it ─────────────────────────────────────
+          Every line of prose the entry carries, gathered under one rule so
+          they read as annotations on the record rather than as more of it. */}
+      {(entry.slow_reason ||
+        overrun?.overrun_note ||
+        entry.comment ||
+        entry.amend_note) && (
+        <div className="mt-1.5 space-y-1 border-l-2 border-line-soft pl-2">
+          {entry.slow_reason && (
+            <p className="text-[11px] leading-snug break-words text-ink-4">
+              Ran slow: <em>{entry.slow_reason}</em>
+            </p>
+          )}
           {/* Once explained, the reason and the name stay on the entry. The
-            flag is gone; the record of why is not. */}
+              flag is gone; the record of why is not. */}
           {overrun?.overrun_note && (
             <p className="text-[11px] leading-snug break-words text-warn-deep">
-              ↳ Overrun: {overrun.overrun_note}
+              Overrun: {overrun.overrun_note}
               {overrun.overrun_cleared_by_name && (
                 <span className="text-warn-ink">
                   {" "}
@@ -313,71 +444,60 @@ function FeedRow({
               )}
             </p>
           )}
-
-          <p className="text-[11px] text-ink-5">
-            {entry.start_time?.slice(0, 5) ?? "—"}
-            {entry.end_time && ` → ${entry.end_time.slice(0, 5)}`}
-            {entry.duration_minutes > 0 &&
-              ` · ${formatMinutes(entry.duration_minutes)}`}
-            {entry.equipment_no && ` · ${entry.equipment_no}`}
-            {entry.operators?.length > 0 && ` · ${entry.operators.join(" / ")}`}
-          </p>
-
-          {entry.target_speed ? (
-            <p className="text-[11px] text-ink-4">
-              Speed: {entry.actual_speed ?? "—"} / {entry.target_speed}{" "}
-              {entry.speed_unit ?? ""}
-              {perf !== null && (
-                <span
-                  className={cn(
-                    "font-semibold",
-                    perf >= 90
-                      ? "text-teal"
-                      : perf >= 70
-                        ? "text-warn"
-                        : "text-danger",
-                  )}
-                >
-                  {" "}
-                  · {perf}%
-                </span>
-              )}
-              {entry.slow_reason && (
-                <em className="text-ink-5"> · {entry.slow_reason}</em>
-              )}
-            </p>
-          ) : null}
-
-          {Number(entry.qty_rejected ?? 0) > 0 && (
-            <p className="text-[11px] font-medium text-danger-deep">
-              ⚠ {fmt(entry.qty_rejected)} rejected / rework
-            </p>
-          )}
-
           {entry.comment && (
-            <p className="line-clamp-3 text-[11px] break-words italic text-ink-4">
+            <p className="line-clamp-3 text-[11px] leading-snug break-words italic text-ink-4">
               {entry.comment}
             </p>
           )}
-
           {entry.amend_note && (
-            <p className="line-clamp-3 text-[11px] break-words whitespace-pre-line text-violet">
-              ↳ {entry.amend_note}
+            <p className="line-clamp-3 text-[11px] leading-snug break-words whitespace-pre-line text-violet">
+              {entry.amend_note}
             </p>
           )}
         </div>
-
-        {canAmend && (
-          <button
-            type="button"
-            onClick={onAmend}
-            title="Attach a correction note — the original entry is preserved"
-            className="h-6 shrink-0 self-start rounded-md border border-line bg-surface px-1.5 text-[10px] font-semibold text-ink-5 opacity-0 transition hover:border-warn-deep hover:bg-warn-tint hover:text-warn-deep focus-visible:opacity-100 group-hover:opacity-100"
-          >
-            Amend
-          </button>
-        )}
-      </div>
+      )}
     </li>
+  );
+}
+
+/** Every badge on a feed card, so none of them drifts a pixel from the rest. */
+const BADGE =
+  "rounded-full px-1.5 py-0.5 text-[9.5px] font-bold whitespace-nowrap";
+
+/**
+ * One measurement, labelled.
+ *
+ * A tile rather than a phrase: the label is what makes "1" readable without a
+ * sentence around it, and a fixed shape is what lets three cards be compared
+ * by looking rather than by reading.
+ */
+function Stat({
+  label,
+  value,
+  tone,
+  suffix,
+}: {
+  label: string;
+  value: string;
+  /** Colour for the value — the measurement's own meaning, not decoration. */
+  tone?: string;
+  /** Trails the value inside the same tile: the performance percentage. */
+  suffix?: React.ReactNode;
+}) {
+  return (
+    <div className="min-w-0 rounded-lg bg-sunken px-2 py-1 ring-1 ring-line-soft/60">
+      <dt className="text-[9px] font-semibold tracking-[0.05em] text-ink-5 uppercase">
+        {label}
+      </dt>
+      <dd
+        className={cn(
+          "truncate font-mono text-[12px] font-semibold tracking-tight",
+          tone ?? "text-ink-2",
+        )}
+      >
+        {value}
+        {suffix && <span className="ml-1">{suffix}</span>}
+      </dd>
+    </div>
   );
 }

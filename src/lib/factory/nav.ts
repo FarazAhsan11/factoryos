@@ -2,6 +2,7 @@ import {
   Activity,
   BarChart3,
   Boxes,
+  FileSearch,
   Lightbulb,
   LayoutGrid,
   ListPlus,
@@ -85,6 +86,17 @@ export const FACTORY_NAV: NavSection[] = [
         label: "Resources",
         icon: Boxes,
         roles: MANAGER_UP,
+        ready: true,
+      },
+      // One batch, everything that happened to it — the shift log, the issues
+      // and the maintenance requests that name it, gathered and read-only.
+      // Everyone, because the question it answers ("what happened to 47004?")
+      // is asked by whoever is holding the batch, not by whoever manages it.
+      {
+        href: "/batch",
+        label: "Batch record",
+        icon: FileSearch,
+        roles: ALL,
         ready: true,
       },
     ],

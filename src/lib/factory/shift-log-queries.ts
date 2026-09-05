@@ -74,6 +74,9 @@ const COLUMNS = `
 export const logKeys = {
   /** Prefix covering every cached day — invalidate this after an insert. */
   factory: (factoryId: string) => ["shift_log_entries", factoryId] as const,
+  /** One batch's whole history — the batch record's first tab. */
+  batch: (factoryId: string, batchNo: string) =>
+    ["shift_log_entries", factoryId, "batch", batchNo.toLowerCase()] as const,
   /** One key per factory + working day: the feed is a day's worth of shift. */
   day: (factoryId: string, date: string) =>
     ["shift_log_entries", factoryId, date] as const,
@@ -201,6 +204,34 @@ export async function fetchBatchEntries(
 
   if (error) throw new Error(error.message);
   return data ?? [];
+}
+
+/**
+ * Every entry ever filed against one batch, newest first.
+ *
+ * Whole rows, unlike `fetchBatchEntries` above, which reads four columns for
+ * a running total. The batch record shows the entries themselves, so it needs
+ * what the feed needs.
+ *
+ * `ilike` rather than `eq`, matching how the log resolves a typed batch
+ * number: nobody types the case consistently, and a record that misses half a
+ * batch's history because someone wrote `47004a` is worse than no record.
+ */
+export async function fetchBatchLog(
+  factoryId: string,
+  batchNo: string,
+): Promise<LogEntry[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("shift_log_entries")
+    .select(COLUMNS)
+    .eq("factory_id", factoryId)
+    .ilike("batch_no", batchNo.trim())
+    .order("log_date", { ascending: false })
+    .order("start_time", { ascending: false, nullsFirst: false });
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as unknown as LogEntry[];
 }
 
 /** Minutes between two HH:MM clocks, wrapping past midnight. */

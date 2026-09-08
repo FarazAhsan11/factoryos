@@ -604,7 +604,6 @@ export function NewBatchDialog({
                     </Field>
                     <Field
                       label="Overage %"
-                      note="extra made on purpose"
                       optional
                       htmlFor="nb-overage-combined"
                       error={errors.overagePct?.message}

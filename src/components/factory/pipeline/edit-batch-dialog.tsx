@@ -356,7 +356,6 @@ export function EditBatchDialog({
                   </Field>
                   <Field
                     label="Overage %"
-                    note="extra made on purpose"
                     optional
                     htmlFor="eb-overage-combined"
                     error={errors.overagePct?.message}

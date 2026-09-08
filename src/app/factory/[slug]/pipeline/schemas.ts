@@ -23,27 +23,35 @@ import { z } from "zod";
 export const BATCH_TYPES = [
   {
     value: "manufacturing",
-    label: "Manufacturing",
+    label: "Bulk Production",
     /** Shown on the type card in step one. */
     description:
-      "Bulk production — mixing, encapsulation, compression, coating.",
+      "Bulk only — mixing, encapsulation, compression, coating. Finished lots draw from it.",
     /** Shown once the type is chosen, above its own fields. */
-    hint: "Its required quantity is the bulk target. Packing batches draw from it.",
+    hint: "Its required quantity is the bulk target. Finished lots draw from it.",
   },
   {
     value: "packing",
-    label: "Packing",
+    label: "Finished Lot",
     description: "Fills finished goods from bulk — bottles, sachets, pouches.",
     hint: "Needs a pack size: the units of bulk per container is the only thing that converts one to the other.",
   },
   {
     value: "combined",
-    label: "Combined",
-    description: "Manufacturing and packing under one batch number.",
+    label: "Single Batch",
+    description: "Made and packed under one batch number.",
     hint: "The whole batch, start to finish, on one number — how every batch worked before batch families.",
   },
 ] as const;
 
+/**
+ * The stored values are **not** the labels, and deliberately so. `manufacturing
+ * | packing | combined` are what `pipeline_jobs_batch_type_known` (0031) checks
+ * and what every query, guard and view in the database reads; "Bulk Production
+ * | Finished Lot | Single Batch" are what this plant calls them. Renaming the
+ * label is a wording change; renaming a value is a migration plus every row
+ * ever written.
+ */
 export type BatchType = (typeof BATCH_TYPES)[number]["value"];
 
 /** The three values as a zod-ready tuple, derived so the two can't drift. */
@@ -368,6 +376,17 @@ export const stageSchema = z.object({
    * tag and so changes which stage completes the order.
    */
   canRunParallel: z.boolean().optional(),
+  /**
+   * The day this stage is planned to run — `YYYY-MM-DD`, the shape both
+   * `DateField` and Postgres speak, exactly like the batch's `dueDate`.
+   *
+   * Optional for the same reason `unitId` is: a route is written before the
+   * days are settled, and refusing the stage until one is picked would only
+   * teach planners to type any date to get past the form. Advisory once set —
+   * the shift log records when the work actually happened and does not have
+   * to agree.
+   */
+  plannedDate: z.union([z.literal(""), z.iso.date()]).optional(),
   targetQty: optionalQty,
   targetUnit: z.enum(STAGE_UNITS, { error: "Pick a unit." }),
   /**
@@ -388,6 +407,64 @@ export const stageSchema = z.object({
 
 export type StageValues = z.input<typeof stageSchema>;
 export type StageParsed = z.output<typeof stageSchema>;
+
+/**
+ * One stage, edited from the Schedule.
+ *
+ * The plan dialog edits a stage three fields at a time, inline, because that
+ * is what planning a route needs — add, target, reorder, next. A planner
+ * working a room queue has the opposite shape of question: one stage, all of
+ * it, because they are deciding when it runs and what to tell the floor about
+ * it. Same row, same rules, a different form over it.
+ *
+ * `processId` is absent, and that is the point: which activity a stage *is*
+ * is not editable. Changing it would silently re-point every shift-log entry
+ * already filed against the stage at a different process, and the sanctioned
+ * way to that answer is removing the stage and adding the right one — which
+ * the database refuses once anything has been logged, exactly as it should.
+ */
+export const stageEditSchema = z
+  .object({
+    unitId: z.union([z.uuid(), z.literal("")]).optional(),
+    plannedDate: z.union([z.literal(""), z.iso.date()]).optional(),
+    /** The planner's estimate of when it comes off the room (migration 0040). */
+    estFinishDate: z.union([z.literal(""), z.iso.date()]).optional(),
+    canRunParallel: z.boolean().optional(),
+    targetQty: optionalQty,
+    targetUnit: z.enum(STAGE_UNITS, { error: "Pick a unit." }),
+    label: z
+      .string()
+      .trim()
+      .max(60, "Keep the label under 60 characters.")
+      .optional(),
+    workOrder: z.string().trim().max(40).optional(),
+    packSize: optionalQty,
+    /** The queue's comment column — why this line sits where it does. */
+    planningNote: z
+      .string()
+      .trim()
+      .max(500, "Keep the note under 500 characters.")
+      .optional(),
+  })
+  /**
+   * A stage cannot come off the room before it goes on.
+   *
+   * Checked here and deliberately *not* in the database (see migration 0040):
+   * as a constraint it would refuse the wrong field — a planner pulling a
+   * start date forward past a stale estimate would have the start rejected,
+   * when the estimate is the thing that is out of date. As a form rule it
+   * lands on the two fields together, where the person can see both.
+   */
+  .refine(
+    (v) => !v.plannedDate || !v.estFinishDate || v.estFinishDate >= v.plannedDate,
+    {
+      message: "The estimated finish is before the planned start.",
+      path: ["estFinishDate"],
+    },
+  );
+
+export type StageEditValues = z.input<typeof stageEditSchema>;
+export type StageEditParsed = z.output<typeof stageEditSchema>;
 
 /**
  * A supervisor's sign-off on a finished stage.

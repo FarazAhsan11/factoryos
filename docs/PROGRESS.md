@@ -308,6 +308,94 @@ a per-stage progress bar plus the stage picker that appears only when it is
 needed. The three customer scenarios — one batch, child batches, work orders —
 all run on this one model.
 
+### 9d. A stage runs on a day — migration 0039
+
+`0035` gave a stage the room it is planned to run in and said that column is
+what a Room schedule tab would read. Half the question was missing: a plan
+could say *what*, *how much* and *where*, and never *when*. The only date on
+the whole route was the batch's `due_date` — one date for four stages.
+
+`batch_stages.planned_date` is that missing half, and it is advisory for
+exactly the reason `unit_id` is. Nothing gates issuing on it, and the shift log
+never checks an entry's `log_date` against it: a stage slips a day, runs across
+a night shift, or is pulled forward when a machine frees up, and refusing the
+entry would put the plan ahead of the work. The plan says when it was *meant*
+to happen; the log says when it did.
+
+A `date`, not a timestamptz — this plant plans in days and shifts, the same
+reason `pipeline_jobs.due_date` is one. One column, not a start/end pair: a
+stage that genuinely spans days is already expressible through
+`can_run_parallel` and the accumulating total.
+
+`batch_stages_expanded` carries it along with a computed **`is_behind_plan`** —
+dated, not signed off, and the day has passed. Computed against `current_date`
+in the view like every other clock in the application, because a stored flag
+would need something to run at midnight to stay true.
+
+**UI.** Plan stages picks it up in both places a stage is written: a
+**Planned date** field in the add-stage form, beside the target, and a
+`DateField` in the inline edit row beside the target and room, so a plan is
+re-dated as readily as it is re-targeted. Each stage's line reads
+"Room 17A · 12 Sep 2026 · Pending", or "Not scheduled" where the days have not
+been settled yet, and a stage left behind its date says so in amber.
+
+### 9e. The plan by room — migration 0040, the Schedule tab
+
+Every view in the Pipeline was organised by **batch**: the Kanban card, the
+plan dialog, the families tree. A planner standing in front of the board does
+not have that question. Theirs is *"what is Room 4 doing, and what comes off it
+next"* — the same rows sorted by room and by day, and the one arrangement the
+module could not produce.
+
+`Pipeline → Schedule` is that arrangement, in two views over **one**
+derivation (`buildRoomLanes`, `src/lib/factory/schedule.ts`) so they cannot
+disagree about which rooms are busy or what order a room's work is in:
+
+- **Board** — the glance. One row per busy room, three stages deep, rooms
+  ordered by their soonest dated stage so the nearest coming day is at the top.
+  A stage that is *in progress* heads its lane whatever the calendar says: if
+  its date has slipped behind tomorrow's work, the calendar would otherwise
+  describe a room as free while somebody is standing in it.
+- **Queue** — the work surface. Every stage in every room, with its dates.
+
+A room holding more than three stages says so twice — a `+N more` chip beside
+the count it contradicts, and a tail under the last card — and both hand the
+room to the Queue, scrolled to it and ringed. The board does not grow a fourth
+and fifth column: past three, a row is no longer something anybody reads
+across, and the view that lists everything already exists.
+
+A room with nothing left to run is in neither: a lane of dashes tells a planner
+nothing, and twenty-five of them buries the four rooms that matter. A stage
+with **no room** cannot be drawn in a room either — but it is counted and named
+rather than silently dropped, because a board that quietly omits them
+under-reports the plant's load.
+
+**Migration 0040** adds the two fields a queue asks for that a plan does not.
+`est_finish_date` is when the planner expects the stage *off* the room — not
+`planned_date` (when it goes on), not `completed_at` (a fact, and only after
+the event), and not derivable from the target, since the same 210,000 tablets
+is two days on one machine and five on another. `planning_note` is why a line
+sits where it does: distinct from `yield_notes`, which is part of a sign-off
+and immutable once given, and from the batch's `notes`, which belong to the
+whole order.
+
+There is deliberately **no** `est_finish_date >= planned_date` constraint. It
+is the obvious one and it is wrong: a planner pulling a start date forward past
+a stale estimate would have the *start* refused, which is not the field they
+were fixing. The rule lives in `stageEditSchema` instead, where the message can
+name both fields.
+
+**UI.** Clicking any card or batch number opens `StageEditDialog` — one stage,
+all of it, with the activity and the accumulated total read-only (changing the
+first would re-point every logged entry at a different process; the second is
+maintained from the shift log). The Queue's Est. finish and comment are edited
+**in place** rather than through that dialog: a planner sets twenty of them in
+a sitting, and a dialog open, save and close per number turns twenty seconds
+into five minutes.
+
+Both views read the stages and jobs the workspace already fetches for the
+Kanban board, so the tab costs no extra request.
+
 ---
 
 ## 10. Next steps

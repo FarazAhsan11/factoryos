@@ -239,6 +239,17 @@ export async function createBatchJob(
   const supabase = createClient();
   const packing = values.batchType === "packing";
   const manufacturing = values.batchType === "manufacturing";
+  /**
+   * Which types end in containers, and so carry a pack size and unit.
+   *
+   * A single batch is made *and* packed under one number, so it finishes in
+   * bottles like a finished lot does — and nothing else in the row says how
+   * many units go in one. Safe against the 0031 comment that worried about
+   * this: `bulk_consumed` in `pipeline_jobs_expanded` is gated on
+   * `batch_type = 'packing'`, so a single batch with a pack size draws no
+   * bulk-consumption panel for bulk nobody allocated.
+   */
+  const packs = packing || values.batchType === "combined";
 
   const { data, error } = await supabase
     .from("pipeline_jobs")
@@ -250,12 +261,12 @@ export async function createBatchJob(
       priority: values.priority,
       due_date: values.dueDate || null,
       notes: values.notes || null,
-      // The type-specific columns are sent only for the type that owns them.
-      // A combined batch carrying a pack size would draw a bulk-consumption
-      // panel in the shift log for bulk nobody allocated.
+      // The type-specific columns are sent only for the types that own them.
+      // Drawing on somebody else's bulk stays packing-only; being packed does
+      // not, which is the difference between `packing` and `packs`.
       parent_job_id: packing ? (values.parentJobId ?? null) : null,
-      pack_size: packing ? (values.packSize ?? null) : null,
-      pack_unit: packing ? (values.packUnit ?? null) : null,
+      pack_size: packs ? (values.packSize ?? null) : null,
+      pack_unit: packs ? (values.packUnit ?? null) : null,
       bulk_qty_received: packing ? (values.bulkQtyReceived ?? null) : null,
       market: packing ? (values.market || null) : null,
       bulk_unit: manufacturing ? (values.bulkUnit ?? null) : null,
@@ -305,6 +316,8 @@ export async function updateBatchJob(
   const supabase = createClient();
   const packing = values.batchType === "packing";
   const manufacturing = values.batchType === "manufacturing";
+  /** See `createBatchJob` — a single batch is packed too. */
+  const packs = packing || values.batchType === "combined";
 
   const { error } = await supabase
     .from("pipeline_jobs")
@@ -316,8 +329,8 @@ export async function updateBatchJob(
       // Cleared when the type no longer owns them, so a batch switched from
       // packing to combined stops claiming a parent's bulk.
       parent_job_id: packing ? (values.parentJobId ?? null) : null,
-      pack_size: packing ? (values.packSize ?? null) : null,
-      pack_unit: packing ? (values.packUnit ?? null) : null,
+      pack_size: packs ? (values.packSize ?? null) : null,
+      pack_unit: packs ? (values.packUnit ?? null) : null,
       bulk_qty_received: packing ? (values.bulkQtyReceived ?? null) : null,
       market: packing ? values.market || null : null,
       bulk_unit: manufacturing ? (values.bulkUnit ?? null) : null,

@@ -35,6 +35,30 @@ export interface BatchStage {
   unit_name: string | null;
   /** May start before the stage before it is complete. */
   can_run_parallel: boolean;
+  /**
+   * The day this stage is planned to run, `YYYY-MM-DD`, or null when the plan
+   * has not been dated yet. Advisory like `unit_id` — the log says when the
+   * work happened, this says when it was meant to.
+   */
+  planned_date: string | null;
+  /**
+   * That day has passed with the stage unfinished. Computed in the view
+   * against `current_date`, never stored: a stored flag needs something to run
+   * at midnight to stay true.
+   */
+  is_behind_plan: boolean;
+  /**
+   * When the planner expects this stage to come off the room (0040).
+   *
+   * An estimate, not a record — `completed_at` is what actually happened — and
+   * deliberately not tied to `planned_date` by any constraint, so pulling a
+   * start date forward is never refused by a stale estimate.
+   */
+  est_finish_date: string | null;
+  /** The planner's note on this line of the room queue. */
+  planning_note: string | null;
+  /** The estimate has passed and the stage is still on the room. */
+  is_overrunning: boolean;
   target_qty: number | null;
   target_unit: string;
   pack_size: number | null;
@@ -86,6 +110,7 @@ const COLUMNS = `
   can_run_parallel, started_at, completed_at, yield_pct, yield_acceptable,
   yield_notes, previous_target_qty, created_at,
   tolerance_pct, effective_tolerance_pct, allowed_qty, is_over_tolerance,
+  planned_date, is_behind_plan, est_finish_date, planning_note, is_overrunning,
   process_name, process_category, unit_name, completed_by_name
 `;
 
@@ -151,6 +176,9 @@ export async function createBatchStage(
       process_id: values.processId,
       unit_id: values.unitId || null,
       can_run_parallel: values.canRunParallel ?? false,
+      // "" is the cleared date field, which means "not scheduled yet" — a
+      // real answer, and the one a plan starts life with.
+      planned_date: values.plannedDate || null,
       label: values.label?.trim() || null,
       work_order: values.workOrder?.trim() || null,
       target_qty: values.targetQty ?? null,
@@ -197,6 +225,9 @@ export async function updateBatchStage(
       | "tolerance_pct"
       | "unit_id"
       | "can_run_parallel"
+      | "planned_date"
+      | "est_finish_date"
+      | "planning_note"
     >
   >,
 ): Promise<void> {

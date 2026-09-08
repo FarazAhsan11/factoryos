@@ -6,13 +6,13 @@ import type { AdminTab } from "@/lib/factory/admin-tabs";
  * this array, and a value exported from a client module would reach it as a
  * reference rather than data.
  *
- * The three unready tabs are listed rather than omitted so the shape of the
- * module is visible on screen — the same choice the sidebar makes in `nav.ts`.
+ * The unready tabs are listed rather than omitted so the shape of the module
+ * is visible on screen — the same choice the sidebar makes in `nav.ts`.
  */
 export const PIPELINE_TABS: AdminTab[] = [
   { value: "board", label: "Kanban board", ready: true },
+  { value: "schedule", label: "Schedule", ready: true },
   { value: "families", label: "Batch families", ready: true },
-  { value: "rooms", label: "Room schedule", ready: false },
   { value: "gantt", label: "Gantt", ready: false },
   { value: "archive", label: "Archive", ready: false },
 ];

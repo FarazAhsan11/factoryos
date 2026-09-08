@@ -368,6 +368,17 @@ export const stageSchema = z.object({
    * tag and so changes which stage completes the order.
    */
   canRunParallel: z.boolean().optional(),
+  /**
+   * The day this stage is planned to run — `YYYY-MM-DD`, the shape both
+   * `DateField` and Postgres speak, exactly like the batch's `dueDate`.
+   *
+   * Optional for the same reason `unitId` is: a route is written before the
+   * days are settled, and refusing the stage until one is picked would only
+   * teach planners to type any date to get past the form. Advisory once set —
+   * the shift log records when the work actually happened and does not have
+   * to agree.
+   */
+  plannedDate: z.union([z.literal(""), z.iso.date()]).optional(),
   targetQty: optionalQty,
   targetUnit: z.enum(STAGE_UNITS, { error: "Pick a unit." }),
   /**

@@ -50,6 +50,8 @@ import {
   plannedOverOrder,
 } from "@/lib/factory/batch-stage-queries";
 import { SelectField } from "@/components/ui/select-field";
+import { DateField } from "@/components/ui/date-picker";
+import { formatReportDate } from "@/lib/factory/shift-report-queries";
 import { pipelineKeys, type PipelineJob } from "@/lib/factory/pipeline-queries";
 import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
 import { cn } from "@/lib/utils";
@@ -147,16 +149,19 @@ export function PlanStagesDialog({
       target,
       unitId,
       parallel,
+      plannedDate,
     }: {
       id: string;
       target: number;
       unitId: string | null;
       parallel: boolean;
+      plannedDate: string | null;
     }) =>
       updateBatchStage(id, {
         target_qty: target,
         unit_id: unitId,
         can_run_parallel: parallel,
+        planned_date: plannedDate,
         // `tolerance_pct` is deliberately not written here. The tolerance is
         // decided once, on the batch, and every stage inherits it — a plan
         // whose stages each carry their own ceiling is a plan nobody can read
@@ -193,6 +198,14 @@ export function PlanStagesDialog({
    * has been logged against it (`batch_stages_guard_delete`).
    */
   const [editParallel, setEditParallel] = useState(false);
+  /**
+   * The day the stage being edited is planned to run.
+   *
+   * Held beside the target rather than behind a separate control, because a
+   * date is the half of scheduling that moves most: a machine frees up, a
+   * stage slips, and the plan is re-dated far more often than it is re-targeted.
+   */
+  const [editDate, setEditDate] = useState("");
 
   const move = useMutation({
     mutationFn: ({ a, b }: { a: BatchStage; b: BatchStage }) =>
@@ -337,11 +350,14 @@ export function PlanStagesDialog({
                   onEditRoom={setEditRoom}
                   editParallel={editParallel}
                   onEditParallel={setEditParallel}
+                  editDate={editDate}
+                  onEditDate={setEditDate}
                   onBeginEdit={() => {
                     setEditing(stage.id);
                     setEditQty(stage.target_qty ? String(stage.target_qty) : "");
                     setEditRoom(stage.unit_id ?? "");
                     setEditParallel(stage.can_run_parallel);
+                    setEditDate(stage.planned_date ?? "");
                   }}
                   onCancelEdit={() => setEditing(null)}
                   onSaveEdit={() => {
@@ -355,6 +371,7 @@ export function PlanStagesDialog({
                       target: value,
                       unitId: editRoom || null,
                       parallel: editParallel,
+                      plannedDate: editDate || null,
                     });
                   }}
                   onMoveUp={
@@ -441,6 +458,8 @@ function StageRow({
   onEditRoom,
   editParallel,
   onEditParallel,
+  editDate,
+  onEditDate,
   onBeginEdit,
   onCancelEdit,
   onSaveEdit,
@@ -462,6 +481,8 @@ function StageRow({
   onEditRoom: (v: string) => void;
   editParallel: boolean;
   onEditParallel: (v: boolean) => void;
+  editDate: string;
+  onEditDate: (v: string) => void;
   onBeginEdit: () => void;
   onCancelEdit: () => void;
   onSaveEdit: () => void;
@@ -514,6 +535,24 @@ function StageRow({
             </p>
             <p className="mt-0.5 text-[11px] text-ink-5">
               {stage.unit_name ?? "No room"}
+              {" · "}
+              {/* Where and when, together: they are the two halves of the
+                  question a planner holds this board to answer — is Room 9
+                  double-booked on Thursday? A stage with neither reads
+                  "No room · Not scheduled", which is the honest state of a
+                  plan whose days have not been settled. */}
+              {stage.planned_date ? (
+                <span
+                  className={cn(
+                    stage.is_behind_plan && "font-semibold text-warn-ink",
+                  )}
+                >
+                  {formatReportDate(stage.planned_date)}
+                  {stage.is_behind_plan ? " · behind plan" : ""}
+                </span>
+              ) : (
+                "Not scheduled"
+              )}
               {" · "}
               {style.label}
               {stage.target_qty
@@ -641,6 +680,15 @@ function StageRow({
                 options={rooms.map((r) => ({ value: r.id, label: r.name }))}
                 className="w-40"
               />
+              {/* Clearable, because "not scheduled yet" is a real answer a
+                  planner comes back to — not an unfilled field. */}
+              <DateField
+                ariaLabel="Planned date"
+                value={editDate}
+                onChange={onEditDate}
+                placeholder="Not scheduled"
+                className="w-44"
+              />
               {/* Meaningless on the first stage, which has nothing before
                   it to overlap and is startable regardless. */}
               {index > 0 && (
@@ -662,7 +710,7 @@ function StageRow({
           ) : (
             <>
               <SmallButton onClick={onBeginEdit}>
-                {stage.target_qty ? "Edit stage" : "Set target & room"}
+                {stage.target_qty ? "Edit stage" : "Set target, room & date"}
               </SmallButton>
               {stage.status === "pending" && canStart && (
                 <SmallButton onClick={onStart}>
@@ -705,6 +753,7 @@ function AddStageForm({
     defaultValues: {
       processId: "",
       unitId: "",
+      plannedDate: "",
       canRunParallel: false,
       targetQty: undefined,
       targetUnit: "units",
@@ -716,6 +765,7 @@ function AddStageForm({
 
   const firstError =
     errors.processId?.message ??
+    errors.plannedDate?.message ??
     errors.targetUnit?.message ??
     errors.targetQty?.message ??
     errors.label?.message;
@@ -781,7 +831,29 @@ function AddStageForm({
         </div>
       </div>
 
-      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+      <div className="mt-2 grid gap-2 sm:grid-cols-3">
+        {/* The day this stage is meant to run — left blank as readily as the
+            room: a route is written before the days are settled, and the date
+            is edited back onto the row later. Controlled, so a `Controller`
+            rather than `register` — the same wiring `SelectField` needs. */}
+        <div className="space-y-1">
+          <label htmlFor="st-date" className={LABEL}>
+            Planned date
+          </label>
+          <Controller
+            name="plannedDate"
+            control={control}
+            render={({ field }) => (
+              <DateField
+                id="st-date"
+                value={field.value ?? ""}
+                onChange={field.onChange}
+                ariaInvalid={Boolean(errors.plannedDate)}
+                placeholder="Not scheduled"
+              />
+            )}
+          />
+        </div>
         <div className="space-y-1">
           <label htmlFor="st-target" className={LABEL}>
             Target
@@ -884,7 +956,9 @@ function AddStageForm({
       <p className="mt-2 text-[10.5px] text-ink-5">
         Label or work order only where the batch runs this activity more than
         once — Packing 30&rsquo;s, 60&rsquo;s, 120&rsquo;s. The stage added
-        last completes the order.
+        last completes the order. The room and date are the plan&rsquo;s
+        intent — the shift log records where and when the work actually
+        happened, and does not have to agree.
       </p>
 
       {firstError && (

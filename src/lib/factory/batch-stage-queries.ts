@@ -47,6 +47,18 @@ export interface BatchStage {
    * at midnight to stay true.
    */
   is_behind_plan: boolean;
+  /**
+   * When the planner expects this stage to come off the room (0040).
+   *
+   * An estimate, not a record — `completed_at` is what actually happened — and
+   * deliberately not tied to `planned_date` by any constraint, so pulling a
+   * start date forward is never refused by a stale estimate.
+   */
+  est_finish_date: string | null;
+  /** The planner's note on this line of the room queue. */
+  planning_note: string | null;
+  /** The estimate has passed and the stage is still on the room. */
+  is_overrunning: boolean;
   target_qty: number | null;
   target_unit: string;
   pack_size: number | null;
@@ -98,7 +110,7 @@ const COLUMNS = `
   can_run_parallel, started_at, completed_at, yield_pct, yield_acceptable,
   yield_notes, previous_target_qty, created_at,
   tolerance_pct, effective_tolerance_pct, allowed_qty, is_over_tolerance,
-  planned_date, is_behind_plan,
+  planned_date, is_behind_plan, est_finish_date, planning_note, is_overrunning,
   process_name, process_category, unit_name, completed_by_name
 `;
 
@@ -214,6 +226,8 @@ export async function updateBatchStage(
       | "unit_id"
       | "can_run_parallel"
       | "planned_date"
+      | "est_finish_date"
+      | "planning_note"
     >
   >,
 ): Promise<void> {

@@ -401,6 +401,64 @@ export type StageValues = z.input<typeof stageSchema>;
 export type StageParsed = z.output<typeof stageSchema>;
 
 /**
+ * One stage, edited from the Schedule.
+ *
+ * The plan dialog edits a stage three fields at a time, inline, because that
+ * is what planning a route needs — add, target, reorder, next. A planner
+ * working a room queue has the opposite shape of question: one stage, all of
+ * it, because they are deciding when it runs and what to tell the floor about
+ * it. Same row, same rules, a different form over it.
+ *
+ * `processId` is absent, and that is the point: which activity a stage *is*
+ * is not editable. Changing it would silently re-point every shift-log entry
+ * already filed against the stage at a different process, and the sanctioned
+ * way to that answer is removing the stage and adding the right one — which
+ * the database refuses once anything has been logged, exactly as it should.
+ */
+export const stageEditSchema = z
+  .object({
+    unitId: z.union([z.uuid(), z.literal("")]).optional(),
+    plannedDate: z.union([z.literal(""), z.iso.date()]).optional(),
+    /** The planner's estimate of when it comes off the room (migration 0040). */
+    estFinishDate: z.union([z.literal(""), z.iso.date()]).optional(),
+    canRunParallel: z.boolean().optional(),
+    targetQty: optionalQty,
+    targetUnit: z.enum(STAGE_UNITS, { error: "Pick a unit." }),
+    label: z
+      .string()
+      .trim()
+      .max(60, "Keep the label under 60 characters.")
+      .optional(),
+    workOrder: z.string().trim().max(40).optional(),
+    packSize: optionalQty,
+    /** The queue's comment column — why this line sits where it does. */
+    planningNote: z
+      .string()
+      .trim()
+      .max(500, "Keep the note under 500 characters.")
+      .optional(),
+  })
+  /**
+   * A stage cannot come off the room before it goes on.
+   *
+   * Checked here and deliberately *not* in the database (see migration 0040):
+   * as a constraint it would refuse the wrong field — a planner pulling a
+   * start date forward past a stale estimate would have the start rejected,
+   * when the estimate is the thing that is out of date. As a form rule it
+   * lands on the two fields together, where the person can see both.
+   */
+  .refine(
+    (v) => !v.plannedDate || !v.estFinishDate || v.estFinishDate >= v.plannedDate,
+    {
+      message: "The estimated finish is before the planned start.",
+      path: ["estFinishDate"],
+    },
+  );
+
+export type StageEditValues = z.input<typeof stageEditSchema>;
+export type StageEditParsed = z.output<typeof stageEditSchema>;
+
+/**
  * A supervisor's sign-off on a finished stage.
  *
  * No "signed off by" field, and its absence is the design — the same argument

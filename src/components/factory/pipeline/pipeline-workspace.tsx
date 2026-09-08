@@ -13,6 +13,7 @@ import { PlanStagesDialog } from "@/components/factory/pipeline/plan-stages-dial
 import { NewBatchDialog } from "@/components/factory/pipeline/new-batch-dialog";
 import { NewJobDialog } from "@/components/factory/pipeline/new-job-dialog";
 import { PipelineBoard } from "@/components/factory/pipeline/pipeline-board";
+import { ScheduleView } from "@/components/factory/pipeline/schedule/schedule-view";
 import {
   batchStageKeys,
   fetchFactoryStages,
@@ -183,7 +184,11 @@ export function PipelineWorkspace({
         onSelect={setTab}
       />
 
-      {!isPending && unissued.length > 0 && (
+      {/* Not on the Schedule: "open a card to do it" is an instruction about
+          the Kanban board, and the Schedule is a room view with no cards to
+          open — so on that tab the banner is a permanent strip of advice
+          nobody can act on where they are standing. */}
+      {!isPending && tab !== "schedule" && unissued.length > 0 && (
         <div className="mb-4 flex shrink-0 items-start gap-2.5 rounded-xl border border-warn-line bg-warn-tint px-4 py-3 text-sm text-warn-ink shadow-[inset_0_1px_2px_rgb(180_83_9/0.06)]">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
           <p>
@@ -220,6 +225,15 @@ export function PipelineWorkspace({
               : "A manager adds batches from the product catalogue."}
           </p>
         </div>
+      ) : tab === "schedule" ? (
+        <ScheduleView
+          stages={stages}
+          jobs={jobs}
+          factoryId={factoryId}
+          unitWord={units.singular}
+          canManage={canManage}
+          onRefresh={refresh}
+        />
       ) : tab === "families" ? (
         <BatchFamilies
           jobs={jobs}

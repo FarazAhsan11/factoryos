@@ -23,27 +23,35 @@ import { z } from "zod";
 export const BATCH_TYPES = [
   {
     value: "manufacturing",
-    label: "Manufacturing",
+    label: "Bulk Production",
     /** Shown on the type card in step one. */
     description:
-      "Bulk production — mixing, encapsulation, compression, coating.",
+      "Bulk only — mixing, encapsulation, compression, coating. Finished lots draw from it.",
     /** Shown once the type is chosen, above its own fields. */
-    hint: "Its required quantity is the bulk target. Packing batches draw from it.",
+    hint: "Its required quantity is the bulk target. Finished lots draw from it.",
   },
   {
     value: "packing",
-    label: "Packing",
+    label: "Finished Lot",
     description: "Fills finished goods from bulk — bottles, sachets, pouches.",
     hint: "Needs a pack size: the units of bulk per container is the only thing that converts one to the other.",
   },
   {
     value: "combined",
-    label: "Combined",
-    description: "Manufacturing and packing under one batch number.",
+    label: "Single Batch",
+    description: "Made and packed under one batch number.",
     hint: "The whole batch, start to finish, on one number — how every batch worked before batch families.",
   },
 ] as const;
 
+/**
+ * The stored values are **not** the labels, and deliberately so. `manufacturing
+ * | packing | combined` are what `pipeline_jobs_batch_type_known` (0031) checks
+ * and what every query, guard and view in the database reads; "Bulk Production
+ * | Finished Lot | Single Batch" are what this plant calls them. Renaming the
+ * label is a wording change; renaming a value is a migration plus every row
+ * ever written.
+ */
 export type BatchType = (typeof BATCH_TYPES)[number]["value"];
 
 /** The three values as a zod-ready tuple, derived so the two can't drift. */

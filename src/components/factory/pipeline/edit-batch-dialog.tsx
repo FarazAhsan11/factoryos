@@ -254,7 +254,7 @@ export function EditBatchDialog({
             {isManufacturing && (
               <TypeSection
                 icon={Beaker}
-                title="Manufacturing details"
+                title="Bulk production details"
                 tone="border-warn-line bg-warn-tint"
               >
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -302,37 +302,84 @@ export function EditBatchDialog({
               </TypeSection>
             )}
 
+            {/* The same three fields New batch offers. A value that can be
+                set at creation and not corrected afterwards is the drift this
+                dialog exists to prevent — the reason both forms share
+                `batchFields` in the first place. */}
             {type === "combined" && (
               <TypeSection
                 icon={RefreshCw}
-                title="Combined details"
+                title="Single batch details"
                 tone="border-teal-line bg-teal-soft"
               >
-                <Field
-                  label="Overage %"
-                  note="extra made on purpose"
-                  optional
-                  htmlFor="eb-overage-combined"
-                  error={errors.overagePct?.message}
-                >
-                  <input
-                    id="eb-overage-combined"
-                    type="number"
-                    step="any"
-                    min={0}
-                    max={100}
-                    placeholder="e.g. 4"
-                    className={cn(FIELD, MONO, "sm:max-w-[12rem]")}
-                    {...register("overagePct", { valueAsNumber: true })}
-                  />
-                </Field>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <Field
+                    label="Pack size"
+                    note="units per container"
+                    optional
+                    htmlFor="eb-pack-size-combined"
+                    error={errors.packSize?.message}
+                  >
+                    <input
+                      id="eb-pack-size-combined"
+                      type="number"
+                      step="any"
+                      min={0}
+                      placeholder="e.g. 60"
+                      className={cn(FIELD, MONO)}
+                      {...register("packSize", { valueAsNumber: true })}
+                    />
+                  </Field>
+                  <Field
+                    label="Pack unit"
+                    optional
+                    htmlFor="eb-pack-unit-combined"
+                    error={errors.packUnit?.message}
+                  >
+                    <Controller
+                      name="packUnit"
+                      control={control}
+                      render={({ field }) => (
+                        <SelectField
+                          id="eb-pack-unit-combined"
+                          value={field.value ?? ""}
+                          onChange={field.onChange}
+                          onBlur={field.onBlur}
+                          clearable
+                          options={PACK_UNITS.map((unit) => ({
+                            value: unit,
+                            label: unit,
+                          }))}
+                        />
+                      )}
+                    />
+                  </Field>
+                  <Field
+                    label="Overage %"
+                    note="extra made on purpose"
+                    optional
+                    htmlFor="eb-overage-combined"
+                    error={errors.overagePct?.message}
+                  >
+                    <input
+                      id="eb-overage-combined"
+                      type="number"
+                      step="any"
+                      min={0}
+                      max={100}
+                      placeholder="e.g. 4"
+                      className={cn(FIELD, MONO)}
+                      {...register("overagePct", { valueAsNumber: true })}
+                    />
+                  </Field>
+                </div>
               </TypeSection>
             )}
 
             {isPacking && (
               <TypeSection
                 icon={Package}
-                title="Packing details"
+                title="Finished lot details"
                 tone="border-brand-line bg-brand-tint"
               >
                 <Field
@@ -626,7 +673,12 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div className={cn("space-y-1.5", className)}>
+    /* A full-height column with the control pushed to the bottom, so a label
+       that wraps to two lines — "Pack size (units per container)" at three
+       across — does not push its input a line lower than its neighbours'.
+       Aligning on the label instead would only work while every label in the
+       row happened to be the same length. */
+    <div className={cn("flex h-full flex-col gap-1.5", className)}>
       <label htmlFor={htmlFor} className={LABEL}>
         {label}
         {optional && (
@@ -640,7 +692,7 @@ function Field({
           </span>
         )}
       </label>
-      {children}
+      <div className="mt-auto">{children}</div>
       {error && (
         <p role="alert" className="text-[11px] text-danger-deep">
           {error}

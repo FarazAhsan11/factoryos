@@ -448,7 +448,7 @@ export function NewBatchDialog({
               {isManufacturing && (
                 <TypeSection
                   icon={Beaker}
-                  title="Manufacturing details"
+                  title="Bulk production details"
                   tone="border-warn-line bg-warn-tint"
                 >
                   {/* Two fields, and neither is obvious from its label — the
@@ -515,36 +515,112 @@ export function NewBatchDialog({
                 </TypeSection>
               )}
 
-              {/* ── Combined ───────────────────────────────────────────────
-                  A combined batch manufactures too — it just packs under the
+              {/* ── Single batch ───────────────────────────────────────────
+                  A single batch manufactures too — it just packs under the
                   same number — so it has the same reason to make a few percent
                   extra, and the same need for the over-production flag to know
-                  that. It needs no bulk unit: nothing else draws on it, so
-                  there is no allocation to read back in one. */}
+                  that. It carries a pack size and unit for the same reason a
+                  finished lot does: it ends in containers, and nothing else
+                  says how many units go in one.
+
+                  It needs no bulk unit: nothing else draws on it, so there is
+                  no allocation to read back in one. */}
               {type === "combined" && (
                 <TypeSection
                   icon={RefreshCw}
-                  title="Combined details"
+                  title="Single batch details"
                   tone="border-teal-line bg-teal-soft"
                 >
-                  <Field
-                    label="Overage %"
-                    note="extra made on purpose"
-                    optional
-                    htmlFor="nb-overage-combined"
-                    error={errors.overagePct?.message}
-                  >
-                    <input
-                      id="nb-overage-combined"
-                      type="number"
-                      step="any"
-                      min={0}
-                      max={100}
-                      placeholder="e.g. 4"
-                      className={cn(FIELD, MONO, "sm:max-w-[12rem]")}
-                      {...register("overagePct", { valueAsNumber: true })}
-                    />
-                  </Field>
+                  {/* The ordered quantity is read, not typed. It lives on the
+                      catalogue row as `required_qty`, and a second copy on the
+                      job would give the overrun check (0023) and the plan's
+                      own total different numbers to be right about. Shown here
+                      so the panel still answers "how many", with the one place
+                      it can be changed named. */}
+                  <p className="mb-2.5 text-[11px] leading-snug text-ink-4">
+                    Made and packed under one number.
+                    {picked?.required_qty ? (
+                      <>
+                        {" "}
+                        Ordered:{" "}
+                        <strong className="font-semibold text-ink-2">
+                          {fmt(picked.required_qty)}
+                        </strong>
+                        , from the catalogue — change it in Admin &amp; Settings
+                        → Products.
+                      </>
+                    ) : picked ? (
+                      <>
+                        {" "}
+                        This batch has no ordered quantity yet — set one in
+                        Admin &amp; Settings → Products, or the stage plan has
+                        nothing to be measured against.
+                      </>
+                    ) : null}
+                  </p>
+
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <Field
+                      label="Pack size"
+                      note="units per container"
+                      optional
+                      htmlFor="nb-pack-size-combined"
+                      error={errors.packSize?.message}
+                    >
+                      <input
+                        id="nb-pack-size-combined"
+                        type="number"
+                        step="any"
+                        min={0}
+                        placeholder="e.g. 60"
+                        aria-invalid={Boolean(errors.packSize)}
+                        className={cn(FIELD, MONO)}
+                        {...register("packSize", { valueAsNumber: true })}
+                      />
+                    </Field>
+                    <Field
+                      label="Pack unit"
+                      optional
+                      htmlFor="nb-pack-unit-combined"
+                      error={errors.packUnit?.message}
+                    >
+                      <Controller
+                        name="packUnit"
+                        control={control}
+                        render={({ field }) => (
+                          <SelectField
+                            id="nb-pack-unit-combined"
+                            value={field.value ?? ""}
+                            onChange={field.onChange}
+                            onBlur={field.onBlur}
+                            clearable
+                            options={PACK_UNITS.map((unit) => ({
+                              value: unit,
+                              label: unit,
+                            }))}
+                          />
+                        )}
+                      />
+                    </Field>
+                    <Field
+                      label="Overage %"
+                      note="extra made on purpose"
+                      optional
+                      htmlFor="nb-overage-combined"
+                      error={errors.overagePct?.message}
+                    >
+                      <input
+                        id="nb-overage-combined"
+                        type="number"
+                        step="any"
+                        min={0}
+                        max={100}
+                        placeholder="e.g. 4"
+                        className={cn(FIELD, MONO)}
+                        {...register("overagePct", { valueAsNumber: true })}
+                      />
+                    </Field>
+                  </div>
                   <OverageNote control={control} required={picked?.required_qty} />
                 </TypeSection>
               )}
@@ -553,7 +629,7 @@ export function NewBatchDialog({
               {isPacking && (
                 <TypeSection
                   icon={Package}
-                  title="Packing details"
+                  title="Finished lot details"
                   tone="border-brand-line bg-brand-tint"
                 >
                   {/* The family link is made from the *child's* side, and
@@ -800,7 +876,12 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div className={cn("space-y-1.5", className)}>
+    /* A full-height column with the control pushed to the bottom, so a label
+       that wraps to two lines — "Pack size (units per container)" at three
+       across — does not push its input a line lower than its neighbours'.
+       Aligning on the label instead would only work while every label in the
+       row happened to be the same length. */
+    <div className={cn("flex h-full flex-col gap-1.5", className)}>
       <label htmlFor={htmlFor} className={LABEL}>
         {label}
         {optional && (
@@ -814,7 +895,7 @@ function Field({
           </span>
         )}
       </label>
-      {children}
+      <div className="mt-auto">{children}</div>
       {error && (
         <p role="alert" className="text-[11px] text-danger-deep">
           {error}

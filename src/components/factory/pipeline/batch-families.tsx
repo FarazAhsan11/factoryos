@@ -100,8 +100,8 @@ export function BatchFamilies({
     <div className="min-h-0 flex-1 space-y-4 lg:overflow-y-auto">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="max-w-2xl text-xs text-ink-4">
-          Manufacturing batches with their packing runs grouped underneath, and
-          how much of the bulk each run has claimed.
+          Bulk production batches with their finished lots grouped underneath,
+          and how much of the bulk each lot has claimed.
         </p>
         <div className="flex shrink-0 gap-1 rounded-xl border border-line bg-sunken-2 p-1">
           {FILTERS.map((f) => (

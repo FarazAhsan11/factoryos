@@ -18,10 +18,8 @@ import {
   type ProductValues,
 } from "@/app/factory/[slug]/admin/schemas";
 import { AddProductDialog } from "@/components/factory/admin/add-product-dialog";
-import {
-  ProductDetailDialog,
-  type BoardState,
-} from "@/components/factory/admin/product-detail-dialog";
+import { ProductDetailDialog } from "@/components/factory/admin/product-detail-dialog";
+import { ProductStatusChip } from "@/components/factory/admin/product-status-chip";
 import { ProductImportDialog } from "@/components/factory/admin/product-import-dialog";
 import { formatDay, todayKey } from "@/lib/factory/dates";
 import {
@@ -33,10 +31,13 @@ import {
   deleteProduct,
   fetchProducts,
   productKeys,
+  productStatus,
+  statusMeta,
   toProductRow,
   updateProduct,
   type Product,
   type ProductPatch,
+  type ProductStatus,
 } from "@/lib/factory/product-queries";
 import { DateField } from "@/components/ui/date-picker";
 import {
@@ -166,9 +167,24 @@ export function ProductsPanel({
     );
   }, [jobs]);
 
-  function boardState(id: string): BoardState {
-    if (finished.has(id)) return "finished";
-    return onBoard.has(id) ? "on_board" : "unplanned";
+  /** Each batch's card status — one card per batch (0016's unique index). */
+  const jobStatus = useMemo(
+    () => new Map(jobs.map((job) => [job.product_id, job.status])),
+    [jobs],
+  );
+  /**
+   * The day each card joined the board (`planned_at`, as a local day) — what
+   * Planned for shows for a batch that was put there rather than scheduled.
+   */
+  const joinedBoard = useMemo(
+    () =>
+      new Map(
+        jobs.map((job) => [job.product_id, todayKey(new Date(job.planned_at))]),
+      ),
+    [jobs],
+  );
+  function statusOf(id: string): ProductStatus {
+    return productStatus(jobStatus.get(id));
   }
 
   /**
@@ -275,11 +291,12 @@ export function ProductsPanel({
         p.customer_code,
         p.customer_name,
         p.sales_order_no,
+        statusMeta(productStatus(jobStatus.get(p.id))).label,
       ]
         .filter(Boolean)
         .some((field) => field!.toLowerCase().includes(term)),
     );
-  }, [scoped, search]);
+  }, [scoped, search, jobStatus]);
 
   function saveQty(product: Product) {
     const value = Number(editQty);
@@ -397,7 +414,7 @@ export function ProductsPanel({
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search batch, product, customer or SO number…"
+              placeholder="Search batch, product, customer, SO or status…"
               aria-label="Search the catalogue"
               className={cn(FIELD, "pr-3.5 pl-10")}
             />
@@ -449,12 +466,13 @@ export function ProductsPanel({
         />
       ) : (
         <div className={cn(PANEL, "overflow-x-auto")}>
-          <table className="w-full min-w-[900px] text-sm">
+          <table className="w-full min-w-[1000px] text-sm">
             <thead>
               <tr className="border-b border-line bg-sunken-2 text-left text-[10px] font-bold tracking-[0.07em] text-ink-3 uppercase">
                 <th className="px-4 py-3">Batch</th>
                 <th className="px-4 py-3">Product</th>
                 <th className="px-4 py-3">Customer</th>
+                <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 text-right">Required qty</th>
                 <th className="px-4 py-3">Due</th>
                 <th className="px-4 py-3">Planned for</th>
@@ -466,6 +484,7 @@ export function ProductsPanel({
                 const editing = editingId === product.id;
                 const editingDate = editingDateId === product.id;
                 const promoted = onBoard.has(product.id);
+                const status = statusOf(product.id);
                 // A finished batch can't be late any more, whatever the date.
                 const pastDue =
                   product.due_date !== null &&
@@ -532,6 +551,19 @@ export function ProductsPanel({
                       ) : (
                         <span className="text-ink-6">—</span>
                       )}
+                    </td>
+
+                    {/* Nobody sets this: Received until the batch has a card,
+                        then the card's column, moved by the shift log. */}
+                    <td className="px-4 py-3 align-top">
+                      <ProductStatusChip
+                        status={status}
+                        title={
+                          status === "received"
+                            ? "Order received — not on the pipeline board yet."
+                            : "Where the batch is on the pipeline board. It follows the shift log."
+                        }
+                      />
                     </td>
 
                     <td className="px-4 py-3 text-right align-top font-mono text-[13px] text-ink">
@@ -632,23 +664,23 @@ export function ProductsPanel({
                           </IconButton>
                         </span>
                       ) : promoted ? (
-                        // No dash when there is no date: a batch added by hand
-                        // from New job never had a schedule, so a dash reads as
-                        // a missing value rather than an inapplicable one. The
-                        // chip already says everything true about the row.
+                        // Fixed once the card exists (0018). Either way this is
+                        // the day the batch reached Planned: its scheduled date,
+                        // or — for one put on the board from New batch or From
+                        // catalogue — the day that happened, read from the card.
                         <span
                           title={
                             product.planned_for
                               ? `Scheduled for ${product.planned_for} and already on the pipeline board, so the date is now fixed.`
-                              : "Added to the pipeline board by hand from New job."
+                              : "No date was scheduled — this is the day it was added to the pipeline board."
                           }
-                          className="inline-flex items-center gap-1.5 text-ink-4"
+                          className="text-ink-4"
                         >
-                          {product.planned_for &&
-                            formatDay(product.planned_for)}
-                          <span className="rounded-full bg-brand-soft px-1.5 py-0.5 text-[10px] font-semibold text-brand">
-                            On board
-                          </span>
+                          {product.planned_for
+                            ? formatDay(product.planned_for)
+                            : joinedBoard.has(product.id)
+                              ? `Added ${formatDay(joinedBoard.get(product.id)!)}`
+                              : "—"}
                         </span>
                       ) : canManage ? (
                         <button
@@ -718,7 +750,9 @@ export function ProductsPanel({
       {canManage && products.length > 0 && (
         <p className="text-xs text-ink-5">
           Click a product&rsquo;s name for everything on file, including the
-          customer order, and to edit it. Retire a finished batch to keep its
+          customer order, and to edit it. Status starts at{" "}
+          <strong>Received</strong> and then follows the batch&rsquo;s card on
+          the pipeline board. Retire a finished batch to keep its
           shift history but hide it from new entries. A batch with a planned
           date joins the pipeline as <strong>Planned</strong> on that day; one
           without is added from <strong>New batch</strong> on the Pipeline.
@@ -727,7 +761,8 @@ export function ProductsPanel({
 
       <ProductDetailDialog
         product={detail}
-        board={detail ? boardState(detail.id) : "unplanned"}
+        status={detail ? statusOf(detail.id) : "received"}
+        joinedBoard={detail ? joinedBoard.get(detail.id) : undefined}
         packingParent={detail ? packingParent.get(detail.id) : undefined}
         canManage={canManage}
         customers={customers}

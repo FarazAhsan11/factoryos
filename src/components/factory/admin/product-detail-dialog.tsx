@@ -5,6 +5,7 @@ import { Pencil } from "lucide-react";
 
 import type { ProductValues } from "@/app/factory/[slug]/admin/schemas";
 import { ProductForm } from "@/components/factory/admin/product-form";
+import { ProductStatusChip } from "@/components/factory/admin/product-status-chip";
 import {
   Dialog,
   DialogContent,
@@ -13,17 +14,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { formatDay, todayKey } from "@/lib/factory/dates";
-import { toProductValues, type Product } from "@/lib/factory/product-queries";
+import {
+  toProductValues,
+  type Product,
+  type ProductStatus,
+} from "@/lib/factory/product-queries";
 import { cn } from "@/lib/utils";
-
-/** Where the pipeline has got to with a batch — read from the board, not the row. */
-export type BoardState = "unplanned" | "on_board" | "finished";
-
-const BOARD_CHIP: Record<BoardState, { label: string; className: string }> = {
-  unplanned: { label: "Not on the board", className: "bg-sunken-2 text-ink-4" },
-  on_board: { label: "On the board", className: "bg-brand-soft text-brand" },
-  finished: { label: "Finished", className: "bg-teal-soft text-teal" },
-};
 
 /** 540000 → "540,000"; null → an em dash, never a 0. */
 function fmt(n: number | null | undefined) {
@@ -49,7 +45,8 @@ function day(iso: string | null) {
  */
 export function ProductDetailDialog({
   product,
-  board,
+  status,
+  joinedBoard,
   packingParent,
   canManage,
   customers,
@@ -57,7 +54,10 @@ export function ProductDetailDialog({
   onClose,
 }: {
   product: Product | null;
-  board: BoardState;
+  /** From `productStatus` — the board's, or Received before there is a card. */
+  status: ProductStatus;
+  /** `YYYY-MM-DD` the card joined the board, when there is one. */
+  joinedBoard?: string;
   /** The bulk batch this one is a packing run of, when it is one. */
   packingParent?: string;
   canManage: boolean;
@@ -90,9 +90,7 @@ export function ProductDetailDialog({
           </DialogDescription>
           {product && !editing && (
             <div className="flex flex-wrap gap-1.5 pt-1">
-              <Chip className={BOARD_CHIP[board].className}>
-                {BOARD_CHIP[board].label}
-              </Chip>
+              <ProductStatusChip status={status} />
               {!product.active && (
                 <Chip className="bg-sunken-2 text-ink-4">Retired</Chip>
               )}
@@ -112,7 +110,7 @@ export function ProductDetailDialog({
               mode="edit"
               initial={toProductValues(product)}
               plannedLocked={
-                board === "unplanned"
+                status === "received"
                   ? undefined
                   : "This batch is already on the pipeline board, so its planned date is fixed."
               }
@@ -126,7 +124,8 @@ export function ProductDetailDialog({
           ) : (
             <ProductDetails
               product={product}
-              board={board}
+              status={status}
+              joinedBoard={joinedBoard}
               canManage={canManage}
               onEdit={() => setEditingFor(product.id)}
             />
@@ -138,12 +137,14 @@ export function ProductDetailDialog({
 
 function ProductDetails({
   product,
-  board,
+  status,
+  joinedBoard,
   canManage,
   onEdit,
 }: {
   product: Product;
-  board: BoardState;
+  status: ProductStatus;
+  joinedBoard?: string;
   canManage: boolean;
   onEdit: () => void;
 }) {
@@ -151,16 +152,18 @@ function ProductDetails({
   const pastDue =
     product.due_date !== null &&
     product.due_date < todayKey() &&
-    board !== "finished";
+    status !== "finished";
 
   const planned =
-    board === "unplanned"
+    status === "received"
       ? product.planned_for
         ? formatDay(product.planned_for)
         : "Not scheduled"
       : product.planned_for
         ? `${formatDay(product.planned_for)} · on the board`
-        : "Added to the board by hand";
+        : joinedBoard
+          ? `Added to the board ${formatDay(joinedBoard)}`
+          : "On the board";
 
   return (
     <>
@@ -184,7 +187,9 @@ function ProductDetails({
               mono
               strong
             />
-            <Row label="Status" value={product.active ? "Active" : "Retired"} />
+            {/* Not the status in the header: that is where the batch is on
+                the board; this is whether the shift log may still name it. */}
+            <Row label="Catalogue" value={product.active ? "Active" : "Retired"} />
           </Group>
 
           <Group title="Dates" className="sm:col-span-2" columns>

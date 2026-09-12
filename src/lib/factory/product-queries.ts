@@ -1,4 +1,8 @@
 import type { ProductValues } from "@/app/factory/[slug]/admin/schemas";
+import {
+  PIPELINE_COLUMNS,
+  type PipelineStatus,
+} from "@/lib/factory/pipeline-queries";
 import { createClient } from "@/lib/supabase/client";
 
 /**
@@ -51,6 +55,49 @@ const COLUMNS = `id, batch_no, code, name, work_order, required_qty, planned_for
 export const productKeys = {
   all: (factoryId: string) => ["factory_products", factoryId] as const,
 };
+
+/** Received, then one of the board's four columns. */
+export type ProductStatus = "received" | PipelineStatus;
+
+/**
+ * Every status in the order a batch moves through them, with the board's own
+ * labels and colours for the four it shares — so "On hold" on a product is
+ * the same amber as the On hold column it is sitting in.
+ */
+export const PRODUCT_STATUSES: {
+  status: ProductStatus;
+  label: string;
+  accent: string;
+  tint: string;
+}[] = [
+  {
+    status: "received",
+    label: "Received",
+    accent: "var(--color-ink-3)",
+    tint: "var(--color-sunken-2)",
+  },
+  ...PIPELINE_COLUMNS,
+];
+
+/**
+ * A product's status: **Received** from the moment it is added, until the
+ * batch has a card on the pipeline board — then whatever the board says:
+ * Planned, In production, On hold, Finished.
+ *
+ * Derived, never stored. The card's status is already moved by the shift log
+ * (`pipeline_sync_from_log`) and by stage sign-offs; a copy on the product
+ * would be a second record of the same fact, and the first one to fall out of
+ * step would be the one a customer rang up about.
+ */
+export function productStatus(
+  jobStatus: PipelineStatus | undefined,
+): ProductStatus {
+  return jobStatus ?? "received";
+}
+
+export function statusMeta(status: ProductStatus) {
+  return PRODUCT_STATUSES.find((s) => s.status === status) ?? PRODUCT_STATUSES[0];
+}
 
 /** Every column a manager may change after the row exists. */
 export type ProductPatch = Partial<Omit<Product, "id" | "created_at">>;

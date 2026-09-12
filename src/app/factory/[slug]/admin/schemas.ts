@@ -119,7 +119,7 @@ export type ImportEmployeesValues = z.infer<typeof importEmployeesSchema>;
 
 export const employeeIdSchema = z.object({ profileId: z.uuid() });
 
-/* ── Admin → Products ──────────────────────────────────────────────────── */
+/* ── Products ──────────────────────────────────────────────────── */
 
 /** How far ahead a batch may be scheduled. A year is already generous. */
 const MAX_PLAN_DAYS = 365;
@@ -156,12 +156,50 @@ export const plannedForField = z
     { message: `Schedule within the next ${MAX_PLAN_DAYS} days.` },
   );
 
+/** A text field that may be left blank. Blank is stored as null. */
+function optionalText(max: number, what: string) {
+  return z
+    .string()
+    .trim()
+    .max(max, `Keep the ${what} under ${max} characters.`)
+    .optional();
+}
+
+/**
+ * A date that may be left blank, as `YYYY-MM-DD`. Unlike `plannedForField`
+ * these may be in the past — an order received last year, a start the sheet
+ * already missed — because they record or estimate, and trigger nothing.
+ */
+const optionalDate = z
+  .union([z.literal(""), z.iso.date("Enter the date as YYYY-MM-DD.")])
+  .optional();
+
+/**
+ * A money figure that may be left blank. An empty number input arrives as
+ * NaN under `valueAsNumber`, and that is "not recorded" — never 0, because an
+ * order nobody priced is not an order worth nothing.
+ */
+const optionalMoney = z
+  .union([z.number(), z.nan()])
+  .optional()
+  .transform((v) => (v === undefined || Number.isNaN(v) ? undefined : v))
+  .refine((v) => v === undefined || v >= 0, "An order value can't be negative.")
+  // numeric(14, 2): twelve digits before the point.
+  .refine(
+    (v) => v === undefined || v < 1_000_000_000_000,
+    "That value looks too large.",
+  );
+
 /**
  * One batch in the catalogue. Batch number and product name are the only
  * required fields — the rest often isn't known when a batch is first raised,
  * exactly as in the prototype.
+ *
+ * The second half is the sales order the batch is made against (migration
+ * 0041): the columns of the planning sheet production never needed, but that
+ * whoever answers "where is my order?" does. All optional.
  */
-export const productSchema = z.object({
+const productFields = {
   batchNo: z
     .string()
     .trim()
@@ -180,9 +218,73 @@ export const productSchema = z.object({
     .min(0, "Quantity can't be negative.")
     .max(1_000_000_000, "That quantity looks too large."),
   plannedFor: plannedForField,
-});
+
+  customerCode: optionalText(40, "customer code"),
+  customerName: optionalText(120, "customer name"),
+  salesOrderNo: optionalText(40, "sales order number"),
+  salesRep: optionalText(80, "rep's name"),
+  orderValue: optionalMoney,
+  orderedOn: optionalDate,
+  dueDate: optionalDate,
+  expectedStart: optionalDate,
+  expectedFinish: optionalDate,
+};
+
+/**
+ * Finish before start is refused here and not in the database, for the reason
+ * migration 0040 gives for a stage's estimate: as a constraint it would reject
+ * whichever of the two dates was saved second, not the one that is wrong.
+ */
+function refineProduct(
+  values: { expectedStart?: string; expectedFinish?: string },
+  ctx: z.RefinementCtx,
+) {
+  if (
+    values.expectedStart &&
+    values.expectedFinish &&
+    values.expectedFinish < values.expectedStart
+  ) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["expectedFinish"],
+      message: `Finish (${values.expectedFinish}) is before the expected start (${values.expectedStart}).`,
+    });
+  }
+}
+
+export const productSchema = z.object(productFields).superRefine(refineProduct);
 
 export type ProductValues = z.infer<typeof productSchema>;
+/** What the fields hold before zod has run — an empty order value is NaN. */
+export type ProductInput = z.input<typeof productSchema>;
+
+/**
+ * The same batch, edited. One rule differs: a planned date that has since gone
+ * by may be *kept*. Migration 0018 refuses setting a past date, never keeping
+ * one — and without this, every batch already promoted to the board would
+ * fail validation on a change to its customer's name.
+ *
+ * The date is checked in the refinement rather than as a union with the kept
+ * value, because a failed union reports "Invalid input" and loses the message
+ * saying *why* the date was refused.
+ */
+export function productEditSchema(keepPlannedFor: string | null) {
+  return z
+    .object({ ...productFields, plannedFor: z.string().optional() })
+    .superRefine((values, ctx) => {
+      if ((values.plannedFor ?? "") !== (keepPlannedFor ?? "")) {
+        const check = plannedForField.safeParse(values.plannedFor);
+        if (!check.success) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["plannedFor"],
+            message: check.error.issues[0]?.message ?? "Invalid date.",
+          });
+        }
+      }
+      refineProduct(values, ctx);
+    });
+}
 
 /* ── Admin → Equipment ───────────────────────────────────── */
 

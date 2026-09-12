@@ -6,18 +6,16 @@ import { useQueryClient } from "@tanstack/react-query";
 import { AdminTabs } from "@/components/factory/admin/admin-tabs";
 import { EmployeesPanel } from "@/components/factory/admin/employees-panel";
 import { EquipmentPanel } from "@/components/factory/admin/equipment-panel";
-import { ProductsPanel } from "@/components/factory/admin/products-panel";
 import { RESOURCE_TABS } from "@/lib/factory/resource-tabs";
 import { employeeKeys, fetchEmployees } from "@/lib/factory/employee-queries";
 import { equipmentKeys, fetchEquipment } from "@/lib/factory/equipment-queries";
-import { fetchProducts, productKeys } from "@/lib/factory/product-queries";
 
 /**
- * Client half of Resources. The three registers that used to sit at the end of
- * the Admin strip — machines, people, catalogue — moved out from under Setup
- * because they are day-to-day production records, not configuration you set
- * once. The panels themselves are untouched: same components, same queries,
- * same permissions.
+ * Client half of Resources. The registers that used to sit at the end of the
+ * Admin strip — machines and people — moved out from under Setup because they
+ * are day-to-day production records, not configuration you set once. The
+ * panels themselves are untouched: same components, same queries, same
+ * permissions. The catalogue left too, for its own page under Pipeline.
  */
 export function ResourcesWorkspace({
   factoryId,
@@ -47,13 +45,6 @@ export function ResourcesWorkspace({
         queryClient.prefetchQuery({
           queryKey: equipmentKeys.all(factoryId),
           queryFn: () => fetchEquipment(factoryId),
-        });
-        return;
-      }
-      if (value === "products") {
-        queryClient.prefetchQuery({
-          queryKey: productKeys.all(factoryId),
-          queryFn: () => fetchProducts(factoryId),
         });
       }
     },
@@ -89,10 +80,6 @@ export function ResourcesWorkspace({
 
         <Panel active={tab === "employees"} lazy>
           <EmployeesPanel factoryId={factoryId} isAdmin={isAdmin} />
-        </Panel>
-
-        <Panel active={tab === "products"} lazy>
-          <ProductsPanel factoryId={factoryId} canManage={canManage} />
         </Panel>
       </div>
     </div>

@@ -87,7 +87,12 @@ export function NewJobDialog({
   }
 
   const create = useMutation({
-    mutationFn: () => createPipelineJobs(factoryId, [...picked], userId),
+    mutationFn: () =>
+      createPipelineJobs(
+        factoryId,
+        available.filter((p) => picked.has(p.id)),
+        userId,
+      ),
     onSuccess: (count) => {
       toast.success(`${count} job${count === 1 ? "" : "s"} added to Planned.`);
       reset();
@@ -141,7 +146,7 @@ export function NewJobDialog({
             <p className="m-5 rounded-2xl border border-dashed border-line-strong bg-surface px-4 py-10 text-center text-sm text-ink-5">
               Every batch in the catalogue is already on the board.
               <br />
-              Add more in Admin &amp; Settings → Products.
+              Add more in Products.
             </p>
           ) : (
             <div className="flex min-h-0 flex-1 flex-col">

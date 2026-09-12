@@ -6,6 +6,7 @@ import {
   Lightbulb,
   LayoutGrid,
   ListPlus,
+  Package,
   Settings,
   Sparkles,
   Table2,
@@ -64,6 +65,16 @@ export const FACTORY_NAV: NavSection[] = [
         roles: ALL,
         ready: true,
       },
+      // The batch catalogue, directly under the board it feeds: a batch is
+      // raised here, with its customer order, and planned there. It was
+      // Resources' third tab until it became a screen people work in.
+      {
+        href: "/products",
+        label: "Products",
+        icon: Package,
+        roles: MANAGER_UP,
+        ready: true,
+      },
       {
         href: "/log",
         label: "Shift log",
@@ -78,9 +89,9 @@ export const FACTORY_NAV: NavSection[] = [
         roles: ALL,
         ready: true,
       },
-      // The three registers the floor reads names from — machines, people,
-      // catalogue. They used to sit at the end of the Admin strip, which
-      // buried day-to-day records under one-time configuration.
+      // The two registers the floor reads names from — machines and people.
+      // They used to sit at the end of the Admin strip, which buried
+      // day-to-day records under one-time configuration.
       {
         href: "/resources",
         label: "Resources",

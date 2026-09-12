@@ -315,15 +315,12 @@ function RoomBlock({
 }) {
   return (
     <>
-      {/* A titled band opening each room, with what the room did beside the
-          name — the one figure a supervisor wants before reading the rows
-          underneath it.
-
-          Beside it, not opposite it. The band spans the sheet, so pushing its
-          summary to the far edge parked "1 entry · 200 produced" underneath
-          SPEED and TARGET SPEED, where it read as those columns' values for
-          this row. Nothing that is not a column's value may sit under that
-          column's heading. */}
+      {/* A titled band opening each room: its name and the way to add to it,
+          nothing else. The entry count and produced total used to sit beside
+          the name, and both are already on the sheet — the rows are right
+          underneath to be counted, and the summary strip above the table
+          carries the shift's produced total. Said twice, they were noise
+          between the reader and the rows. */}
       <tr className="group/room border-t border-line bg-sunken-2 print:bg-sunken">
         {/* An empty cell for the edit column, so the band's title starts where
             the Room column starts rather than at the table's edge. */}
@@ -336,17 +333,6 @@ function RoomBlock({
                 className="h-3.5 w-1 rounded-full bg-brand print:hidden"
               />
               {room.name}
-            </span>
-            <span className="flex items-center gap-2 text-[11px] text-ink-4">
-              <span>
-                {room.entries.length}{" "}
-                {room.entries.length === 1 ? "entry" : "entries"}
-              </span>
-              {room.producedQty > 0 && (
-                <span className="rounded-full bg-brand-soft px-2 py-0.5 font-mono text-[10.5px] font-semibold text-brand-deep print:bg-surface">
-                  {room.producedQty.toLocaleString()} produced
-                </span>
-              )}
             </span>
             <AddButton room={room.name} onAdd={onAdd} />
           </div>

@@ -131,7 +131,7 @@ const batchFields = {
   batchType: z.enum(BATCH_TYPE_VALUES, { error: "Pick a batch type." }),
 
     /**
-     * The batch, picked from Admin → Products rather than typed.
+     * The batch, picked from Products rather than typed.
      *
      * Everything identifying it — batch number, product name, code, work
      * order, required quantity — is read back from that row, so this dialog
@@ -273,7 +273,7 @@ export const newBatchSchema = z
     ...batchFields,
     factoryId: z.uuid(),
     /**
-     * The batch, picked from Admin → Products rather than typed.
+     * The batch, picked from Products rather than typed.
      *
      * Everything identifying it — batch number, product name, code, work
      * order, required quantity — is read back from that row, so this dialog

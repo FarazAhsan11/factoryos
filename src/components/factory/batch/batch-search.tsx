@@ -144,7 +144,7 @@ export function BatchSearch({
               No batch matches “{debounced}”.
               <br />
               <span className="text-ink-6">
-                Batches are added under Resources → Products.
+                Batches are added under Products.
               </span>
             </li>
           ) : (

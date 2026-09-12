@@ -4,6 +4,7 @@ import type {
   NewBatchParsed,
   Priority,
 } from "@/app/factory/[slug]/pipeline/schemas";
+import type { Product } from "@/lib/factory/product-queries";
 import { createClient } from "@/lib/supabase/client";
 
 /**
@@ -149,7 +150,7 @@ export const PIPELINE_COLUMNS: {
  * many that was.
  *
  * The second way onto the board, beside the New job modal: a batch given a
- * `planned_for` date in Admin → Products joins Planned on that day without
+ * `planned_for` date in Products joins Planned on that day without
  * anyone re-entering it. Called immediately before the board is read, because
  * a job is a row and cannot be derived on read the way a status can — see
  * migration 0018 for why this stands in for a scheduler.
@@ -188,22 +189,26 @@ export async function fetchPipelineJobs(
  * A single insert, so twenty ticked boxes are one round-trip. The unique index
  * on `product_id` is the backstop: the modal only offers batches with no job,
  * but two planners ticking the same batch at once would otherwise both win.
+ *
+ * Each card's due date starts as its order's (migration 0041), exactly as it
+ * does from New batch and from a scheduled promotion — copied, not linked.
  */
 export async function createPipelineJobs(
   factoryId: string,
-  productIds: string[],
+  products: Pick<Product, "id" | "due_date">[],
   createdBy: string,
 ): Promise<number> {
-  if (productIds.length === 0) return 0;
+  if (products.length === 0) return 0;
 
   const supabase = createClient();
   const { data, error } = await supabase
     .from("pipeline_jobs")
     .insert(
-      productIds.map((product_id) => ({
+      products.map((product) => ({
         factory_id: factoryId,
-        product_id,
+        product_id: product.id,
         created_by: createdBy,
+        due_date: product.due_date,
       })),
     )
     .select("id");

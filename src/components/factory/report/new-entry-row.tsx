@@ -547,10 +547,19 @@ export function NewEntryRow({
           first — the quantity's unit, the action flag, the speed unit — is in
           the strip below instead: two-storey cells made the row twice as tall
           as the ones around it and left every single-control cell floating in
-          the middle of its own white space. */}
-      <tr className="border-t-2 border-brand bg-brand-tint/50">
-        <Cell className="print:hidden">
-          <span className="grid size-5 place-items-center rounded-md bg-brand text-white">
+          the middle of its own white space.
+
+          Styled as cells, not as form fields. Boxed, rounded inputs with a gap
+          round each one read as a web form laid over the sheet; this row is
+          the sheet's next line being typed into, so each control fills its
+          cell edge to edge, gridlines separate them, the type and padding are
+          the rows' own, and the cell being typed in gets the outline a
+          spreadsheet gives its active cell. */}
+      <tr className="border-t-2 border-brand bg-surface">
+        {/* The row header: where a filed row has its pencil and its spine,
+            this one has the spine and a +. */}
+        <Cell className="bg-sunken-2 shadow-[inset_4px_0_0_0_var(--color-brand)] print:hidden">
+          <span className="mx-auto grid size-5 place-items-center rounded-md bg-brand text-white">
             <Plus className="size-3" aria-hidden />
           </span>
         </Cell>
@@ -600,7 +609,7 @@ export function NewEntryRow({
                 "font-mono",
                 (equipmentNo ?? "").trim() &&
                   !equipment &&
-                  "border-danger-line",
+                  INVALID,
               )}
             />
           ) : (
@@ -648,8 +657,8 @@ export function NewEntryRow({
             className={cn(
               INPUT,
               "font-mono",
-              batchBlock && "border-warn-line bg-warn-tint",
-              product && !batchBlock && "border-teal-line",
+              batchBlock && WARN,
+              product && !batchBlock && RESOLVED,
             )}
           />
         </Cell>
@@ -667,7 +676,7 @@ export function NewEntryRow({
               className={cn(
                 INPUT,
                 "text-right font-mono",
-                (errors.qty || overTolerance) && "border-danger-line",
+                (errors.qty || overTolerance) && INVALID,
               )}
             />
           )}
@@ -725,7 +734,7 @@ export function NewEntryRow({
                   INPUT,
                   "flex items-center gap-1 text-left",
                   chosen.length === 0 && "text-placeholder",
-                  errors.operators && "border-danger-line",
+                  errors.operators && INVALID,
                 )}
               >
                 <Users className="size-3 shrink-0 text-ink-5" aria-hidden />
@@ -831,10 +840,10 @@ export function NewEntryRow({
           derived from, and the pickers that qualify a value rather than being
           one. Each is labelled, because down here they have no heading above
           them to say what they are. */}
-      <tr className="border-b-2 border-brand bg-brand-tint/50">
-        <td className="print:hidden" />
-        <td colSpan={16} className="px-3 pt-0.5 pb-2.5">
-          <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+      <tr className="border-b-2 border-brand bg-sunken">
+        <td className="bg-sunken-2 shadow-[inset_4px_0_0_0_var(--color-brand)] print:hidden" />
+        <td colSpan={16} className="border-t border-line px-3 py-2.5">
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2">
             <StripField label="Start">
               <Controller
                 name="startTime"
@@ -848,7 +857,7 @@ export function NewEntryRow({
                     from={clockWindow?.from}
                     to={clockWindow?.to}
                     windowNote={clockWindow?.note}
-                    className="h-8 w-28 text-[11px]"
+                    className={cn(STRIP_CONTROL, "w-28")}
                   />
                 )}
               />
@@ -866,7 +875,7 @@ export function NewEntryRow({
                     from={clockWindow?.from}
                     to={clockWindow?.to}
                     windowNote={clockWindow?.note}
-                    className="h-8 w-28 text-[11px]"
+                    className={cn(STRIP_CONTROL, "w-28")}
                   />
                 )}
               />
@@ -890,7 +899,7 @@ export function NewEntryRow({
                         value: s.id,
                         label: stageName(s),
                       }))}
-                      className="h-8 w-48 text-[11px]"
+                      className={cn(STRIP_CONTROL, "w-48")}
                     />
                   )}
                 />
@@ -911,7 +920,7 @@ export function NewEntryRow({
                       ariaInvalid={Boolean(errors.qtyUnit)}
                       placeholder="unit"
                       options={QTY_UNITS.map((u) => ({ value: u, label: u }))}
-                      className="h-8 w-32 text-[11px]"
+                      className={cn(STRIP_CONTROL, "w-32")}
                     />
                   )}
                 />
@@ -920,7 +929,7 @@ export function NewEntryRow({
 
             {hasMachine && (
               <StripField label="Speed unit">
-                <div className="flex gap-1.5">
+                <div className="flex divide-x divide-line">
                   <Controller
                     name="speedType"
                     control={control}
@@ -933,7 +942,7 @@ export function NewEntryRow({
                           value: t.value,
                           label: t.label,
                         }))}
-                        className="h-8 w-36 text-[11px]"
+                        className={cn(STRIP_CONTROL, "w-36")}
                       />
                     )}
                   />
@@ -952,7 +961,7 @@ export function NewEntryRow({
                             { value: "min", label: "/ min" },
                             { value: "hr", label: "/ hr" },
                           ]}
-                          className="h-8 w-24 text-[11px]"
+                          className={cn(STRIP_CONTROL, "w-24")}
                         />
                       )}
                     />
@@ -981,8 +990,9 @@ export function NewEntryRow({
                         label: r,
                       }))}
                       className={cn(
-                        "h-8 w-44 text-[11px]",
-                        errors.slowReason && "border-danger-line",
+                        STRIP_CONTROL,
+                        "w-44",
+                        errors.slowReason && INVALID,
                       )}
                     />
                   )}
@@ -1009,7 +1019,7 @@ export function NewEntryRow({
                         value: f,
                         label: ACTION_FLAG_LABELS[f] ?? f,
                       }))}
-                      className="h-8 w-40 text-[11px]"
+                      className={cn(STRIP_CONTROL, "w-40")}
                     />
                   )}
                 />
@@ -1025,7 +1035,7 @@ export function NewEntryRow({
               <button
                 type="button"
                 onClick={onDone}
-                className="inline-flex h-8 items-center gap-1 rounded-lg border border-line bg-surface px-2.5 text-[11px] font-semibold text-ink-4 transition hover:text-ink"
+                className="inline-flex h-8 items-center gap-1 rounded-md border border-line bg-surface px-2.5 text-[12px] font-semibold text-ink-4 transition hover:border-ink-6 hover:text-ink"
               >
                 <X className="size-3" /> {logged > 0 ? "Done" : "Cancel"}
               </button>
@@ -1033,7 +1043,7 @@ export function NewEntryRow({
                 type="button"
                 onClick={save}
                 disabled={isSubmitting}
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-3.5 text-[11px] font-semibold text-white shadow-brand transition hover:brightness-[1.06] disabled:opacity-70"
+                className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-3.5 text-[12px] font-semibold text-white shadow-brand transition hover:brightness-[1.06] disabled:opacity-70"
               >
                 {isSubmitting && <Loader2 className="size-3 animate-spin" />}
                 {isSubmitting
@@ -1083,17 +1093,41 @@ export function NewEntryRow({
 /* ── The row's own furniture ─────────────────────────────────────────── */
 
 /**
- * Every control in a cell.
+ * Every control in a cell — a spreadsheet cell, not a form field.
  *
- * One height for all of them, and one height for the read-only values beside
- * them — that is what makes a row of seventeen mixed cells read as a line
- * rather than as seventeen separate boxes at seventeen different offsets.
+ * No border, no radius, no gap: the control fills its cell and the gridlines
+ * between cells do the separating. Hover tints it so the pointer can tell
+ * what is typeable; focus draws the outline a spreadsheet draws round its
+ * active cell, inset so the neighbouring gridlines stay put. One height for
+ * every control and every read-only value beside them, which is what makes a
+ * row of seventeen mixed cells read as a line.
  */
 const INPUT =
-  "h-8 w-full rounded-md border border-line bg-surface px-2 text-[11px] text-ink shadow-[0_1px_1px_rgb(20_22_43/0.03)] outline-none transition placeholder:text-placeholder hover:border-ink-6 focus:border-brand focus:ring-2 focus:ring-brand/15";
+  "block h-9 w-full rounded-none border-0 bg-transparent px-3 text-[12px] text-ink outline-none transition-[background-color,box-shadow] placeholder:text-ink-6 hover:bg-brand-tint/40 focus:bg-surface focus:shadow-[inset_0_0_0_2px_var(--color-brand)]";
 
-/** The same, for the combobox, which brings its own border and background. */
-const SELECT = "h-8 w-full rounded-md px-2 text-[11px]";
+/**
+ * The same, for the combobox — which brings its own rounded, bordered,
+ * ringed trigger. Each of those is overridden rather than the component
+ * changed, because every other form in the app wants the boxed version.
+ */
+const SELECT =
+  "h-9 w-full rounded-none border-0 bg-transparent px-3 text-[12px] shadow-none hover:bg-brand-tint/40 focus-visible:ring-0 focus-visible:shadow-[inset_0_0_0_2px_var(--color-brand)] data-popup-open:bg-surface data-popup-open:ring-0 data-popup-open:shadow-[inset_0_0_0_2px_var(--color-brand)] aria-invalid:ring-0 aria-invalid:bg-danger-soft/50 aria-invalid:shadow-[inset_0_0_0_1.5px_var(--color-danger)]";
+
+/** A cell that fails validation — the red a spreadsheet's data check uses. */
+const INVALID = "bg-danger-soft/50 shadow-[inset_0_0_0_1.5px_var(--color-danger)]";
+
+/** A batch the gate would refuse: amber, the colour of the note saying why. */
+const WARN = "bg-warn-tint shadow-[inset_0_-2px_0_var(--color-warn)]";
+
+/** A batch that resolved to a product: a green underline, the cell's tick. */
+const RESOLVED = "shadow-[inset_0_-2px_0_var(--color-teal)]";
+
+/**
+ * A control in the strip. `StripField` draws the box round it and its label,
+ * so the control itself goes flat and borderless inside that box.
+ */
+const STRIP_CONTROL =
+  "h-8 rounded-none border-0 bg-transparent px-2 text-[12px] shadow-none focus-visible:ring-0 data-popup-open:ring-0 aria-invalid:ring-0";
 
 function Cell({
   children,
@@ -1106,7 +1140,16 @@ function Cell({
   title?: string;
 }) {
   return (
-    <td title={title} className={cn("px-1 py-2 align-top", className)}>
+    <td
+      title={title}
+      className={cn(
+        // The gridline. Only on this row: the filed rows around it are read,
+        // not typed into, and a grid drawn on every row is sixteen hundred
+        // lines of noise between the reader and the figures.
+        "h-9 overflow-hidden border-r border-line-soft p-0 align-middle last:border-r-0",
+        className,
+      )}
+    >
       {children}
     </td>
   );
@@ -1116,9 +1159,9 @@ function Cell({
  * A value the row shows but nobody types — the run time, the product the
  * batch resolved to, the running total.
  *
- * Boxed to the same height as an input and centred in it, so it sits on the
- * same line as the cells either side rather than floating against the top of
- * a taller neighbour.
+ * Shaded like a spreadsheet's locked or formula cell, so it reads at a glance
+ * as worked out rather than waiting to be filled in, and held to the input's
+ * height so it sits on the same line as the cells either side.
  */
 function Static({
   children,
@@ -1132,9 +1175,12 @@ function Static({
   return (
     <span
       title={title}
-      className={cn("flex h-8 items-center text-[11px] text-ink-2", className)}
+      className={cn(
+        "flex h-9 items-center bg-sunken/60 px-3 text-[12px] text-ink-3",
+        className,
+      )}
     >
-      {children}
+      <span className="min-w-0 truncate">{children}</span>
     </span>
   );
 }
@@ -1142,13 +1188,16 @@ function Static({
 /**
  * A cell this activity does not have.
  *
- * A dash, not an empty box: an input the category has switched off must not
- * look like one nobody has filled in yet. Held at the control's own height so
- * switching to downtime does not make the row jump.
+ * Hatched, the way a spreadsheet greys out a cell that takes no value: it must
+ * not look like an input nobody has filled in yet. Held at the control's own
+ * height so switching to downtime does not make the row jump.
  */
 function Blank() {
   return (
-    <span className="flex h-8 items-center justify-center text-ink-6">—</span>
+    <span
+      title="Not used for this activity"
+      className="block h-9 w-full bg-[repeating-linear-gradient(135deg,transparent_0,transparent_5px,var(--color-line-soft)_5px,var(--color-line-soft)_6px)]"
+    />
   );
 }
 
@@ -1181,8 +1230,10 @@ const FIELD_LABELS: Record<string, string> = {
  * A labelled control in the strip.
  *
  * The strip's controls have no column heading above them, so each carries its
- * own — set in the same small caps as the table's headings, for the same
- * reason.
+ * own — in the same small caps as the table's headings, set *beside* the value
+ * in one box, the way a spreadsheet's name box sits beside its formula bar.
+ * A label stacked over each control made the strip two lines tall and read as
+ * a form; one segmented line reads as the bar under the sheet.
  */
 function StripField({
   label,
@@ -1195,11 +1246,18 @@ function StripField({
   children: React.ReactNode;
 }) {
   return (
-    <label className="flex flex-col gap-0.5">
+    <label
+      className={cn(
+        "flex h-8 items-stretch overflow-hidden rounded-md border bg-surface transition focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/15",
+        tone === "warn" ? "border-warn-line" : "border-line",
+      )}
+    >
       <span
         className={cn(
-          "text-[9px] font-bold tracking-[0.06em] uppercase",
-          tone === "warn" ? "text-warn-deep" : "text-ink-5",
+          "flex items-center border-r px-2 text-[9.5px] font-bold tracking-[0.06em] whitespace-nowrap uppercase",
+          tone === "warn"
+            ? "border-warn-line bg-warn-tint text-warn-deep"
+            : "border-line bg-sunken-2 text-ink-5",
         )}
       >
         {label}

@@ -119,7 +119,7 @@ export type ImportEmployeesValues = z.infer<typeof importEmployeesSchema>;
 
 export const employeeIdSchema = z.object({ profileId: z.uuid() });
 
-/* ── Admin → Products ──────────────────────────────────────────────────── */
+/* ── Products ──────────────────────────────────────────────────── */
 
 /** How far ahead a batch may be scheduled. A year is already generous. */
 const MAX_PLAN_DAYS = 365;

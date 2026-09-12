@@ -76,7 +76,7 @@ function formatQty(qty: number) {
 }
 
 /**
- * Resources → Products: the batch catalogue. One row per batch / work order,
+ * Products: the batch catalogue. One row per batch / work order,
  * carrying its own code, name and required quantity — the shape the shift log
  * auto-fills from when someone types a batch number — and, since migration
  * 0041, the customer order it is made against.

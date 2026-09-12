@@ -62,7 +62,7 @@ function fmt(n: number) {
  * Asking all of them at once produced a form where two thirds of the boxes
  * were always irrelevant.
  *
- * The batch itself is **picked**, never typed. Admin → Products owns the
+ * The batch itself is **picked**, never typed. Products owns the
  * batch number, product name, code, work order and required quantity, and the
  * shift log resolves entries against that same row — so a batch typed here
  * would be a second place the name can be spelt and a second number for the
@@ -85,7 +85,7 @@ export function NewBatchDialog({
 }: {
   factoryId: string;
   userId: string;
-  /** Admin → Products: the batches this can be raised for. */
+  /** Products: the batches this can be raised for. */
   products: Product[];
   /** The board, for the parent picker and for hiding batches already on it. */
   jobs: PipelineJob[];
@@ -367,8 +367,8 @@ export function NewBatchDialog({
                 ) : (
                   <p className="rounded-xl border border-dashed border-line-strong bg-surface px-3.5 py-3 text-xs text-ink-5">
                     {available.length === 0
-                      ? "Every active batch is already on the board. Add more in Admin & Settings → Products."
-                      : "Pick a batch and its product details fill in from Admin & Settings → Products."}
+                      ? "Every active batch is already on the board. Add more in Products."
+                      : "Pick a batch and its product details fill in from Products."}
                   </p>
                 )}
 
@@ -380,7 +380,7 @@ export function NewBatchDialog({
                 {picked && !picked.required_qty && (
                   <p className="rounded-xl border border-warn-line bg-warn-tint px-3.5 py-2.5 text-[11px] text-warn-ink">
                     Batch {picked.batch_no} has no required quantity. Set it in
-                    Admin &amp; Settings → Products, or this batch shows no
+                    Products, or this batch shows no
                     progress and counts as nothing against its bulk.
                   </p>
                 )}
@@ -576,7 +576,7 @@ export function NewBatchDialog({
                       <>
                         {" "}
                         This batch has no ordered quantity yet — set one in
-                        Admin &amp; Settings → Products, or the stage plan has
+                        Products, or the stage plan has
                         nothing to be measured against.
                       </>
                     ) : null}

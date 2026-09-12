@@ -13,7 +13,7 @@ function fmt(n: number) {
 /**
  * What the batch number resolved to, and how far through its required
  * quantity the batch is. The operator types a batch; everything here is read
- * back out of Admin → Products and the entries already logged, so nobody
+ * back out of Products and the entries already logged, so nobody
  * retypes a product name into a shift record.
  *
  * Since batch families (migration 0031) it also says what *kind* of batch

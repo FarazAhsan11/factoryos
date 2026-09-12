@@ -481,7 +481,7 @@ export function LogEntryForm({
       if (!product) {
         return {
           head: `No batch ${typed} in the product register.`,
-          body: "Check the number, or have it added under Resources → Products.",
+          body: "Check the number, or have it added under Products.",
         };
       }
       if (!job) {
@@ -502,7 +502,7 @@ export function LogEntryForm({
     if (!product) {
       return {
         head: `No batch ${typed} in the product register.`,
-        body: "Check the number, or have it added under Resources → Products.",
+        body: "Check the number, or have it added under Products.",
       };
     }
     if (!job) {

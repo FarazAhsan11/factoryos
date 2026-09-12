@@ -317,7 +317,7 @@ export function PlanStagesDialog({
                 .
               </strong>{" "}
               {fmt(overOrder.over)} more than permitted. Correct a stage target,
-              or raise the required quantity in Admin &amp; Settings → Products
+              or raise the required quantity in Products
               if the order really is larger.
             </p>
           )}

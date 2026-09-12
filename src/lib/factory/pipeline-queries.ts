@@ -150,7 +150,7 @@ export const PIPELINE_COLUMNS: {
  * many that was.
  *
  * The second way onto the board, beside the New job modal: a batch given a
- * `planned_for` date in Admin → Products joins Planned on that day without
+ * `planned_for` date in Products joins Planned on that day without
  * anyone re-entering it. Called immediately before the board is read, because
  * a job is a row and cannot be derived on read the way a status can — see
  * migration 0018 for why this stands in for a scheduler.

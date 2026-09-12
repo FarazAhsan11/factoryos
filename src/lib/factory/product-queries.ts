@@ -2,7 +2,7 @@ import type { ProductValues } from "@/app/factory/[slug]/admin/schemas";
 import { createClient } from "@/lib/supabase/client";
 
 /**
- * Client-side data access for Resources → Products. Like the units/processes
+ * Client-side data access for Products. Like the units/processes
  * lists, reads and writes go straight from the browser to Supabase and RLS
  * (`can_manage_factory`) is the trust boundary — which is what makes the
  * optimistic updates in the panel cheap.

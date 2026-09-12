@@ -25,6 +25,7 @@ import {
   parseProductCsv,
   productCsvTemplate,
   splitExisting,
+  type ReadColumn,
 } from "@/lib/factory/product-csv";
 import {
   createProducts,
@@ -65,6 +66,8 @@ export function ProductImportDialog({
   const [rows, setRows] = useState<ProductValues[]>([]);
   const [duplicates, setDuplicates] = useState<ProductValues[]>([]);
   const [parseErrors, setParseErrors] = useState<CsvRowError[]>([]);
+  const [read, setRead] = useState<ReadColumn[]>([]);
+  const [ignored, setIgnored] = useState<string[]>([]);
   const [results, setResults] = useState<ProductImportResult[]>([]);
   const [fatal, setFatal] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -75,6 +78,8 @@ export function ProductImportDialog({
     setRows([]);
     setDuplicates([]);
     setParseErrors([]);
+    setRead([]);
+    setIgnored([]);
     setResults([]);
     setFatal(null);
     if (inputRef.current) inputRef.current.value = "";
@@ -91,6 +96,8 @@ export function ProductImportDialog({
     setRows(fresh);
     setDuplicates(dupes);
     setParseErrors(parsed.errors);
+    setRead(parsed.read);
+    setIgnored(parsed.ignored);
     setStage("review");
   }
 
@@ -176,8 +183,9 @@ export function ProductImportDialog({
                   Choose a CSV file
                 </span>
                 <span className="text-xs text-ink-5">
-                  Columns: batch, code, product name, work order, required qty,
-                  planned for
+                  Needs a batch and a product name. Also reads product code,
+                  work order, required qty, the customer order (customer code
+                  &amp; name, SO order no, order value, rep) and its dates.
                 </span>
               </label>
               <input
@@ -205,15 +213,17 @@ export function ProductImportDialog({
                 header row — it&rsquo;s what lets the columns be in any order.
               </p>
               <p className="text-xs text-ink-5">
+                Dates can be <span className="font-mono">YYYY-MM-DD</span> or{" "}
+                <span className="font-mono">30-Sep-26</span>, the way Excel
+                saves them —{" "}
+                <span className="font-mono">14/08</span> means two different
+                days either side of the Atlantic, so it&rsquo;s refused rather
+                than guessed.{" "}
                 <strong className="font-semibold text-ink-3">
                   Planned for
                 </strong>{" "}
-                is optional: a date puts the batch on the pipeline as Planned
-                that day. Write it as{" "}
-                <span className="font-mono">YYYY-MM-DD</span> —{" "}
-                <span className="font-mono">14/08</span> means two different
-                days either side of the Atlantic, so it&rsquo;s refused rather
-                than guessed. Leave it blank to add the batch by hand later.
+                is the one date that acts: it puts the batch on the pipeline as
+                Planned that day. Leave it blank to add the batch by hand later.
               </p>
             </div>
           )}
@@ -230,7 +240,41 @@ export function ProductImportDialog({
                   {parseErrors.length > 0 &&
                     ` · ${parseErrors.length} can't be read`}
                 </p>
+                {/* Which header became which field, so a column read as the
+                    wrong thing is caught here rather than on the hundredth
+                    row somebody opens. */}
+                {read.length > 0 && (
+                  <p className="mt-2 text-[11.5px] leading-relaxed text-ink-5">
+                    Reading{" "}
+                    {read.map((column, i) => (
+                      <span key={column.label}>
+                        {i > 0 && ", "}
+                        <span className="font-medium text-ink-3">
+                          {column.label}
+                        </span>
+                        {column.header.toLowerCase() !==
+                          column.label.toLowerCase() && (
+                          <span className="text-ink-6">
+                            {" "}
+                            ← {column.header}
+                          </span>
+                        )}
+                      </span>
+                    ))}
+                    .
+                  </p>
+                )}
               </div>
+
+              {ignored.length > 0 && (
+                <ProblemList title="Columns not recognised — these are left out">
+                  <li className="mb-1">
+                    Rename the header to one the template uses if it should be
+                    imported.
+                  </li>
+                  <li className="font-medium">{ignored.join(", ")}</li>
+                </ProblemList>
+              )}
 
               {parseErrors.length > 0 && (
                 <ProblemList title="Rows that can't be imported">
@@ -275,6 +319,12 @@ export function ProductImportDialog({
                       </span>
                       <span className="min-w-0 flex-1 truncate text-ink-2">
                         {r.name}
+                        {r.customerName && (
+                          <span className="text-ink-5">
+                            {" "}
+                            · {r.customerName}
+                          </span>
+                        )}
                       </span>
                       {r.plannedFor && (
                         <span

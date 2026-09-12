@@ -17,7 +17,11 @@ import {
   plannedForField,
   type ProductValues,
 } from "@/app/factory/[slug]/admin/schemas";
-import { AddProductForm } from "@/components/factory/admin/add-product-form";
+import { AddProductDialog } from "@/components/factory/admin/add-product-dialog";
+import {
+  ProductDetailDialog,
+  type BoardState,
+} from "@/components/factory/admin/product-detail-dialog";
 import { ProductImportDialog } from "@/components/factory/admin/product-import-dialog";
 import { formatDay, todayKey } from "@/lib/factory/dates";
 import {
@@ -29,8 +33,10 @@ import {
   deleteProduct,
   fetchProducts,
   productKeys,
+  toProductRow,
   updateProduct,
   type Product,
+  type ProductPatch,
 } from "@/lib/factory/product-queries";
 import { DateField } from "@/components/ui/date-picker";
 import {
@@ -70,9 +76,12 @@ function formatQty(qty: number) {
 }
 
 /**
- * Admin → Products: the batch catalogue. One row per batch / work order,
+ * Resources → Products: the batch catalogue. One row per batch / work order,
  * carrying its own code, name and required quantity — the shape the shift log
- * auto-fills from when someone types a batch number.
+ * auto-fills from when someone types a batch number — and, since migration
+ * 0041, the customer order it is made against.
+ *
+ * The table shows what someone scans for; the product's name opens the rest.
  */
 export function ProductsPanel({
   factoryId,
@@ -89,6 +98,7 @@ export function ProductsPanel({
   const [editQty, setEditQty] = useState("");
   const [editingDateId, setEditingDateId] = useState<string | null>(null);
   const [editDate, setEditDate] = useState("");
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   const {
     data: products = [],
@@ -156,6 +166,27 @@ export function ProductsPanel({
     );
   }, [jobs]);
 
+  function boardState(id: string): BoardState {
+    if (finished.has(id)) return "finished";
+    return onBoard.has(id) ? "on_board" : "unplanned";
+  }
+
+  /**
+   * Customer code → name, from what the catalogue already holds, so the form
+   * can fill the name in once it has seen the code. The list is newest first
+   * and the first spelling found wins — the one somebody chose most recently.
+   */
+  const customers = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of products) {
+      const code = p.customer_code?.trim().toLowerCase();
+      if (code && p.customer_name && !map.has(code)) {
+        map.set(code, p.customer_name);
+      }
+    }
+    return map;
+  }, [products]);
+
   /* The catalogue grows monotonically — every batch ever made stays in it, so
      by the second month the rows anyone actually works with are outnumbered by
      history. The pills split it on the one fact that decides that: whether the
@@ -168,6 +199,12 @@ export function ProductsPanel({
     () => products.filter((p) => finished.has(p.id)).length,
     [products, finished],
   );
+
+  // Read from the cache rather than kept as a copy, so a save — including
+  // its optimistic patch — shows in the open dialog straight away.
+  const detail = detailId
+    ? (products.find((p) => p.id === detailId) ?? null)
+    : null;
 
   function refresh() {
     return queryClient.invalidateQueries({ queryKey });
@@ -182,9 +219,9 @@ export function ProductsPanel({
     onError: (e: Error) => toast.error(e.message),
   });
 
-  /** Shared optimistic patch for the row-level edits. */
+  /** Shared optimistic patch for the row-level edits and the detail dialog. */
   const patch = useMutation({
-    mutationFn: ({ id, values }: { id: string; values: Partial<Product> }) =>
+    mutationFn: ({ id, values }: { id: string; values: ProductPatch }) =>
       updateProduct(id, values),
     onMutate: async ({ id, values }) => {
       await queryClient.cancelQueries({ queryKey });
@@ -223,12 +260,22 @@ export function ProductsPanel({
   });
 
   // A real catalogue runs to hundreds of batches, so filter in the client —
-  // the list is already loaded and cached.
+  // the list is already loaded and cached. The customer and the sales order
+  // are searched too: "everything for Phytologic" is a question the list
+  // gets asked.
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term) return scoped;
     return scoped.filter((p) =>
-      [p.batch_no, p.code, p.name, p.work_order]
+      [
+        p.batch_no,
+        p.code,
+        p.name,
+        p.work_order,
+        p.customer_code,
+        p.customer_name,
+        p.sales_order_no,
+      ]
         .filter(Boolean)
         .some((field) => field!.toLowerCase().includes(term)),
     );
@@ -271,34 +318,40 @@ export function ProductsPanel({
     patch.mutate({ id: product.id, values: { planned_for: value || null } });
   }
 
+  /** The detail dialog's Edit. Rejects on failure so the form stays open. */
+  async function saveDetails(product: Product, values: ProductValues) {
+    await patch.mutateAsync({ id: product.id, values: toProductRow(values) });
+    toast.success(`Batch ${product.batch_no} updated.`);
+  }
+
+  const today = todayKey();
+
   return (
     <div className="space-y-5">
       <PanelHeader
         icon={Package}
         title="Products"
-        description="The batch catalogue. A batch number typed into the shift log resolves to a product here, and a scheduled date puts it on the pipeline board."
+        description="The batch catalogue and the customer order behind each batch. A batch number typed into the shift log resolves to a product here, and a scheduled date puts it on the pipeline board."
         count={products.length}
         action={
           canManage ? (
-            <ProductImportDialog
-              factoryId={factoryId}
-              // The catalogue is already loaded here, so the dialog can name
-              // the batches it will skip before writing anything.
-              existingBatchNos={products.map((p) => p.batch_no)}
-              onImported={refresh}
-            />
+            <>
+              <ProductImportDialog
+                factoryId={factoryId}
+                // The catalogue is already loaded here, so the dialog can name
+                // the batches it will skip before writing anything.
+                existingBatchNos={products.map((p) => p.batch_no)}
+                onImported={refresh}
+              />
+              <AddProductDialog
+                customers={customers}
+                onAdd={(values) => add.mutateAsync(values).then(() => {})}
+              />
+            </>
           ) : undefined
         }
       />
 
-      {canManage && (
-        <AddProductForm
-          onAdd={(values) => add.mutateAsync(values).then(() => {})}
-        />
-      )}
-
-      {/* Import moved up beside the title — it is a second way to fill the
-          catalogue, not a field of the Add form and not a sibling of search. */}
       {products.length > 0 && (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           {/* Which half of the catalogue is on screen. Not a tab strip: it
@@ -344,7 +397,7 @@ export function ProductsPanel({
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by batch, code or product name…"
+              placeholder="Search batch, product, customer or SO number…"
               aria-label="Search the catalogue"
               className={cn(FIELD, "pr-3.5 pl-10")}
             />
@@ -364,7 +417,7 @@ export function ProductsPanel({
           title="No products yet."
           hint={
             canManage
-              ? "Add your first batch above, or import the catalogue from CSV."
+              ? "Add your first batch with Add product, or import the catalogue from CSV."
               : "A manager fills the catalogue."
           }
         />
@@ -381,7 +434,7 @@ export function ProductsPanel({
           hint={
             scope === "finished"
               ? "A batch lands here once every pipeline job against it is signed off."
-              : "Add a batch above, or switch to Finished to see the completed ones."
+              : "Add a batch with Add product, or switch to Finished to see the completed ones."
           }
         />
       ) : visible.length === 0 ? (
@@ -396,14 +449,14 @@ export function ProductsPanel({
         />
       ) : (
         <div className={cn(PANEL, "overflow-x-auto")}>
-          <table className="w-full min-w-[860px] text-sm">
+          <table className="w-full min-w-[900px] text-sm">
             <thead>
               <tr className="border-b border-line bg-sunken-2 text-left text-[10px] font-bold tracking-[0.07em] text-ink-3 uppercase">
                 <th className="px-4 py-3">Batch</th>
-                <th className="px-4 py-3">Code</th>
-                <th className="px-4 py-3">Product name</th>
-                <th className="px-4 py-3">Work order</th>
+                <th className="px-4 py-3">Product</th>
+                <th className="px-4 py-3">Customer</th>
                 <th className="px-4 py-3 text-right">Required qty</th>
+                <th className="px-4 py-3">Due</th>
                 <th className="px-4 py-3">Planned for</th>
                 {canManage && <th className="px-4 py-3 text-right">Actions</th>}
               </tr>
@@ -413,6 +466,11 @@ export function ProductsPanel({
                 const editing = editingId === product.id;
                 const editingDate = editingDateId === product.id;
                 const promoted = onBoard.has(product.id);
+                // A finished batch can't be late any more, whatever the date.
+                const pastDue =
+                  product.due_date !== null &&
+                  product.due_date < today &&
+                  !finished.has(product.id);
                 return (
                   <tr
                     key={product.id}
@@ -421,20 +479,25 @@ export function ProductsPanel({
                       !product.active && "bg-sunken text-ink-5",
                     )}
                   >
-                    <td className="px-4 py-3 font-mono text-[13px] font-medium text-ink">
+                    <td className="px-4 py-3 align-top font-mono text-[13px] font-medium text-ink">
                       {product.batch_no}
                     </td>
-                    <td className="px-4 py-3 font-mono text-[13px] text-ink-4">
-                      {product.code || "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
+
+                    {/* The name is the way into everything else on file, so it
+                        is the button — the obvious thing to click, and the one
+                        column every row has. */}
+                    <td className="max-w-[280px] px-4 py-3 align-top">
+                      <button
+                        type="button"
+                        onClick={() => setDetailId(product.id)}
+                        title="Open every detail on file"
                         className={cn(
+                          "text-left font-medium underline-offset-2 transition hover:text-brand hover:underline",
                           product.active ? "text-ink" : "line-through",
                         )}
                       >
                         {product.name}
-                      </span>
+                      </button>
                       {packingParent.has(product.id) && (
                         <span
                           className="ml-1.5 font-mono text-[10px] font-semibold text-brand"
@@ -443,11 +506,35 @@ export function ProductsPanel({
                           ← {packingParent.get(product.id)}
                         </span>
                       )}
+                      {product.code && (
+                        <p className="mt-0.5 font-mono text-[11.5px] text-ink-5">
+                          {product.code}
+                        </p>
+                      )}
                     </td>
-                    <td className="px-4 py-3 font-mono text-[13px] text-ink-4">
-                      {product.work_order || "—"}
+
+                    <td className="max-w-[220px] px-4 py-3 align-top">
+                      {product.customer_name || product.customer_code ? (
+                        <>
+                          <p className="truncate text-ink-2">
+                            {product.customer_name ?? product.customer_code}
+                          </p>
+                          <p className="mt-0.5 truncate font-mono text-[11.5px] text-ink-5">
+                            {[
+                              product.customer_name && product.customer_code,
+                              product.sales_order_no &&
+                                `SO ${product.sales_order_no}`,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </p>
+                        </>
+                      ) : (
+                        <span className="text-ink-6">—</span>
+                      )}
                     </td>
-                    <td className="px-4 py-3 text-right font-mono text-[13px] text-ink">
+
+                    <td className="px-4 py-3 text-right align-top font-mono text-[13px] text-ink">
                       {editing ? (
                         <span className="inline-flex items-center gap-1">
                           <input
@@ -494,16 +581,37 @@ export function ProductsPanel({
                       )}
                     </td>
 
+                    <td className="px-4 py-3 align-top text-[13px] whitespace-nowrap">
+                      {product.due_date ? (
+                        <span
+                          title={
+                            pastDue
+                              ? `Due ${product.due_date} — past due and not finished`
+                              : `Due ${product.due_date}`
+                          }
+                          className={cn(
+                            pastDue
+                              ? "font-medium text-danger-deep"
+                              : "text-ink-3",
+                          )}
+                        >
+                          {formatDay(product.due_date)}
+                        </span>
+                      ) : (
+                        <span className="text-ink-6">—</span>
+                      )}
+                    </td>
+
                     {/* The schedule. Three states, and they are genuinely
                         different things: a date still to come, a batch already
                         on the board (frozen — the schedule has been acted on),
                         and no schedule at all, which is not a gap but the
                         other way of working: New job, by hand, on the day. */}
-                    <td className="px-4 py-3 text-[13px]">
+                    <td className="px-4 py-3 align-top text-[13px]">
                       {editingDate ? (
                         <span className="inline-flex items-center gap-1">
                           <DateField
-                            min={todayKey()}
+                            min={today}
                             value={editDate}
                             onChange={setEditDate}
                             ariaLabel={`Planned date for batch ${product.batch_no}`}
@@ -576,7 +684,7 @@ export function ProductsPanel({
                     </td>
 
                     {canManage && (
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 align-top">
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             type="button"
@@ -609,12 +717,23 @@ export function ProductsPanel({
 
       {canManage && products.length > 0 && (
         <p className="text-xs text-ink-5">
-          Retire a finished batch to keep its shift history but hide it from new
-          entries. Click a quantity or a planned date to change it. A batch with
-          a planned date joins the pipeline as <strong>Planned</strong> on that
-          day; one without is added by hand from <strong>New job</strong>.
+          Click a product&rsquo;s name for everything on file, including the
+          customer order, and to edit it. Retire a finished batch to keep its
+          shift history but hide it from new entries. A batch with a planned
+          date joins the pipeline as <strong>Planned</strong> on that day; one
+          without is added from <strong>New batch</strong> on the Pipeline.
         </p>
       )}
+
+      <ProductDetailDialog
+        product={detail}
+        board={detail ? boardState(detail.id) : "unplanned"}
+        packingParent={detail ? packingParent.get(detail.id) : undefined}
+        canManage={canManage}
+        customers={customers}
+        onSave={saveDetails}
+        onClose={() => setDetailId(null)}
+      />
     </div>
   );
 }

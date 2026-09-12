@@ -87,7 +87,12 @@ export function NewJobDialog({
   }
 
   const create = useMutation({
-    mutationFn: () => createPipelineJobs(factoryId, [...picked], userId),
+    mutationFn: () =>
+      createPipelineJobs(
+        factoryId,
+        available.filter((p) => picked.has(p.id)),
+        userId,
+      ),
     onSuccess: (count) => {
       toast.success(`${count} job${count === 1 ? "" : "s"} added to Planned.`);
       reset();

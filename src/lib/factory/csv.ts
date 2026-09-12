@@ -91,6 +91,57 @@ export function indexOfHeader(cells: string[], candidates: string[]): number {
 }
 
 /**
+ * "Batch /Work order" → "batch work order"; "Exp. Start" → "exp start".
+ *
+ * A planning sheet's column names carry whatever punctuation someone put there
+ * once, and "Rep / Sales Manager", "Rep/Sales Manager" and "rep - sales
+ * manager" are one column. Matching after this, rather than as typed, is what
+ * lets a real sheet be imported without first renaming its headers.
+ */
+export function normalizeHeader(cell: string): string {
+  return cell
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/**
+ * Finds a column for each field, using each column at most once.
+ *
+ * Fields are resolved in the order given and candidates in the order listed,
+ * and a column claimed by one field is not offered to the next. That is what
+ * lets "Product" be the code on a sheet that also has "Item Description" and
+ * the name on one that doesn't: the name is resolved first and prefers the
+ * description, which leaves "Product" for the code.
+ *
+ * -1 for a field no column matched.
+ */
+export function resolveHeaders<K extends string>(
+  cells: string[],
+  fields: Record<K, readonly string[]>,
+): Record<K, number> {
+  const headers = cells.map(normalizeHeader);
+  const claimed = new Set<number>();
+  const found = {} as Record<K, number>;
+
+  for (const field of Object.keys(fields) as K[]) {
+    found[field] = -1;
+    for (const candidate of fields[field]) {
+      const target = normalizeHeader(candidate);
+      const index = headers.findIndex(
+        (header, i) => header === target && !claimed.has(i),
+      );
+      if (index !== -1) {
+        found[field] = index;
+        claimed.add(index);
+        break;
+      }
+    }
+  }
+  return found;
+}
+
+/**
  * "540,000" → 540000; "1 875 000" → 1875000; "" → 0.
  *
  * Thousands separators are stripped because a required quantity copied out of
@@ -131,6 +182,67 @@ export function parseIsoDate(value: string): string | null {
     date.getMonth() === m - 1 &&
     date.getDate() === d;
   return roundTrips ? cleaned : null;
+}
+
+const MONTHS = [
+  "january",
+  "february",
+  "march",
+  "april",
+  "may",
+  "june",
+  "july",
+  "august",
+  "september",
+  "october",
+  "november",
+  "december",
+];
+
+/** "Sep", "Sept", "september" → 8; anything shorter than three letters → -1. */
+function monthIndex(token: string): number {
+  const t = token.toLowerCase();
+  if (t.length < 3) return -1;
+  if (t === "sept") return 8;
+  return MONTHS.findIndex((m) => m.startsWith(t));
+}
+
+/**
+ * A date cell as a planning sheet writes it: "2026-08-14", or with the month
+ * as a word — "30-Sep-24", "30 Sep 2024", "30-Sept-2024". "" → ""; anything
+ * else → null.
+ *
+ * The month-name forms are accepted because they carry none of the ambiguity
+ * `parseIsoDate` refuses slashes for: "30-Sep-24" is the 30th of September
+ * wherever the file was saved. Excel writes exactly this shape when a column is
+ * formatted d-mmm-yy and saved as CSV, so refusing it would refuse the sheet as
+ * it comes out of Excel. All-numeric day/month forms are still refused.
+ *
+ * A two-digit year is this century — nothing a factory plans is dated 1924.
+ */
+export function parseDateCell(value: string): string | null {
+  const iso = parseIsoDate(value);
+  if (iso !== null) return iso;
+
+  const match = /^(\d{1,2})[\s./-]+([a-z]+)\.?[\s./,-]+(\d{4}|\d{2})$/i.exec(
+    value.trim(),
+  );
+  if (!match) return null;
+
+  const day = Number(match[1]);
+  const month = monthIndex(match[2]);
+  const year = match[3].length === 2 ? 2000 + Number(match[3]) : Number(match[3]);
+  if (month === -1) return null;
+
+  const date = new Date(year, month, day);
+  const real =
+    date.getFullYear() === year &&
+    date.getMonth() === month &&
+    date.getDate() === day;
+  if (!real) return null;
+
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${year}-${pad(month + 1)}-${pad(day)}`;
 }
 
 /** Splits validated rows into batches the caller can send one at a time. */

@@ -105,6 +105,8 @@ export function NewBatchDialog({
     register,
     handleSubmit,
     reset,
+    getValues,
+    setValue,
     formState: { errors, isSubmitting },
     // Three generics, like `LogEntryForm`: the fields hold the *input* shape
     // while the submit handler receives what zod transformed — so "" becomes
@@ -114,9 +116,9 @@ export function NewBatchDialog({
     defaultValues: emptyValues(factoryId),
   });
 
-  const [batchType, productId, packSize, parentJobId] = useWatch({
+  const [batchType, productId, packSize, parentJobId, dueDate] = useWatch({
     control,
-    name: ["batchType", "productId", "packSize", "parentJobId"],
+    name: ["batchType", "productId", "packSize", "parentJobId", "dueDate"],
   });
 
   /**
@@ -298,7 +300,23 @@ export function NewBatchDialog({
                       <SelectField
                         id="nb-product"
                         value={field.value ?? ""}
-                        onChange={field.onChange}
+                        onChange={(id) => {
+                          // The card's due date starts as the order's (0041)
+                          // — but only while nobody has chosen one: still
+                          // blank, or still what the last pick filled in.
+                          const current = getValues("dueDate") ?? "";
+                          const previous =
+                            products.find((p) => p.id === field.value)
+                              ?.due_date ?? "";
+                          field.onChange(id);
+                          if (current === "" || current === previous) {
+                            setValue(
+                              "dueDate",
+                              products.find((p) => p.id === id)?.due_date ??
+                                "",
+                            );
+                          }
+                        }}
                         onBlur={field.onBlur}
                         ariaInvalid={Boolean(errors.productId)}
                         placeholder="Select a batch…"
@@ -425,6 +443,11 @@ export function NewBatchDialog({
                   <Field
                     label="Due date"
                     optional
+                    note={
+                      dueDate && dueDate === picked?.due_date
+                        ? "from the order"
+                        : undefined
+                    }
                     htmlFor="nb-due"
                     error={errors.dueDate?.message}
                   >

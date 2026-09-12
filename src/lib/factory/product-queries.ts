@@ -2,7 +2,7 @@ import type { ProductValues } from "@/app/factory/[slug]/admin/schemas";
 import { createClient } from "@/lib/supabase/client";
 
 /**
- * Client-side data access for Admin → Products. Like the units/processes
+ * Client-side data access for Resources → Products. Like the units/processes
  * lists, reads and writes go straight from the browser to Supabase and RLS
  * (`can_manage_factory`) is the trust boundary — which is what makes the
  * optimistic updates in the panel cheap.
@@ -17,20 +17,43 @@ export interface Product {
   required_qty: number;
   /**
    * `YYYY-MM-DD` — the day this batch joins the pipeline as Planned, or null
-   * for a batch that is only ever added by hand from New job. Kept after the
+   * for a batch that is only ever added by hand from New batch. Kept after the
    * job is created, as the record of what was scheduled (migration 0018).
    */
   planned_for: string | null;
   active: boolean;
   created_at: string;
+
+  /* ── The sales order behind the batch (migration 0041). All optional. ── */
+  customer_code: string | null;
+  customer_name: string | null;
+  sales_order_no: string | null;
+  /** Null is "not recorded"; 0 is kept as typed. */
+  order_value: number | null;
+  sales_rep: string | null;
+  /** `YYYY-MM-DD` — the day the order was received. */
+  ordered_on: string | null;
+  /** `YYYY-MM-DD` — what the customer was promised. Seeds a new card's due date. */
+  due_date: string | null;
+  /**
+   * `YYYY-MM-DD` — production's estimate. Informational: unlike `planned_for`
+   * it moves nothing, and may already be in the past.
+   */
+  expected_start: string | null;
+  expected_finish: string | null;
 }
 
-const COLUMNS =
-  "id, batch_no, code, name, work_order, required_qty, planned_for, active, created_at";
+const COLUMNS = `id, batch_no, code, name, work_order, required_qty, planned_for,
+  active, created_at, customer_code, customer_name, sales_order_no,
+  order_value, sales_rep, ordered_on, due_date, expected_start,
+  expected_finish`;
 
 export const productKeys = {
   all: (factoryId: string) => ["factory_products", factoryId] as const,
 };
+
+/** Every column a manager may change after the row exists. */
+export type ProductPatch = Partial<Omit<Product, "id" | "created_at">>;
 
 /** Turns a Postgres error into something an operator can act on. */
 function toMessage(
@@ -43,6 +66,62 @@ function toMessage(
       : "That batch number is already in use.";
   }
   return error.message;
+}
+
+/**
+ * Form values → columns, for the single insert, the bulk import and an edit
+ * alike, so the three can't disagree about what a blank field means.
+ *
+ * Everything but `batch_no`, which only the inserts send: once a batch exists
+ * its number is what the shift log, the paperwork and every issue are filed
+ * under, so an edit never re-sends it.
+ */
+export function toProductRow(values: ProductValues) {
+  return {
+    code: values.code || null,
+    name: values.name,
+    // The prototype falls back to the batch number when no separate work
+    // order is tracked; keep that so the shift log always has something.
+    work_order: values.workOrder?.trim() || values.batchNo,
+    required_qty: values.requiredQty,
+    // "" from an untouched date input is "not scheduled", not an empty date.
+    // Re-sent unchanged on an edit, which the 0018 guard lets through — it
+    // only objects to a date that moves.
+    planned_for: values.plannedFor || null,
+    // Blank is null, never "" or 0 — an order nobody priced is not an order
+    // worth nothing.
+    customer_code: values.customerCode || null,
+    customer_name: values.customerName || null,
+    sales_order_no: values.salesOrderNo || null,
+    order_value: values.orderValue ?? null,
+    sales_rep: values.salesRep || null,
+    ordered_on: values.orderedOn || null,
+    due_date: values.dueDate || null,
+    expected_start: values.expectedStart || null,
+    expected_finish: values.expectedFinish || null,
+  } satisfies ProductPatch;
+}
+
+/** A stored row → what the edit form opens on. Null becomes "", not "null". */
+export function toProductValues(product: Product): ProductValues {
+  return {
+    batchNo: product.batch_no,
+    code: product.code ?? "",
+    name: product.name,
+    workOrder: product.work_order ?? "",
+    requiredQty: Number(product.required_qty),
+    plannedFor: product.planned_for ?? "",
+    customerCode: product.customer_code ?? "",
+    customerName: product.customer_name ?? "",
+    salesOrderNo: product.sales_order_no ?? "",
+    salesRep: product.sales_rep ?? "",
+    orderValue:
+      product.order_value === null ? undefined : Number(product.order_value),
+    orderedOn: product.ordered_on ?? "",
+    dueDate: product.due_date ?? "",
+    expectedStart: product.expected_start ?? "",
+    expectedFinish: product.expected_finish ?? "",
+  };
 }
 
 export async function fetchProducts(factoryId: string): Promise<Product[]> {
@@ -67,14 +146,7 @@ export async function createProduct(
     .insert({
       factory_id: factoryId,
       batch_no: values.batchNo,
-      code: values.code || null,
-      name: values.name,
-      // The prototype falls back to the batch number when no separate work
-      // order is tracked; keep that so the shift log always has something.
-      work_order: values.workOrder?.trim() || values.batchNo,
-      required_qty: values.requiredQty,
-      // "" from an untouched date input is "not scheduled", not an empty date.
-      planned_for: values.plannedFor || null,
+      ...toProductRow(values),
     })
     .select(COLUMNS)
     .single();
@@ -117,11 +189,7 @@ export async function createProducts(
   const toRow = (values: ProductValues) => ({
     factory_id: factoryId,
     batch_no: values.batchNo,
-    code: values.code || null,
-    name: values.name,
-    work_order: values.workOrder?.trim() || values.batchNo,
-    required_qty: values.requiredQty,
-    planned_for: values.plannedFor || null,
+    ...toProductRow(values),
   });
 
   for (let i = 0; i < rows.length; i += IMPORT_CHUNK) {
@@ -151,7 +219,8 @@ export async function createProducts(
 }
 
 /**
- * Row-level edits from the catalogue table.
+ * Row-level edits — the table's inline quantity, date and Active toggle, and
+ * the detail dialog's whole-row edit.
  *
  * `planned_for` is in here like any other column, but the database has the
  * final say on it: `factory_products_planned_for_guard` (migration 0018)
@@ -161,18 +230,7 @@ export async function createProducts(
  */
 export async function updateProduct(
   id: string,
-  patch: Partial<
-    Pick<
-      Product,
-      | "batch_no"
-      | "code"
-      | "name"
-      | "work_order"
-      | "required_qty"
-      | "planned_for"
-      | "active"
-    >
-  >,
+  patch: ProductPatch,
 ): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase

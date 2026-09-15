@@ -60,6 +60,7 @@ export function StageEditDialog({
   job,
   factoryId,
   canManage,
+  showWorkOrder = false,
   onSaved,
   onClose,
 }: {
@@ -68,6 +69,11 @@ export function StageEditDialog({
   job: PipelineJob | undefined;
   factoryId: string;
   canManage: boolean;
+  /**
+   * Admin → Company tracks a work order per stage (0043). Hidden otherwise —
+   * but still loaded and saved back, so a number already on file survives.
+   */
+  showWorkOrder?: boolean;
   onSaved: () => void | Promise<void>;
   onClose: () => void;
 }) {
@@ -298,7 +304,12 @@ export function StageEditDialog({
               </div>
             </div>
 
-            <div className="grid gap-2.5 sm:grid-cols-3">
+            <div
+              className={cn(
+                "grid gap-2.5",
+                showWorkOrder ? "sm:grid-cols-3" : "sm:grid-cols-2",
+              )}
+            >
               <div className="space-y-1">
                 <label htmlFor="se-label" className={LABEL}>
                   Label
@@ -310,17 +321,19 @@ export function StageEditDialog({
                   {...register("label")}
                 />
               </div>
-              <div className="space-y-1">
-                <label htmlFor="se-wo" className={LABEL}>
-                  Work order
-                </label>
-                <input
-                  id="se-wo"
-                  placeholder="e.g. 46000D"
-                  className={cn(FIELD, MONO)}
-                  {...register("workOrder")}
-                />
-              </div>
+              {showWorkOrder && (
+                <div className="space-y-1">
+                  <label htmlFor="se-wo" className={LABEL}>
+                    Work order
+                  </label>
+                  <input
+                    id="se-wo"
+                    placeholder="e.g. 46000D"
+                    className={cn(FIELD, MONO)}
+                    {...register("workOrder")}
+                  />
+                </div>
+              )}
               <div className="space-y-1">
                 <label htmlFor="se-pack" className={LABEL}>
                   Pack size

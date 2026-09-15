@@ -7,6 +7,7 @@ import {
   Check,
   CheckCircle2,
   Package,
+  Pencil,
   Search,
   Trash2,
   X,
@@ -18,7 +19,7 @@ import {
   type ProductValues,
 } from "@/app/factory/[slug]/admin/schemas";
 import { AddProductDialog } from "@/components/factory/admin/add-product-dialog";
-import { ProductDetailDialog } from "@/components/factory/admin/product-detail-dialog";
+import { EditProductDialog } from "@/components/factory/admin/edit-product-dialog";
 import { ProductStatusChip } from "@/components/factory/admin/product-status-chip";
 import { ProductImportDialog } from "@/components/factory/admin/product-import-dialog";
 import { formatDay, todayKey } from "@/lib/factory/dates";
@@ -76,13 +77,29 @@ function formatQty(qty: number) {
   return qty.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
+/** `YYYY-MM-DD` → "14 Aug"; a blank date stays null so its cell shows a dash. */
+function day(iso: string | null) {
+  return iso ? formatDay(iso) : null;
+}
+
+const CELL = "px-4 py-3 align-top text-[13px] whitespace-nowrap";
+/* Every field is a column, so the table runs wider than the screen. The batch
+   number stays pinned while the rest scroll, so a row is still identifiable
+   wherever it is scrolled to. */
+const STICKY_LEFT = "sticky left-0 z-10 shadow-[inset_-1px_0_0_var(--color-line)]";
+/* The header row stays in view while the rows scroll under it. Each cell
+   paints its own ground and bottom rule: a row's background and border don't
+   travel with a sticky cell. */
+const TH =
+  "sticky top-0 z-20 bg-sunken-2 px-4 py-3 shadow-[inset_0_-1px_0_var(--color-line)]";
+
 /**
  * Products: the batch catalogue. One row per batch / work order,
  * carrying its own code, name and required quantity — the shape the shift log
  * auto-fills from when someone types a batch number — and, since migration
  * 0041, the customer order it is made against.
  *
- * The table shows what someone scans for; the product's name opens the rest.
+ * Every field on file is a column; the pencil in Actions opens the edit form.
  */
 export function ProductsPanel({
   factoryId,
@@ -99,7 +116,7 @@ export function ProductsPanel({
   const [editQty, setEditQty] = useState("");
   const [editingDateId, setEditingDateId] = useState<string | null>(null);
   const [editDate, setEditDate] = useState("");
-  const [detailId, setDetailId] = useState<string | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
 
   const {
     data: products = [],
@@ -218,8 +235,8 @@ export function ProductsPanel({
 
   // Read from the cache rather than kept as a copy, so a save — including
   // its optimistic patch — shows in the open dialog straight away.
-  const detail = detailId
-    ? (products.find((p) => p.id === detailId) ?? null)
+  const editProduct = editId
+    ? (products.find((p) => p.id === editId) ?? null)
     : null;
 
   function refresh() {
@@ -235,7 +252,7 @@ export function ProductsPanel({
     onError: (e: Error) => toast.error(e.message),
   });
 
-  /** Shared optimistic patch for the row-level edits and the detail dialog. */
+  /** Shared optimistic patch for the row-level edits and the Edit dialog. */
   const patch = useMutation({
     mutationFn: ({ id, values }: { id: string; values: ProductPatch }) =>
       updateProduct(id, values),
@@ -335,7 +352,7 @@ export function ProductsPanel({
     patch.mutate({ id: product.id, values: { planned_for: value || null } });
   }
 
-  /** The detail dialog's Edit. Rejects on failure so the form stays open. */
+  /** The Edit dialog's save. Rejects on failure so the form stays open. */
   async function saveDetails(product: Product, values: ProductValues) {
     await patch.mutateAsync({ id: product.id, values: toProductRow(values) });
     toast.success(`Batch ${product.batch_no} updated.`);
@@ -465,18 +482,46 @@ export function ProductsPanel({
           }
         />
       ) : (
-        <div className={cn(PANEL, "overflow-x-auto")}>
-          <table className="w-full min-w-[1000px] text-sm">
+        // Scrolls both ways inside itself, capped to the viewport, so the
+        // header row can stick to its top — a sticky header only sticks
+        // within its nearest scrolling box, and this one has to scroll
+        // sideways anyway.
+        <div
+          className={cn(
+            PANEL,
+            "scrollbar-slim max-h-[max(20rem,calc(100dvh-20rem))] overflow-auto",
+          )}
+        >
+          <table className="w-full min-w-max text-sm">
             <thead>
-              <tr className="border-b border-line bg-sunken-2 text-left text-[10px] font-bold tracking-[0.07em] text-ink-3 uppercase">
-                <th className="px-4 py-3">Batch</th>
-                <th className="px-4 py-3">Product</th>
-                <th className="px-4 py-3">Customer</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Required qty</th>
-                <th className="px-4 py-3">Due</th>
-                <th className="px-4 py-3">Planned for</th>
-                {canManage && <th className="px-4 py-3 text-right">Actions</th>}
+              <tr className="text-left text-[10px] font-bold tracking-[0.07em] whitespace-nowrap text-ink-3 uppercase">
+                {/* Pinned on both axes, so it sits above the scrolling
+                    header cells and the pinned batch cells alike. */}
+                <th
+                  className={cn(
+                    TH,
+                    "left-0 z-30 shadow-[inset_-1px_-1px_0_var(--color-line)]",
+                  )}
+                >
+                  Batch
+                </th>
+                <th className={TH}>Product</th>
+                <th className={TH}>Product code</th>
+                <th className={TH}>Work order</th>
+                <th className={TH}>Status</th>
+                <th className={cn(TH, "text-right")}>Required qty</th>
+                <th className={TH}>Customer</th>
+                <th className={TH}>Customer code</th>
+                <th className={TH}>SO order no</th>
+                <th className={cn(TH, "text-right")}>Order value</th>
+                <th className={TH}>Rep / sales manager</th>
+                <th className={TH}>Order received</th>
+                <th className={TH}>Exp. start</th>
+                <th className={TH}>Exp. finish</th>
+                <th className={TH}>Due</th>
+                <th className={TH}>Planned for</th>
+                <th className={TH}>Added</th>
+                {canManage && <th className={cn(TH, "text-right")}>Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -490,6 +535,9 @@ export function ProductsPanel({
                   product.due_date !== null &&
                   product.due_date < today &&
                   !finished.has(product.id);
+                // The pinned batch cell paints its own ground, or the
+                // scrolling columns would show through it.
+                const rowBg = product.active ? "bg-surface" : "bg-sunken";
                 return (
                   <tr
                     key={product.id}
@@ -498,25 +546,25 @@ export function ProductsPanel({
                       !product.active && "bg-sunken text-ink-5",
                     )}
                   >
-                    <td className="px-4 py-3 align-top font-mono text-[13px] font-medium text-ink">
+                    <td
+                      className={cn(
+                        STICKY_LEFT,
+                        rowBg,
+                        "px-4 py-3 align-top font-mono text-[13px] font-medium whitespace-nowrap text-ink",
+                      )}
+                    >
                       {product.batch_no}
                     </td>
 
-                    {/* The name is the way into everything else on file, so it
-                        is the button — the obvious thing to click, and the one
-                        column every row has. */}
-                    <td className="max-w-[280px] px-4 py-3 align-top">
-                      <button
-                        type="button"
-                        onClick={() => setDetailId(product.id)}
-                        title="Open every detail on file"
+                    <td className="min-w-[240px] px-4 py-3 align-top">
+                      <span
                         className={cn(
-                          "text-left font-medium underline-offset-2 transition hover:text-brand hover:underline",
+                          "font-medium",
                           product.active ? "text-ink" : "line-through",
                         )}
                       >
                         {product.name}
-                      </button>
+                      </span>
                       {packingParent.has(product.id) && (
                         <span
                           className="ml-1.5 font-mono text-[10px] font-semibold text-brand"
@@ -525,32 +573,13 @@ export function ProductsPanel({
                           ← {packingParent.get(product.id)}
                         </span>
                       )}
-                      {product.code && (
-                        <p className="mt-0.5 font-mono text-[11.5px] text-ink-5">
-                          {product.code}
-                        </p>
-                      )}
                     </td>
 
-                    <td className="max-w-[220px] px-4 py-3 align-top">
-                      {product.customer_name || product.customer_code ? (
-                        <>
-                          <p className="truncate text-ink-2">
-                            {product.customer_name ?? product.customer_code}
-                          </p>
-                          <p className="mt-0.5 truncate font-mono text-[11.5px] text-ink-5">
-                            {[
-                              product.customer_name && product.customer_code,
-                              product.sales_order_no &&
-                                `SO ${product.sales_order_no}`,
-                            ]
-                              .filter(Boolean)
-                              .join(" · ")}
-                          </p>
-                        </>
-                      ) : (
-                        <span className="text-ink-6">—</span>
-                      )}
+                    <td className={CELL}>
+                      <Val value={product.code} mono />
+                    </td>
+                    <td className={CELL}>
+                      <Val value={product.work_order} mono />
                     </td>
 
                     {/* Nobody sets this: Received until the batch has a card,
@@ -613,7 +642,40 @@ export function ProductsPanel({
                       )}
                     </td>
 
-                    <td className="px-4 py-3 align-top text-[13px] whitespace-nowrap">
+                    <td className="min-w-[180px] px-4 py-3 align-top text-[13px]">
+                      <Val value={product.customer_name} />
+                    </td>
+                    <td className={CELL}>
+                      <Val value={product.customer_code} mono />
+                    </td>
+                    <td className={CELL}>
+                      <Val value={product.sales_order_no} mono />
+                    </td>
+                    {/* A blank order value is "not recorded" — a dash, never a 0. */}
+                    <td className={cn(CELL, "text-right")}>
+                      <Val
+                        value={
+                          product.order_value === null
+                            ? null
+                            : formatQty(Number(product.order_value))
+                        }
+                        mono
+                      />
+                    </td>
+                    <td className={CELL}>
+                      <Val value={product.sales_rep} />
+                    </td>
+                    <td className={CELL}>
+                      <Val value={day(product.ordered_on)} />
+                    </td>
+                    <td className={CELL}>
+                      <Val value={day(product.expected_start)} />
+                    </td>
+                    <td className={CELL}>
+                      <Val value={day(product.expected_finish)} />
+                    </td>
+
+                    <td className={CELL}>
                       {product.due_date ? (
                         <span
                           title={
@@ -715,6 +777,10 @@ export function ProductsPanel({
                       )}
                     </td>
 
+                    <td className={CELL}>
+                      <Val value={formatDay(todayKey(new Date(product.created_at)))} />
+                    </td>
+
                     {canManage && (
                       <td className="px-4 py-3 align-top">
                         <div className="flex items-center justify-end gap-1.5">
@@ -730,6 +796,12 @@ export function ProductsPanel({
                           >
                             {product.active ? "Active" : "Retired"}
                           </button>
+                          <IconButton
+                            label={`Edit batch ${product.batch_no}`}
+                            onClick={() => setEditId(product.id)}
+                          >
+                            <Pencil className="size-3.5 text-brand" />
+                          </IconButton>
                           <IconButton
                             label={`Delete batch ${product.batch_no}`}
                             onClick={() => remove.mutate(product.id)}
@@ -747,27 +819,12 @@ export function ProductsPanel({
         </div>
       )}
 
-      {canManage && products.length > 0 && (
-        <p className="text-xs text-ink-5">
-          Click a product&rsquo;s name for everything on file, including the
-          customer order, and to edit it. Status starts at{" "}
-          <strong>Received</strong> and then follows the batch&rsquo;s card on
-          the pipeline board. Retire a finished batch to keep its
-          shift history but hide it from new entries. A batch with a planned
-          date joins the pipeline as <strong>Planned</strong> on that day; one
-          without is added from <strong>New batch</strong> on the Pipeline.
-        </p>
-      )}
-
-      <ProductDetailDialog
-        product={detail}
-        status={detail ? statusOf(detail.id) : "received"}
-        joinedBoard={detail ? joinedBoard.get(detail.id) : undefined}
-        packingParent={detail ? packingParent.get(detail.id) : undefined}
-        canManage={canManage}
+      <EditProductDialog
+        product={editProduct}
+        status={editProduct ? statusOf(editProduct.id) : "received"}
         customers={customers}
         onSave={saveDetails}
-        onClose={() => setDetailId(null)}
+        onClose={() => setEditId(null)}
       />
     </div>
   );
@@ -792,6 +849,22 @@ function IconButton({
     >
       {children}
     </button>
+  );
+}
+
+/** A plain value cell — an em dash for a field left blank, never an empty cell. */
+function Val({
+  value,
+  mono,
+}: {
+  value: string | null | undefined;
+  mono?: boolean;
+}) {
+  if (!value) return <span className="text-ink-6">—</span>;
+  return (
+    <span className={cn("text-ink-2", mono && "font-mono text-[12.5px]")}>
+      {value}
+    </span>
   );
 }
 

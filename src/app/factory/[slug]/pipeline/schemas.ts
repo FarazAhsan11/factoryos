@@ -282,6 +282,17 @@ export const newBatchSchema = z
      * entries against the catalogue, not against the board.
      */
     productId: z.uuid("Pick the batch from the catalogue."),
+    /**
+     * The batch's work order, where the company tracks one per batch (0043).
+     * Saved on the batch's row in Products, not on the card — see
+     * `NewBatchDialog`. Blank falls back to the batch number, as it does in
+     * Products.
+     */
+    workOrder: z
+      .string()
+      .trim()
+      .max(40, "Keep the work order under 40 characters.")
+      .optional(),
   })
   .superRefine(refineBatch);
 

@@ -7,9 +7,17 @@ import {
   useWatch,
   type Control,
 } from "react-hook-form";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Beaker, Loader2, Package, Plus, RefreshCw } from "lucide-react";
+import {
+  Beaker,
+  CalendarDays,
+  Loader2,
+  Lock,
+  Package,
+  Plus,
+  RefreshCw,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -24,6 +32,10 @@ import {
   type NewBatchParsed,
   type NewBatchValues,
 } from "@/app/factory/[slug]/pipeline/schemas";
+import type {
+  BatchModel,
+  WorkOrderMode,
+} from "@/app/factory/[slug]/admin/schemas";
 import {
   Dialog,
   DialogContent,
@@ -31,10 +43,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { DateField } from "@/components/ui/date-picker";
 import { SelectField } from "@/components/ui/select-field";
 import { createBatchJob, type PipelineJob } from "@/lib/factory/pipeline-queries";
-import type { Product } from "@/lib/factory/product-queries";
+import {
+  productKeys,
+  updateProduct,
+  type Product,
+} from "@/lib/factory/product-queries";
 import { cn } from "@/lib/utils";
 
 const FIELD =
@@ -48,19 +63,37 @@ const TYPE_ICONS: Record<BatchType, typeof Package> = {
   combined: RefreshCw,
 };
 
+/**
+ * What a split-batch company chooses between. With the bulk and the packed lot
+ * numbered separately there is no batch that is both, so Single Batch is not
+ * offered at all.
+ */
+const SPLIT_TYPES = BATCH_TYPES.filter((t) => t.value !== "combined");
+
 function fmt(n: number) {
   return Number(n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+/** "2026-09-30" → "30 Sep 2026", read as a local day so no timezone shifts it. */
+function longDay(iso: string) {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 /**
  * Pipeline → New batch.
  *
- * Two steps, because the first one changes what the second asks for. Picking
- * Manufacturing, Packing or Combined is not a field among fields — it decides
- * whether this batch produces bulk, draws on someone else's, or does both
- * under one number, and each answer needs a different half-dozen questions.
- * Asking all of them at once produced a form where two thirds of the boxes
- * were always irrelevant.
+ * The batch type is not a field among fields — it decides whether this batch
+ * produces bulk, draws on someone else's, or does both under one number, and
+ * each answer needs a different half-dozen questions. Which types are on
+ * offer is the company's batch number model (Admin → Company, 0042): a
+ * single-batch company is never asked — every batch is a Single Batch — and a
+ * split-batch company picks Bulk Production or Finished Lot from two tabs,
+ * each opening its own form.
  *
  * The batch itself is **picked**, never typed. Products owns the
  * batch number, product name, code, work order and required quantity, and the
@@ -79,6 +112,8 @@ export function NewBatchDialog({
   onCreated,
   /** Opens straight onto Packing with this parent pre-filled. */
   presetParentId,
+  batchModel = "single",
+  workOrderMode = "none",
   open: controlledOpen,
   onOpenChange,
   trigger = true,
@@ -91,6 +126,16 @@ export function NewBatchDialog({
   jobs: PipelineJob[];
   onCreated: () => void;
   presetParentId?: string | null;
+  /**
+   * Admin → Company (0042). `single` asks for no type — the batch is a Single
+   * Batch; `split` asks for Bulk Production or Finished Lot, as tabs.
+   */
+  batchModel?: BatchModel;
+  /**
+   * Admin → Company (0043). Only `batch` asks for a work order here; `stage`
+   * asks for one per stage when the plan is made, and `none` never asks.
+   */
+  workOrderMode?: WorkOrderMode;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   /** False when the caller opens it itself — the families view does. */
@@ -99,13 +144,16 @@ export function NewBatchDialog({
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const open = controlledOpen ?? uncontrolledOpen;
   const setOpen = onOpenChange ?? setUncontrolledOpen;
+  const split = batchModel === "split";
+  const perBatchWo = workOrderMode === "batch";
+  const queryClient = useQueryClient();
+  const defaultType: BatchType = split ? "manufacturing" : "combined";
 
   const {
     control,
     register,
     handleSubmit,
     reset,
-    getValues,
     setValue,
     formState: { errors, isSubmitting },
     // Three generics, like `LogEntryForm`: the fields hold the *input* shape
@@ -116,9 +164,9 @@ export function NewBatchDialog({
     defaultValues: emptyValues(factoryId),
   });
 
-  const [batchType, productId, packSize, parentJobId, dueDate] = useWatch({
+  const [batchType, productId, packSize, parentJobId] = useWatch({
     control,
-    name: ["batchType", "productId", "packSize", "parentJobId", "dueDate"],
+    name: ["batchType", "productId", "packSize", "parentJobId"],
   });
 
   /**
@@ -130,11 +178,12 @@ export function NewBatchDialog({
     if (!open) return;
     reset({
       ...emptyValues(factoryId),
+      batchType: defaultType,
       ...(presetParentId
         ? { batchType: "packing" as const, parentJobId: presetParentId }
         : {}),
     });
-  }, [open, factoryId, presetParentId, reset]);
+  }, [open, factoryId, presetParentId, defaultType, reset]);
 
   /** Manufacturing batches on the board are the only possible bulk sources. */
   const bulkSources = useMemo(
@@ -167,8 +216,22 @@ export function NewBatchDialog({
   );
 
   const create = useMutation({
-    mutationFn: (values: NewBatchParsed) => createBatchJob(values, userId),
+    mutationFn: async (values: NewBatchParsed) => {
+      // A per-batch work order lives on the batch's own row in Products — the
+      // column the shift log's autofill and the batch record already read —
+      // so it is written there, not onto the card as a second copy. Blank
+      // falls back to the batch number, the same rule Products applies.
+      if (perBatchWo && picked) {
+        await updateProduct(picked.id, {
+          work_order: values.workOrder?.trim() || picked.batch_no,
+        });
+      }
+      return createBatchJob(values, userId);
+    },
     onSuccess: () => {
+      if (perBatchWo) {
+        queryClient.invalidateQueries({ queryKey: productKeys.all(factoryId) });
+      }
       toast.success(`Batch ${picked?.batch_no ?? ""} added to Planned.`);
       setOpen(false);
       onCreated();
@@ -176,7 +239,19 @@ export function NewBatchDialog({
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const type = (batchType ?? "combined") as BatchType;
+  /**
+   * Switches the batch type — from a type card or a split-model tab alike.
+   *
+   * A packing run never carries overage (`refineBatch` refuses one), and its
+   * section has no overage box, so a number typed under another type would
+   * fail the form on a field nobody can see. Cleared on the way in instead.
+   */
+  function selectType(next: BatchType, onChange: (value: BatchType) => void) {
+    onChange(next);
+    if (next === "packing") setValue("overagePct", undefined);
+  }
+
+  const type = (batchType ?? defaultType) as BatchType;
   const isManufacturing = type === "manufacturing";
   const isPacking = type === "packing";
   const meta = BATCH_TYPES.find((t) => t.value === type);
@@ -225,68 +300,69 @@ export function NewBatchDialog({
             onSubmit={handleSubmit((values) => create.mutateAsync(values))}
             className="flex min-h-0 flex-1 flex-col"
           >
-            <div className="scrollbar-slim min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
-              {/* ── Step 1 — the type ──────────────────────────────────── */}
-              <section className="space-y-2">
-                <p className={LABEL}>Step 1 — what type of batch is this?</p>
-                <Controller
-                  name="batchType"
-                  control={control}
-                  render={({ field }) => (
-                    <div
-                      role="radiogroup"
-                      aria-label="Batch type"
-                      className="grid gap-2 sm:grid-cols-3"
-                    >
-                      {BATCH_TYPES.map((option) => {
-                        const Icon = TYPE_ICONS[option.value];
-                        const on = field.value === option.value;
-                        return (
-                          <button
-                            key={option.value}
-                            type="button"
-                            role="radio"
-                            aria-checked={on}
-                            onClick={() => field.onChange(option.value)}
+            {/* ── Split model — the type as tabs ───────────────────────
+                A split-batch company raises the bulk and the packed lot as
+                separate batches, so the choice is one of two forms rather
+                than one of three cards: tabs, above everything, and the
+                tab's own form below. */}
+            {split && (
+              <Controller
+                name="batchType"
+                control={control}
+                render={({ field }) => (
+                  <div
+                    role="tablist"
+                    aria-label="Batch type"
+                    className="flex shrink-0 gap-1 border-b border-line bg-surface px-5"
+                  >
+                    {SPLIT_TYPES.map((option) => {
+                      const Icon = TYPE_ICONS[option.value];
+                      const on = field.value === option.value;
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          role="tab"
+                          aria-selected={on}
+                          onClick={() =>
+                            selectType(option.value, field.onChange)
+                          }
+                          className={cn(
+                            "-mb-px inline-flex items-center gap-2 border-b-2 px-3 py-3 text-sm font-semibold transition",
+                            on
+                              ? "border-brand text-brand-deep"
+                              : "border-transparent text-ink-4 hover:text-ink",
+                          )}
+                        >
+                          <Icon
                             className={cn(
-                              "rounded-2xl border p-3 text-left transition",
-                              on
-                                ? "border-brand bg-brand-tint shadow-[0_0_0_3px_rgba(79,70,229,0.10)]"
-                                : "border-line bg-surface hover:border-ink-6 hover:bg-sunken",
+                              "size-4",
+                              on ? "text-brand" : "text-ink-5",
                             )}
-                          >
-                            <Icon
-                              className={cn(
-                                "size-4",
-                                on ? "text-brand" : "text-ink-5",
-                              )}
-                              aria-hidden
-                            />
-                            <span
-                              className={cn(
-                                "mt-1.5 block text-[13px] font-semibold",
-                                on ? "text-brand-deep" : "text-ink",
-                              )}
-                            >
-                              {option.label}
-                            </span>
-                            <span className="mt-0.5 block text-[11px] leading-snug text-ink-5">
-                              {option.description}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                />
-                {meta && (
-                  <p className="text-[11px] text-ink-5">{meta.hint}</p>
+                            aria-hidden
+                          />
+                          {option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 )}
-              </section>
+              />
+            )}
 
-              {/* ── Step 2 — the batch ─────────────────────────────────── */}
+            <div className="scrollbar-slim min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+              {/* What the open tab is for. A single-batch company is never
+                  asked for a type — every batch it raises is a Single Batch —
+                  so there is nothing to choose and nothing to explain. */}
+              {split && meta && (
+                <p className="text-[11px] text-ink-5">
+                  {meta.description} {meta.hint}
+                </p>
+              )}
+
+              {/* ── The batch ──────────────────────────────────────────── */}
               <section className="space-y-3">
-                <p className={LABEL}>Step 2 — which batch?</p>
+                <p className={LABEL}>Which batch?</p>
 
                 <Field
                   label="Batch"
@@ -301,21 +377,20 @@ export function NewBatchDialog({
                         id="nb-product"
                         value={field.value ?? ""}
                         onChange={(id) => {
-                          // The card's due date starts as the order's (0041)
-                          // — but only while nobody has chosen one: still
-                          // blank, or still what the last pick filled in.
-                          const current = getValues("dueDate") ?? "";
-                          const previous =
-                            products.find((p) => p.id === field.value)
-                              ?.due_date ?? "";
                           field.onChange(id);
-                          if (current === "" || current === previous) {
-                            setValue(
-                              "dueDate",
-                              products.find((p) => p.id === id)?.due_date ??
-                                "",
-                            );
-                          }
+                          // The card's due date is the order's (0041), read
+                          // from Products and never typed here — so every
+                          // pick replaces it, including with a blank.
+                          setValue(
+                            "dueDate",
+                            products.find((p) => p.id === id)?.due_date ?? "",
+                          );
+                          // Starts as what Products already holds, so saving
+                          // without touching it changes nothing.
+                          setValue(
+                            "workOrder",
+                            products.find((p) => p.id === id)?.work_order ?? "",
+                          );
                         }}
                         onBlur={field.onBlur}
                         ariaInvalid={Boolean(errors.productId)}
@@ -345,11 +420,6 @@ export function NewBatchDialog({
                   <dl className="grid gap-1.5 rounded-xl border border-brand-soft bg-brand-tint p-3.5 text-xs">
                     <Row label="Product" value={picked.name} />
                     <Row label="Code" value={picked.code || "—"} mono />
-                    <Row
-                      label="Work order"
-                      value={picked.work_order || picked.batch_no}
-                      mono
-                    />
                     <Row
                       label={
                         isPacking
@@ -398,6 +468,29 @@ export function NewBatchDialog({
                     point: overage is extra deliberately *made* and raises a
                     flag; tolerance is how far past a stage's plan an entry may
                     be *recorded*, and it stops the entry. */}
+                {/* Only where the company tracks one work order per batch
+                    (Admin → Company). Per-stage work orders are asked when
+                    the plan is made, not here. */}
+                {perBatchWo && (
+                  <Field
+                    label="Work order"
+                    note="saved on the batch"
+                    optional
+                    htmlFor="nb-wo"
+                    error={errors.workOrder?.message}
+                  >
+                    <input
+                      id="nb-wo"
+                      placeholder={
+                        picked ? `Same as batch — ${picked.batch_no}` : "e.g. 46000"
+                      }
+                      autoComplete="off"
+                      className={cn(FIELD, MONO, "sm:max-w-[16rem]")}
+                      {...register("workOrder")}
+                    />
+                  </Field>
+                )}
+
                 <Field
                   label="Stage tolerance %"
                   note="how far past a planned stage the log will accept"
@@ -440,29 +533,36 @@ export function NewBatchDialog({
                       )}
                     />
                   </Field>
-                  <Field
-                    label="Due date"
-                    optional
-                    note={
-                      dueDate && dueDate === picked?.due_date
-                        ? "from the order"
-                        : undefined
-                    }
-                    htmlFor="nb-due"
-                    error={errors.dueDate?.message}
-                  >
-                    <Controller
-                      name="dueDate"
-                      control={control}
-                      render={({ field }) => (
-                        <DateField
-                          id="nb-due"
-                          value={field.value ?? ""}
-                          onChange={field.onChange}
-                          placeholder="No date"
-                        />
+                  {/* Read-only: the customer's due date, owned by the batch's
+                      row in Products. Shown here so the planner sees it, but
+                      changed only there — one place for the date to live. */}
+                  <Field label="Due date" note="from Products">
+                    <div
+                      aria-readonly
+                      title="Set on the batch in Products"
+                      className={cn(
+                        FIELD,
+                        "flex cursor-not-allowed items-center gap-2 bg-sunken text-ink-3 hover:border-line",
                       )}
-                    />
+                    >
+                      <CalendarDays
+                        className="size-4 shrink-0 text-ink-5"
+                        aria-hidden
+                      />
+                      <span
+                        className={cn(
+                          "min-w-0 flex-1 truncate",
+                          !picked?.due_date && "text-ink-5",
+                        )}
+                      >
+                        {picked
+                          ? picked.due_date
+                            ? longDay(picked.due_date)
+                            : "No due date in Products"
+                          : "Pick a batch first"}
+                      </span>
+                      <Lock className="size-3.5 shrink-0 text-ink-5" aria-hidden />
+                    </div>
                   </Field>
                 </div>
               </section>
@@ -546,8 +646,11 @@ export function NewBatchDialog({
                   finished lot does: it ends in containers, and nothing else
                   says how many units go in one.
 
-                  It needs no bulk unit: nothing else draws on it, so there is
-                  no allocation to read back in one. */}
+                  So the block carries both halves under one heading — the
+                  bulk's (unit, overage) and the lot's (pack size, pack unit,
+                  market). Everything but a parent and the bulk received: a
+                  batch that makes its own bulk draws on nobody's, and the 0031
+                  family guard refuses a parent on anything but a finished lot. */}
               {type === "combined" && (
                 <TypeSection
                   icon={RefreshCw}
@@ -582,6 +685,56 @@ export function NewBatchDialog({
                     ) : null}
                   </p>
 
+                  <SubHead icon={Beaker}>Bulk production</SubHead>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Field
+                      label="Bulk unit"
+                      optional
+                      htmlFor="nb-bulk-unit-combined"
+                      error={errors.bulkUnit?.message}
+                    >
+                      <Controller
+                        name="bulkUnit"
+                        control={control}
+                        render={({ field }) => (
+                          <SelectField
+                            id="nb-bulk-unit-combined"
+                            value={field.value ?? ""}
+                            onChange={field.onChange}
+                            onBlur={field.onBlur}
+                            clearable
+                            options={BULK_UNITS.map((unit) => ({
+                              value: unit,
+                              label: unit,
+                            }))}
+                          />
+                        )}
+                      />
+                    </Field>
+                    <Field
+                      label="Overage %"
+                      note="extra made on purpose"
+                      optional
+                      htmlFor="nb-overage-combined"
+                      error={errors.overagePct?.message}
+                    >
+                      <input
+                        id="nb-overage-combined"
+                        type="number"
+                        step="any"
+                        min={0}
+                        max={100}
+                        placeholder="e.g. 4"
+                        className={cn(FIELD, MONO)}
+                        {...register("overagePct", { valueAsNumber: true })}
+                      />
+                    </Field>
+                  </div>
+                  <OverageNote control={control} required={picked?.required_qty} />
+
+                  <SubHead icon={Package} className="mt-4">
+                    Finished lot
+                  </SubHead>
                   <div className="grid gap-3 sm:grid-cols-3">
                     <Field
                       label="Pack size"
@@ -626,24 +779,19 @@ export function NewBatchDialog({
                       />
                     </Field>
                     <Field
-                      label="Overage %"
+                      label="Market"
                       optional
-                      htmlFor="nb-overage-combined"
-                      error={errors.overagePct?.message}
+                      htmlFor="nb-market-combined"
+                      error={errors.market?.message}
                     >
                       <input
-                        id="nb-overage-combined"
-                        type="number"
-                        step="any"
-                        min={0}
-                        max={100}
-                        placeholder="e.g. 4"
-                        className={cn(FIELD, MONO)}
-                        {...register("overagePct", { valueAsNumber: true })}
+                        id="nb-market-combined"
+                        placeholder="AU, NZ, UK…"
+                        className={FIELD}
+                        {...register("market")}
                       />
                     </Field>
                   </div>
-                  <OverageNote control={control} required={picked?.required_qty} />
                 </TypeSection>
               )}
 
@@ -854,10 +1002,34 @@ function emptyValues(factoryId: string): NewBatchValues {
     packUnit: "",
     bulkQtyReceived: undefined,
     market: "",
+    workOrder: "",
   };
 }
 
 /** The tinted block a batch type's own fields live in. */
+/** One half of the Single batch block — which batch's fields sit below it. */
+function SubHead({
+  icon: Icon,
+  className,
+  children,
+}: {
+  icon: typeof Package;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <p
+      className={cn(
+        "mb-2 flex items-center gap-1.5 text-[10.5px] font-semibold tracking-[0.04em] text-ink-4 uppercase",
+        className,
+      )}
+    >
+      <Icon className="size-3.5" aria-hidden />
+      {children}
+    </p>
+  );
+}
+
 function TypeSection({
   icon: Icon,
   title,

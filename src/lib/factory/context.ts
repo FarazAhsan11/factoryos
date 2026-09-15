@@ -1,6 +1,10 @@
 import { cache } from "react";
 import { notFound, redirect } from "next/navigation";
 
+import type {
+  BatchModel,
+  WorkOrderMode,
+} from "@/app/factory/[slug]/admin/schemas";
 import { createClient } from "@/lib/supabase/server";
 
 export type FactoryRole =
@@ -19,6 +23,10 @@ export interface FactoryContext {
     onboarded_at: string | null;
     oee_target: number;
     escalate_hours: number;
+    /** How batches are numbered (0042) — decides what New batch offers. */
+    batch_model: BatchModel;
+    /** Where work orders are recorded (0043) — per batch, per stage, or not. */
+    work_order_mode: WorkOrderMode;
   };
   /** The signed-in viewer's role, and whether they may edit factory setup. */
   role: FactoryRole;
@@ -57,7 +65,7 @@ export const getFactoryContext = cache(
       supabase
         .from("factories")
         .select(
-          "id, name, slug, description, logo_url, created_at, unit_label, unit_label_plural, onboarded_at, oee_target, escalate_hours",
+          "id, name, slug, description, logo_url, created_at, unit_label, unit_label_plural, onboarded_at, oee_target, escalate_hours, batch_model, work_order_mode",
         )
         .eq("slug", slug)
         .single(),

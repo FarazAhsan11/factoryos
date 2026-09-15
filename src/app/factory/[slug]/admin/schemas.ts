@@ -2,6 +2,69 @@ import { z } from "zod";
 
 import { todayKey } from "@/lib/factory/dates";
 
+/**
+ * How the company numbers a batch — `factories.batch_model` (migration 0042).
+ *
+ * `single`: manufacturing and packing share one number, so Pipeline → New
+ * batch asks for no type — every batch is a Single Batch. `split`: the bulk
+ * and the packed lot are
+ * numbered separately, so New batch asks for Bulk Production or Finished Lot,
+ * as two tabs, and never offers a Single Batch.
+ */
+export const BATCH_MODEL_VALUES = ["single", "split"] as const;
+export type BatchModel = (typeof BATCH_MODEL_VALUES)[number];
+
+export const BATCH_MODELS: {
+  value: BatchModel;
+  label: string;
+  description: string;
+}[] = [
+  {
+    value: "single",
+    label: "Single batch",
+    description: "Manufacturing and packing share one batch number.",
+  },
+  {
+    value: "split",
+    label: "Split batch",
+    description: "Manufacturing and packing use separate batch numbers.",
+  },
+];
+
+/**
+ * Where a work order number is recorded — `factories.work_order_mode` (0043).
+ *
+ * `none`: nowhere — neither New batch nor stage planning asks. `batch`: one
+ * per batch, asked in New batch and saved on the batch's row in Products
+ * (`factory_products.work_order`). `stage`: one per planned stage
+ * (`batch_stages.work_order`), asked when a stage is planned, never in New
+ * batch.
+ */
+export const WORK_ORDER_MODE_VALUES = ["none", "batch", "stage"] as const;
+export type WorkOrderMode = (typeof WORK_ORDER_MODE_VALUES)[number];
+
+export const WORK_ORDER_MODES: {
+  value: WorkOrderMode;
+  label: string;
+  description: string;
+}[] = [
+  {
+    value: "none",
+    label: "No work orders",
+    description: "Batches and stages are known by batch number alone.",
+  },
+  {
+    value: "batch",
+    label: "Work order per batch",
+    description: "New batch asks for one work order, saved on the batch.",
+  },
+  {
+    value: "stage",
+    label: "Work order per stage",
+    description: "Every stage planned on the pipeline gets its own work order.",
+  },
+];
+
 /** Admin → Company. Shared by the form and the Server Action. */
 export const companySettingsSchema = z.object({
   factoryId: z.uuid(),
@@ -28,6 +91,12 @@ export const companySettingsSchema = z.object({
     .int()
     .min(1, "Escalate after at least 1 hour.")
     .max(48, "Escalation caps at 48 hours."),
+  batchModel: z.enum(BATCH_MODEL_VALUES, {
+    error: "Pick a batch number model.",
+  }),
+  workOrderMode: z.enum(WORK_ORDER_MODE_VALUES, {
+    error: "Pick how work orders are tracked.",
+  }),
 });
 
 export type CompanySettingsValues = z.infer<typeof companySettingsSchema>;

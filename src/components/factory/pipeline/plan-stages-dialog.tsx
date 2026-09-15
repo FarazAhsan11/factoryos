@@ -82,12 +82,15 @@ export function PlanStagesDialog({
   job,
   factoryId,
   canManage,
+  showWorkOrder = false,
   onClose,
 }: {
   /** Null closes the dialog; setting one opens it on that batch. */
   job: PipelineJob | null;
   factoryId: string;
   canManage: boolean;
+  /** Admin → Company tracks a work order per stage (0043). */
+  showWorkOrder?: boolean;
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
@@ -395,6 +398,7 @@ export function PlanStagesDialog({
               <AddStageForm
                 processes={plannable}
                 rooms={rooms}
+                showWorkOrder={showWorkOrder}
                 onAdd={async (values) => {
                   await add.mutateAsync(values);
                 }}
@@ -736,10 +740,13 @@ function StageRow({
 function AddStageForm({
   processes,
   rooms,
+  showWorkOrder,
   onAdd,
 }: {
   processes: { id: string; name: string; category: string | null }[];
   rooms: { id: string; name: string }[];
+  /** Only a company tracking work orders per stage is asked for one. */
+  showWorkOrder: boolean;
   onAdd: (values: StageParsed) => Promise<void>;
 }) {
   const {
@@ -891,7 +898,14 @@ function AddStageForm({
       {/* Only needed when the batch runs the same activity more than once —
           three packing runs under one number. Left blank on the ordinary
           stage, where the activity name already says everything. */}
-      <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_1fr_auto]">
+      <div
+        className={cn(
+          "mt-2 grid gap-2",
+          showWorkOrder
+            ? "sm:grid-cols-[1fr_1fr_1fr_auto]"
+            : "sm:grid-cols-[1fr_1fr_auto]",
+        )}
+      >
         <div className="space-y-1">
           <label htmlFor="st-label" className={LABEL}>
             Label
@@ -903,17 +917,19 @@ function AddStageForm({
             {...register("label")}
           />
         </div>
-        <div className="space-y-1">
-          <label htmlFor="st-wo" className={LABEL}>
-            Work order
-          </label>
-          <input
-            id="st-wo"
-            placeholder="e.g. 46000D"
-            className={cn(FIELD, MONO)}
-            {...register("workOrder")}
-          />
-        </div>
+        {showWorkOrder && (
+          <div className="space-y-1">
+            <label htmlFor="st-wo" className={LABEL}>
+              Work order
+            </label>
+            <input
+              id="st-wo"
+              placeholder="e.g. 46000D"
+              className={cn(FIELD, MONO)}
+              {...register("workOrder")}
+            />
+          </div>
+        )}
         <div className="space-y-1">
           <label htmlFor="st-pack" className={LABEL}>
             Pack size

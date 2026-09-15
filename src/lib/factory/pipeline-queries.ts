@@ -273,8 +273,14 @@ export async function createBatchJob(
       pack_size: packs ? (values.packSize ?? null) : null,
       pack_unit: packs ? (values.packUnit ?? null) : null,
       bulk_qty_received: packing ? (values.bulkQtyReceived ?? null) : null,
-      market: packing ? (values.market || null) : null,
-      bulk_unit: manufacturing ? (values.bulkUnit ?? null) : null,
+      // A single batch is both halves under one number, so it carries the
+      // bulk's unit and the lot's market too — never a parent or a bulk
+      // received, which belong to a run drawing on somebody else's bulk.
+      market: packs ? (values.market || null) : null,
+      bulk_unit:
+        manufacturing || values.batchType === "combined"
+          ? (values.bulkUnit ?? null)
+          : null,
       // Anything that manufactures may declare one; a packing run may not, and
       // `pipeline_jobs_overage_belongs` (0032) refuses it if this ever slips.
       overage_pct: packing ? 0 : (values.overagePct ?? 0),
@@ -337,8 +343,11 @@ export async function updateBatchJob(
       pack_size: packs ? (values.packSize ?? null) : null,
       pack_unit: packs ? (values.packUnit ?? null) : null,
       bulk_qty_received: packing ? (values.bulkQtyReceived ?? null) : null,
-      market: packing ? values.market || null : null,
-      bulk_unit: manufacturing ? (values.bulkUnit ?? null) : null,
+      market: packs ? values.market || null : null,
+      bulk_unit:
+        manufacturing || values.batchType === "combined"
+          ? (values.bulkUnit ?? null)
+          : null,
       overage_pct: packing ? 0 : (values.overagePct ?? 0),
       tolerance_pct: values.tolerancePct ?? 0,
     })

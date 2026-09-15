@@ -62,6 +62,8 @@ export async function updateCompanySettings(
       unit_label_plural: input.unitLabelPlural,
       oee_target: input.oeeTarget,
       escalate_hours: input.escalateHours,
+      batch_model: input.batchModel,
+      work_order_mode: input.workOrderMode,
     })
     .eq("id", input.factoryId)
     .select("slug")

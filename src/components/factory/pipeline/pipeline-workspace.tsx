@@ -10,6 +10,10 @@ import { BatchFamilies } from "@/components/factory/pipeline/batch-families";
 import { JobDetailDialog } from "@/components/factory/pipeline/job-detail-dialog";
 import { EditBatchDialog } from "@/components/factory/pipeline/edit-batch-dialog";
 import { PlanStagesDialog } from "@/components/factory/pipeline/plan-stages-dialog";
+import type {
+  BatchModel,
+  WorkOrderMode,
+} from "@/app/factory/[slug]/admin/schemas";
 import { NewBatchDialog } from "@/components/factory/pipeline/new-batch-dialog";
 import { NewJobDialog } from "@/components/factory/pipeline/new-job-dialog";
 import { PipelineBoard } from "@/components/factory/pipeline/pipeline-board";
@@ -40,11 +44,17 @@ export function PipelineWorkspace({
   factoryId,
   userId,
   units,
+  batchModel,
+  workOrderMode,
   canManage,
 }: {
   factoryId: string;
   userId: string;
   units: { singular: string; plural: string };
+  /** Admin → Company's batch number model — what New batch offers. */
+  batchModel: BatchModel;
+  /** Admin → Company's work order tracking — where a work order is asked. */
+  workOrderMode: WorkOrderMode;
   canManage: boolean;
 }) {
   const queryClient = useQueryClient();
@@ -162,6 +172,8 @@ export function PipelineWorkspace({
               userId={userId}
               products={products}
               jobs={jobs}
+              batchModel={batchModel}
+              workOrderMode={workOrderMode}
               open={newBatchOpen}
               onOpenChange={(open) => {
                 setNewBatchOpen(open);
@@ -232,6 +244,7 @@ export function PipelineWorkspace({
           factoryId={factoryId}
           unitWord={units.singular}
           canManage={canManage}
+          showWorkOrder={workOrderMode === "stage"}
           onRefresh={refresh}
         />
       ) : tab === "families" ? (
@@ -287,6 +300,7 @@ export function PipelineWorkspace({
         job={planJob}
         factoryId={factoryId}
         canManage={canManage}
+        showWorkOrder={workOrderMode === "stage"}
         onClose={() => setPlanJob(null)}
       />
     </div>

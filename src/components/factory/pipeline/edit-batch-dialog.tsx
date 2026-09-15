@@ -302,16 +302,66 @@ export function EditBatchDialog({
               </TypeSection>
             )}
 
-            {/* The same three fields New batch offers. A value that can be
-                set at creation and not corrected afterwards is the drift this
-                dialog exists to prevent — the reason both forms share
-                `batchFields` in the first place. */}
+            {/* The same fields New batch offers — both halves, the bulk's and
+                the lot's, under one heading. A value that can be set at
+                creation and not corrected afterwards is the drift this dialog
+                exists to prevent — the reason both forms share `batchFields`
+                in the first place. */}
             {type === "combined" && (
               <TypeSection
                 icon={RefreshCw}
                 title="Single batch details"
                 tone="border-teal-line bg-teal-soft"
               >
+                <SubHead icon={Beaker}>Bulk production</SubHead>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field
+                    label="Bulk unit"
+                    optional
+                    htmlFor="eb-bulk-unit-combined"
+                    error={errors.bulkUnit?.message}
+                  >
+                    <Controller
+                      name="bulkUnit"
+                      control={control}
+                      render={({ field }) => (
+                        <SelectField
+                          id="eb-bulk-unit-combined"
+                          value={field.value ?? ""}
+                          onChange={field.onChange}
+                          onBlur={field.onBlur}
+                          clearable
+                          options={BULK_UNITS.map((unit) => ({
+                            value: unit,
+                            label: unit,
+                          }))}
+                        />
+                      )}
+                    />
+                  </Field>
+                  <Field
+                    label="Overage %"
+                    note="extra made on purpose"
+                    optional
+                    htmlFor="eb-overage-combined"
+                    error={errors.overagePct?.message}
+                  >
+                    <input
+                      id="eb-overage-combined"
+                      type="number"
+                      step="any"
+                      min={0}
+                      max={100}
+                      placeholder="e.g. 4"
+                      className={cn(FIELD, MONO)}
+                      {...register("overagePct", { valueAsNumber: true })}
+                    />
+                  </Field>
+                </div>
+
+                <SubHead icon={Package} className="mt-4">
+                  Finished lot
+                </SubHead>
                 <div className="grid gap-3 sm:grid-cols-3">
                   <Field
                     label="Pack size"
@@ -355,20 +405,16 @@ export function EditBatchDialog({
                     />
                   </Field>
                   <Field
-                    label="Overage %"
+                    label="Market"
                     optional
-                    htmlFor="eb-overage-combined"
-                    error={errors.overagePct?.message}
+                    htmlFor="eb-market-combined"
+                    error={errors.market?.message}
                   >
                     <input
-                      id="eb-overage-combined"
-                      type="number"
-                      step="any"
-                      min={0}
-                      max={100}
-                      placeholder="e.g. 4"
-                      className={cn(FIELD, MONO)}
-                      {...register("overagePct", { valueAsNumber: true })}
+                      id="eb-market-combined"
+                      placeholder="AU, NZ, UK…"
+                      className={FIELD}
+                      {...register("market")}
                     />
                   </Field>
                 </div>
@@ -630,6 +676,29 @@ function emptyValues(): EditBatchValues {
     bulkQtyReceived: undefined,
     market: "",
   };
+}
+
+/** One half of the Single batch block — which batch's fields sit below it. */
+function SubHead({
+  icon: Icon,
+  className,
+  children,
+}: {
+  icon: typeof Package;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <p
+      className={cn(
+        "mb-2 flex items-center gap-1.5 text-[10.5px] font-semibold tracking-[0.04em] text-ink-4 uppercase",
+        className,
+      )}
+    >
+      <Icon className="size-3.5" aria-hidden />
+      {children}
+    </p>
+  );
 }
 
 function TypeSection({

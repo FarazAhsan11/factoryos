@@ -35,6 +35,8 @@ export default async function PipelinePage({
         factoryId={factory.id}
         userId={user.id}
         units={unitWords(factory)}
+        batchModel={factory.batch_model}
+        workOrderMode={factory.work_order_mode}
         canManage={canManage}
       />
     </div>

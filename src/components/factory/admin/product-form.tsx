@@ -47,7 +47,7 @@ type DateName =
 /**
  * Every field a catalogue row carries, for adding one and for editing one.
  *
- * One form for both on purpose: Add product and the detail dialog's Edit ask
+ * One form for both on purpose: Add product and the row's Edit dialog ask
  * the same fifteen questions, and two copies of them is how the two drift —
  * one gains a limit, the other a placeholder. The differences are narrow and
  * named. In edit the batch number is locked, because it is what the shift log,

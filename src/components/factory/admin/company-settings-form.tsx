@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
@@ -10,9 +10,12 @@ import { toast } from "sonner";
 
 import { updateCompanySettings } from "@/app/factory/[slug]/admin/actions";
 import {
+  BATCH_MODELS,
+  WORK_ORDER_MODES,
   companySettingsSchema,
   type CompanySettingsValues,
 } from "@/app/factory/[slug]/admin/schemas";
+import { SelectField } from "@/components/ui/select-field";
 import type { FactoryContext } from "@/lib/factory/context";
 
 const FIELD =
@@ -30,6 +33,7 @@ export function CompanySettingsForm({
   const [error, setError] = useState<string | null>(null);
 
   const {
+    control,
     register,
     handleSubmit,
     reset,
@@ -44,6 +48,8 @@ export function CompanySettingsForm({
       unitLabelPlural: factory.unit_label_plural ?? "Units",
       oeeTarget: factory.oee_target,
       escalateHours: factory.escalate_hours,
+      batchModel: factory.batch_model ?? "single",
+      workOrderMode: factory.work_order_mode ?? "none",
     },
   });
 
@@ -145,6 +151,60 @@ export function CompanySettingsForm({
         </Field>
       </div>
 
+      {/* Decides what Pipeline → New batch asks: Single opens on Single
+          Batch; Split offers Bulk Production and Finished Lot as two tabs. */}
+      <Field
+        label="Batch number model"
+        hint="Company-wide — applies to all new batches."
+        error={errors.batchModel?.message}
+      >
+        <Controller
+          name="batchModel"
+          control={control}
+          render={({ field }) => (
+            <SelectField
+              value={field.value}
+              onChange={field.onChange}
+              onBlur={field.onBlur}
+              disabled={!canManage}
+              ariaInvalid={Boolean(errors.batchModel)}
+              options={BATCH_MODELS.map((model) => ({
+                value: model.value,
+                label: model.label,
+                hint: model.description,
+              }))}
+            />
+          )}
+        />
+      </Field>
+
+      {/* Decides where a work order is asked for: nowhere, once in New
+          batch (saved on the batch), or on every stage planned. */}
+      <Field
+        label="Work order tracking"
+        hint="Company-wide — decides where a work order is asked for."
+        error={errors.workOrderMode?.message}
+      >
+        <Controller
+          name="workOrderMode"
+          control={control}
+          render={({ field }) => (
+            <SelectField
+              value={field.value}
+              onChange={field.onChange}
+              onBlur={field.onBlur}
+              disabled={!canManage}
+              ariaInvalid={Boolean(errors.workOrderMode)}
+              options={WORK_ORDER_MODES.map((mode) => ({
+                value: mode.value,
+                label: mode.label,
+                hint: mode.description,
+              }))}
+            />
+          )}
+        />
+      </Field>
+
       {error && (
         <p
           role="alert"
@@ -175,11 +235,13 @@ export function CompanySettingsForm({
 
 function Field({
   label,
+  hint,
   error,
   optional,
   children,
 }: {
   label: string;
+  hint?: string;
   error?: string;
   optional?: boolean;
   children: React.ReactNode;
@@ -191,7 +253,11 @@ function Field({
         {optional && <span className="text-ink-5"> (optional)</span>}
       </span>
       {children}
-      {error && <p className="text-xs text-danger-deep">{error}</p>}
+      {error ? (
+        <p className="text-xs text-danger-deep">{error}</p>
+      ) : (
+        hint && <p className="text-xs text-ink-5">{hint}</p>
+      )}
     </div>
   );
 }

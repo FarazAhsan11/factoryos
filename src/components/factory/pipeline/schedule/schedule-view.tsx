@@ -54,6 +54,7 @@ export function ScheduleView({
   factoryId,
   unitWord,
   canManage,
+  showWorkOrder = false,
   onRefresh,
 }: {
   stages: BatchStage[];
@@ -61,6 +62,8 @@ export function ScheduleView({
   factoryId: string;
   unitWord: string;
   canManage: boolean;
+  /** Admin → Company tracks a work order per stage (0043). */
+  showWorkOrder?: boolean;
   onRefresh: () => void | Promise<void>;
 }) {
   const [view, setView] = useState<ViewKey>("board");
@@ -191,6 +194,7 @@ export function ScheduleView({
         job={editing?.job}
         factoryId={factoryId}
         canManage={canManage}
+        showWorkOrder={showWorkOrder}
         onSaved={onRefresh}
         onClose={() => setEditing(null)}
       />

@@ -1,5 +1,5 @@
-import { PageSkeleton } from "@/components/factory/page-skeleton";
+import { TablePageSkeleton } from "@/components/factory/page-skeleton";
 
 export default function ProductsLoading() {
-  return <PageSkeleton rows={3} />;
+  return <TablePageSkeleton className="max-w-6xl" heading={false} />;
 }

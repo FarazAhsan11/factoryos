@@ -417,9 +417,6 @@ export function formatMinutes(minutes: number | null): string {
 }
 
 /** Minutes between an instant and now — the clock that is still running. */
-export function minutesSince(iso: string): number {
-  return Math.max(
-    0,
-    Math.round((Date.now() - new Date(iso).getTime()) / 60000),
-  );
+export function minutesSince(iso: string, now: number = Date.now()): number {
+  return Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000));
 }

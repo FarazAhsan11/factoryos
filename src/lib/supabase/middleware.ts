@@ -29,10 +29,18 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  // IMPORTANT: getUser() revalidates the token; keep it right after client init.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // IMPORTANT: keep this right after client init — it is what refreshes an
+  // expired session and writes the new cookies onto the response.
+  //
+  // `getClaims()` rather than `getUser()`: it refreshes the session exactly
+  // the same way, then verifies the JWT's signature — locally, against the
+  // project's cached signing keys, when the project signs with asymmetric
+  // keys, and by falling back to `getUser()` when it doesn't. This runs on
+  // every request, so skipping a round trip to Supabase Auth here is felt on
+  // every navigation. The pages themselves still authorize through
+  // `getFactoryContext`, which asks the Auth server directly.
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims ?? null;
 
   const path = request.nextUrl.pathname;
 

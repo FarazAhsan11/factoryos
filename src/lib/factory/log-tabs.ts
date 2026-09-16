@@ -29,3 +29,23 @@ export function resolveLogTab(tab: string | undefined, canReview = true) {
   return logTabsFor(canReview).find((t) => t.value === tab && t.ready)?.value ??
     "entry";
 }
+
+/**
+ * The two ways the Log entry tab can be filled in.
+ *
+ * **Form** is one entry at a time, every field labelled — the right shape for
+ * an operator in one room. **Grid** is every room at once, one line each — the
+ * right shape for whoever is catching up the whole floor after a round.
+ * Both write the same record through the same schema; only the layout differs.
+ */
+export const LOG_VIEWS = [
+  { value: "form", label: "Form" },
+  { value: "grid", label: "Grid" },
+] as const;
+
+export type LogView = (typeof LOG_VIEWS)[number]["value"];
+
+/** Falls back to the form for an unknown or missing ?view=. */
+export function resolveLogView(view: string | undefined): LogView {
+  return LOG_VIEWS.find((v) => v.value === view)?.value ?? "form";
+}

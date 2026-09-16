@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { Building2, Loader2, PanelLeftClose, X } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { Building2, PanelLeftClose, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import type { FactoryRole } from "@/lib/factory/context";
 import { navForRole } from "@/lib/factory/nav";
+import { prefetchModule } from "@/lib/factory/nav-prefetch";
 import { useSidebar } from "@/components/factory/sidebar-context";
 
 /**
@@ -18,32 +19,46 @@ import { useSidebar } from "@/components/factory/sidebar-context";
  * to a 72px icon strip, and the preference sticks per browser. Below `lg` it
  * is an off-canvas drawer over the page, opened from the header menu button.
  *
- * Navigation is optimistic: the clicked item highlights immediately and shows
- * a spinner while the route streams in, so the rail never looks frozen.
+ * Navigation is optimistic: the clicked item highlights in the same frame as
+ * the click, and the page area swaps to that page's skeleton at once (see
+ * `NavigationFrame`). There is no spinner on the item — the page area already
+ * says the page is on its way, and a second indicator in the rail only made
+ * the switch look slower than it was.
+ *
+ * Pointing at an item also starts on the page's lists (`prefetchModule`), so
+ * they load alongside the route instead of after it.
  */
 export function FactorySidebar({
+  factoryId,
   slug,
   role,
   factoryName,
   logoUrl,
 }: {
+  /** Which tenant's lists to warm when an item is pointed at. */
+  factoryId: string;
   slug: string;
   role: FactoryRole;
   factoryName: string;
   logoUrl: string | null;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
-  const [pendingHref, setPendingHref] = useState<string | null>(null);
-  const { collapsed, toggleCollapsed, mobileOpen, setMobileOpen, mounted } =
-    useSidebar();
+  const queryClient = useQueryClient();
+  const {
+    collapsed,
+    toggleCollapsed,
+    mobileOpen,
+    setMobileOpen,
+    mounted,
+    pendingHref,
+    navigate,
+  } = useSidebar();
   const base = `/factory/${slug}`;
 
   // While a navigation is in flight, treat the destination as current. Once
   // the transition settles we fall back to the real pathname — no effect and
   // no stale state to clear.
-  const currentPath = isPending && pendingHref ? pendingHref : pathname;
+  const currentPath = pendingHref ?? pathname;
 
   // The collapse is a desktop idea only: an icon strip you had to open a
   // drawer to reach would be a worse rail, not a smaller one. Every collapsed
@@ -168,7 +183,6 @@ export function FactorySidebar({
                     item.href === ""
                       ? currentPath === base
                       : currentPath.startsWith(href);
-                  const loading = isPending && pendingHref === href;
 
                   const shared = cn(
                     "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-200",
@@ -209,6 +223,15 @@ export function FactorySidebar({
                         href={href}
                         prefetch
                         aria-current={active ? "page" : undefined}
+                        onMouseEnter={() =>
+                          prefetchModule(queryClient, factoryId, item.href)
+                        }
+                        onFocus={() =>
+                          prefetchModule(queryClient, factoryId, item.href)
+                        }
+                        onTouchStart={() =>
+                          prefetchModule(queryClient, factoryId, item.href)
+                        }
                         onClick={(event) => {
                           // Let modified clicks (new tab, etc.) behave normally.
                           if (
@@ -221,14 +244,17 @@ export function FactorySidebar({
                           }
                           event.preventDefault();
                           setMobileOpen(false);
-                          if (href === pathname) return;
-                          setPendingHref(href);
-                          startTransition(() => router.push(href));
+                          if (href === pathname && !pendingHref) return;
+                          navigate(href);
                         }}
                         className={cn(
                           shared,
                           active
-                            ? "bg-gradient-to-r from-brand to-brand-bright font-semibold text-white shadow-brand"
+                            ? // No transition into the active state: the
+                              // gradient can't animate, so easing only the
+                              // text colour left the item half-selected for
+                              // 200ms after the click.
+                              "bg-gradient-to-r from-brand to-brand-bright font-semibold text-white shadow-brand transition-none"
                             : "text-ink-3 hover:bg-surface hover:text-ink hover:shadow-soft",
                         )}
                       >
@@ -239,15 +265,6 @@ export function FactorySidebar({
                           )}
                         />
                         <Label hidden={icons}>{item.label}</Label>
-                        {loading && (
-                          <Loader2
-                            className={cn(
-                              "size-3.5 shrink-0 animate-spin",
-                              active ? "text-white" : "text-brand",
-                              icons && "lg:absolute lg:right-1 lg:top-1",
-                            )}
-                          />
-                        )}
                         {icons && <Tip>{item.label}</Tip>}
                       </Link>
                     </li>

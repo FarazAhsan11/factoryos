@@ -1,5 +1,5 @@
-import { PageSkeleton } from "@/components/factory/page-skeleton";
+import { SettingsPageSkeleton } from "@/components/factory/page-skeleton";
 
 export default function AdminLoading() {
-  return <PageSkeleton rows={3} />;
+  return <SettingsPageSkeleton tabs={5} />;
 }

@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 
 import { LogWorkspace } from "@/components/factory/log/log-workspace";
 import { getFactoryContext, unitWords } from "@/lib/factory/context";
-import { resolveLogTab } from "@/lib/factory/log-tabs";
-import { createClient } from "@/lib/supabase/server";
+import { resolveLogTab, resolveLogView } from "@/lib/factory/log-tabs";
 
 export const metadata: Metadata = {
   title: "Shift log · FactoryOS",
@@ -15,19 +13,16 @@ export default async function ShiftLogPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; view?: string }>;
 }) {
   const { slug } = await params;
-  const { tab } = await searchParams;
-  const { factory, canManage, role } = await getFactoryContext(slug);
+  const { tab, view } = await searchParams;
+  const { factory, canManage, role, viewer } = await getFactoryContext(slug);
 
   // Everyone in the factory logs entries, so there's no role gate here — but
-  // the insert is stamped with the signed-in user, which RLS checks.
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  // the insert is stamped with the signed-in user, which RLS checks. The
+  // viewer comes from the factory context, which has already asked Supabase
+  // Auth who this is; asking again here was a second round trip per visit.
 
   // Decides whether the Shift report tab exists at all: the report is the
   // handover document — every room side by side rather than the operator's
@@ -51,9 +46,10 @@ export default async function ShiftLogPage({
       <LogWorkspace
         factoryId={factory.id}
         factoryName={factory.name}
-        userId={user.id}
+        userId={viewer.id}
         units={unitWords(factory)}
         initialTab={resolveLogTab(tab, canReview)}
+        initialView={resolveLogView(view)}
         canManage={canManage}
         canReview={canReview}
       />

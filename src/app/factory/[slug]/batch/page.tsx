@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 
 import { BatchRecordWorkspace } from "@/components/factory/batch/batch-record-workspace";
 import { getFactoryContext, unitWords } from "@/lib/factory/context";
-import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "Batch record · FactoryOS",
@@ -25,13 +23,7 @@ export default async function BatchRecordPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const { factory, role } = await getFactoryContext(slug);
-
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const { factory, role, viewer } = await getFactoryContext(slug);
 
   return (
     /* Fills the workspace frame from `lg` up rather than growing the page, so
@@ -42,7 +34,7 @@ export default async function BatchRecordPage({
     <div className="mx-auto w-full max-w-6xl lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
       <BatchRecordWorkspace
         factoryId={factory.id}
-        userId={user.id}
+        userId={viewer.id}
         role={role}
         units={unitWords(factory)}
       />

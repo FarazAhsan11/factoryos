@@ -22,6 +22,7 @@ import {
   type KaizenIdea,
   type KaizenStatus,
 } from "@/lib/factory/kaizen-queries";
+import { secondNow, useRenderClock } from "@/lib/use-render-clock";
 import { cn } from "@/lib/utils";
 
 /**
@@ -84,6 +85,9 @@ function Body({
   canReview: boolean;
   onClose: () => void;
 }) {
+  // Read per render through the hook, so the relative times below stay as
+  // current as they were before the React Compiler (see `useRenderClock`).
+  const now = useRenderClock(secondNow);
   const queryClient = useQueryClient();
   const [note, setNote] = useState(idea.review_note ?? "");
   const [declining, setDeclining] = useState(false);
@@ -136,7 +140,7 @@ function Body({
       <DialogHeader>
         <DialogTitle className="text-ink">Improvement idea</DialogTitle>
         <DialogDescription className="break-words">
-          {idea.submitted_by_name ?? "Unknown"} · {timeAgo(idea.created_at)} ·{" "}
+          {idea.submitted_by_name ?? "Unknown"} · {timeAgo(idea.created_at, now)} ·{" "}
           {idea.category} · {IMPACT_LABELS[idea.impact]}
         </DialogDescription>
       </DialogHeader>
@@ -150,7 +154,7 @@ function Body({
         </span>
         {idea.reviewed_by_name && idea.reviewed_at && (
           <span className="rounded-full bg-sunken-2 px-2 py-0.5 text-[10px] font-semibold text-ink-3">
-            {idea.reviewed_by_name} · {timeAgo(idea.reviewed_at)}
+            {idea.reviewed_by_name} · {timeAgo(idea.reviewed_at, now)}
           </span>
         )}
       </div>

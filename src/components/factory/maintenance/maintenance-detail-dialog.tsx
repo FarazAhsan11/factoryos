@@ -27,6 +27,7 @@ import {
   type MaintenancePhase,
   type MaintenanceRequest,
 } from "@/lib/factory/maintenance-queries";
+import { secondNow, useRenderClock } from "@/lib/use-render-clock";
 import { cn } from "@/lib/utils";
 
 /**
@@ -285,6 +286,9 @@ function Initiation({
 /* ── Section 2 ────────────────────────────────────────────────────────── */
 
 function Engineering({ request }: { request: MaintenanceRequest }) {
+  // Read per render through the hook, so the relative times below stay as
+  // current as they were before the React Compiler (see `useRenderClock`).
+  const now = useRenderClock(secondNow);
   if (request.status === "reported") {
     return (
       <Empty
@@ -309,7 +313,7 @@ function Engineering({ request }: { request: MaintenanceRequest }) {
             formatMinutes(request.downtime_minutes)
           ) : request.work_started_at ? (
             <span className="font-semibold text-warn-deep">
-              {formatMinutes(minutesSince(request.work_started_at))} and running
+              {formatMinutes(minutesSince(request.work_started_at, now))} and running
             </span>
           ) : (
             "—"
@@ -446,12 +450,15 @@ function Answer({
 
 /** Response and downtime, side by side — the two numbers this module is for. */
 function Clocks({ request }: { request: MaintenanceRequest }) {
+  // Read per render through the hook, so the relative times below stay as
+  // current as they were before the React Compiler (see `useRenderClock`).
+  const now = useRenderClock(secondNow);
   if (request.status === "reported") {
     return (
       <p className="min-w-0 truncate text-xs text-ink-4">
         Waiting{" "}
         <span className="font-semibold text-ink">
-          {formatMinutes(minutesSince(request.created_at))}
+          {formatMinutes(minutesSince(request.created_at, now))}
         </span>{" "}
         for someone to take it
       </p>
@@ -479,7 +486,7 @@ function Clocks({ request }: { request: MaintenanceRequest }) {
           {request.downtime_minutes !== null
             ? formatMinutes(request.downtime_minutes)
             : request.work_started_at
-              ? `${formatMinutes(minutesSince(request.work_started_at))}…`
+              ? `${formatMinutes(minutesSince(request.work_started_at, now))}…`
               : "—"}
         </span>
       </span>

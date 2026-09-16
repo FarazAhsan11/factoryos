@@ -34,6 +34,7 @@ import {
   type RunningShift,
 } from "@/lib/factory/shift-time-queries";
 import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
+import { useRenderClock } from "@/lib/use-render-clock";
 import { cn } from "@/lib/utils";
 
 /** Pipeline status → what an idle room's row should say it is doing. */
@@ -70,6 +71,9 @@ export function ShiftReportWorkspace({
 }) {
   const [date, setDate] = useState(todayISO);
   const [shift, setShift] = useState<RunningShift>("morning");
+  // Today, read on every render — through the hook, or the React Compiler
+  // would keep the day the sheet was opened (see `useRenderClock`).
+  const today = useRenderClock(todayISO);
   /**
    * The row the correction dialog is open on.
    *
@@ -89,7 +93,7 @@ export function ShiftReportWorkspace({
     queryFn: () => fetchShiftReportEntries(factoryId, date, shift),
     // A shift in progress is still being written to. Today's sheet keeps up on
     // its own; a past one is finished and refetching it buys nothing.
-    refetchInterval: date === todayISO() ? 60_000 : false,
+    refetchInterval: date === today ? 60_000 : false,
   });
 
   const { data: unitList = [] } = useQuery({
@@ -170,7 +174,7 @@ export function ShiftReportWorkspace({
               clearing falls back to today rather than to nothing. */}
         <DateField
           value={date}
-          max={todayISO()}
+          max={today}
           onChange={(next) => setDate(next || todayISO())}
           ariaLabel="Report date"
           className="h-9 w-[11.5rem] shadow-soft"

@@ -25,6 +25,7 @@ import {
   priorityMeta,
   type MaintenanceRequest,
 } from "@/lib/factory/maintenance-queries";
+import { secondNow, useRenderClock } from "@/lib/use-render-clock";
 import { cn } from "@/lib/utils";
 
 type FilterKey = "all" | string;
@@ -396,6 +397,9 @@ export function RequestRow({
  * nothing to say, and a "0m" there would read as a machine that never broke.
  */
 function Downtime({ request }: { request: MaintenanceRequest }) {
+  // Read per render through the hook, so the relative times below stay as
+  // current as they were before the React Compiler (see `useRenderClock`).
+  const now = useRenderClock(secondNow);
   if (request.downtime_minutes !== null) {
     return (
       <span className="text-ink-3">
@@ -406,7 +410,7 @@ function Downtime({ request }: { request: MaintenanceRequest }) {
   if (request.work_started_at) {
     return (
       <span className="mr-1.5 rounded-md bg-warn-soft px-1.5 py-0.5 font-semibold text-warn-deep ring-1 ring-warn-line">
-        Down {formatMinutes(minutesSince(request.work_started_at))}
+        Down {formatMinutes(minutesSince(request.work_started_at, now))}
       </span>
     );
   }

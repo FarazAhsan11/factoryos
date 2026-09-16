@@ -1,5 +1,5 @@
-import { PageSkeleton } from "@/components/factory/page-skeleton";
+import { SplitPageSkeleton } from "@/components/factory/page-skeleton";
 
 export default function ShiftLogLoading() {
-  return <PageSkeleton rows={4} />;
+  return <SplitPageSkeleton variant="log" />;
 }

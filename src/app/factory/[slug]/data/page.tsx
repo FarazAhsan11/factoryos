@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 
 import { DataTableWorkspace } from "@/components/factory/data/data-table-workspace";
 import { getFactoryContext, unitWords } from "@/lib/factory/context";
-import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "Shift log data · FactoryOS",
@@ -17,16 +15,10 @@ export default async function ShiftLogDataPage({
   const { slug } = await params;
   // No role gate, matching the shift log itself: everyone who logs entries can
   // read back what their factory logged. RLS scopes the rows to the tenant.
-  const { factory, canManage } = await getFactoryContext(slug);
+  const { factory, canManage, viewer } = await getFactoryContext(slug);
 
-  // Needed to decide which rows offer an Amend button — the update policy
+  // The viewer decides which rows offer an Amend button — the update policy
   // allows the entry's author or a manager, and the UI mirrors that.
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
   return (
     /* Fills the workspace frame from `lg` up rather than growing the page:
        the table then has a bounded box to scroll inside, which is what makes
@@ -36,7 +28,7 @@ export default async function ShiftLogDataPage({
         factoryId={factory.id}
         factoryName={factory.name}
         units={unitWords(factory)}
-        userId={user.id}
+        userId={viewer.id}
         canManage={canManage}
       />
     </div>

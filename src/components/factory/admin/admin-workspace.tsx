@@ -199,7 +199,10 @@ function Panel({
   if (!visited) return null;
 
   return (
-    <div role="tabpanel" hidden={!active}>
+    // Eases in whenever it comes back from `hidden` — the animation restarts
+    // each time the panel is displayed again, so a switch fades rather than
+    // snaps.
+    <div role="tabpanel" hidden={!active} className="animate-in fade-in-0">
       {children}
     </div>
   );

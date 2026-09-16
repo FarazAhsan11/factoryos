@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 
 import { KaizenWorkspace } from "@/components/factory/kaizen/kaizen-workspace";
 import { getFactoryContext } from "@/lib/factory/context";
-import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "Kaizen · FactoryOS",
@@ -22,27 +20,14 @@ export default async function KaizenPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const { factory, role } = await getFactoryContext(slug);
-
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const { factory, role, viewer } = await getFactoryContext(slug);
 
   // The form shows who an idea will be credited to instead of asking for a
-  // name. Read here rather than in the client so the panel doesn't render
-  // "Submitted as …" empty for a moment on every open.
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, email")
-    .eq("id", user.id)
-    .maybeSingle();
-
+  // name. Resolved on the server rather than in the client so the panel
+  // doesn't render "Submitted as …" empty for a moment on every open — and
+  // from the factory context, which has already read this person's profile.
   const userName =
-    profile?.full_name?.trim() ||
-    profile?.email?.split("@")[0] ||
-    "your account";
+    viewer.fullName?.trim() || viewer.email.split("@")[0] || "your account";
 
   // Wider than `canManage` on purpose: reviewing improvement ideas is the
   // supervisor's job, and routing every one through an admin is how a queue
@@ -70,7 +55,7 @@ export default async function KaizenPage({
 
       <KaizenWorkspace
         factoryId={factory.id}
-        userId={user.id}
+        userId={viewer.id}
         userName={userName}
         canReview={canReview}
       />

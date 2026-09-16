@@ -206,15 +206,18 @@ export function LogGridRow({
 
   // Mirrored into the form values because that is what the schema's
   // cross-field rules read, and what decides which cells are live at all.
+  //
+  // Every derived write in this row checks the value first. `setValue` wakes
+  // the row's watchers whether or not anything changed, and on a freshly
+  // mounted row these effects were each forcing another full render of an
+  // unchanged line — times twenty-five rooms, on every opening of the grid.
   useEffect(() => {
     const process = processes.find((p) => p.id === processId);
     const next = (process?.category as ProcessCategory) ?? "production";
-    setValue("category", next);
-    setValue(
-      "hasMachine",
-      next === "production" && Boolean(process?.flags.machine),
-    );
-  }, [processId, processes, setValue]);
+    const machine = next === "production" && Boolean(process?.flags.machine);
+    if (getValues("category") !== next) setValue("category", next);
+    if (getValues("hasMachine") !== machine) setValue("hasMachine", machine);
+  }, [processId, processes, setValue, getValues]);
 
   const isDowntime = category === "downtime";
   const isPreparatory = category === "preparatory";
@@ -348,12 +351,11 @@ export function LogGridRow({
   // more of the activity — not about when the row was typed.
   useEffect(() => {
     if (!shiftTimes) return;
-    setValue(
-      "shift",
+    const next =
       resolveShiftForEntry(shiftTimes, startTime ?? "", duration) ??
-        resolveCurrentShift(shiftTimes),
-    );
-  }, [shiftTimes, startTime, duration, setValue]);
+      resolveCurrentShift(shiftTimes);
+    if (getValues("shift") !== next) setValue("shift", next);
+  }, [shiftTimes, startTime, duration, setValue, getValues]);
 
   /**
    * How wide the two clocks open: the operator's own shift, or the whole day
@@ -382,8 +384,9 @@ export function LogGridRow({
   // Never typed, in either direction — clearing it matters as much as setting
   // it, or a stale figure sits in a read-only cell looking like a fact.
   useEffect(() => {
-    setValue("targetQty", derivedTarget ?? undefined);
-  }, [derivedTarget, setValue]);
+    const next = derivedTarget ?? undefined;
+    if (getValues("targetQty") !== next) setValue("targetQty", next);
+  }, [derivedTarget, setValue, getValues]);
 
   const thisQty = typeof qty === "number" && !Number.isNaN(qty) ? qty : 0;
 

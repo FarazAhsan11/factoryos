@@ -128,12 +128,16 @@ export function LogWorkspace({
 
           `lg:grid-rows-1` is what makes the columns equal-height: without a
           single explicit row, each panel sizes to its own content and the
-          taller one sets a page scroll again. */}
+          taller one sets a page scroll again.
+
+          `animate-in fade-in-0`: a panel coming back from `display: none`
+          restarts its animation, so every switch eases in over 150ms instead
+          of snapping — the same on all three panels below. */}
       <div
         role="tabpanel"
         aria-hidden={isReport || isGrid}
         className={cn(
-          "grid items-start gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_380px] lg:grid-rows-1 lg:items-stretch",
+          "grid items-start gap-5 animate-in fade-in-0 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_380px] lg:grid-rows-1 lg:items-stretch",
           (isReport || isGrid) && "hidden",
         )}
       >
@@ -161,7 +165,7 @@ export function LogWorkspace({
           role="tabpanel"
           aria-hidden={!isGrid}
           className={cn(
-            "flex flex-col lg:min-h-0 lg:flex-1",
+            "flex flex-col animate-in fade-in-0 lg:min-h-0 lg:flex-1",
             !isGrid && "hidden",
           )}
         >
@@ -178,13 +182,15 @@ export function LogWorkspace({
           leaving it mounted would keep its minute-by-minute refetch running
           behind a form nobody is reading it from. */}
       {isReport && (
-        <ShiftReportWorkspace
-          factoryId={factoryId}
-          factoryName={factoryName}
-          units={units}
-          userId={userId}
-          canManage={canManage}
-        />
+        <div className="animate-in fade-in-0 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col print:block print:animate-none">
+          <ShiftReportWorkspace
+            factoryId={factoryId}
+            factoryName={factoryName}
+            units={units}
+            userId={userId}
+            canManage={canManage}
+          />
+        </div>
       )}
     </div>
   );

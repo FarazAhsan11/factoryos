@@ -1,4 +1,5 @@
 import { FactorySidebar } from "@/components/factory/factory-sidebar";
+import { NavigationFrame } from "@/components/factory/navigation-frame";
 import { ShiftIndicator } from "@/components/factory/shift-indicator";
 import { SidebarMenuButton } from "@/components/factory/sidebar-menu-button";
 import { SidebarProvider } from "@/components/factory/sidebar-context";
@@ -46,6 +47,7 @@ export function FactoryShell({
     <SidebarProvider>
       <div className="bg-canvas max-lg:min-h-svh lg:flex lg:h-svh lg:overflow-hidden print:block print:h-auto print:overflow-visible">
         <FactorySidebar
+          factoryId={factory.id}
           slug={factory.slug ?? ""}
           role={role}
           factoryName={factory.name}
@@ -85,7 +87,7 @@ export function FactoryShell({
               the space and scrolls internally. No prop, no route-sniffing —
               the page decides by how it sizes itself. */}
           <main className="min-w-0 flex-1 px-6 py-5 lg:flex lg:min-h-0 lg:flex-col lg:overflow-y-auto print:overflow-visible print:px-0 print:py-0">
-            {children}
+            <NavigationFrame>{children}</NavigationFrame>
           </main>
         </div>
       </div>

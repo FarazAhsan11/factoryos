@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useRef, useState } from "react";
 import { Check, Flag, Plus, ShieldCheck, Sheet } from "lucide-react";
 
 import {
@@ -170,21 +170,17 @@ export function LogGrid({
             </tr>
           </thead>
 
-          {registers.units.map((unit) => (
-            <RoomBlock
-              key={unit.id}
-              factoryId={factoryId}
-              userId={userId}
-              canManage={canManage}
-              unit={{ id: unit.id, name: unit.name }}
-              registers={registers}
-              logged={logged[unit.id] ?? []}
-              extraRows={extraRows[unit.id] ?? []}
-              onAddRow={addRow}
-              onRemoveRow={removeRow}
-              onLogged={addLogged}
-            />
-          ))}
+          <RoomBlocks
+            factoryId={factoryId}
+            userId={userId}
+            canManage={canManage}
+            registers={registers}
+            logged={logged}
+            extraRows={extraRows}
+            onAddRow={addRow}
+            onRemoveRow={removeRow}
+            onLogged={addLogged}
+          />
         </table>
       </div>
 
@@ -200,6 +196,73 @@ export function LogGrid({
       </footer>
     </section>
   );
+}
+
+/** Nothing logged, no rows added — shared so an idle room's props never change. */
+const NO_ENTRIES: LogEntry[] = [];
+const NO_ROWS: string[] = [];
+
+/**
+ * How many rooms the grid draws on its first paint. Enough to fill a screen;
+ * the rest follow in a background render (see `RoomBlocks`).
+ */
+const FIRST_PAINT_ROOMS = 8;
+
+/**
+ * Every room's block, drawn in two passes.
+ *
+ * A grid row is a whole entry form — a dozen controls, each with its own
+ * popup machinery — and twenty-five of them in one synchronous render is what
+ * made opening the grid stall. `useDeferredValue` with an initial value paints
+ * the first screenful at once and renders the remaining rooms at background
+ * priority straight after, so the sheet is usable before it is complete and
+ * nothing a user does waits on rooms below the fold.
+ *
+ * Its own component so the deferral starts when the rooms first exist: a hook
+ * in the grid itself would mount while the registers were still loading, and
+ * the "first paint" would be spent on zero rooms.
+ */
+function RoomBlocks({
+  factoryId,
+  userId,
+  canManage,
+  registers,
+  logged,
+  extraRows,
+  onAddRow,
+  onRemoveRow,
+  onLogged,
+}: {
+  factoryId: string;
+  userId: string;
+  canManage: boolean;
+  registers: LogRegisters;
+  logged: Record<string, LogEntry[]>;
+  extraRows: Record<string, string[]>;
+  onAddRow: (unitId: string) => void;
+  onRemoveRow: (unitId: string, key: string) => void;
+  onLogged: (unitId: string, entry: LogEntry) => void;
+}) {
+  const total = registers.units.length;
+  const shown = useDeferredValue(total, Math.min(total, FIRST_PAINT_ROOMS));
+
+  return registers.units.slice(0, shown).map((unit) => (
+    <RoomBlock
+      key={unit.id}
+      factoryId={factoryId}
+      userId={userId}
+      canManage={canManage}
+      // The register's own object, not a fresh `{ id, name }`: a new object
+      // per render would re-render every room whenever any one of them logs.
+      unit={unit}
+      registers={registers}
+      logged={logged[unit.id] ?? NO_ENTRIES}
+      extraRows={extraRows[unit.id] ?? NO_ROWS}
+      onAddRow={onAddRow}
+      onRemoveRow={onRemoveRow}
+      onLogged={onLogged}
+    />
+  ));
 }
 
 /**

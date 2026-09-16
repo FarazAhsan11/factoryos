@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 
 import { LogWorkspace } from "@/components/factory/log/log-workspace";
 import { getFactoryContext, unitWords } from "@/lib/factory/context";
-import { resolveLogTab } from "@/lib/factory/log-tabs";
+import { resolveLogTab, resolveLogView } from "@/lib/factory/log-tabs";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -15,10 +15,10 @@ export default async function ShiftLogPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; view?: string }>;
 }) {
   const { slug } = await params;
-  const { tab } = await searchParams;
+  const { tab, view } = await searchParams;
   const { factory, canManage, role } = await getFactoryContext(slug);
 
   // Everyone in the factory logs entries, so there's no role gate here — but
@@ -54,6 +54,7 @@ export default async function ShiftLogPage({
         userId={user.id}
         units={unitWords(factory)}
         initialTab={resolveLogTab(tab, canReview)}
+        initialView={resolveLogView(view)}
         canManage={canManage}
         canReview={canReview}
       />

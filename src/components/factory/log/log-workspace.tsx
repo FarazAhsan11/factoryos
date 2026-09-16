@@ -4,9 +4,11 @@ import { useCallback, useState } from "react";
 
 import { AdminTabs } from "@/components/factory/admin/admin-tabs";
 import { ActivityFeed } from "@/components/factory/log/activity-feed";
+import { LogGrid } from "@/components/factory/log/grid/log-grid";
 import { LogEntryForm } from "@/components/factory/log/log-entry-form";
+import { LogViewToggle } from "@/components/factory/log/log-view-toggle";
 import { ShiftReportWorkspace } from "@/components/factory/report/shift-report-workspace";
-import { logTabsFor } from "@/lib/factory/log-tabs";
+import { logTabsFor, type LogView } from "@/lib/factory/log-tabs";
 import { cn } from "@/lib/utils";
 
 /**
@@ -27,6 +29,11 @@ import { cn } from "@/lib/utils";
  * Neither the form nor the feed is handed a working day: the form stamps one
  * at submit time and the feed picks its own, so a session left open across
  * midnight can't file entries under the wrong date or hide them.
+ *
+ * Log entry itself comes in two views. **Form** is the one-entry form with its
+ * feed; **Grid** is every room on one sheet, a line each, for catching up the
+ * whole floor at once. Same schema, same write, same database rules — only the
+ * layout differs, so which to use is a preference, not a permission.
  */
 export function LogWorkspace({
   factoryId,
@@ -34,6 +41,7 @@ export function LogWorkspace({
   userId,
   units,
   initialTab,
+  initialView,
   canManage,
   canReview,
 }: {
@@ -43,16 +51,44 @@ export function LogWorkspace({
   userId: string;
   units: { singular: string; plural: string };
   initialTab: string;
+  initialView: LogView;
   canManage: boolean;
   /** Supervisor and up. Also decides whether the report tab exists at all. */
   canReview: boolean;
 }) {
   const [tab, setTab] = useState(initialTab);
+  const [view, setView] = useState<LogView>(initialView);
+  /**
+   * Mounted on first use and kept mounted after: a grid with five rooms half
+   * typed must survive a look at the form or the report, and a user who never
+   * opens it never pays for twenty-five row forms.
+   */
+  const [gridOpened, setGridOpened] = useState(initialView === "grid");
   const isReport = tab === "report";
+  const isGrid = !isReport && view === "grid";
 
-  const select = useCallback((value: string) => {
-    setTab(value);
-    window.history.replaceState(null, "", `?tab=${value}`);
+  const select = useCallback(
+    (value: string) => {
+      setTab(value);
+      window.history.replaceState(
+        null,
+        "",
+        value === "entry" && view === "grid"
+          ? `?tab=entry&view=grid`
+          : `?tab=${value}`,
+      );
+    },
+    [view],
+  );
+
+  const selectView = useCallback((next: LogView) => {
+    setView(next);
+    if (next === "grid") setGridOpened(true);
+    window.history.replaceState(
+      null,
+      "",
+      next === "grid" ? `?tab=entry&view=grid` : `?tab=entry`,
+    );
   }, []);
 
   return (
@@ -61,7 +97,7 @@ export function LogWorkspace({
     <div
       className={cn(
         "mx-auto flex w-full flex-col lg:min-h-0 lg:flex-1",
-        isReport ? "max-w-[1400px]" : "max-w-7xl",
+        isReport ? "max-w-[1400px]" : isGrid ? "max-w-[1600px]" : "max-w-7xl",
       )}
     >
       {/* No heading above the strip. The form has to fit on one screen
@@ -72,13 +108,17 @@ export function LogWorkspace({
 
           Hidden on paper: the report prints as a handover document, and a tab
           strip is a control, not part of the record. */}
-      <AdminTabs
-        tabs={logTabsFor(canReview)}
-        active={tab}
-        label="Shift log sections"
-        onSelect={select}
-        className="print:hidden"
-      />
+      <div className="mb-5 flex shrink-0 flex-wrap items-center justify-between gap-3 print:hidden">
+        <AdminTabs
+          tabs={logTabsFor(canReview)}
+          active={tab}
+          label="Shift log sections"
+          onSelect={select}
+          className="mb-0"
+        />
+        {/* A setting of the Log entry tab, so it is only on screen there. */}
+        {!isReport && <LogViewToggle value={view} onChange={selectView} />}
+      </div>
 
       {/* The entry pair is hidden rather than unmounted: the form is long,
           often half-filled, and a glance at the report must not throw that
@@ -91,10 +131,10 @@ export function LogWorkspace({
           taller one sets a page scroll again. */}
       <div
         role="tabpanel"
-        aria-hidden={isReport}
+        aria-hidden={isReport || isGrid}
         className={cn(
           "grid items-start gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_380px] lg:grid-rows-1 lg:items-stretch",
-          isReport && "hidden",
+          (isReport || isGrid) && "hidden",
         )}
       >
         <div className="min-w-0 lg:min-h-0">
@@ -113,6 +153,26 @@ export function LogWorkspace({
           canManage={canManage}
         />
       </div>
+
+      {/* The grid, hidden rather than unmounted for the form's reason — rows
+          typed into and not yet logged must survive a switch of view or tab. */}
+      {gridOpened && (
+        <div
+          role="tabpanel"
+          aria-hidden={!isGrid}
+          className={cn(
+            "flex flex-col lg:min-h-0 lg:flex-1",
+            !isGrid && "hidden",
+          )}
+        >
+          <LogGrid
+            factoryId={factoryId}
+            userId={userId}
+            units={units}
+            canManage={canManage}
+          />
+        </div>
+      )}
 
       {/* The report is unmounted when it isn't showing — it is read-only, and
           leaving it mounted would keep its minute-by-minute refetch running

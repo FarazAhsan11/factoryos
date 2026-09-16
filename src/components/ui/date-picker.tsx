@@ -10,6 +10,7 @@ import {
   X,
 } from "lucide-react";
 
+import { minutesNow, useRenderClock } from "@/lib/use-render-clock";
 import { cn } from "@/lib/utils";
 
 /**
@@ -650,9 +651,10 @@ export function TimeField({
       : MINUTES;
 
   // "Now" outside the window would write a time the window forbids, so it is
-  // offered only when it is a legal answer.
-  const now = new Date();
-  const nowAllowed = inWindow(now.getHours() * 60 + now.getMinutes());
+  // offered only when it is a legal answer. The clock is read through a hook
+  // so it is current on every render — see `useRenderClock`.
+  const nowMinutes = useRenderClock(minutesNow);
+  const nowAllowed = inWindow(nowMinutes);
 
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>

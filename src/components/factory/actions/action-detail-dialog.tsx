@@ -33,6 +33,7 @@ import {
   relativeTime,
   type FactoryAction,
 } from "@/lib/factory/action-queries";
+import { secondNow, useRenderClock } from "@/lib/use-render-clock";
 import { cn } from "@/lib/utils";
 
 const CONTROL =
@@ -406,6 +407,9 @@ function Body({
  * nobody is asking.
  */
 function Clock({ action }: { action: FactoryAction }) {
+  // Read per render through the hook, so the relative times below stay as
+  // current as they were before the React Compiler (see `useRenderClock`).
+  const now = useRenderClock(secondNow);
   if (action.status === "closed") {
     return (
       <p className="min-w-0 truncate text-xs text-ink-4">
@@ -432,13 +436,13 @@ function Clock({ action }: { action: FactoryAction }) {
         className="font-semibold"
         style={{ color: late ? (tone as string) : "var(--color-ink-4)" }}
       >
-        {relativeTime(at as string)}
+        {relativeTime(at as string, now)}
       </span>
       {/* The one number that turns "overdue" into something actionable: how
           long before this becomes a management problem. */}
       {action.is_overdue && !action.is_escalated && (
         <span className="text-warn-deep">
-          · escalates {relativeTime(action.escalates_at)}
+          · escalates {relativeTime(action.escalates_at, now)}
         </span>
       )}
     </p>

@@ -9,6 +9,7 @@ import {
   type ActionPriority,
   type FactoryAction,
 } from "@/lib/factory/action-queries";
+import { secondNow, useRenderClock } from "@/lib/use-render-clock";
 import { cn } from "@/lib/utils";
 
 /**
@@ -49,6 +50,9 @@ export function ActionList({
   actions: FactoryAction[];
   onOpen: (action: FactoryAction) => void;
 }) {
+  // Read per render through the hook, so the relative times below stay as
+  // current as they were before the React Compiler (see `useRenderClock`).
+  const now = useRenderClock(secondNow);
   return (
     <ul className="space-y-2.5">
       {actions.map((action) => (
@@ -177,7 +181,7 @@ export function ActionList({
               <span className="font-mono text-[11px] tabular-nums text-ink-5">
                 {action.status === "closed" ? (
                   <>
-                    Closed {action.closed_at && relativeTime(action.closed_at)}
+                    Closed {action.closed_at && relativeTime(action.closed_at, now)}
                   </>
                 ) : action.verify_due_at ? (
                   <>
@@ -190,7 +194,7 @@ export function ActionList({
                           : "text-ink-4",
                       )}
                     >
-                      {relativeTime(action.verify_due_at)}
+                      {relativeTime(action.verify_due_at, now)}
                     </span>
                   </>
                 ) : (
@@ -202,7 +206,7 @@ export function ActionList({
                         action.is_overdue ? "text-danger-deep" : "text-ink-4",
                       )}
                     >
-                      {relativeTime(action.due_at)}
+                      {relativeTime(action.due_at, now)}
                     </span>
                   </>
                 )}
@@ -214,7 +218,7 @@ export function ActionList({
             {action.is_overdue && !action.is_escalated && (
               <p className="mt-2 flex items-center gap-1.5 rounded-lg bg-warn-tint px-2 py-1 text-[11px] font-medium text-warn-deep ring-1 ring-warn-line">
                 <AlertTriangle className="size-3 shrink-0" />
-                Escalates {relativeTime(action.escalates_at)}
+                Escalates {relativeTime(action.escalates_at, now)}
               </p>
             )}
           </button>

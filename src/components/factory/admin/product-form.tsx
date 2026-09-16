@@ -14,6 +14,7 @@ import {
 import { FIELD } from "@/components/factory/admin/settings-ui";
 import { DateField } from "@/components/ui/date-picker";
 import { todayKey } from "@/lib/factory/dates";
+import { useRenderClock } from "@/lib/use-render-clock";
 import { cn } from "@/lib/utils";
 
 const MONO = "font-mono tracking-tight";
@@ -98,8 +99,9 @@ export function ProductForm({
   });
 
   // Read per render rather than at module load: a tab left open overnight
-  // would otherwise still be refusing today.
-  const today = todayKey();
+  // would otherwise still be refusing today. Through the hook, or the React
+  // Compiler caches the first read for the life of the form.
+  const today = useRenderClock(todayKey);
 
   async function submit(values: ProductValues) {
     try {

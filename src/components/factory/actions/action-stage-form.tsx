@@ -40,6 +40,7 @@ import {
   saveRootCause,
   type FactoryAction,
 } from "@/lib/factory/action-queries";
+import { secondNow, useRenderClock } from "@/lib/use-render-clock";
 import { cn } from "@/lib/utils";
 
 const FIELD =
@@ -566,6 +567,9 @@ function ClosePanel({
   role: FactoryRole;
   onDone: () => Promise<void> | void;
 }) {
+  // Read per render through the hook, so the relative times below stay as
+  // current as they were before the React Compiler (see `useRenderClock`).
+  const now = useRenderClock(secondNow);
   const {
     register,
     handleSubmit,
@@ -602,7 +606,7 @@ function ClosePanel({
                 action.is_verify_overdue ? "text-warn-deep" : "text-ink",
               )}
             >
-              {relativeTime(action.verify_due_at)}
+              {relativeTime(action.verify_due_at, now)}
             </span>
           </>
         )}

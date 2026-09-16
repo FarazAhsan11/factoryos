@@ -18,6 +18,7 @@ import {
   type KaizenFilter,
   type KaizenIdea,
 } from "@/lib/factory/kaizen-queries";
+import { secondNow, useRenderClock } from "@/lib/use-render-clock";
 import { cn } from "@/lib/utils";
 
 const IMPACT_TINT = Object.fromEntries(KAIZEN_IMPACTS.map((i) => [i.value, i]));
@@ -201,6 +202,9 @@ function IdeaRow({
   /** A reviewer, or the person who submitted it. Everyone else just reads. */
   canOpen: boolean;
 }) {
+  // Read per render through the hook, so the relative times below stay as
+  // current as they were before the React Compiler (see `useRenderClock`).
+  const now = useRenderClock(secondNow);
   const status = STATUS_META[idea.status];
   const impact = IMPACT_TINT[idea.impact];
 
@@ -234,7 +238,7 @@ function IdeaRow({
         </div>
 
         <p className="text-[11px] break-words text-ink-5">
-          {idea.submitted_by_name ?? "Unknown"} · {timeAgo(idea.created_at)}
+          {idea.submitted_by_name ?? "Unknown"} · {timeAgo(idea.created_at, now)}
           {idea.reviewed_by_name && ` · reviewed by ${idea.reviewed_by_name}`}
         </p>
 

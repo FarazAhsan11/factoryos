@@ -16,6 +16,7 @@ import {
 } from "@/components/factory/log/grid/use-log-registers";
 import { formatMinutes, type LogEntry } from "@/lib/factory/shift-log-queries";
 import { resolveCurrentShift } from "@/lib/factory/shift-time-queries";
+import { useRenderClock } from "@/lib/use-render-clock";
 import { cn } from "@/lib/utils";
 
 /**
@@ -77,6 +78,13 @@ export function LogGrid({
     }));
   }, []);
 
+  const shiftTimes = registers.shiftTimes;
+  // The running shift, read on every render through the hook so the header
+  // follows the clock across a handover (see `useRenderClock`).
+  const running = useRenderClock(() =>
+    shiftTimes ? resolveCurrentShift(shiftTimes) : null,
+  );
+
   const loggedCount = Object.values(logged).reduce(
     (sum, list) => sum + list.length,
     0,
@@ -95,9 +103,6 @@ export function LogGrid({
       </div>
     );
   }
-
-  const shiftTimes = registers.shiftTimes;
-  const running = shiftTimes ? resolveCurrentShift(shiftTimes) : null;
 
   return (
     <section className="flex flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-card lg:min-h-0 lg:flex-1">

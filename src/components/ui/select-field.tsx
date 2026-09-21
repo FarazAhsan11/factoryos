@@ -141,6 +141,12 @@ export function SelectField({
     <Combobox.Root<SelectOption>
       items={items}
       value={selected}
+      // The input is only ever the search box, never a mirror of the choice.
+      // Left unset, Base UI seeds the query with the label chosen at mount and
+      // clears it on close only if an input is rendered — which a short list
+      // never has. So after picking a different option, reopening filtered
+      // every row against the old label and showed "Nothing matches that".
+      defaultInputValue=""
       disabled={disabled}
       onValueChange={(next) => onChange(next?.value ?? "")}
       // The option objects are rebuilt on every parent render, so identity

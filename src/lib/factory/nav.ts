@@ -3,6 +3,7 @@ import {
   BarChart3,
   Boxes,
   FileSearch,
+  FileWarning,
   Lightbulb,
   LayoutGrid,
   ListPlus,
@@ -127,6 +128,15 @@ export const FACTORY_NAV: NavSection[] = [
         label: "Maintenance",
         icon: Wrench,
         roles: ALL,
+        ready: true,
+      },
+      // The QA register. Supervisor and up, as in the prototype: raising a
+      // quarantine NCR stops a batch, and closing one is a QA sign-off.
+      {
+        href: "/deviations",
+        label: "Deviations & NCRs",
+        icon: FileWarning,
+        roles: SUPERVISOR_UP,
         ready: true,
       },
     ],

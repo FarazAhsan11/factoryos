@@ -2,13 +2,21 @@
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ClipboardList, PackageSearch, Wrench, Zap } from "lucide-react";
+import {
+  ClipboardList,
+  FileWarning,
+  PackageSearch,
+  Wrench,
+  Zap,
+} from "lucide-react";
 
 import { ActionDetailDialog } from "@/components/factory/actions/action-detail-dialog";
 import { ActionList } from "@/components/factory/actions/action-list";
 import { BatchActivityList } from "@/components/factory/batch/batch-activity-list";
 import { BatchEntryDialog } from "@/components/factory/batch/batch-entry-dialog";
 import { BatchSearch } from "@/components/factory/batch/batch-search";
+import { DeviationDetailDialog } from "@/components/factory/deviations/deviation-detail-dialog";
+import { DeviationRow } from "@/components/factory/deviations/deviations-workspace";
 import { BatchTypeBadge } from "@/components/factory/pipeline/batch-type-badge";
 import { MaintenanceDetailDialog } from "@/components/factory/maintenance/maintenance-detail-dialog";
 import { RequestRow } from "@/components/factory/maintenance/maintenance-workspace";
@@ -18,6 +26,10 @@ import {
   type FactoryAction,
 } from "@/lib/factory/action-queries";
 import type { FactoryRole } from "@/lib/factory/context";
+import {
+  deviationKeys,
+  fetchDeviations,
+} from "@/lib/factory/deviation-queries";
 import {
   fetchMaintenanceRequests,
   maintenanceKeys,
@@ -35,18 +47,18 @@ import {
 } from "@/lib/factory/shift-log-queries";
 import { cn } from "@/lib/utils";
 
-type Tab = "activity" | "issues" | "maintenance";
+type Tab = "activity" | "issues" | "maintenance" | "deviations";
 
 /**
  * Batch record — one batch, everything that happened to it.
  *
- * The three modules that write about a batch each answer to their own working
+ * The four modules that write about a batch each answer to their own working
  * rhythm: the shift log is filled hour by hour, issues are worked through
- * stages over days, maintenance runs its own three-section document. That is
- * right for the people doing the work and useless for the person asked, six
- * weeks later, what happened to batch 47004. This screen is that question,
- * and nothing else — it reads the same three tables and writes to none of
- * them.
+ * stages over days, maintenance runs its own three-section document, and QA
+ * raises and closes deviations and NCRs. That is right for the people doing
+ * the work and useless for the person asked, six weeks later, what happened
+ * to batch 47004. This screen is that question, and nothing else — it reads
+ * the same four tables and writes to none of them.
  *
  * **Activity**, not "production": the first tab holds every entry filed
  * against the batch, and a room's downtime and its mixing steps are as much
@@ -73,6 +85,9 @@ export function BatchRecordWorkspace({
   const [openRequest, setOpenRequest] = useState<MaintenanceRequest | null>(
     null,
   );
+  // An id rather than a snapshot, so the dialog shows the record closed the
+  // moment it is signed from here.
+  const [openDeviationId, setOpenDeviationId] = useState<string | null>(null);
 
   const batchNo = product?.batch_no ?? "";
 
@@ -103,6 +118,11 @@ export function BatchRecordWorkspace({
     queryFn: () => fetchMaintenanceRequests(factoryId),
     enabled: Boolean(batchNo),
   });
+  const { data: deviations = [], isPending: deviationsPending } = useQuery({
+    queryKey: deviationKeys.all(factoryId),
+    queryFn: () => fetchDeviations(factoryId),
+    enabled: Boolean(batchNo),
+  });
   const { data: jobs = [] } = useQuery({
     queryKey: pipelineKeys.all(factoryId),
     queryFn: () => fetchPipelineJobs(factoryId),
@@ -128,6 +148,15 @@ export function BatchRecordWorkspace({
       requests.filter((r) => (r.batch_no ?? "").trim().toLowerCase() === key),
     [requests, key],
   );
+  const batchDeviations = useMemo(
+    () =>
+      deviations.filter(
+        (d) => (d.batch_no ?? "").trim().toLowerCase() === key,
+      ),
+    [deviations, key],
+  );
+  const openDeviation =
+    deviations.find((d) => d.id === openDeviationId) ?? null;
   const job = useMemo(
     () => jobs.find((j) => j.product_id === product?.id) ?? null,
     [jobs, product],
@@ -152,12 +181,19 @@ export function BatchRecordWorkspace({
       count: batchRequests.length,
       icon: Wrench,
     },
+    {
+      id: "deviations",
+      label: "Deviations",
+      count: batchDeviations.length,
+      icon: FileWarning,
+    },
   ];
 
   const pending =
     (tab === "activity" && entriesPending) ||
     (tab === "issues" && actionsPending) ||
-    (tab === "maintenance" && requestsPending);
+    (tab === "maintenance" && requestsPending) ||
+    (tab === "deviations" && deviationsPending);
 
   return (
     <div className="flex w-full flex-col gap-4 lg:min-h-0 lg:flex-1">
@@ -218,7 +254,7 @@ export function BatchRecordWorkspace({
             </div>
           </header>
 
-          {/* ── The three questions ───────────────────────────────────
+          {/* ── The four questions ────────────────────────────────────
               Counts on the tabs, because "were there any issues?" is answered
               by the number on the tab rather than by opening it. */}
           <div
@@ -280,19 +316,36 @@ export function BatchRecordWorkspace({
               ) : (
                 <ActionList actions={batchActions} onOpen={setOpenAction} />
               )
-            ) : batchRequests.length === 0 ? (
+            ) : tab === "maintenance" ? (
+              batchRequests.length === 0 ? (
+                <Nothing
+                  icon={Wrench}
+                  text={`No maintenance has been requested against ${product.batch_no}.`}
+                />
+              ) : (
+                <ul className="space-y-2.5">
+                  {batchRequests.map((request) => (
+                    <RequestRow
+                      key={request.id}
+                      request={request}
+                      unitWord={units.singular}
+                      onOpen={() => setOpenRequest(request)}
+                    />
+                  ))}
+                </ul>
+              )
+            ) : batchDeviations.length === 0 ? (
               <Nothing
-                icon={Wrench}
-                text={`No maintenance has been requested against ${product.batch_no}.`}
+                icon={FileWarning}
+                text={`No deviations or NCRs have been raised against ${product.batch_no}.`}
               />
             ) : (
               <ul className="space-y-2.5">
-                {batchRequests.map((request) => (
-                  <RequestRow
-                    key={request.id}
-                    request={request}
-                    unitWord={units.singular}
-                    onOpen={() => setOpenRequest(request)}
+                {batchDeviations.map((deviation) => (
+                  <DeviationRow
+                    key={deviation.id}
+                    deviation={deviation}
+                    onOpen={() => setOpenDeviationId(deviation.id)}
                   />
                 ))}
               </ul>
@@ -317,6 +370,12 @@ export function BatchRecordWorkspace({
         role={role}
         unitWord={units.singular}
         onClose={() => setOpenRequest(null)}
+      />
+      <DeviationDetailDialog
+        deviation={openDeviation}
+        factoryId={factoryId}
+        role={role}
+        onClose={() => setOpenDeviationId(null)}
       />
     </div>
   );
@@ -361,9 +420,9 @@ function EmptyState() {
         Search a batch to open its record.
       </p>
       <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-ink-5">
-        Everything logged on the floor, every issue raised and every maintenance
-        request for one batch — gathered from the three screens that record
-        them, and read-only.
+        Everything logged on the floor, and every issue, maintenance request
+        and deviation raised for one batch — gathered from the screens that
+        record them, and read-only.
       </p>
     </div>
   );

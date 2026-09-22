@@ -40,6 +40,7 @@ Applied by hand via **Supabase Dashboard → SQL Editor**, in order, continuing 
 | `0025_action_batch.sql` | `actions.batch_no` + `product_id`; `actions_from_log()` now records the batch it already looked up; `actions_expanded` rebuilt with the product joined on. See §16 |
 | `0024_maintenance_requests.sql` | `factory_departments` setup list; `factory_counters` + `next_document_number()`; `maintenance_priority` / `maintenance_status` enums; `maintenance_requests` + RLS + the number-stamping trigger; `maintenance_requests_expanded` view. See §15 |
 | `0023_overrun_flag.sql` | Overproduction: `overrun_note` / `_cleared_by` / `_cleared_at` on `shift_log_entries`, a rewritten `shift_log_amend_guard` that tells a clearance from an amendment, and `shift_log_entries_expanded` rebuilt with `is_overrun` / `overrun_qty` / `needs_overrun_note`. See §13 |
+| `0044_deviations.sql` | Deviations & NCRs: `deviation_type` / `deviation_status` / `ncr_disposition` enums; `deviations` + RLS; `deviations_guard()` (number, product resolution, the open → closed gate); `batch_quarantine_no()`; `deviations_hold_batch()`; `shift_log_quarantine_guard()`; a replaced `pipeline_sync_from_log()`; `deviations_expanded`; `pipeline_jobs_expanded` with `quarantine_no` appended. Needs `0024`, `0033` and `0037` applied. See §17 |
 
 No new npm dependencies.
 
@@ -738,7 +739,49 @@ The shift log keeps its own `BatchAutofill`, and that is not duplication: there 
 
 ---
 
-## 17. Related docs
+## 17. Deviations & NCRs — migration `0044`
+
+**Files:** migration `0044`, `deviation-queries.ts`, `deviations/schemas.ts`, `deviations-workspace.tsx`, `new-deviation-dialog.tsx`, `deviation-detail-dialog.tsx`, `use-capa-options.ts`, `batch-record-workspace.tsx`, `pipeline-queries.ts`, `pipeline-board.tsx`, `job-detail-dialog.tsx`, `log-entry-form.tsx`, `log-grid-row.tsx`, `nav.ts`, `nav-prefetch.ts`, `navigation-frame.tsx`. Ported from the prototype's Deviations / NCR view.
+
+### The record
+
+Three types, and the type is part of the number: **planned** and **unplanned** deviations are `DEV-2026-004`, an **NCR** is `NCR-2026-001` — two counters in `factory_counters` (kinds `DEV` and `NCR`), stamped by `deviations_guard` like a maintenance request's. The fields are the prototype's: specification, what actually happened (required, ≥ 10 characters), potential impact, raised by, QA reviewer, and an optional link to a CAPA in the Issues register (`action_id`, `on delete set null`).
+
+An NCR also takes a **disposition** — use as is, rework, reject or quarantine — and a deviation takes none (`deviations_disposition_ncr_only`).
+
+The batch is typed, as everywhere else, and resolved to `product_id` **by the trigger**, not the browser: a quarantine must never miss its card because a form forgot a lookup. Records are matched to the Batch record on `batch_no`, the same as issues and maintenance.
+
+### Open → Closed
+
+One gate, forward only. Closing costs a QA reviewer's name and a closing note (≥ 10 characters), and stamps `closed_at` / `closed_by`. For an NCR it also costs a **final disposition that isn't quarantine**: quarantine is a hold while QA decides, not the decision itself. A closed record is frozen — every column that records something is refused — except that the `on delete set null` references may still be nulled, or a closed deviation would block deleting a CAPA.
+
+Raising and closing are supervisor and up (`can_review_factory`), matching the nav item and the prototype. There is no delete policy.
+
+### Quarantine
+
+An open NCR with disposition quarantine, against a batch in the register (the guard refuses one against an unknown batch):
+
+| | While the NCR is open | After it is closed |
+|---|---|---|
+| Pipeline card | Put **On hold**, reason Quality, by `deviations_hold_batch` (a finished card is left alone) | Stays on hold |
+| Preparatory / production entry | **Refused** by `shift_log_quarantine_guard`, naming the NCR | Accepted, and releases the hold |
+| Downtime entry | Accepted, and **does not** release the hold | Accepted, and does not release the hold |
+
+`batch_quarantine_no(product)` is the one definition of "quarantined", read by the guard, the sync and the board view. Closing releases nothing by itself: the next preparatory or production entry is the shift log saying the batch is being worked again, and a rejected batch is never worked again, so it stays held.
+
+The guard, like the stage guard, skips an amendment that leaves the batch and the activity where they were — correcting an entry filed before the NCR is not new work. The log form and the grid say the refusal before the submit, from `quarantine_no` on the cached board (appended to `pipeline_jobs_expanded`, so it costs no request); the board card and the job dialog say "Quarantined — NCR-…" instead of the generic hold line.
+
+### Downtime no longer releases any hold
+
+`pipeline_sync_from_log` is replaced with one rule added besides the quarantine: **a downtime entry never releases a hold** — a flagged issue's included. A downtime entry is about the room and says nothing about the batch being worked again; only a preparatory or production entry releases. Downtime still starts a planned job and still moves the card to the room it names, as before.
+
+### Left out
+
+Editing an open record's fields after it is raised (the trigger allows it; there is no form); raising a CAPA *from* a deviation rather than linking an existing one; linking Maintenance's QA "deviation raised" answer to this register (it stays a typed number); the prototype's yield-sign-off prompt to raise a deviation; stopping a **stage sign-off** on a quarantined batch — only the shift log is gated.
+
+---
+
+## 18. Related docs
 
 - `docs/IMPLEMENTATION_GUIDE.md` — everything up to and including the shift log and data table. **Read first.**
 - `docs/PROGRESS.md` — narrative record of what landed when.

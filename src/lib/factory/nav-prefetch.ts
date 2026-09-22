@@ -5,6 +5,10 @@ import {
   batchStageKeys,
   fetchFactoryStages,
 } from "@/lib/factory/batch-stage-queries";
+import {
+  deviationKeys,
+  fetchDeviations,
+} from "@/lib/factory/deviation-queries";
 import { employeeKeys, fetchEmployees } from "@/lib/factory/employee-queries";
 import {
   equipmentKeys,
@@ -130,6 +134,12 @@ const WARMERS: Record<string, Warm> = {
     void client.prefetchQuery({
       queryKey: maintenanceKeys.all(factoryId),
       queryFn: () => fetchMaintenanceRequests(factoryId),
+    });
+  },
+  "/deviations": (client, factoryId) => {
+    void client.prefetchQuery({
+      queryKey: deviationKeys.all(factoryId),
+      queryFn: () => fetchDeviations(factoryId),
     });
   },
   "/kaizen": (client, factoryId) => {

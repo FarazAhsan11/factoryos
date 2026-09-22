@@ -295,10 +295,17 @@ function JobCard({
 
         {/* The hold's cause, not just its existence — "On hold" alone sends
             someone to the shift log to find out why. */}
-        {job.status === "hold" && job.hold_reason && (
-          <p className="mt-2 rounded-lg bg-warn-tint px-2 py-1 text-[11px] font-medium text-warn-ink ring-1 ring-warn-line">
-            Held — {job.hold_reason.toLowerCase()} issue flagged
+        {job.quarantine_no ? (
+          <p className="mt-2 rounded-lg bg-danger-soft px-2 py-1 text-[11px] font-medium text-danger-deep ring-1 ring-danger-line">
+            Quarantined — {job.quarantine_no}
           </p>
+        ) : (
+          job.status === "hold" &&
+          job.hold_reason && (
+            <p className="mt-2 rounded-lg bg-warn-tint px-2 py-1 text-[11px] font-medium text-warn-ink ring-1 ring-warn-line">
+              Held — {job.hold_reason.toLowerCase()} issue flagged
+            </p>
+          )
         )}
 
         {/* Nothing can be logged against this batch yet, and the operator who

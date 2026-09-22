@@ -396,6 +396,23 @@ into five minutes.
 Both views read the stages and jobs the workspace already fetches for the
 Kanban board, so the tab costs no extra request.
 
+### 9f. Deviations & NCRs — migration 0044
+
+The prototype's QA register, under Accountability: planned and unplanned
+deviations numbered `DEV-2026-…`, NCRs numbered `NCR-2026-…`, each open until
+QA closes it with a name and a closing note. An NCR carries a disposition, and
+closing one needs a final one — quarantine is a hold, not an outcome.
+
+Quarantine is the part that reaches past the module. An open quarantine NCR
+holds the batch's card, and the shift log refuses preparatory and production
+entries against the batch until the NCR is closed. Downtime is still accepted,
+because a room loses time whatever its batch is doing, but it never releases
+the hold. The same migration makes that true of every hold: a downtime entry
+used to release a flagged issue's hold as if the batch were running again.
+
+The Batch record gained a fourth tab, Deviations. Details in
+IMPLEMENTATION_GUIDE_2 §17.
+
 ---
 
 ## 10. Next steps

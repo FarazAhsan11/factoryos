@@ -59,6 +59,7 @@ function PendingSkeleton({ href }: { href: string }) {
     case "/actions":
       return <ListPageSkeleton />;
     case "/maintenance":
+    case "/deviations":
       return <ListPageSkeleton action />;
     case "/data":
       return <TablePageSkeleton className="max-w-[1600px]" />;

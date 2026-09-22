@@ -93,6 +93,14 @@ export interface PipelineJob {
   /** What still stands between this plan and being issued. */
   stages_without_target: number;
   final_target_qty: number | null;
+
+  /* ── Deviations & NCRs (0044) ──────────────────────────────────────── */
+  /**
+   * The open quarantine NCR holding this batch — "NCR-2026-003" — or null.
+   * While set, the card stays on hold and the shift log refuses preparatory
+   * and production entries against the batch; downtime is still accepted.
+   */
+  quarantine_no: string | null;
 }
 
 const COLUMNS = `
@@ -105,7 +113,7 @@ const COLUMNS = `
   parent_batch_no, parent_product_name, child_count,
   allocated_qty, bulk_consumed,
   issued_at, stage_count, stages_complete, stages_without_target,
-  final_target_qty
+  final_target_qty, quarantine_no
 `;
 
 export const pipelineKeys = {

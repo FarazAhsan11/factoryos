@@ -511,6 +511,13 @@ export function LogEntryForm({
         body: "A manager adds it on the Pipeline, plans its stages and issues it before work can be logged against it.",
       };
     }
+    // Checked by `shift_log_quarantine_guard` (0044), ahead of the stage rules.
+    if (job.quarantine_no) {
+      return {
+        head: `Batch ${typed} is quarantined under ${job.quarantine_no}.`,
+        body: "Preparatory and production work can't be logged against it until QA closes the NCR. You can still log downtime against it.",
+      };
+    }
     if (!job.issued_at) {
       return {
         head: `Batch ${typed} isn't issued for production yet.`,

@@ -19,7 +19,7 @@ export default async function DeviationsPage({
   // what actually enforces raising and closing. The role is passed down so the
   // screens can say so rather than letting RLS refuse a typed-out form.
   return (
-    <div className="mx-auto w-full max-w-5xl lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
+    <div className="mx-auto w-full max-w-[1600px] lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
       <DeviationsWorkspace
         factoryId={factory.id}
         userId={viewer.id}

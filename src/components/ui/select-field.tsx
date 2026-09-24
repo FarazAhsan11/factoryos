@@ -268,7 +268,9 @@ function Row({ item }: { item: SelectOption }) {
         )}
       </span>
       {item.meta && (
-        <span className="col-start-3 shrink-0 font-mono text-[11px] font-normal text-ink-5">
+        // Capped so an over-long meta truncates itself instead of squeezing the
+        // label to nothing — sentences belong in `hint`.
+        <span className="col-start-3 max-w-40 truncate font-mono text-[11px] font-normal text-ink-5">
           {item.meta}
         </span>
       )}

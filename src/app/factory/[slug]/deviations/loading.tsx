@@ -1,5 +1,5 @@
-import { ListPageSkeleton } from "@/components/factory/page-skeleton";
+import { TablePageSkeleton } from "@/components/factory/page-skeleton";
 
 export default function DeviationsLoading() {
-  return <ListPageSkeleton action />;
+  return <TablePageSkeleton className="max-w-[1600px]" />;
 }

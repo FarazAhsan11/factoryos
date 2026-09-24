@@ -133,7 +133,7 @@ export function InitiationFields({
                 options={DEVIATION_TYPES.map((t) => ({
                   value: t.value,
                   label: t.label,
-                  meta: t.hint,
+                  hint: t.hint,
                 }))}
               />
             )}

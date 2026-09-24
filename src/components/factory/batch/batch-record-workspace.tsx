@@ -16,7 +16,7 @@ import { BatchActivityList } from "@/components/factory/batch/batch-activity-lis
 import { BatchEntryDialog } from "@/components/factory/batch/batch-entry-dialog";
 import { BatchSearch } from "@/components/factory/batch/batch-search";
 import { DeviationDetailDialog } from "@/components/factory/deviations/deviation-detail-dialog";
-import { DeviationRow } from "@/components/factory/deviations/deviations-workspace";
+import { DeviationsTable } from "@/components/factory/deviations/deviations-table";
 import { BatchTypeBadge } from "@/components/factory/pipeline/batch-type-badge";
 import { MaintenanceDetailDialog } from "@/components/factory/maintenance/maintenance-detail-dialog";
 import { RequestRow } from "@/components/factory/maintenance/maintenance-workspace";
@@ -334,21 +334,13 @@ export function BatchRecordWorkspace({
                   ))}
                 </ul>
               )
-            ) : batchDeviations.length === 0 ? (
-              <Nothing
-                icon={FileWarning}
-                text={`No deviations or NCRs have been raised against ${product.batch_no}.`}
-              />
             ) : (
-              <ul className="space-y-2.5">
-                {batchDeviations.map((deviation) => (
-                  <DeviationRow
-                    key={deviation.id}
-                    deviation={deviation}
-                    onOpen={() => setOpenDeviationId(deviation.id)}
-                  />
-                ))}
-              </ul>
+              <DeviationsTable
+                deviations={batchDeviations}
+                onOpen={setOpenDeviationId}
+                emptyTitle="No quality cases."
+                emptyBody={`No deviations or NCRs have been raised against ${product.batch_no}.`}
+              />
             )}
           </div>
         </div>

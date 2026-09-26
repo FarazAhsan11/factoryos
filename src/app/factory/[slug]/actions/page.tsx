@@ -24,7 +24,7 @@ export default async function ActionsPage({
        see the note on <main> in FactoryShell. The stage tabs then stay put
        while the queue under them scrolls, which is the whole point of tabs
        that carry counts. */
-    <div className="mx-auto w-full max-w-5xl lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
+    <div className="mx-auto w-full max-w-[1600px] lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
       <ActionsWorkspace
         factoryId={factory.id}
         userId={viewer.id}

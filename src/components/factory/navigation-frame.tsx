@@ -2,7 +2,6 @@
 
 import {
   BoardPageSkeleton,
-  ListPageSkeleton,
   PageSkeleton,
   SearchPageSkeleton,
   SettingsPageSkeleton,
@@ -57,9 +56,7 @@ function PendingSkeleton({ href }: { href: string }) {
     case "/pipeline":
       return <BoardPageSkeleton />;
     case "/actions":
-      return <ListPageSkeleton />;
     case "/maintenance":
-      return <ListPageSkeleton action />;
     case "/deviations":
       return <TablePageSkeleton className="max-w-[1600px]" />;
     case "/data":

@@ -43,6 +43,10 @@ const STAGE_PILL: Record<string, string> = {
   closed: "bg-teal-soft text-teal-deep ring-teal-line",
 };
 
+/**
+ * Issues as cards — the batch record's Issues tab. The Issues & CAPA screen
+ * itself is a table now (`ActionsTable`).
+ */
 export function ActionList({
   actions,
   onOpen,

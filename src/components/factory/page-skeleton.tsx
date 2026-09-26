@@ -53,22 +53,7 @@ export function BoardPageSkeleton() {
   );
 }
 
-/** Issues & CAPAs, Maintenance: heading, a strip of filter chips, cards. */
-export function ListPageSkeleton({ action = false }: { action?: boolean }) {
-  return (
-    <Frame className="max-w-5xl">
-      <Heading actions={action ? 1 : 0} />
-      <Tabs count={5} className="mb-4" />
-      <div className="space-y-3">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Shimmer key={i} className="h-24 w-full rounded-2xl" />
-        ))}
-      </div>
-    </Frame>
-  );
-}
-
-/** Data table, Products: a heading or toolbar over one wide table card. */
+/** Registers, Data table, Products: a heading or toolbar over one wide table card. */
 export function TablePageSkeleton({
   className,
   heading = true,

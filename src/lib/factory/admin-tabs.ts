@@ -1,5 +1,3 @@
-import type { SetupTable } from "@/lib/factory/setup-queries";
-
 export interface AdminTab {
   value: string;
   label: string;
@@ -8,7 +6,8 @@ export interface AdminTab {
 }
 
 /**
- * Admin sub-tab config. Lives in a plain module (no "use client") so the
+ * Configuration's sections — chosen in the rail (Plant setup → Configuration),
+ * checked against this array when read from `?tab=`. Lives in a plain module (no "use client") so the
  * server page and the client workspace can both read the real array — values
  * exported from a client module cross the boundary as references, not data.
  */
@@ -19,13 +18,6 @@ export const ADMIN_TABS: AdminTab[] = [
   { value: "departments", label: "Departments", ready: true },
   { value: "shift-times", label: "Shift times", ready: true },
 ];
-
-/** Sub-tabs backed by a setup list, for cache prefetching. */
-export const TAB_TABLE: Record<string, SetupTable> = {
-  units: "factory_units",
-  processes: "factory_processes",
-  departments: "factory_departments",
-};
 
 /** Falls back to Company for an unknown, unbuilt, or missing ?tab=. */
 export function resolveAdminTab(tab: string | undefined): string {

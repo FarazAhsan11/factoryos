@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, LayoutGrid } from "lucide-react";
 import { toast } from "sonner";
 
-import { AdminTabs } from "@/components/factory/admin/admin-tabs";
 import { BatchFamilies } from "@/components/factory/pipeline/batch-families";
 import { JobDetailDialog } from "@/components/factory/pipeline/job-detail-dialog";
 import { EditBatchDialog } from "@/components/factory/pipeline/edit-batch-dialog";
@@ -22,7 +22,7 @@ import {
   batchStageKeys,
   fetchFactoryStages,
 } from "@/lib/factory/batch-stage-queries";
-import { PIPELINE_TABS } from "@/lib/factory/pipeline-tabs";
+import { resolvePipelineTab } from "@/lib/factory/pipeline-tabs";
 import {
   deletePipelineJob,
   fetchPipelineJobs,
@@ -59,7 +59,9 @@ export function PipelineWorkspace({
 }) {
   const queryClient = useQueryClient();
   const [detailJob, setDetailJob] = useState<PipelineJob | null>(null);
-  const [tab, setTab] = useState("board");
+  // Which screen of the pipeline is open is chosen in the rail and carried
+  // in the URL, so it survives a reload and a shared link.
+  const tab = resolvePipelineTab(useSearchParams().get("tab") ?? undefined);
   /**
    * The families view opens New batch itself, pre-set to Packing with the
    * parent filled — the prototype's `quickAddPackingFor`. Held here rather
@@ -145,14 +147,21 @@ export function PipelineWorkspace({
       <div className="mb-5 flex shrink-0 flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-[11px] font-bold tracking-[0.09em] text-ink-5 uppercase">
-            Production pipeline
+            Production planning
           </p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">
-            Batch tracker
+            {tab === "schedule"
+              ? `${units.singular} schedule`
+              : tab === "families"
+                ? "Batch families"
+                : "Batch board"}
           </h1>
           <p className="mt-1 text-sm text-ink-4">
-            Cards move themselves: first entry → In production · issue flagged →
-            On hold · final stage complete → Finished.
+            {tab === "schedule"
+              ? `What each ${units.singular.toLowerCase()} runs next, read from every batch's plan.`
+              : tab === "families"
+                ? "Each bulk batch with the finished lots packed from it, against the bulk it made."
+                : "Cards move themselves: first entry → In production · issue flagged → On hold · final stage complete → Finished."}
           </p>
         </div>
 
@@ -188,13 +197,6 @@ export function PipelineWorkspace({
           </div>
         )}
       </div>
-
-      <AdminTabs
-        tabs={PIPELINE_TABS}
-        active={tab}
-        label="Pipeline views"
-        onSelect={setTab}
-      />
 
       {/* Not on the Schedule: "open a card to do it" is an instruction about
           the Kanban board, and the Schedule is a room view with no cards to

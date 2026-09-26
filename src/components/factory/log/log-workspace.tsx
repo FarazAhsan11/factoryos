@@ -1,14 +1,14 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
-import { AdminTabs } from "@/components/factory/admin/admin-tabs";
 import { ActivityFeed } from "@/components/factory/log/activity-feed";
 import { LogGrid } from "@/components/factory/log/grid/log-grid";
 import { LogEntryForm } from "@/components/factory/log/log-entry-form";
 import { LogViewToggle } from "@/components/factory/log/log-view-toggle";
 import { ShiftReportWorkspace } from "@/components/factory/report/shift-report-workspace";
-import { logTabsFor, type LogView } from "@/lib/factory/log-tabs";
+import { resolveLogTab, type LogView } from "@/lib/factory/log-tabs";
 import { cn } from "@/lib/utils";
 
 /**
@@ -22,9 +22,14 @@ import { cn } from "@/lib/utils";
  * same job, done minutes apart, and they were two clicks and a page load
  * away from each other.
  *
- * The page width belongs to the tab for that reason — a handover document is
- * not 1,280px wide. There is no heading above the strip: the sidebar already
- * names the section, and the two pills say which of its screens you are on.
+ * Which of the two is open is chosen in the rail (Shop floor → Production log
+ * / Shift handover) and carried in `?tab=`. The rail switches it by rewriting
+ * the URL, so this component is never remounted by the switch — the half-typed
+ * entry and grid below survive a look at the handover, as they did when the
+ * choice was a tab strip on this page.
+ *
+ * The page width belongs to the screen for that reason — a handover document
+ * is not 1,280px wide. There is no heading: the rail names the screen.
  *
  * Neither the form nor the feed is handed a working day: the form stamps one
  * at submit time and the feed picks its own, so a session left open across
@@ -40,7 +45,6 @@ export function LogWorkspace({
   factoryName,
   userId,
   units,
-  initialTab,
   initialView,
   canManage,
   canReview,
@@ -50,13 +54,12 @@ export function LogWorkspace({
   factoryName: string;
   userId: string;
   units: { singular: string; plural: string };
-  initialTab: string;
   initialView: LogView;
   canManage: boolean;
   /** Supervisor and up. Also decides whether the report tab exists at all. */
   canReview: boolean;
 }) {
-  const [tab, setTab] = useState(initialTab);
+  const tab = resolveLogTab(useSearchParams().get("tab") ?? undefined, canReview);
   const [view, setView] = useState<LogView>(initialView);
   /**
    * Mounted on first use and kept mounted after: a grid with five rooms half
@@ -66,20 +69,6 @@ export function LogWorkspace({
   const [gridOpened, setGridOpened] = useState(initialView === "grid");
   const isReport = tab === "report";
   const isGrid = !isReport && view === "grid";
-
-  const select = useCallback(
-    (value: string) => {
-      setTab(value);
-      window.history.replaceState(
-        null,
-        "",
-        value === "entry" && view === "grid"
-          ? `?tab=entry&view=grid`
-          : `?tab=${value}`,
-      );
-    },
-    [view],
-  );
 
   const selectView = useCallback((next: LogView) => {
     setView(next);
@@ -100,25 +89,15 @@ export function LogWorkspace({
         isReport ? "max-w-[1400px]" : isGrid ? "max-w-[1600px]" : "max-w-7xl",
       )}
     >
-      {/* No heading above the strip. The form has to fit on one screen
-          without scrolling the entry out of reach, and a title the sidebar
-          already carries was spending that height twice — the two pills say
-          which of the shift's two screens you are on, which is the whole of
-          what a heading was telling anyone here.
-
-          Hidden on paper: the report prints as a handover document, and a tab
-          strip is a control, not part of the record. */}
-      <div className="mb-5 flex shrink-0 flex-wrap items-center justify-between gap-3 print:hidden">
-        <AdminTabs
-          tabs={logTabsFor(canReview)}
-          active={tab}
-          label="Shift log sections"
-          onSelect={select}
-          className="mb-0"
-        />
-        {/* A setting of the Log entry tab, so it is only on screen there. */}
-        {!isReport && <LogViewToggle value={view} onChange={selectView} />}
-      </div>
+      {/* How Production log is filled in — a setting of that screen, so it
+          is only on screen there. Hidden on paper with the rest of the
+          chrome: the handover prints as a document, and a toggle is a
+          control, not part of the record. */}
+      {!isReport && (
+        <div className="mb-4 flex shrink-0 items-center gap-3 print:hidden">
+          <LogViewToggle value={view} onChange={selectView} />
+        </div>
+      )}
 
       {/* The entry pair is hidden rather than unmounted: the form is long,
           often half-filled, and a glance at the report must not throw that

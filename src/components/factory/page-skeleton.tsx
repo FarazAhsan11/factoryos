@@ -30,12 +30,11 @@ export function PageSkeleton({ rows = 4 }: { rows?: number }) {
   );
 }
 
-/** Pipeline: heading with its buttons, the view strip, four board columns. */
+/** Pipeline: heading with its buttons, then four board columns. */
 export function BoardPageSkeleton() {
   return (
     <Frame className="max-w-[1500px]">
       <Heading actions={2} />
-      <Tabs count={3} />
       <div className="grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-4 lg:grid-rows-1">
         {Array.from({ length: 4 }).map((_, i) => (
           <div
@@ -108,8 +107,8 @@ export function TablePageSkeleton({
 }
 
 /**
- * A work surface beside its feed — the shift log (tab strip first, no
- * heading) and Kaizen (a heading first, no tabs).
+ * A work surface beside its feed — the shift log (its Form / Grid toggle
+ * first, no heading) and Kaizen (a heading first, no tabs).
  */
 export function SplitPageSkeleton({
   variant,
@@ -119,8 +118,7 @@ export function SplitPageSkeleton({
   return (
     <Frame className="max-w-7xl">
       {variant === "log" ? (
-        <div className="mb-5 flex shrink-0 items-center justify-between gap-3">
-          <Tabs count={2} className="mb-0" />
+        <div className="mb-4 flex shrink-0 items-center gap-3">
           <Tabs count={2} className="mb-0" />
         </div>
       ) : (
@@ -151,12 +149,10 @@ export function SplitPageSkeleton({
   );
 }
 
-/** Admin, Resources: heading, the section strip, one settings card. */
-export function SettingsPageSkeleton({ tabs }: { tabs: number }) {
+/** Configuration, Resources: one settings card — the rail names the screen. */
+export function SettingsPageSkeleton() {
   return (
     <Frame className="max-w-5xl">
-      <Heading />
-      <Tabs count={tabs} />
       <Card className="p-5">
         <Shimmer className="h-5 w-40" />
         <Shimmer className="mt-2 h-4 w-96 max-w-full" />

@@ -67,9 +67,9 @@ function PendingSkeleton({ href }: { href: string }) {
     case "/products":
       return <TablePageSkeleton className="max-w-6xl" heading={false} />;
     case "/admin":
-      return <SettingsPageSkeleton tabs={5} />;
+      return <SettingsPageSkeleton />;
     case "/resources":
-      return <SettingsPageSkeleton tabs={2} />;
+      return <SettingsPageSkeleton />;
     case "/batch":
       return <SearchPageSkeleton />;
     default:

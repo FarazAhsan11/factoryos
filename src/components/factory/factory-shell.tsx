@@ -4,7 +4,7 @@ import { ShiftIndicator } from "@/components/factory/shift-indicator";
 import { SidebarMenuButton } from "@/components/factory/sidebar-menu-button";
 import { SidebarProvider } from "@/components/factory/sidebar-context";
 import { UserMenu } from "@/components/factory/user-menu";
-import type { FactoryContext } from "@/lib/factory/context";
+import { unitWords, type FactoryContext } from "@/lib/factory/context";
 
 const ROLE_LABELS: Record<FactoryContext["role"], string> = {
   super_admin: "Super Admin",
@@ -50,6 +50,7 @@ export function FactoryShell({
           factoryId={factory.id}
           slug={factory.slug ?? ""}
           role={role}
+          units={unitWords(factory)}
           factoryName={factory.name}
           logoUrl={factory.logo_url}
         />

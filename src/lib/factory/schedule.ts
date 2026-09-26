@@ -1,5 +1,6 @@
 import type { BatchStage } from "@/lib/factory/batch-stage-queries";
 import type { PipelineJob } from "@/lib/factory/pipeline-queries";
+import { formatDay } from "@/lib/factory/dates";
 
 /**
  * Pipeline → Schedule. The plan read the other way round.
@@ -175,22 +176,9 @@ export function todayKey(): string {
   ).padStart(2, "0")}`;
 }
 
-const MONTHS = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-];
-
-/**
- * "15 Sep" — the year dropped, because a schedule is read weeks out and the
- * year is noise on every line of it. Assembled from a fixed month table for
- * the reason `formatReportDate` is: an undefined locale means *the
- * environment*, and this renders on the server before it renders in the
- * browser.
- */
+/** "15 Sep 2026", or a dash — the app's one date format (`formatDay`). */
 export function formatShortDate(iso: string | null): string {
-  if (!iso) return "—";
-  const [, m, d] = iso.slice(0, 10).split("-").map(Number);
-  return `${d ?? 1} ${MONTHS[(m ?? 1) - 1] ?? MONTHS[0]}`;
+  return iso ? formatDay(iso) : "—";
 }
 
 /**

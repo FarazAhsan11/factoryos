@@ -1,5 +1,6 @@
 import type { FactoryRole } from "@/lib/factory/context";
 import { createClient } from "@/lib/supabase/client";
+import { formatDateTime } from "@/lib/factory/dates";
 
 /**
  * Issues & CAPAs. Reads the `actions_expanded` view (migrations 0017, 0020,
@@ -496,14 +497,9 @@ export async function addActionNote(
 
 /* ── Display helpers ──────────────────────────────────────────────────── */
 
-/** "8 Aug, 06:46 pm" — the prototype's format, which reads well in a list. */
+/** "8 Aug 2026, 18:46". */
 export function formatDue(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatDateTime(iso);
 }
 
 /**

@@ -2,7 +2,6 @@
 
 import {
   BoardPageSkeleton,
-  ListPageSkeleton,
   PageSkeleton,
   SearchPageSkeleton,
   SettingsPageSkeleton,
@@ -57,9 +56,7 @@ function PendingSkeleton({ href }: { href: string }) {
     case "/pipeline":
       return <BoardPageSkeleton />;
     case "/actions":
-      return <ListPageSkeleton />;
     case "/maintenance":
-      return <ListPageSkeleton action />;
     case "/deviations":
       return <TablePageSkeleton className="max-w-[1600px]" />;
     case "/data":
@@ -67,9 +64,9 @@ function PendingSkeleton({ href }: { href: string }) {
     case "/products":
       return <TablePageSkeleton className="max-w-6xl" heading={false} />;
     case "/admin":
-      return <SettingsPageSkeleton tabs={5} />;
+      return <SettingsPageSkeleton />;
     case "/resources":
-      return <SettingsPageSkeleton tabs={2} />;
+      return <SettingsPageSkeleton />;
     case "/batch":
       return <SearchPageSkeleton />;
     default:

@@ -1,17 +1,21 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
   ChevronRight,
   Package,
   User,
-  Wrench,
 } from "lucide-react";
 
 import { MaintenanceDetailDialog } from "@/components/factory/maintenance/maintenance-detail-dialog";
+import { MaintenanceTable } from "@/components/factory/maintenance/maintenance-table";
 import { NewMaintenanceDialog } from "@/components/factory/maintenance/new-maintenance-dialog";
+import {
+  RegisterSearch,
+  RegisterSkeleton,
+} from "@/components/factory/register-table";
 import type { FactoryRole } from "@/lib/factory/context";
 import {
   MAINTENANCE_FILTERS,
@@ -30,9 +34,31 @@ import { cn } from "@/lib/utils";
 
 type FilterKey = "all" | string;
 
+/** What the keyword box searches — the columns somebody actually types into. */
+function haystack(r: MaintenanceRequest): string {
+  return [
+    r.request_no,
+    r.equipment_no,
+    r.equipment_name,
+    r.unit_name,
+    r.description,
+    r.batch_no,
+    r.product_name,
+    r.reported_by,
+    r.assigned_to,
+    r.department_name,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
 /**
  * Maintenance — the whole Breakdown Maintenance Request, not just its first
  * page.
+ *
+ * A register in the Deviations & NCRs frame — section chips, a keyword box,
+ * and a table with all three sections of the form as columns.
  *
  * The list is the tray the paper forms used to sit in, so it is filtered the
  * way that tray is searched: by which section is waiting on someone, and by
@@ -57,6 +83,8 @@ export function MaintenanceWorkspace({
   const [filter, setFilter] = useState<FilterKey>("all");
   const [urgent, setUrgent] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const term = useDeferredValue(search).trim().toLowerCase();
 
   const {
     data: requests = [],
@@ -76,26 +104,34 @@ export function MaintenanceWorkspace({
     [queryClient, factoryId],
   );
 
+  // The counts follow the keyword box, so a chip's number always describes
+  // the list it would show.
+  const searched = useMemo(
+    () =>
+      term ? requests.filter((r) => haystack(r).includes(term)) : requests,
+    [requests, term],
+  );
+
   const counts = useMemo(() => {
-    const map: Record<string, number> = { all: requests.length };
+    const map: Record<string, number> = { all: searched.length };
     for (const f of MAINTENANCE_FILTERS) {
-      map[f.key] = requests.filter((r) => f.match(r.status)).length;
+      map[f.key] = searched.filter((r) => f.match(r.status)).length;
     }
     return map;
-  }, [requests]);
+  }, [searched]);
 
   const urgentCount = useMemo(
-    () => requests.filter((r) => r.priority === "urgent").length,
-    [requests],
+    () => searched.filter((r) => r.priority === "urgent").length,
+    [searched],
   );
 
   const visible = useMemo(() => {
     const chip = MAINTENANCE_FILTERS.find((f) => f.key === filter);
-    return requests.filter(
+    return searched.filter(
       (r) =>
         (!chip || chip.match(r.status)) && (!urgent || r.priority === "urgent"),
     );
-  }, [requests, filter, urgent]);
+  }, [searched, filter, urgent]);
 
   // Read out of the freshly fetched list rather than held in state, so the
   // open dialog re-renders with the new record the moment a section is signed
@@ -132,7 +168,7 @@ export function MaintenanceWorkspace({
           one chip for both is a chip nobody can use. The toggle beside them
           cuts across all four rather than joining them: "urgent" is not a
           place a request can be. */}
-      <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-2">
+      <div className="mb-4 flex shrink-0 flex-wrap items-center gap-2">
         {/* One shell holding the chips rather than five free-floating pills:
             the sections are a sequence, and a shared track says so. It also
             stops the row re-flowing as the counts change width. */}
@@ -204,49 +240,42 @@ export function MaintenanceWorkspace({
             {urgentCount}
           </span>
         </button>
+
+        <RegisterSearch
+          value={search}
+          onChange={setSearch}
+          placeholder="Filter by request no., equipment, fault, batch, person…"
+          label="Filter requests"
+        />
       </div>
 
-      {/* The tray is the only thing that scrolls. A page-length scroll took
-          the section chips and their counts off screen, which is exactly the
-          context you need while reading down the tray. The negative margin and
-          matching padding let a card's hover shadow breathe without being
-          clipped by the scroll box. */}
-      <div className="scrollbar-slim -mx-1 min-h-0 flex-1 px-1 pb-1 lg:overflow-y-auto">
+      <div className="min-h-0 flex-1 lg:overflow-hidden">
         {isPending ? (
-          <ListSkeleton />
+          <RegisterSkeleton />
         ) : isError ? (
           <p className="rounded-2xl border border-danger-line bg-danger-soft px-4 py-6 text-center text-sm font-medium text-danger-deep">
             Could not load maintenance requests: {(error as Error).message}
           </p>
-        ) : visible.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-line-strong bg-surface px-4 py-16 text-center">
-            <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-sunken text-ink-6">
-              <Wrench className="size-6" />
-            </span>
-            <p className="mt-3 text-sm font-medium text-ink-3">
-              {requests.length === 0
-                ? "No maintenance requests yet."
-                : "Nothing matches that filter."}
-            </p>
-            <p className="mt-1 text-xs text-ink-5">
-              {requests.length === 0
-                ? "Raise one when a machine needs attention."
-                : urgent
-                  ? "Nothing urgent in that section."
-                  : "Try another section."}
-            </p>
-          </div>
         ) : (
-          <ul className="space-y-2.5">
-            {visible.map((request) => (
-              <RequestRow
-                key={request.id}
-                request={request}
-                unitWord={units.singular}
-                onOpen={() => setOpenId(request.id)}
-              />
-            ))}
-          </ul>
+          <MaintenanceTable
+            requests={visible}
+            unitWord={units.singular}
+            onOpen={setOpenId}
+            emptyTitle={
+              requests.length === 0
+                ? "No maintenance requests yet."
+                : "Nothing matches those filters."
+            }
+            emptyBody={
+              requests.length === 0
+                ? "Raise one when a machine needs attention."
+                : term
+                  ? "Try a different keyword, or clear the filter."
+                  : urgent
+                    ? "Nothing urgent in that section."
+                    : "Try another section."
+            }
+          />
         )}
       </div>
 
@@ -262,10 +291,8 @@ export function MaintenanceWorkspace({
 }
 
 /**
- * One request, as a card.
- *
- * Exported because the batch record shows the same cards under its
- * Maintenance tab. A second card built to look like this one would drift the
+ * One request, as a card — the batch record's Maintenance tab. The
+ * maintenance screen itself is a table now (`MaintenanceTable`). A second card built to look like this one would drift the
  * first time a status pill or a downtime rule changed.
  */
 export function RequestRow({
@@ -415,24 +442,6 @@ function Downtime({ request }: { request: MaintenanceRequest }) {
     );
   }
   return null;
-}
-
-function ListSkeleton() {
-  return (
-    <div className="space-y-2.5">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <div
-          key={i}
-          className="overflow-hidden rounded-2xl border border-line bg-surface p-4"
-        >
-          <span className="block h-3.5 w-2/5 animate-pulse rounded bg-sunken-2" />
-          <span className="mt-2.5 block h-2.5 w-1/3 animate-pulse rounded bg-sunken-2" />
-          <span className="mt-3 block h-2.5 w-4/5 animate-pulse rounded bg-sunken-2" />
-          <span className="mt-4 block h-2.5 w-1/4 animate-pulse rounded bg-sunken-2" />
-        </div>
-      ))}
-    </div>
-  );
 }
 
 /** The separator in a meta line, dimmer than the words it separates. */

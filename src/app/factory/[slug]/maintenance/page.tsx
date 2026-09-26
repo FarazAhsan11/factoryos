@@ -25,7 +25,7 @@ export default async function MaintenancePage({
        see the note on <main> in FactoryShell. The section chips then stay put
        while the tray under them scrolls, which is the whole point of chips
        that carry counts. */
-    <div className="mx-auto w-full max-w-5xl lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
+    <div className="mx-auto w-full max-w-[1600px] lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
       <MaintenanceWorkspace
         factoryId={factory.id}
         userId={viewer.id}

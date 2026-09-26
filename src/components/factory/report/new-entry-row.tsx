@@ -857,7 +857,7 @@ export function NewEntryRow({
                     from={clockWindow?.from}
                     to={clockWindow?.to}
                     windowNote={clockWindow?.note}
-                    className={cn(STRIP_CONTROL, "w-28")}
+                    className={cn(STRIP_CONTROL, "w-36")}
                   />
                 )}
               />
@@ -875,7 +875,7 @@ export function NewEntryRow({
                     from={clockWindow?.from}
                     to={clockWindow?.to}
                     windowNote={clockWindow?.note}
-                    className={cn(STRIP_CONTROL, "w-28")}
+                    className={cn(STRIP_CONTROL, "w-36")}
                   />
                 )}
               />

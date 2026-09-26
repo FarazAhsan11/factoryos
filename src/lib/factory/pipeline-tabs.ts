@@ -1,7 +1,8 @@
 import type { AdminTab } from "@/lib/factory/admin-tabs";
 
 /**
- * Pipeline sub-tabs. Plain module (no "use client") for the same reason as
+ * Pipeline screens — chosen in the rail's Production planning group, not by
+ * a strip on the page; this array is what `?tab=` is checked against. Plain module (no "use client") for the same reason as
  * `admin-tabs.ts` and `log-tabs.ts`: the server page resolves `?tab=` from
  * this array, and a value exported from a client module would reach it as a
  * reference rather than data.

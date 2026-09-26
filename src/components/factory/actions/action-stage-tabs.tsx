@@ -25,6 +25,7 @@ export function ActionStageTabs({
   attention,
   attentionCount,
   onAttention,
+  children,
 }: {
   stage: ActionStage;
   onStage: (stage: ActionStage) => void;
@@ -32,9 +33,11 @@ export function ActionStageTabs({
   attention: boolean;
   attentionCount: number;
   onAttention: (on: boolean) => void;
+  /** More filters on the same row — the register's keyword box. */
+  children?: React.ReactNode;
 }) {
   return (
-    <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-2">
+    <div className="mb-4 flex shrink-0 flex-wrap items-center gap-2">
       {/* One shell holding five segments rather than five free-floating
           pills: the stages are a sequence, and a shared track is what says
           so. It also stops the row from re-flowing as counts change width. */}
@@ -100,6 +103,8 @@ export function ActionStageTabs({
           {attentionCount}
         </span>
       </button>
+
+      {children}
     </div>
   );
 }

@@ -1,75 +1,33 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 
-import { AdminTabs } from "@/components/factory/admin/admin-tabs";
 import { EmployeesPanel } from "@/components/factory/admin/employees-panel";
 import { EquipmentPanel } from "@/components/factory/admin/equipment-panel";
-import { RESOURCE_TABS } from "@/lib/factory/resource-tabs";
-import { employeeKeys, fetchEmployees } from "@/lib/factory/employee-queries";
-import { equipmentKeys, fetchEquipment } from "@/lib/factory/equipment-queries";
+import { resolveResourceTab } from "@/lib/factory/resource-tabs";
 
 /**
- * Client half of Resources. The registers that used to sit at the end of the
- * Admin strip — machines and people — moved out from under Setup because they
- * are day-to-day production records, not configuration you set once. The
- * panels themselves are untouched: same components, same queries, same
- * permissions. The catalogue left too, for its own page under Pipeline.
+ * Client half of Resources — the registers the floor names things from, the
+ * machines and the people. Which one is open is chosen in the rail (Plant
+ * setup → Resources) and carried in `?tab=`; the rail warms each register's
+ * list on hover, as the tab strip it replaced used to.
  */
 export function ResourcesWorkspace({
   factoryId,
   canManage,
   isAdmin,
-  initialTab,
 }: {
   factoryId: string;
   canManage: boolean;
   /** Narrower than canManage: only an admin may add or remove people. */
   isAdmin: boolean;
-  initialTab: string;
 }) {
-  const queryClient = useQueryClient();
-  const [tab, setTab] = useState(initialTab);
-
-  const prefetch = useCallback(
-    (value: string) => {
-      if (value === "employees") {
-        queryClient.prefetchQuery({
-          queryKey: employeeKeys.all(factoryId),
-          queryFn: () => fetchEmployees(factoryId),
-        });
-        return;
-      }
-      if (value === "equipment") {
-        queryClient.prefetchQuery({
-          queryKey: equipmentKeys.all(factoryId),
-          queryFn: () => fetchEquipment(factoryId),
-        });
-      }
-    },
-    [queryClient, factoryId],
-  );
-
-  const select = useCallback((value: string) => {
-    setTab(value);
-    // replaceState (not router.replace) — updates the address bar without
-    // re-running the server component.
-    window.history.replaceState(null, "", `?tab=${value}`);
-  }, []);
+  const tab = resolveResourceTab(useSearchParams().get("tab") ?? undefined);
 
   return (
     <div className="flex flex-col lg:min-h-0 lg:flex-1">
-      <AdminTabs
-        tabs={RESOURCE_TABS}
-        active={tab}
-        label="Resource registers"
-        onSelect={select}
-        onPrefetch={prefetch}
-      />
-
-      {/* One scrolling region for whichever panel is open, so the tab strip
-          never leaves the screen. The inset padding keeps a card's focus ring
+      {/* One scrolling region for whichever panel is open. The inset padding keeps a card's focus ring
           from being clipped by the scroll box's edge. */}
       <div className="scrollbar-slim -mx-1 min-h-0 flex-1 px-1 pb-1 lg:overflow-y-auto">
         {/* Panels stay mounted once visited, so going back to one is instant

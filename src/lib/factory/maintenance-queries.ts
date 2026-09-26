@@ -4,6 +4,7 @@ import type {
   MaintenanceWorkValues,
 } from "@/app/factory/[slug]/maintenance/schemas";
 import { createClient } from "@/lib/supabase/client";
+import { formatDateTime } from "@/lib/factory/dates";
 
 /**
  * Maintenance requests — the whole Breakdown Maintenance Request.
@@ -381,30 +382,14 @@ export function priorityMeta(priority: MaintenancePriority) {
   );
 }
 
-/** "8 Aug, 06:46 pm" — the same format the rest of the workspace uses. */
+/** "8 Aug 2026, 18:46" — the same format the rest of the workspace uses. */
 export function formatRaised(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatDateTime(iso);
 }
 
-/**
- * "8 Apr 2026, 05:20 pm" — with the year, because every signature on the
- * paper form carries a full date next to it and a record read a year later
- * has to say which April it means.
- */
+/** "8 Apr 2026, 17:20", or a dash for a stamp not yet made. */
 export function formatStamp(iso: string | null): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return iso ? formatDateTime(iso) : "—";
 }
 
 /** "1h 42m" — minutes are how it is stored, hours are how it is read. */

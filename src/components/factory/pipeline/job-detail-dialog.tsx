@@ -29,6 +29,7 @@ import {
   type PipelineJob, packUnitSingular } from "@/lib/factory/pipeline-queries";
 import { formatMinutes } from "@/lib/factory/shift-log-queries";
 import { cn } from "@/lib/utils";
+import { formatDay } from "@/lib/factory/dates";
 
 type Tab = "progress" | "rooms" | "issues";
 
@@ -36,15 +37,8 @@ function fmt(n: number | null | undefined) {
   return Number(n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
-/** "2026-08-08" → "8 Aug". */
-function shortDate(iso: string) {
-  const [y, m, d] = iso.split("-").map(Number);
-  if (!y || !m || !d) return iso;
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-  });
-}
+/** "2026-08-08" → "8 Aug 2026". */
+const shortDate = formatDay;
 
 /**
  * Everything known about one batch, opened from its card.

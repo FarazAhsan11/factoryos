@@ -123,6 +123,29 @@ const WARMERS: Record<string, Warm> = {
       queryFn: () => fetchEquipment(factoryId),
     });
   },
+  // A screen that lives on a tab has its own entry, keyed by its full rail
+  // href, where its data differs from the page's first tab.
+  "/resources?tab=employees": (client, factoryId) => {
+    void client.prefetchQuery({
+      queryKey: employeeKeys.all(factoryId),
+      queryFn: () => fetchEmployees(factoryId),
+    });
+  },
+  "/admin?tab=units": (client, factoryId) => {
+    setupList(client, factoryId, "factory_units");
+  },
+  "/admin?tab=processes": (client, factoryId) => {
+    setupList(client, factoryId, "factory_processes");
+  },
+  "/admin?tab=departments": (client, factoryId) => {
+    setupList(client, factoryId, "factory_departments");
+  },
+  "/admin?tab=shift-times": (client, factoryId) => {
+    void client.prefetchQuery({
+      queryKey: shiftTimeKeys.all(factoryId),
+      queryFn: () => fetchShiftTimes(factoryId),
+    });
+  },
   "/actions": (client, factoryId) => {
     setupList(client, factoryId, "factory_units");
     void client.prefetchQuery({
@@ -150,11 +173,15 @@ const WARMERS: Record<string, Warm> = {
   },
 };
 
-/** Warms the lists behind a nav item's href (the part after /factory/<slug>). */
+/**
+ * Warms the lists behind a nav item's href (the part after /factory/<slug>).
+ * A tab's own entry wins; otherwise the page's — "/log?tab=report" warms what
+ * "/log" does.
+ */
 export function prefetchModule(
   client: QueryClient,
   factoryId: string,
   href: string,
 ) {
-  WARMERS[href]?.(client, factoryId);
+  (WARMERS[href] ?? WARMERS[href.split("?")[0]])?.(client, factoryId);
 }

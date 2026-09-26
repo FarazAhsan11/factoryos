@@ -2,11 +2,14 @@
 
 import { useCallback, useDeferredValue, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Search, X } from "lucide-react";
 
 import { DeviationDetailDialog } from "@/components/factory/deviations/deviation-detail-dialog";
 import { DeviationsTable } from "@/components/factory/deviations/deviations-table";
 import { NewDeviationDialog } from "@/components/factory/deviations/new-deviation-dialog";
+import {
+  RegisterSearch,
+  RegisterSkeleton,
+} from "@/components/factory/register-table";
 import { canReview } from "@/lib/factory/action-queries";
 import type { FactoryRole } from "@/lib/factory/context";
 import {
@@ -218,31 +221,17 @@ export function DeviationsWorkspace({
           )}
         </div>
 
-        <div className="relative min-w-[13rem] flex-1">
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-5" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Filter by case no., title, batch, product, customer…"
-            aria-label="Filter cases"
-            className="h-[38px] w-full rounded-xl border border-line bg-surface pr-9 pl-9 text-sm text-ink shadow-soft outline-none transition placeholder:text-placeholder hover:border-line-strong focus:border-brand focus:ring-4 focus:ring-brand/12"
-          />
-          {search && (
-            <button
-              type="button"
-              onClick={() => setSearch("")}
-              aria-label="Clear the filter"
-              className="absolute top-1/2 right-2.5 -translate-y-1/2 rounded-md p-1 text-ink-5 transition hover:bg-sunken-2 hover:text-ink"
-            >
-              <X className="size-3.5" />
-            </button>
-          )}
-        </div>
+        <RegisterSearch
+          value={search}
+          onChange={setSearch}
+          placeholder="Filter by case no., title, batch, product, customer…"
+          label="Filter cases"
+        />
       </div>
 
       <div className="min-h-0 flex-1 lg:overflow-hidden">
         {isPending ? (
-          <TableSkeleton />
+          <RegisterSkeleton />
         ) : isError ? (
           <p className="rounded-2xl border border-danger-line bg-danger-soft px-4 py-6 text-center text-sm font-medium text-danger-deep">
             Could not load the register: {(error as Error).message}
@@ -275,17 +264,6 @@ export function DeviationsWorkspace({
         role={role}
         onClose={() => setOpenId(null)}
       />
-    </div>
-  );
-}
-
-function TableSkeleton() {
-  return (
-    <div className="space-y-px overflow-hidden rounded-2xl border border-line bg-surface">
-      <div className="h-10 animate-pulse bg-sunken-2" />
-      {Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} className="h-11 animate-pulse bg-sunken/60" />
-      ))}
     </div>
   );
 }

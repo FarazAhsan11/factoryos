@@ -1,80 +1,37 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Building2, Clock3, Cog, LayoutGrid, Wrench } from "lucide-react";
 
 import { PROCESS_CATEGORIES } from "@/app/factory/[slug]/log/schemas";
-import { AdminTabs } from "@/components/factory/admin/admin-tabs";
 import { CompanySettingsForm } from "@/components/factory/admin/company-settings-form";
 import { SetupListManager } from "@/components/factory/admin/setup-list-manager";
 import { ShiftTimesForm } from "@/components/factory/admin/shift-times-form";
 import { PanelHeader } from "@/components/factory/admin/settings-ui";
-import { ADMIN_TABS, TAB_TABLE } from "@/lib/factory/admin-tabs";
+import { resolveAdminTab } from "@/lib/factory/admin-tabs";
 import type { FactoryContext } from "@/lib/factory/context";
-import {
-  fetchShiftTimes,
-  shiftTimeKeys,
-} from "@/lib/factory/shift-time-queries";
-import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
 
 /**
- * Client half of Admin. Owns the active sub-tab so switching is instant: the
- * server already handed us the factory, and React Query holds the setup lists,
- * so no navigation is needed. The URL is rewritten in place (history API) to
- * keep tabs deep-linkable without a round-trip.
+ * Client half of Configuration. Which section is open is chosen in the rail
+ * (Plant setup → Configuration) and carried in `?tab=`, so switching is a URL
+ * change and never a round trip: the server already handed us the factory,
+ * and React Query holds the setup lists — the rail warms them on hover.
  */
 export function AdminWorkspace({
   factory,
   canManage,
   units,
-  initialTab,
 }: {
   factory: FactoryContext["factory"];
   canManage: boolean;
   units: { singular: string; plural: string };
-  initialTab: string;
 }) {
-  const queryClient = useQueryClient();
-  const [tab, setTab] = useState(initialTab);
-
-  const prefetch = useCallback(
-    (value: string) => {
-      if (value === "shift-times") {
-        queryClient.prefetchQuery({
-          queryKey: shiftTimeKeys.all(factory.id),
-          queryFn: () => fetchShiftTimes(factory.id),
-        });
-        return;
-      }
-      const table = TAB_TABLE[value];
-      if (!table) return;
-      queryClient.prefetchQuery({
-        queryKey: setupKeys.all(table, factory.id),
-        queryFn: () => fetchSetupItems(table, factory.id),
-      });
-    },
-    [queryClient, factory.id],
-  );
-
-  const select = useCallback((value: string) => {
-    setTab(value);
-    // replaceState (not router.replace) — updates the address bar without
-    // re-running the server component.
-    window.history.replaceState(null, "", `?tab=${value}`);
-  }, []);
+  const tab = resolveAdminTab(useSearchParams().get("tab") ?? undefined);
 
   return (
     <div className="flex flex-col lg:min-h-0 lg:flex-1">
-      <AdminTabs
-        tabs={ADMIN_TABS}
-        active={tab}
-        onSelect={select}
-        onPrefetch={prefetch}
-      />
-
-      {/* One scrolling region for whichever panel is open, so the tab strip
-          never leaves the screen. The inset padding keeps a card's focus ring
+      {/* One scrolling region for whichever panel is open. The inset padding keeps a card's focus ring
           from being clipped by the scroll box's edge. */}
       <div className="scrollbar-slim -mx-1 min-h-0 flex-1 px-1 pb-1 lg:overflow-y-auto">
         {/* Panels stay mounted once visited, so going back to one is instant

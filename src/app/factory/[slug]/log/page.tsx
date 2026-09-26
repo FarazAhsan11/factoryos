@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 
 import { LogWorkspace } from "@/components/factory/log/log-workspace";
 import { getFactoryContext, unitWords } from "@/lib/factory/context";
-import { resolveLogTab, resolveLogView } from "@/lib/factory/log-tabs";
+import { resolveLogView } from "@/lib/factory/log-tabs";
 
 export const metadata: Metadata = {
-  title: "Shift log · FactoryOS",
+  title: "Shop floor · FactoryOS",
 };
 
 export default async function ShiftLogPage({
@@ -13,10 +13,10 @@ export default async function ShiftLogPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ tab?: string; view?: string }>;
+  searchParams: Promise<{ view?: string }>;
 }) {
   const { slug } = await params;
-  const { tab, view } = await searchParams;
+  const { view } = await searchParams;
   const { factory, canManage, role, viewer } = await getFactoryContext(slug);
 
   // Everyone in the factory logs entries, so there's no role gate here — but
@@ -39,16 +39,15 @@ export default async function ShiftLogPage({
        on <main> in FactoryShell. The panels below then have a real height to
        scroll inside, instead of one page scrollbar dragging both.
 
-       There is no heading: the tab strip is the first thing on the screen,
-       and the max width lives in the workspace because it belongs to the open
-       tab, which a tab switch never comes back here to change. */
+       There is no heading — the rail names the screen — and the max width
+       lives in the workspace because it belongs to the open screen, which the
+       rail switches without coming back here. */
     <div className="flex w-full flex-col lg:min-h-0 lg:flex-1">
       <LogWorkspace
         factoryId={factory.id}
         factoryName={factory.name}
         userId={viewer.id}
         units={unitWords(factory)}
-        initialTab={resolveLogTab(tab, canReview)}
         initialView={resolveLogView(view)}
         canManage={canManage}
         canReview={canReview}

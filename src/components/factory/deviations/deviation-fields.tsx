@@ -11,6 +11,7 @@ import { Loader2 } from "lucide-react";
 import { SelectField, type SelectOptionGroup } from "@/components/ui/select-field";
 import { DateField } from "@/components/ui/date-picker";
 import { cn } from "@/lib/utils";
+import { formatDay } from "@/lib/factory/dates";
 
 /**
  * The controls the seven case tabs are built from.
@@ -314,12 +315,5 @@ export function SaveBar({
 
 /** "14 Aug 2026", or a dash. Dates here are plain `YYYY-MM-DD` strings. */
 export function formatDate(value: string | null): string {
-  if (!value) return "—";
-  const [y, m, d] = value.slice(0, 10).split("-").map(Number);
-  if (!y || !m || !d) return value;
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  return value ? formatDay(value) : "—";
 }

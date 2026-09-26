@@ -55,6 +55,7 @@ import {
 } from "@/lib/factory/deviation-queries";
 import { pipelineKeys } from "@/lib/factory/pipeline-queries";
 import { cn } from "@/lib/utils";
+import { formatDateTime } from "@/lib/factory/dates";
 
 /**
  * One form per tab of the case.
@@ -778,13 +779,7 @@ export function CloseOutTab({
             </p>
             <p className="text-xs text-teal-deep/80">
               {deviation.closed_at &&
-                new Date(deviation.closed_at).toLocaleString(undefined, {
-                  day: "numeric",
-                  month: "short",
-                  year: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
+                formatDateTime(deviation.closed_at)}
               {deviation.status_reason && ` · ${deviation.status_reason}`}
             </p>
           </div>

@@ -51,6 +51,7 @@ import {
   type Product,
 } from "@/lib/factory/product-queries";
 import { cn } from "@/lib/utils";
+import { formatDay } from "@/lib/factory/dates";
 
 const FIELD =
   "h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)] outline-none transition placeholder:text-placeholder hover:border-line-strong focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12";
@@ -75,14 +76,7 @@ function fmt(n: number) {
 }
 
 /** "2026-09-30" → "30 Sep 2026", read as a local day so no timezone shifts it. */
-function longDay(iso: string) {
-  const [y, m, d] = iso.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
+const longDay = formatDay;
 
 /**
  * Pipeline → New batch.

@@ -17,6 +17,7 @@ import type {
   SortColumn,
 } from "@/lib/factory/shift-log-table-queries";
 import { cn } from "@/lib/utils";
+import { formatDay } from "@/lib/factory/dates";
 
 /* ── Formatting ──────────────────────────────────────────────────────────
    The table's job is to make a shift readable at a glance, so every number
@@ -32,17 +33,8 @@ function num(value: number | null | undefined): string {
   return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
-/** "2026-07-31" → "31 Jul", or "31 Jul 25" when it isn't the current year. */
-function formatDate(iso: string): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  if (!y || !m || !d) return iso;
-  const date = new Date(y, m - 1, d);
-  const day = date.toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-  });
-  return y === new Date().getFullYear() ? day : `${day} ${String(y).slice(2)}`;
-}
+/** "2026-07-31" → "31 Jul 2026". */
+const formatDate = formatDay;
 
 function clock(value: string | null): string {
   return value ? value.slice(0, 5) : "";

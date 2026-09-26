@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { formatMinutes, type LogEntry } from "@/lib/factory/shift-log-queries";
 import { cn } from "@/lib/utils";
+import { formatDateTime } from "@/lib/factory/dates";
 
 /** 540000 → "540,000"; null → an em dash, never a 0. */
 function fmt(n: number | null | undefined) {
@@ -164,9 +165,9 @@ export function BatchEntryDialog({
 
             <p className="mt-4 flex items-center gap-1.5 border-t border-line-soft pt-3 text-[11px] text-ink-5">
               <ShieldCheck className="size-3 shrink-0" aria-hidden />
-              Filed {new Date(entry.created_at).toLocaleString()}
+              Filed {formatDateTime(entry.created_at)}
               {entry.amended_at &&
-                ` · amended ${new Date(entry.amended_at).toLocaleString()}`}
+                ` · amended ${formatDateTime(entry.amended_at)}`}
               . Corrections are made from the shift log, never here.
             </p>
           </div>

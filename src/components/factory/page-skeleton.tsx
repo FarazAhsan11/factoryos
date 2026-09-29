@@ -168,6 +168,24 @@ export function SearchPageSkeleton() {
   );
 }
 
+/** Floor status: heading, a toolbar, then a grid of room cards. */
+export function GridPageSkeleton() {
+  return (
+    <Frame className="max-w-[1600px]">
+      <Heading />
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <Shimmer className="h-9 w-72" />
+        <Shimmer className="h-9 w-80" />
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+        {Array.from({ length: 10 }).map((_, i) => (
+          <Shimmer key={i} className="h-[176px] rounded-2xl" />
+        ))}
+      </div>
+    </Frame>
+  );
+}
+
 /* ── Pieces ─────────────────────────────────────────────────────────────── */
 
 /**

@@ -1,4 +1,5 @@
 import {
+  Activity,
   Boxes,
   CalendarRange,
   ClipboardList,
@@ -182,6 +183,15 @@ export const FACTORY_NAV: NavSection[] = [
   {
     label: "Quality & maintenance",
     items: [
+      // Every room at a glance, from the latest thing each one logged today.
+      // Everyone, because it is read by whoever is walking the floor.
+      {
+        href: "/floor",
+        label: "Floor status",
+        icon: Activity,
+        roles: ALL,
+        ready: true,
+      },
       {
         href: "/actions",
         label: "Issues & CAPA",

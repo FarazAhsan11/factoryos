@@ -64,3 +64,9 @@ export function formatDateTime(iso: string): string {
   if (Number.isNaN(date.getTime())) return iso;
   return `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}, ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
+
+/** "2026-09-29" moved by whole days → "2026-09-30", in local time. */
+export function addDays(key: string, days: number): string {
+  const [y, m, d] = key.slice(0, 10).split("-").map(Number);
+  return todayKey(new Date(y, m - 1, d + days));
+}

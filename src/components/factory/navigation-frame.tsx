@@ -2,6 +2,7 @@
 
 import {
   BoardPageSkeleton,
+  GridPageSkeleton,
   PageSkeleton,
   SearchPageSkeleton,
   SettingsPageSkeleton,
@@ -69,6 +70,8 @@ function PendingSkeleton({ href }: { href: string }) {
       return <SettingsPageSkeleton />;
     case "/batch":
       return <SearchPageSkeleton />;
+    case "/floor":
+      return <GridPageSkeleton />;
     default:
       return <PageSkeleton />;
   }

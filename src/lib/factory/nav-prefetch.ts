@@ -11,6 +11,10 @@ import {
 } from "@/lib/factory/deviation-queries";
 import { employeeKeys, fetchEmployees } from "@/lib/factory/employee-queries";
 import {
+  fetchFloorEntries,
+  floorKeys,
+} from "@/lib/factory/floor-queries";
+import {
   equipmentKeys,
   fetchEquipment,
 } from "@/lib/factory/equipment-queries";
@@ -19,6 +23,7 @@ import {
   fetchMaintenanceRequests,
   maintenanceKeys,
 } from "@/lib/factory/maintenance-queries";
+import { fetchPipelineJobs } from "@/lib/factory/pipeline-queries";
 import { fetchProducts, productKeys } from "@/lib/factory/product-queries";
 import {
   fetchSetupItems,
@@ -163,6 +168,21 @@ const WARMERS: Record<string, Warm> = {
     void client.prefetchQuery({
       queryKey: deviationKeys.all(factoryId),
       queryFn: () => fetchDeviations(factoryId),
+    });
+  },
+  // Today's board. Its jobs are a plain read under their own key, so warming
+  // them here never stands in for the pipeline page's promotion.
+  "/floor": (client, factoryId) => {
+    setupList(client, factoryId, "factory_units");
+    stages(client, factoryId);
+    const date = todayKey();
+    void client.prefetchQuery({
+      queryKey: floorKeys.day(factoryId, date),
+      queryFn: () => fetchFloorEntries(factoryId, date),
+    });
+    void client.prefetchQuery({
+      queryKey: floorKeys.jobs(factoryId),
+      queryFn: () => fetchPipelineJobs(factoryId),
     });
   },
   "/kaizen": (client, factoryId) => {

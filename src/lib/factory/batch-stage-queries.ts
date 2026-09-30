@@ -179,6 +179,7 @@ export async function createBatchStage(
       // "" is the cleared date field, which means "not scheduled yet" — a
       // real answer, and the one a plan starts life with.
       planned_date: values.plannedDate || null,
+      est_finish_date: values.estFinishDate || null,
       label: values.label?.trim() || null,
       work_order: values.workOrder?.trim() || null,
       target_qty: values.targetQty ?? null,

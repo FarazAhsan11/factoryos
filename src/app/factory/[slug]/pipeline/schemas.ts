@@ -331,6 +331,12 @@ export const pairedLotSchema = z.object({
     .refine((v) => v !== undefined, "Pick what's being filled."),
   market: z.string().trim().max(40).optional(),
   bulkQtyReceived: optionalQty,
+  /** Where the company tracks one work order per batch (0043), as the bulk's. */
+  workOrder: z
+    .string()
+    .trim()
+    .max(40, "Keep the work order under 40 characters.")
+    .optional(),
 });
 
 export type PairedLotValues = z.input<typeof pairedLotSchema>;
@@ -427,6 +433,12 @@ export const stageSchema = z.object({
    * to agree.
    */
   plannedDate: z.union([z.literal(""), z.iso.date()]).optional(),
+  /**
+   * When the planner expects the stage off the room (migration 0040) — the
+   * "End" beside the "Start" when a plan is written in New batch. Optional and
+   * advisory, like the start.
+   */
+  estFinishDate: z.union([z.literal(""), z.iso.date()]).optional(),
   targetQty: optionalQty,
   targetUnit: z.enum(STAGE_UNITS, { error: "Pick a unit." }),
   /**
@@ -447,6 +459,79 @@ export const stageSchema = z.object({
 
 export type StageValues = z.input<typeof stageSchema>;
 export type StageParsed = z.output<typeof stageSchema>;
+
+/**
+ * One row of a plan written in New batch, before the batch exists.
+ *
+ * The plan dialog's stage, minus the two things that dialog is the place for:
+ * a per-stage tolerance (the batch's is inherited — see the note in
+ * `PlanStagesDialog`) and a pack size (a packing detail edited on the plan).
+ */
+export const stageDraftSchema = stageSchema.omit({
+  tolerancePct: true,
+  packSize: true,
+});
+
+/**
+ * A whole plan written in New batch, and whether to issue the batch with it.
+ *
+ * The rules that span rows live here, each mirroring what the database will
+ * say so a form that passes cannot fail half way through the save:
+ *
+ *   - Issuing needs a plan, and a target on every stage (`issue_job`, 0033).
+ *   - One activity twice needs a label to tell the runs apart
+ *     (`batch_stages_job_process_label_key`).
+ *   - A stage cannot come off the room before it goes on (`stageEditSchema`).
+ */
+export const stagePlanSchema = z
+  .object({
+    stages: z.array(stageDraftSchema),
+    issue: z.boolean(),
+  })
+  .superRefine((plan, ctx) => {
+    if (plan.issue && plan.stages.length === 0) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["issue"],
+        message: "Add at least one stage to issue the batch — or untick this and plan it later.",
+      });
+    }
+
+    const seen = new Set<string>();
+    plan.stages.forEach((stage, i) => {
+      if (plan.issue && !(stage.targetQty && stage.targetQty > 0)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["stages", i, "targetQty"],
+          message: "Needs a target to issue the batch.",
+        });
+      }
+      if (
+        stage.plannedDate &&
+        stage.estFinishDate &&
+        stage.estFinishDate < stage.plannedDate
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["stages", i, "estFinishDate"],
+          message: "The finish is before the start.",
+        });
+      }
+      const key = `${stage.processId}|${(stage.label ?? "").trim().toLowerCase()}`;
+      if (seen.has(key)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["stages", i, "label"],
+          message: "This activity is already in the plan — give this run a label (30's, 60's).",
+        });
+      }
+      seen.add(key);
+    });
+  });
+
+export type StageDraftValues = z.input<typeof stageDraftSchema>;
+export type StagePlanValues = z.input<typeof stagePlanSchema>;
+export type StagePlanParsed = z.output<typeof stagePlanSchema>;
 
 /**
  * One stage, edited from the Schedule.

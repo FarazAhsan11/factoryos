@@ -1,38 +1,87 @@
 "use client";
 
-import { useMemo } from "react";
-import { AlertTriangle, Inbox, ListChecks, Trash2 } from "lucide-react";
-
+import { useMemo, useState } from "react";
 import {
-  BatchTypeBadge,
-  ParentBatchLink,
-} from "@/components/factory/pipeline/batch-type-badge";
+  AlertTriangle,
+  CalendarDays,
+  ChevronRight,
+  CornerDownRight,
+  Inbox,
+  ListChecks,
+  Plus,
+  Trash2,
+} from "lucide-react";
+
+import { BatchTypeBadge } from "@/components/factory/pipeline/batch-type-badge";
 import { StageStrip } from "@/components/factory/pipeline/stage-strip";
+import { SelectField } from "@/components/ui/select-field";
+import { BATCH_TYPES } from "@/app/factory/[slug]/pipeline/schemas";
 import type { BatchStage } from "@/lib/factory/batch-stage-queries";
+import { formatDay, todayKey } from "@/lib/factory/dates";
 import {
   PIPELINE_COLUMNS,
+  allocationFor,
+  formatPackSize,
   jobProgress,
+  packUnitSingular,
   type PipelineJob,
-  type PipelineStatus,
 } from "@/lib/factory/pipeline-queries";
+import { useRenderClock } from "@/lib/use-render-clock";
 import { cn } from "@/lib/utils";
 
 function fmt(n: number) {
   return Number(n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
+/** The status's own colours — the same four the rest of the module uses. */
+function statusStyle(status: PipelineJob["status"]) {
+  const column = PIPELINE_COLUMNS.find((c) => c.status === status);
+  return {
+    label: column?.label ?? status,
+    accent: column?.accent ?? "var(--color-ink-5)",
+    tint: column?.tint ?? "var(--color-sunken)",
+  };
+}
+
+/** "200 kg", "1,000 bottles" — the ordered quantity in the unit it is counted in. */
+function quantityLabel(job: PipelineJob): string | null {
+  if (!job.required_qty) return null;
+  const unit =
+    job.batch_type === "manufacturing"
+      ? (job.bulk_unit ?? "units")
+      : job.batch_type === "packing"
+        ? (job.pack_unit ?? "containers")
+        : (job.pack_unit ?? job.bulk_unit ?? "units");
+  return `${fmt(job.required_qty)} ${unit}`;
+}
+
+/** Why nothing can be logged against the batch yet, or null once it is issued. */
+function planningNote(job: PipelineJob): string | null {
+  if (job.issued_at) return null;
+  if (job.stage_count === 0) return "Not issued — no stages planned";
+  if (job.stages_without_target > 0)
+    return `Not issued — ${job.stages_without_target} stage${job.stages_without_target === 1 ? "" : "s"} without a target`;
+  return "Not issued — ready to issue";
+}
+
+interface BoardRow {
+  job: PipelineJob;
+  /** Finished lots drawing on this batch's bulk, oldest first. */
+  lots: PipelineJob[];
+}
+
 /**
- * The Kanban board: four columns, one card per batch.
+ * The batch board: one row per batch, a bulk batch's finished lots folded
+ * underneath it.
  *
- * There is no drag-and-drop, and that is the design rather than a shortcut.
- * A card's column is a fact about what has been logged against the batch — a
- * hand-dragged card would be an opinion sitting next to it, and the two would
- * disagree the moment anyone filed an entry. Cards move when the work moves.
+ * It was four Kanban columns. The columns answered "what state is it in" and
+ * nothing else: a bulk batch and the three lots packed from it were four cards
+ * in up to four columns, related only by a line of small type. A row per batch
+ * says the status with a colour and a chip and spends the width on what the
+ * columns had no room for — the quantity, the due date, and the family.
  *
- * Each column is its own scroll container from `lg` up, sized to the screen.
- * A board where one busy column sets the page's height leaves the other three
- * as short stubs with an acre of white under them, and pushes the column
- * headings — the only thing saying which pile you are reading — off the top.
+ * Still nothing to drag. A row's status is a fact about what has been logged
+ * against the batch; rows change when the work does.
  */
 export function PipelineBoard({
   jobs,
@@ -42,9 +91,10 @@ export function PipelineBoard({
   onOpen,
   onPlan,
   onDelete,
+  onAddPacking,
 }: {
   jobs: PipelineJob[];
-  /** Every plan in the tenant, so a card can draw its own without a fetch. */
+  /** Every plan in the tenant, so a row can draw its own without a fetch. */
   stages: BatchStage[];
   unitWord: string;
   canManage: boolean;
@@ -52,8 +102,15 @@ export function PipelineBoard({
   onPlan: (job: PipelineJob) => void;
   /** Only ever called for a Planned job — see `deletePipelineJob`. */
   onDelete: (job: PipelineJob) => void;
+  /** Opens New batch on Finished Lot with this parent pre-filled. */
+  onAddPacking: (parentId: string) => void;
 }) {
-  // Grouped once for the whole board rather than filtered per card, which
+  const [status, setStatus] = useState("");
+  const [type, setType] = useState("");
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
+  const today = useRenderClock(todayKey);
+
+  // Grouped once for the whole board rather than filtered per row, which
   // would be a scan of every stage for every job on screen.
   const stagesByJob = useMemo(() => {
     const map = new Map<string, BatchStage[]>();
@@ -64,93 +121,346 @@ export function PipelineBoard({
     }
     return map;
   }, [stages]);
-  const byStatus = useMemo(() => {
-    const map = new Map<PipelineStatus, PipelineJob[]>();
-    for (const column of PIPELINE_COLUMNS) map.set(column.status, []);
-    for (const job of jobs) map.get(job.status)?.push(job);
-    return map;
+
+  // A lot is folded under its bulk only while that bulk is on the board; one
+  // whose parent has left stays a row of its own rather than vanishing.
+  const rows = useMemo<BoardRow[]>(() => {
+    const onBoard = new Set(jobs.map((job) => job.id));
+    const nested = (job: PipelineJob) =>
+      Boolean(job.parent_job_id && onBoard.has(job.parent_job_id));
+    const lotsOf = new Map<string, PipelineJob[]>();
+    for (const job of jobs) {
+      if (!nested(job)) continue;
+      const list = lotsOf.get(job.parent_job_id!) ?? [];
+      list.push(job);
+      lotsOf.set(job.parent_job_id!, list);
+    }
+    return jobs
+      .filter((job) => !nested(job))
+      .map((job) => ({ job, lots: lotsOf.get(job.id) ?? [] }));
   }, [jobs]);
 
-  return (
-    /* `lg:grid-rows-1` is what makes the four columns equal-height: without a
-       single explicit row each sizes to its own contents and the tallest one
-       sets a page scroll again. */
-    <div className="grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-4 lg:grid-rows-1">
-      {PIPELINE_COLUMNS.map((column) => {
-        const items = byStatus.get(column.status) ?? [];
-        return (
-          <section
-            key={column.status}
-            aria-label={column.label}
-            /* Sunken, so the cards read as pieces sitting *in* a tray rather
-               than as white boxes on a white box — the separation the old
-               surface-on-surface board never had. */
-            className="flex flex-col overflow-hidden rounded-2xl border border-line bg-sunken shadow-[inset_0_1px_2px_rgb(20_22_43/0.04)] lg:min-h-0"
-          >
-            <header
-              className="flex shrink-0 items-center justify-between gap-2 border-b border-line px-3.5 py-2.5"
-              style={{ background: column.tint }}
-            >
-              <h2 className="flex items-center gap-2 text-[12px] font-bold tracking-[0.07em] uppercase">
-                <span
-                  aria-hidden
-                  className="h-3.5 w-1 rounded-full"
-                  style={{ background: column.accent }}
-                />
-                <span style={{ color: column.accent }}>{column.label}</span>
-              </h2>
-              <span
-                className="rounded-full bg-surface/80 px-2 py-0.5 text-[11px] font-bold tabular-nums"
-                style={{ color: column.accent }}
-              >
-                {items.length}
-              </span>
-            </header>
+  const statusOptions = useMemo(
+    () =>
+      PIPELINE_COLUMNS.map((column) => ({
+        value: column.status,
+        label: column.label,
+        meta: String(jobs.filter((j) => j.status === column.status).length),
+      })),
+    [jobs],
+  );
+  const typeOptions = useMemo(
+    () =>
+      BATCH_TYPES.map((t) => ({
+        value: t.value,
+        label: t.label,
+        meta: String(jobs.filter((j) => j.batch_type === t.value).length),
+      })),
+    [jobs],
+  );
 
-            {/* The column's own scrollbar. Below `lg` the columns stack and the
-                page scrolls, but a capped height keeps one long pile from
-                burying the three under it. */}
-            <div className="scrollbar-slim min-h-0 flex-1 space-y-2.5 overflow-y-auto p-2.5 max-lg:max-h-[26rem]">
-              {items.length === 0 ? (
-                <div className="grid place-items-center rounded-xl border border-dashed border-line-strong py-10 text-center">
-                  <Inbox className="size-5 text-ink-6" />
-                  <p className="mt-1.5 text-[11px] text-ink-5">Nothing here.</p>
-                </div>
-              ) : (
-                items.map((job) => (
-                  <JobCard
-                    stages={stagesByJob.get(job.id) ?? []}
-                    canManage={canManage}
-                    onPlan={() => onPlan(job)}
-                    key={job.id}
-                    job={job}
-                    accent={column.accent}
-                    unitWord={unitWord}
-                    onOpen={() => onOpen(job)}
-                    // Deleting is offered only before anything has been logged.
-                    // After that the job is the visible half of an
-                    // audit-protected record.
-                    onDelete={
-                      canManage && job.status === "planned"
-                        ? () => onDelete(job)
-                        : undefined
-                    }
-                  />
-                ))
-              )}
-            </div>
-          </section>
-        );
-      })}
+  const filtering = status !== "" || type !== "";
+  const matches = (job: PipelineJob) =>
+    (status === "" || job.status === status) &&
+    (type === "" || job.batch_type === type);
+  // A family is kept whole: a bulk batch stays when one of its lots is what
+  // matched, and is opened so the match is not hidden behind an arrow.
+  const shown = rows.filter(
+    (row) => matches(row.job) || row.lots.some(matches),
+  );
+
+  function toggle(id: string) {
+    setExpanded((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-3 lg:min-h-0 lg:flex-1">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-ink-4">
+          {filtering
+            ? `${shown.length} of ${rows.length} batches`
+            : `${rows.length} batch${rows.length === 1 ? "" : "es"}`}
+          {jobs.length > rows.length &&
+            ` · ${jobs.length - rows.length} finished lot${jobs.length - rows.length === 1 ? "" : "s"} folded under their bulk`}
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <SelectField
+            value={status}
+            onChange={setStatus}
+            options={statusOptions}
+            clearable
+            clearLabel="All statuses"
+            ariaLabel="Filter by status"
+            className="h-9 w-44 text-[13px]"
+          />
+          <SelectField
+            value={type}
+            onChange={setType}
+            options={typeOptions}
+            clearable
+            clearLabel="All types"
+            ariaLabel="Filter by batch type"
+            className="h-9 w-44 text-[13px]"
+          />
+        </div>
+      </div>
+
+      {/* The list's own scrollbar from `lg` up, so the heading and the filters
+          stay put while forty batches scroll under them. */}
+      <div className="scrollbar-slim space-y-2 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1 lg:pb-1">
+        {shown.length === 0 ? (
+          <div className="grid place-items-center rounded-2xl border border-dashed border-line-strong bg-surface py-14 text-center">
+            <Inbox className="size-5 text-ink-6" />
+            <p className="mt-1.5 text-sm text-ink-5">
+              Nothing matches these filters.
+            </p>
+          </div>
+        ) : (
+          shown.map(({ job, lots }) => (
+            <BatchRow
+              key={job.id}
+              job={job}
+              lots={lots}
+              stagesByJob={stagesByJob}
+              unitWord={unitWord}
+              today={today}
+              canManage={canManage}
+              open={
+                expanded.has(job.id) ||
+                (filtering && !matches(job) && lots.some(matches))
+              }
+              onToggle={() => toggle(job.id)}
+              onOpen={onOpen}
+              onPlan={onPlan}
+              onDelete={onDelete}
+              onAddPacking={onAddPacking}
+            />
+          ))
+        )}
+      </div>
     </div>
   );
 }
 
-function JobCard({
+function BatchRow({
+  job,
+  lots,
+  stagesByJob,
+  unitWord,
+  today,
+  canManage,
+  open,
+  onToggle,
+  onOpen,
+  onPlan,
+  onDelete,
+  onAddPacking,
+}: {
+  job: PipelineJob;
+  lots: PipelineJob[];
+  stagesByJob: Map<string, BatchStage[]>;
+  unitWord: string;
+  today: string;
+  canManage: boolean;
+  open: boolean;
+  onToggle: () => void;
+  onOpen: (job: PipelineJob) => void;
+  onPlan: (job: PipelineJob) => void;
+  onDelete: (job: PipelineJob) => void;
+  onAddPacking: (parentId: string) => void;
+}) {
+  const status = statusStyle(job.status);
+  const stages = stagesByJob.get(job.id) ?? [];
+  const percent = jobProgress(job);
+  const isBulk = job.batch_type === "manufacturing";
+  const allocation = allocationFor(job);
+  const panelId = `batch-panel-${job.id}`;
+
+  return (
+    <article
+      className={cn(
+        "group relative overflow-hidden rounded-xl border border-line bg-surface shadow-[0_1px_2px_rgb(20_22_43/0.05)] transition",
+        open ? "border-line-strong shadow-card" : "hover:border-line-strong",
+      )}
+    >
+      {/* A rendered spine rather than a `borderLeft` style, so the accent
+          rounds with the row instead of leaving one squared-off edge. */}
+      <span
+        aria-hidden
+        className="absolute inset-y-0 left-0 w-1"
+        style={{ background: status.accent }}
+      />
+
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3 pr-3 pl-3.5 sm:flex-nowrap">
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={open}
+          aria-controls={panelId}
+          aria-label={`${open ? "Collapse" : "Expand"} batch ${job.batch_no}`}
+          className="grid size-7 shrink-0 place-items-center rounded-lg text-ink-5 transition outline-none hover:bg-sunken-2 hover:text-ink focus-visible:ring-4 focus-visible:ring-brand/12"
+        >
+          <ChevronRight
+            className={cn("size-4 transition-transform", open && "rotate-90")}
+            aria-hidden
+          />
+        </button>
+
+        <div className="min-w-0 flex-1 basis-60">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            {/* The name is the way into the batch's details — a button, so it
+                reaches the keyboard. */}
+            <button
+              type="button"
+              onClick={() => onOpen(job)}
+              title={`Open details for batch ${job.batch_no}`}
+              className="max-w-full truncate rounded text-left text-[14px] font-semibold text-ink outline-none transition hover:text-brand-deep hover:underline focus-visible:ring-4 focus-visible:ring-brand/12"
+            >
+              {job.product_name}
+            </button>
+            {/* Single Batch is the overwhelming majority and says nothing new,
+                so it stays unbadged — a badge on every row is a badge on none. */}
+            {job.batch_type !== "combined" && (
+              <BatchTypeBadge type={job.batch_type} />
+            )}
+            {isBulk && lots.length > 0 && (
+              <span className="rounded-md bg-brand-soft px-1.5 py-0.5 text-[10px] font-bold text-brand-deep">
+                {lots.length} lot{lots.length === 1 ? "" : "s"}
+              </span>
+            )}
+            <RowAlerts job={job} />
+          </div>
+          <MetaLine job={job} unitWord={unitWord} today={today} />
+        </div>
+
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {percent !== null && job.status !== "planned" && (
+            <span
+              className="hidden items-center gap-2 md:flex"
+              title={`${fmt(job.produced_qty)} of ${fmt(job.required_qty)}`}
+            >
+              <span className="h-1.5 w-20 overflow-hidden rounded-full bg-sunken-2 ring-1 ring-line-soft ring-inset">
+                <span
+                  className="block h-full rounded-full transition-[width] duration-500"
+                  style={{ width: `${percent}%`, background: status.accent }}
+                />
+              </span>
+              <span className="w-9 font-mono text-[11px] font-semibold tabular-nums text-ink-4">
+                {percent}%
+              </span>
+            </span>
+          )}
+          <StatusChip job={job} />
+          <RowActions
+            job={job}
+            canManage={canManage}
+            onPlan={onPlan}
+            onDelete={onDelete}
+            onAddPacking={isBulk ? onAddPacking : undefined}
+          />
+        </div>
+      </div>
+
+      {open && (
+        <div
+          id={panelId}
+          className="animate-in space-y-3 border-t border-line-soft bg-sunken py-3 pr-3 pl-[3.25rem] fade-in-0"
+        >
+          {/* Where the batch is in its own route: which stage is running,
+              which are done, and which one finishes the order. */}
+          <div>
+            <p className="text-[10px] font-bold tracking-[0.07em] text-ink-5 uppercase">
+              Stages
+            </p>
+            {stages.length > 0 ? (
+              <StageStrip stages={stages} className="mt-1.5" />
+            ) : (
+              <p className="mt-1 text-xs text-ink-5">No stages planned yet.</p>
+            )}
+            {percent !== null && (
+              <p className="mt-1.5 font-mono text-[11px] tabular-nums text-ink-4">
+                {fmt(job.produced_qty)} / {fmt(job.required_qty)} made
+                <span
+                  className="ml-1 font-semibold"
+                  style={{ color: status.accent }}
+                >
+                  {percent}%
+                </span>
+              </p>
+            )}
+          </div>
+
+          {isBulk && (
+            <div>
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <p className="text-[10px] font-bold tracking-[0.07em] text-ink-5 uppercase">
+                  Finished lots
+                </p>
+                {/* Over-allocation is badged, never blocked — as in Batch
+                    families, which is where the full sum is drawn. */}
+                {/* Over, it says by how much rather than as a percentage: a
+                    pack size in the wrong unit reads as 95,238%, which names
+                    no fix, where "needs 1,000,000, bulk makes 1,050" points
+                    straight at the mismatch. */}
+                {allocation &&
+                  (allocation.ok ? (
+                    <p className="font-mono text-[11px] tabular-nums text-ink-4">
+                      {fmt(allocation.allocated)} / {fmt(allocation.allowance)}{" "}
+                      {job.bulk_unit ?? "units"} of bulk allocated (
+                      {allocation.pct}%)
+                    </p>
+                  ) : (
+                    <p
+                      title="Lots need containers × pack size, in this bulk's unit. Check the pack size is in the same unit as the bulk."
+                      className="inline-flex items-center gap-1 rounded-md bg-warn-tint px-2 py-0.5 text-[11px] font-semibold text-warn-ink ring-1 ring-warn-line"
+                    >
+                      <AlertTriangle className="size-3" aria-hidden />
+                      Lots need {fmt(allocation.allocated)}{" "}
+                      {job.bulk_unit ?? "units"} — this bulk makes{" "}
+                      {fmt(allocation.allowance)}
+                    </p>
+                  ))}
+              </div>
+              {lots.length === 0 ? (
+                <p className="mt-1 text-xs text-ink-5">
+                  No finished lots drawn from this bulk yet.
+                </p>
+              ) : (
+                <div className="mt-1.5 space-y-1.5">
+                  {lots.map((lot) => (
+                    <LotRow
+                      key={lot.id}
+                      job={lot}
+                      stages={stagesByJob.get(lot.id) ?? []}
+                      unitWord={unitWord}
+                      today={today}
+                      canManage={canManage}
+                      onOpen={onOpen}
+                      onPlan={onPlan}
+                      onDelete={onDelete}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </article>
+  );
+}
+
+/** A finished lot under its bulk batch: the same row, one size down. */
+function LotRow({
   job,
   stages,
-  accent,
   unitWord,
+  today,
   canManage,
   onOpen,
   onPlan,
@@ -158,188 +468,236 @@ function JobCard({
 }: {
   job: PipelineJob;
   stages: BatchStage[];
-  accent: string;
   unitWord: string;
+  today: string;
   canManage: boolean;
-  onOpen: () => void;
-  onPlan: () => void;
-  onDelete?: () => void;
+  onOpen: (job: PipelineJob) => void;
+  onPlan: (job: PipelineJob) => void;
+  onDelete: (job: PipelineJob) => void;
 }) {
-  const percent = jobProgress(job);
+  const status = statusStyle(job.status);
+
+  return (
+    <div className="relative flex flex-wrap items-center gap-x-3 gap-y-2 overflow-hidden rounded-lg border border-line bg-surface py-2.5 pr-2.5 pl-3.5 sm:flex-nowrap">
+      <span
+        aria-hidden
+        className="absolute inset-y-0 left-0 w-[3px]"
+        style={{ background: status.accent }}
+      />
+      <CornerDownRight className="size-3.5 shrink-0 text-ink-6" aria-hidden />
+
+      <div className="min-w-0 flex-1 basis-60">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <button
+            type="button"
+            onClick={() => onOpen(job)}
+            title={`Open details for batch ${job.batch_no}`}
+            className="max-w-full truncate rounded text-left text-[13px] font-semibold text-ink outline-none transition hover:text-brand-deep hover:underline focus-visible:ring-4 focus-visible:ring-brand/12"
+          >
+            {job.product_name}
+          </button>
+          {job.pack_size && (
+            <span className="text-[11px] text-ink-5">
+              {formatPackSize(job.pack_size)} per{" "}
+              {packUnitSingular(job.pack_unit)}
+              {job.market && ` · ${job.market}`}
+            </span>
+          )}
+          <RowAlerts job={job} />
+        </div>
+        <MetaLine job={job} unitWord={unitWord} today={today} />
+        {stages.length > 0 && <StageStrip stages={stages} className="mt-1.5" />}
+      </div>
+
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <StatusChip job={job} />
+        <RowActions
+          job={job}
+          canManage={canManage}
+          onPlan={onPlan}
+          onDelete={onDelete}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** `B001 · 200 kg · Room 3 · Due 9 Oct 2026` */
+function MetaLine({
+  job,
+  unitWord,
+  today,
+}: {
+  job: PipelineJob;
+  unitWord: string;
+  today: string;
+}) {
+  const quantity = quantityLabel(job);
+  const overdue =
+    job.due_date !== null && job.status !== "finished" && job.due_date < today;
+
+  return (
+    <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12px] text-ink-5">
+      <span className="font-mono text-[11.5px] font-semibold text-ink-4">
+        {job.batch_no}
+      </span>
+      {job.product_code && (
+        <>
+          <Dot />
+          <span className="font-mono text-[11.5px]">{job.product_code}</span>
+        </>
+      )}
+      {quantity && (
+        <>
+          <Dot />
+          <span>{quantity}</span>
+        </>
+      )}
+      <Dot />
+      {job.unit_name ? (
+        <span>{job.unit_name}</span>
+      ) : (
+        <span className="italic">No {unitWord.toLowerCase()} yet</span>
+      )}
+      {job.due_date && (
+        <>
+          <Dot />
+          <span
+            className={cn(
+              "inline-flex items-center gap-1",
+              overdue && "font-semibold text-danger-deep",
+            )}
+          >
+            <CalendarDays className="size-3" aria-hidden />
+            Due {formatDay(job.due_date)}
+            {overdue && " · overdue"}
+          </span>
+        </>
+      )}
+    </p>
+  );
+}
+
+function Dot() {
+  return (
+    <span aria-hidden className="text-ink-6">
+      ·
+    </span>
+  );
+}
+
+/**
+ * What needs someone's attention, said on the row: flagged entries, the
+ * hold's cause rather than just its existence, and a batch nothing can be
+ * logged against yet — the operator who finds that out otherwise is the one
+ * refused at 6am.
+ */
+function RowAlerts({ job }: { job: PipelineJob }) {
+  const note = planningNote(job);
+
+  return (
+    <>
+      {job.flagged_count > 0 && (
+        <span
+          title={`${job.flagged_count} flagged shift-log entr${job.flagged_count === 1 ? "y" : "ies"}`}
+          className="inline-flex items-center gap-0.5 rounded-full bg-warn-soft px-1.5 py-0.5 text-[10px] font-bold text-warn-deep ring-1 ring-warn-line"
+        >
+          <AlertTriangle className="size-2.5" aria-hidden />
+          {job.flagged_count}
+        </span>
+      )}
+      {job.quarantine_no ? (
+        <span className="rounded-md bg-danger-soft px-1.5 py-0.5 text-[10.5px] font-semibold text-danger-deep ring-1 ring-danger-line">
+          Quarantined — {job.quarantine_no}
+        </span>
+      ) : (
+        job.status === "hold" &&
+        job.hold_reason && (
+          <span className="rounded-md bg-warn-tint px-1.5 py-0.5 text-[10.5px] font-semibold text-warn-ink ring-1 ring-warn-line">
+            Held — {job.hold_reason.toLowerCase()} issue flagged
+          </span>
+        )
+      )}
+      {note && (
+        <span className="text-[11px] font-medium text-warn-ink">{note}</span>
+      )}
+    </>
+  );
+}
+
+function StatusChip({ job }: { job: PipelineJob }) {
+  const status = statusStyle(job.status);
+  return (
+    <span
+      className="rounded-full px-2.5 py-1 text-[10px] font-bold tracking-[0.05em] whitespace-nowrap uppercase"
+      style={{ background: status.tint, color: status.accent }}
+    >
+      {status.label}
+    </span>
+  );
+}
+
+function RowActions({
+  job,
+  canManage,
+  onPlan,
+  onDelete,
+  onAddPacking,
+}: {
+  job: PipelineJob;
+  canManage: boolean;
+  onPlan: (job: PipelineJob) => void;
+  onDelete: (job: PipelineJob) => void;
+  /** Passed only for a bulk batch — nothing else has lots to add. */
+  onAddPacking?: (parentId: string) => void;
+}) {
+  if (!canManage) return null;
   const needsPlanning = !job.issued_at;
 
   return (
-    <article className="group relative overflow-hidden rounded-xl border border-line bg-surface shadow-[0_1px_2px_rgb(20_22_43/0.05)] transition hover:-translate-y-0.5 hover:border-line-strong hover:shadow-lift focus-within:border-brand focus-within:ring-4 focus-within:ring-brand/12">
-      {/* A rendered spine rather than a `borderLeft` style, so the accent
-          rounds with the card instead of leaving one squared-off edge. */}
-      <span
-        aria-hidden
-        className="absolute inset-y-0 left-0 w-1"
-        style={{ background: accent }}
-      />
+    <>
+      {/* Labelled, and amber until the batch is issued: planning is the thing
+          standing between this row and any work being logged against it. */}
+      <button
+        type="button"
+        onClick={() => onPlan(job)}
+        aria-label={`${needsPlanning ? "Plan stages for" : "View the plan for"} batch ${job.batch_no}`}
+        className={cn(
+          "inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold transition",
+          needsPlanning
+            ? "bg-warn-tint text-warn-ink ring-1 ring-warn-line hover:brightness-95"
+            : "border border-line bg-surface text-ink-3 hover:border-ink-6 hover:text-ink",
+        )}
+      >
+        <ListChecks className="size-3.5" aria-hidden />
+        {needsPlanning ? "Plan stages" : "Stages"}
+      </button>
 
-      {/* Same reason as Delete below: a button inside a button is invalid HTML
-          and the inner one stops being reachable by keyboard.
-
-          On an unissued batch this is a labelled button, not an icon. It was
-          an icon first, and that was wrong: planning is the thing standing
-          between this card and any work being logged against it, and hiding
-          it behind 24 unlabelled pixels meant people opened the card, found
-          the details dialog, and concluded the feature did not exist. */}
-      {canManage && needsPlanning && (
+      {onAddPacking && (
         <button
           type="button"
-          onClick={onPlan}
-          className="absolute right-1.5 bottom-1.5 z-10 inline-flex items-center gap-1 rounded-lg bg-warn-tint px-2 py-1 text-[10px] font-bold text-warn-ink ring-1 ring-warn-line transition hover:brightness-95"
+          onClick={() => onAddPacking(job.id)}
+          aria-label={`Add a finished lot to batch ${job.batch_no}`}
+          className="inline-flex h-8 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-ink-4 transition hover:bg-brand-tint hover:text-brand"
         >
-          <ListChecks className="size-3" />
-          Plan stages
-        </button>
-      )}
-      {canManage && !needsPlanning && (
-        <button
-          type="button"
-          onClick={onPlan}
-          title="View this batch's plan"
-          aria-label={`View the plan for batch ${job.batch_no}`}
-          className={cn(
-            "absolute right-1.5 z-10 grid size-6 place-items-center rounded-lg text-ink-6 opacity-0 transition hover:bg-sunken-2 hover:text-ink focus-visible:opacity-100 group-hover:opacity-100",
-            onDelete ? "top-8" : "top-1.5",
-          )}
-        >
-          <ListChecks className="size-3.5" />
+          <Plus className="size-3.5" aria-hidden />
+          Lot
         </button>
       )}
 
-      {/* Delete sits outside the card's own button — nesting one button inside
-          another is invalid HTML and the inner one stops being reachable by
-          keyboard. Absolutely positioned so it overlays the corner instead. */}
-      {onDelete && (
+      {/* Deleting is offered only before anything has been logged. After that
+          the job is the visible half of an audit-protected record. */}
+      {job.status === "planned" && (
         <button
           type="button"
-          onClick={onDelete}
-          title="Remove this job — nothing has been logged against it yet"
-          aria-label={`Remove job for batch ${job.batch_no}`}
-          className="absolute top-1.5 right-1.5 z-10 grid size-6 place-items-center rounded-lg text-ink-6 opacity-0 transition hover:bg-danger-soft hover:text-danger-deep focus-visible:opacity-100 group-hover:opacity-100"
+          onClick={() => onDelete(job)}
+          title="Remove this batch from the board — nothing has been logged against it yet"
+          aria-label={`Remove batch ${job.batch_no} from the board`}
+          className="grid size-8 place-items-center rounded-lg text-ink-6 transition hover:bg-danger-soft hover:text-danger-deep"
         >
           <Trash2 className="size-3.5" />
         </button>
       )}
-
-      {/* The whole card is one target, and a button rather than a div with an
-          onClick so it reaches the keyboard — this is the only way into the
-          batch's history. */}
-      <button
-        type="button"
-        onClick={onOpen}
-        aria-label={`Open details for batch ${job.batch_no}, ${job.product_name}`}
-        className={cn(
-          "block w-full cursor-pointer py-3 pr-3 pl-4 text-left outline-none",
-          // Room for the labelled Plan stages button pinned bottom-right.
-          canManage && needsPlanning && "pb-9",
-        )}
-      >
-        <p className="pr-5">
-          <span className="rounded-md bg-sunken-2 px-1.5 py-0.5 font-mono text-[10.5px] font-bold text-ink-4 ring-1 ring-line">
-            {job.batch_no}
-          </span>
-          {job.product_code && (
-            <span className="ml-1.5 font-mono text-[10.5px] text-ink-5">
-              {job.product_code}
-            </span>
-          )}
-        </p>
-
-        <h3 className="mt-1.5 text-[13px] leading-snug font-semibold break-words text-ink transition group-hover:text-brand-deep">
-          {job.product_name}
-        </h3>
-
-        {/* What kind of batch, and whose bulk. A packing run and the bulk it
-            came out of are two cards in different columns with similar
-            numbers on them; without this the board cannot say which is which,
-            or that they are related at all. Combined is the overwhelming
-            majority and says nothing new, so it stays unbadged — a badge on
-            every card is a badge on none. */}
-        {job.batch_type !== "combined" && (
-          <p className="mt-1.5 flex flex-wrap items-center gap-1.5">
-            <BatchTypeBadge
-              type={job.batch_type}
-              detail={
-                job.pack_size
-                  ? `${fmt(job.pack_size)}${job.market ? ` · ${job.market}` : ""}`
-                  : undefined
-              }
-            />
-          </p>
-        )}
-        <ParentBatchLink batchNo={job.parent_batch_no} className="mt-1" />
-
-        <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-ink-5">
-          {job.unit_name ? (
-            <span className="font-medium text-ink-4">{job.unit_name}</span>
-          ) : (
-            <span className="italic">No {unitWord.toLowerCase()} yet</span>
-          )}
-          {job.flagged_count > 0 && (
-            <span className="inline-flex items-center gap-0.5 rounded-full bg-warn-soft px-1.5 py-0.5 text-[10px] font-bold text-warn-deep ring-1 ring-warn-line">
-              <AlertTriangle className="size-2.5" />
-              {job.flagged_count}
-            </span>
-          )}
-        </p>
-
-        {/* Where the batch is in its own route. Four pills say more than one
-            percentage can: which stage is running, which are done, and which
-            one will finish the order. */}
-        {stages.length > 0 && <StageStrip stages={stages} className="mt-2" />}
-
-        {/* The hold's cause, not just its existence — "On hold" alone sends
-            someone to the shift log to find out why. */}
-        {job.quarantine_no ? (
-          <p className="mt-2 rounded-lg bg-danger-soft px-2 py-1 text-[11px] font-medium text-danger-deep ring-1 ring-danger-line">
-            Quarantined — {job.quarantine_no}
-          </p>
-        ) : (
-          job.status === "hold" &&
-          job.hold_reason && (
-            <p className="mt-2 rounded-lg bg-warn-tint px-2 py-1 text-[11px] font-medium text-warn-ink ring-1 ring-warn-line">
-              Held — {job.hold_reason.toLowerCase()} issue flagged
-            </p>
-          )
-        )}
-
-        {/* Nothing can be logged against this batch yet, and the operator who
-            finds that out is the one refused at 6am. Said on the card, where
-            the person who can fix it is looking. */}
-        {needsPlanning && (
-          <p className="mt-2 text-[11px] font-medium text-warn-ink">
-            {job.stage_count === 0
-              ? "Not issued — no stages planned"
-              : job.stages_without_target > 0
-                ? `Not issued — ${job.stages_without_target} stage${job.stages_without_target === 1 ? "" : "s"} without a target`
-                : "Not issued — ready to issue"}
-          </p>
-        )}
-
-        {percent !== null && (
-          <div className="mt-2.5 space-y-1">
-            <div className="h-2 overflow-hidden rounded-full bg-sunken-2 ring-1 ring-line-soft ring-inset">
-              <div
-                className={cn(
-                  "h-full rounded-full transition-[width] duration-500",
-                )}
-                style={{ width: `${percent}%`, background: accent }}
-              />
-            </div>
-            <p className="font-mono text-[10.5px] tabular-nums text-ink-4">
-              {fmt(job.produced_qty)} / {fmt(job.required_qty)}
-              <span className="ml-1 font-semibold" style={{ color: accent }}>
-                {percent}%
-              </span>
-            </p>
-          </div>
-        )}
-      </button>
-    </article>
+    </>
   );
 }

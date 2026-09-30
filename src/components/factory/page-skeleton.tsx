@@ -30,23 +30,17 @@ export function PageSkeleton({ rows = 4 }: { rows?: number }) {
   );
 }
 
-/** Pipeline: heading with its buttons, then four board columns. */
+/** Pipeline: heading with its buttons, then one row per batch. */
 export function BoardPageSkeleton() {
   return (
     <Frame className="max-w-[1500px]">
       <Heading actions={2} />
-      <div className="grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-4 lg:grid-rows-1">
-        {Array.from({ length: 4 }).map((_, i) => (
+      <div className="space-y-2 lg:min-h-0 lg:flex-1">
+        {Array.from({ length: 6 }).map((_, i) => (
           <div
             key={i}
-            className="flex flex-col overflow-hidden rounded-2xl border border-line bg-sunken lg:min-h-0"
-          >
-            <div className="h-[41px] shrink-0 animate-pulse border-b border-line bg-sunken-2" />
-            <div className="space-y-2.5 p-2.5">
-              <div className="h-28 animate-pulse rounded-xl bg-surface" />
-              <div className="h-28 animate-pulse rounded-xl bg-surface" />
-            </div>
-          </div>
+            className="h-[66px] animate-pulse rounded-xl border border-line bg-sunken"
+          />
         ))}
       </div>
     </Frame>

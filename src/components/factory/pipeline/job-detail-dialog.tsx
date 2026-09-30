@@ -26,7 +26,10 @@ import {
   jobProgress,
   totalsByProcess,
   totalsByRoom,
-  type PipelineJob, packUnitSingular } from "@/lib/factory/pipeline-queries";
+  formatPackSize,
+  packUnitSingular,
+  type PipelineJob,
+} from "@/lib/factory/pipeline-queries";
 import { formatMinutes } from "@/lib/factory/shift-log-queries";
 import { cn } from "@/lib/utils";
 import { formatDay } from "@/lib/factory/dates";
@@ -441,7 +444,7 @@ function FamilyPanel({ job }: { job: PipelineJob }) {
           type={job.batch_type}
           detail={
             job.pack_size
-              ? `${fmt(job.pack_size)} per ${packUnitSingular(job.pack_unit)}`
+              ? `${formatPackSize(job.pack_size)} per ${packUnitSingular(job.pack_unit)}`
               : undefined
           }
         />

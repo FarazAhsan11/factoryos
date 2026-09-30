@@ -1,7 +1,12 @@
 "use client";
 
 import { BatchTypeBadge } from "@/components/factory/pipeline/batch-type-badge";
-import { bulkRemaining, type PipelineJob, packUnitSingular } from "@/lib/factory/pipeline-queries";
+import {
+  bulkRemaining,
+  formatPackSize,
+  packUnitSingular,
+  type PipelineJob,
+} from "@/lib/factory/pipeline-queries";
 import type { Product } from "@/lib/factory/product-queries";
 import { cn } from "@/lib/utils";
 
@@ -100,7 +105,7 @@ export function BatchAutofill({
             type={job.batch_type}
             detail={
               job.pack_size
-                ? `${fmt(job.pack_size)} per ${packUnitSingular(job.pack_unit)}${job.market ? ` · ${job.market}` : ""}`
+                ? `${formatPackSize(job.pack_size)} per ${packUnitSingular(job.pack_unit)}${job.market ? ` · ${job.market}` : ""}`
                 : undefined
             }
           />

@@ -57,11 +57,9 @@ function fmt(n: number | null | undefined) {
  * resolves through, and changing it would quietly re-point the meaning of work
  * already recorded.
  *
- * This exists mainly for the batches that predate batch families. Migration
- * 0031 backfilled every one of them as **Combined**, which is exactly what
- * they were — manufactured and packed under one number — but a plant that
- * splits its bulk from its packing runs needs to be able to say so about a
- * batch already on the board, not only about the next one.
+ * The batch type is shown, not editable: it is fixed by how the batch was
+ * raised in New batch. What changes here is everything under it — the bulk
+ * source, pack size and unit, overage, tolerance, priority, due date, notes.
  */
 export function EditBatchDialog({
   job,
@@ -140,6 +138,7 @@ export function EditBatchDialog({
   const isManufacturing = type === "manufacturing";
   const isPacking = type === "packing";
   const meta = BATCH_TYPES.find((t) => t.value === type);
+  const TypeIcon = TYPE_ICONS[type];
 
   const needed = isPacking
     ? bulkNeeded(
@@ -148,14 +147,6 @@ export function EditBatchDialog({
       )
     : null;
   const parent = bulkSources.find((j) => j.id === parentJobId);
-
-  /**
-   * A parent with packing runs drawing on it cannot change type — the guard in
-   * 0031 refuses it, because those runs would be left pointing at a batch that
-   * is no longer bulk. Said before the attempt rather than as a rejection.
-   */
-  const lockedByChildren =
-    job?.batch_type === "manufacturing" && job.child_count > 0;
 
   return (
     <Dialog
@@ -180,76 +171,29 @@ export function EditBatchDialog({
           className="flex min-h-0 flex-1 flex-col"
         >
           <div className="scrollbar-slim min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
-            <section className="space-y-2">
-              <p className={LABEL}>What type of batch is this?</p>
-              <Controller
-                name="batchType"
-                control={control}
-                render={({ field }) => (
-                  <div
-                    role="radiogroup"
-                    aria-label="Batch type"
-                    className="grid gap-2 sm:grid-cols-3"
-                  >
-                    {BATCH_TYPES.map((option) => {
-                      const Icon = TYPE_ICONS[option.value];
-                      const on = field.value === option.value;
-                      const blocked =
-                        lockedByChildren && option.value !== "manufacturing";
-                      return (
-                        <button
-                          key={option.value}
-                          type="button"
-                          role="radio"
-                          aria-checked={on}
-                          disabled={blocked}
-                          title={
-                            blocked
-                              ? "Packing batches draw on this bulk — unlink them first."
-                              : undefined
-                          }
-                          onClick={() => field.onChange(option.value)}
-                          className={cn(
-                            "rounded-2xl border p-3 text-left transition",
-                            on
-                              ? "border-brand bg-brand-tint shadow-[0_0_0_3px_rgba(79,70,229,0.10)]"
-                              : "border-line bg-surface hover:border-ink-6 hover:bg-sunken",
-                            blocked && "cursor-not-allowed opacity-40",
-                          )}
-                        >
-                          <Icon
-                            className={cn(
-                              "size-4",
-                              on ? "text-brand" : "text-ink-5",
-                            )}
-                            aria-hidden
-                          />
-                          <span
-                            className={cn(
-                              "mt-1.5 block text-[13px] font-semibold",
-                              on ? "text-brand-deep" : "text-ink",
-                            )}
-                          >
-                            {option.label}
-                          </span>
-                          <span className="mt-0.5 block text-[11px] leading-snug text-ink-5">
-                            {option.description}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              />
-              {meta && <p className="text-[11px] text-ink-5">{meta.hint}</p>}
-              {lockedByChildren && (
-                <p className="rounded-xl border border-warn-line bg-warn-tint px-3 py-2 text-[11px] text-warn-ink">
-                  {job?.child_count} packing batch
-                  {job?.child_count === 1 ? "" : "es"} draw on this bulk, so its
-                  type is fixed while they do. Unlink them first to change it.
-                </p>
-              )}
-            </section>
+            {/* The type is shown, not chosen. It was three cards to pick
+                from, which read as a question every time the dialog opened
+                and made re-typing a batch — with the board, the families view
+                and its stage plan all built on that answer — a one-click
+                accident. The batch is what it was raised as. */}
+            {meta && (
+              <section className="flex items-start gap-3 rounded-2xl border border-brand-line bg-brand-tint px-3.5 py-3">
+                <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-surface text-brand ring-1 ring-brand-line">
+                  <TypeIcon className="size-4" aria-hidden />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-[10px] font-bold tracking-[0.07em] text-ink-5 uppercase">
+                    Batch type
+                  </span>
+                  <span className="block text-[14px] font-semibold text-brand-deep">
+                    {meta.label}
+                  </span>
+                  <span className="mt-0.5 block text-[11px] leading-snug text-ink-4">
+                    {meta.description}
+                  </span>
+                </span>
+              </section>
+            )}
 
             {isManufacturing && (
               <TypeSection

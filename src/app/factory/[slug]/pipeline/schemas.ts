@@ -307,6 +307,35 @@ export const editBatchSchema = z
   .object({ ...batchFields })
   .superRefine(refineBatch);
 
+/**
+ * New batch → Bulk Production → "Also add a finished lot": the lot raised in
+ * the same submit, drawing on the bulk being raised.
+ *
+ * Its own schema because it is its own form inside the dialog, and because
+ * two of `refineBatch`'s rules change shape here: the lot always has a parent
+ * (the bulk beside it), so the pack size is always required, and the parent
+ * is not a field at all — it does not exist until the bulk is inserted.
+ * Priority and tolerance are the bulk's, the due date is the lot's own row in
+ * Products, so none of those are asked twice.
+ */
+export const pairedLotSchema = z.object({
+  productId: z.uuid("Pick the finished lot's batch from the catalogue."),
+  packSize: optionalQty.refine(
+    (v) => v !== undefined && v > 0,
+    "Enter the pack size — it's what converts containers to bulk.",
+  ),
+  packUnit: z
+    .union([z.enum(PACK_UNITS), z.literal("")])
+    .optional()
+    .transform((v) => (v ? v : undefined))
+    .refine((v) => v !== undefined, "Pick what's being filled."),
+  market: z.string().trim().max(40).optional(),
+  bulkQtyReceived: optionalQty,
+});
+
+export type PairedLotValues = z.input<typeof pairedLotSchema>;
+export type PairedLotParsed = z.output<typeof pairedLotSchema>;
+
 export type NewBatchValues = z.input<typeof newBatchSchema>;
 export type NewBatchParsed = z.output<typeof newBatchSchema>;
 export type EditBatchValues = z.input<typeof editBatchSchema>;

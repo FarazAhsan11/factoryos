@@ -21,6 +21,7 @@ import { formatDay, todayKey } from "@/lib/factory/dates";
 import {
   PIPELINE_COLUMNS,
   allocationFor,
+  formatPackSize,
   jobProgress,
   packUnitSingular,
   type PipelineJob,
@@ -402,18 +403,28 @@ function BatchRow({
                 </p>
                 {/* Over-allocation is badged, never blocked — as in Batch
                     families, which is where the full sum is drawn. */}
-                {allocation && (
-                  <p
-                    className={cn(
-                      "font-mono text-[11px] tabular-nums",
-                      allocation.ok ? "text-ink-4" : "font-semibold text-warn-ink",
-                    )}
-                  >
-                    {fmt(allocation.allocated)} / {fmt(allocation.allowance)}{" "}
-                    {job.bulk_unit ?? "units"} of bulk allocated (
-                    {allocation.pct}%)
-                  </p>
-                )}
+                {/* Over, it says by how much rather than as a percentage: a
+                    pack size in the wrong unit reads as 95,238%, which names
+                    no fix, where "needs 1,000,000, bulk makes 1,050" points
+                    straight at the mismatch. */}
+                {allocation &&
+                  (allocation.ok ? (
+                    <p className="font-mono text-[11px] tabular-nums text-ink-4">
+                      {fmt(allocation.allocated)} / {fmt(allocation.allowance)}{" "}
+                      {job.bulk_unit ?? "units"} of bulk allocated (
+                      {allocation.pct}%)
+                    </p>
+                  ) : (
+                    <p
+                      title="Lots need containers × pack size, in this bulk's unit. Check the pack size is in the same unit as the bulk."
+                      className="inline-flex items-center gap-1 rounded-md bg-warn-tint px-2 py-0.5 text-[11px] font-semibold text-warn-ink ring-1 ring-warn-line"
+                    >
+                      <AlertTriangle className="size-3" aria-hidden />
+                      Lots need {fmt(allocation.allocated)}{" "}
+                      {job.bulk_unit ?? "units"} — this bulk makes{" "}
+                      {fmt(allocation.allowance)}
+                    </p>
+                  ))}
               </div>
               {lots.length === 0 ? (
                 <p className="mt-1 text-xs text-ink-5">
@@ -487,7 +498,8 @@ function LotRow({
           </button>
           {job.pack_size && (
             <span className="text-[11px] text-ink-5">
-              {fmt(job.pack_size)} per {packUnitSingular(job.pack_unit)}
+              {formatPackSize(job.pack_size)} per{" "}
+              {packUnitSingular(job.pack_unit)}
               {job.market && ` · ${job.market}`}
             </span>
           )}

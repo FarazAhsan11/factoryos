@@ -641,10 +641,23 @@ export function bulkRemaining(job: PipelineJob): number | null {
  *
  * The pack unit is stored plural because that is how it reads everywhere else
  * — "1,000 bottles" — but "30 per bottles" is wrong in the one place the unit
- * is used distributively. A trailing "s" is the whole rule: every value in
- * `PACK_UNITS` is a regular plural.
+ * is used distributively. Two rules cover every value in `PACK_UNITS`:
+ * "-xes" / "-ches" drop "es" (boxes, pouches), anything else ending in "s"
+ * drops the "s" (bottles, sachets, units).
  */
+/**
+ * A pack size as stored — up to six decimals (migration 0046).
+ *
+ * Not the two-decimal `fmt` every other quantity uses: a 25 g tube against
+ * bulk in kg is 0.025, and rounding it to "0.03" on screen reproduces exactly
+ * the mistake 0046 took out of the column.
+ */
+export function formatPackSize(n: number | null | undefined): string {
+  return Number(n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 6 });
+}
+
 export function packUnitSingular(unit: string | null | undefined): string {
   const value = (unit ?? "container").trim();
+  if (/(x|ch)es$/.test(value)) return value.slice(0, -2);
   return value.endsWith("s") ? value.slice(0, -1) : value;
 }

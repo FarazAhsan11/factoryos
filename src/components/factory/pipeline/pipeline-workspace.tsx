@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, LayoutGrid } from "lucide-react";
+import { LayoutGrid } from "lucide-react";
 import { toast } from "sonner";
 
 import { BatchFamilies } from "@/components/factory/pipeline/batch-families";
@@ -18,6 +18,7 @@ import { NewBatchDialog } from "@/components/factory/pipeline/new-batch-dialog";
 import { NewJobDialog } from "@/components/factory/pipeline/new-job-dialog";
 import { PipelineBoard } from "@/components/factory/pipeline/pipeline-board";
 import { ScheduleView } from "@/components/factory/pipeline/schedule/schedule-view";
+import { UnissuedNotice } from "@/components/factory/pipeline/unissued-notice";
 import {
   batchStageKeys,
   fetchFactoryStages,
@@ -144,25 +145,23 @@ export function PipelineWorkspace({
 
   return (
     <div className="flex flex-col lg:min-h-0 lg:flex-1">
-      <div className="mb-5 flex shrink-0 flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-bold tracking-[0.09em] text-ink-5 uppercase">
-            Production planning
-          </p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">
+      {/* One line: the title, then the buttons. The eyebrow and the sentence
+          under the title cost three rows of a screen whose job is the list. */}
+      <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <h1 className="text-2xl font-semibold tracking-tight text-ink">
             {tab === "schedule"
               ? `${units.singular} schedule`
               : tab === "families"
                 ? "Batch families"
                 : "Batch board"}
           </h1>
-          <p className="mt-1 text-sm text-ink-4">
-            {tab === "schedule"
-              ? `What each ${units.singular.toLowerCase()} runs next, read from every batch's plan.`
-              : tab === "families"
-                ? "Each bulk batch with the finished lots packed from it, against the bulk it made."
-                : "Cards move themselves: first entry → In production · issue flagged → On hold · final stage complete → Finished."}
-          </p>
+          {/* Not on the Schedule: "use Plan stages on the batch" is an
+              instruction about the board, and the Schedule is a room view
+              with no batch rows to act on. */}
+          {!isPending && tab !== "schedule" && unissued.length > 0 && (
+            <UnissuedNotice count={unissued.length} />
+          )}
         </div>
 
         {canManage && (
@@ -197,27 +196,6 @@ export function PipelineWorkspace({
           </div>
         )}
       </div>
-
-      {/* Not on the Schedule: "open a card to do it" is an instruction about
-          the Kanban board, and the Schedule is a room view with no cards to
-          open — so on that tab the banner is a permanent strip of advice
-          nobody can act on where they are standing. */}
-      {!isPending && tab !== "schedule" && unissued.length > 0 && (
-        <div className="mb-4 flex shrink-0 items-start gap-2.5 rounded-xl border border-warn-line bg-warn-tint px-4 py-3 text-sm text-warn-ink shadow-[inset_0_1px_2px_rgb(180_83_9/0.06)]">
-          <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-          <p>
-            <strong className="font-semibold">
-              {unissued.length} batch{unissued.length === 1 ? "" : "es"} not
-              issued yet.
-            </strong>{" "}
-            Nothing can be logged against{" "}
-            {unissued.length === 1 ? "it" : "them"} until{" "}
-            {unissued.length === 1 ? "its" : "their"} stages are planned and{" "}
-            {unissued.length === 1 ? "it is" : "they are"} issued for
-            production — open a card to do it. Downtime is always loggable.
-          </p>
-        </div>
-      )}
 
       {isPending ? (
         <BoardSkeleton />
@@ -268,6 +246,10 @@ export function PipelineWorkspace({
           onOpen={setDetailJob}
           onPlan={setPlanJob}
           onDelete={(job) => remove.mutate(job)}
+          onAddPacking={(parentId) => {
+            setPackingParent(parentId);
+            setNewBatchOpen(true);
+          }}
         />
       )}
 
@@ -311,18 +293,12 @@ export function PipelineWorkspace({
 
 function BoardSkeleton() {
   return (
-    <div className="grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-4 lg:grid-rows-1">
-      {Array.from({ length: 4 }).map((_, i) => (
+    <div className="space-y-2 lg:min-h-0 lg:flex-1">
+      {Array.from({ length: 6 }).map((_, i) => (
         <div
           key={i}
-          className="flex flex-col overflow-hidden rounded-2xl border border-line bg-sunken lg:min-h-0"
-        >
-          <div className="h-[41px] shrink-0 animate-pulse border-b border-line bg-sunken-2" />
-          <div className="space-y-2.5 p-2.5">
-            <div className="h-28 animate-pulse rounded-xl bg-surface" />
-            <div className="h-28 animate-pulse rounded-xl bg-surface" />
-          </div>
-        </div>
+          className="h-[66px] animate-pulse rounded-xl border border-line bg-sunken"
+        />
       ))}
     </div>
   );

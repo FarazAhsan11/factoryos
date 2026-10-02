@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarClock, LayoutList, Rows3 } from "lucide-react";
+import { CalendarClock, CalendarDays, LayoutList } from "lucide-react";
 
-import { ScheduleBoard } from "@/components/factory/pipeline/schedule/schedule-board";
+import { ScheduleCalendar } from "@/components/factory/pipeline/schedule/schedule-calendar";
 import { ScheduleQueue } from "@/components/factory/pipeline/schedule/schedule-queue";
 import { StageEditDialog } from "@/components/factory/pipeline/schedule/stage-edit-dialog";
 import type { BatchStage } from "@/lib/factory/batch-stage-queries";
@@ -19,8 +19,8 @@ const VIEWS = [
   {
     value: "board",
     label: "Board",
-    icon: Rows3,
-    hint: "Board view — three stages ahead per room at a glance",
+    icon: CalendarDays,
+    hint: "Board view — every room across a fortnight, clashes marked",
   },
   {
     value: "queue",
@@ -69,11 +69,10 @@ export function ScheduleView({
   const [view, setView] = useState<ViewKey>("board");
   const [editing, setEditing] = useState<ScheduledStage | null>(null);
   /**
-   * The room the Queue should open on, set by a "+N more" on the Board.
-   *
-   * The Board draws three stages and a room can hold ten; rather than growing
-   * a fourth and fifth column nobody can read across, the overflow hands the
-   * room to the view that lists all of it, at the row it was asked about.
+   * The room the Queue should open on, set from the Board's calendar — a
+   * "+N more" on a day stacked past three, or a room's undated stages, which
+   * have no day to be drawn on. Either way the room goes to the view that
+   * lists all of it, at the row it was asked about.
    */
   const [focusRoom, setFocusRoom] = useState<string | null>(null);
 
@@ -162,30 +161,31 @@ export function ScheduleView({
             planned in it that has not been signed off.
           </p>
         </div>
+      ) : view === "board" ? (
+        /* The calendar owns its scroller: its week controls and the conflict
+           banner stay put while the rooms scroll under a sticky day header. */
+        <ScheduleCalendar
+          lanes={lanes}
+          unitWord={unitWord}
+          onOpen={setEditing}
+          onShowAll={(unitId) => {
+            setFocusRoom(unitId);
+            setView("queue");
+          }}
+        />
       ) : (
         /* The rooms scroll, the toggle above them does not. A plant with
            twenty busy rooms is the ordinary case, and a planner comparing
            Room 4 with Room 22 should not lose the view switch on the way
            down. `min-h-0` is what lets a flex child scroll at all. */
         <div className="scrollbar-slim min-h-0 flex-1 overflow-auto pr-0.5 pb-1">
-          {view === "board" ? (
-            <ScheduleBoard
-              lanes={lanes}
-              onOpen={setEditing}
-              onShowAll={(unitId) => {
-                setFocusRoom(unitId);
-                setView("queue");
-              }}
-            />
-          ) : (
-            <ScheduleQueue
-              lanes={lanes}
-              canManage={canManage}
-              focusRoom={focusRoom}
-              onOpen={setEditing}
-              onSaved={onRefresh}
-            />
-          )}
+          <ScheduleQueue
+            lanes={lanes}
+            canManage={canManage}
+            focusRoom={focusRoom}
+            onOpen={setEditing}
+            onSaved={onRefresh}
+          />
         </div>
       )}
 

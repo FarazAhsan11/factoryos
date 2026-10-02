@@ -27,7 +27,12 @@ export const TH_PINNED = cn(
   "left-0 z-30 shadow-[inset_-1px_-1px_0_var(--color-line)]",
 );
 
-/** The scroll box and the table. Scrolls both ways inside itself so the header can stick. */
+/**
+ * The scroll box and the table. Scrolls both ways inside itself so the header
+ * can stick. On a desktop it fills the workspace's remaining height; below
+ * `lg` the page scrolls instead, so the box takes a viewport cap — without
+ * one it grows to fit every row and the header scrolls away with the page.
+ */
 export function RegisterTable({
   head,
   children,
@@ -36,7 +41,7 @@ export function RegisterTable({
   children: React.ReactNode;
 }) {
   return (
-    <div className="scrollbar-slim h-full overflow-auto rounded-2xl border border-line bg-surface shadow-card">
+    <div className="scrollbar-slim h-full overflow-auto rounded-2xl border border-line bg-surface shadow-card max-lg:max-h-[75svh]">
       <table className="w-full min-w-max text-sm">
         <thead>
           <tr className="text-left text-[10px] font-bold tracking-[0.07em] whitespace-nowrap text-ink-3 uppercase">

@@ -1,6 +1,6 @@
 import type { BatchStage } from "@/lib/factory/batch-stage-queries";
 import type { PipelineJob } from "@/lib/factory/pipeline-queries";
-import { formatDay } from "@/lib/factory/dates";
+import { addDays, formatDay } from "@/lib/factory/dates";
 
 /**
  * Pipeline → Schedule. The plan read the other way round.
@@ -166,6 +166,144 @@ export function buildRoomLanes(
  */
 export function stagesWithoutRoom(stages: BatchStage[]): BatchStage[] {
   return stages.filter((s) => s.status !== "complete" && !s.unit_id);
+}
+
+/* ── The calendar ────────────────────────────────────────────────────────── */
+
+/** Whole days from `a` to `b` (`YYYY-MM-DD`), negative when `b` is earlier. */
+export function dayDiff(a: string, b: string): number {
+  const [ay, am, ad] = a.slice(0, 10).split("-").map(Number);
+  const [by, bm, bd] = b.slice(0, 10).split("-").map(Number);
+  return Math.round(
+    (Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86_400_000,
+  );
+}
+
+/** The Monday on or before a day — the calendar's weeks start on Monday. */
+export function mondayOf(day: string): string {
+  const [y, m, d] = day.slice(0, 10).split("-").map(Number);
+  const weekday = (new Date(y, m - 1, d).getDay() + 6) % 7; // Mon 0 … Sun 6
+  return addDays(day, -weekday);
+}
+
+/** The days a stage holds its room, both ends inclusive. */
+export interface StageSpan {
+  start: string;
+  end: string;
+}
+
+/**
+ * Which days a stage occupies its room, or null when it has no day to be drawn
+ * on.
+ *
+ * From the planned date to the estimated finish — a single day when there is
+ * no estimate, or when the estimate is earlier than the start (0040 leaves
+ * that to the form, so a stale row can still hold one). A **running** stage is
+ * on the machine now whatever the plan says: undated, it is drawn today, and
+ * past its estimate it stretches to today, because the room is not free until
+ * somebody signs the stage off.
+ */
+export function stageSpan(stage: BatchStage, today: string): StageSpan | null {
+  const running = stage.status === "in_progress";
+  const start = stage.planned_date?.slice(0, 10) ?? (running ? today : null);
+  if (!start) return null;
+
+  const estimate = stage.est_finish_date?.slice(0, 10);
+  let end = estimate && estimate >= start ? estimate : start;
+  if (running && end < today) end = today;
+  return { start, end };
+}
+
+/** Two or more stages planned into one room over the same run of days. */
+export interface RoomConflict {
+  unitId: string;
+  unitName: string;
+  from: string;
+  to: string;
+  entries: ScheduledStage[];
+}
+
+/**
+ * How far ahead clashes are looked for. A typo'd estimate in 2062 would
+ * otherwise have the scan walk thirteen thousand days.
+ */
+const CONFLICT_HORIZON_DAYS = 366;
+
+/**
+ * Every room double-booked from today on, a clash per run of days.
+ *
+ * A room runs one stage a day — the rule `seed-stage-dates.mjs` schedules by —
+ * so two stages covering the same day in the same room is a clash. Days with
+ * the same stages clashing are merged into one, so a four-day overlap of two
+ * batches reads as one conflict and not four.
+ *
+ * Only from today: a clash on a day already gone cannot be planned away, and
+ * the shift log, not the plan, says what that room actually did.
+ */
+export function findRoomConflicts(
+  lanes: RoomLane[],
+  today: string,
+): RoomConflict[] {
+  const horizon = addDays(today, CONFLICT_HORIZON_DAYS);
+  const conflicts: RoomConflict[] = [];
+
+  for (const lane of lanes) {
+    const spans = lane.stages
+      .map((entry) => ({ entry, span: stageSpan(entry.stage, today) }))
+      .filter(
+        (s): s is { entry: ScheduledStage; span: StageSpan } =>
+          s.span !== null && s.span.end >= today && s.span.start <= horizon,
+      );
+    if (spans.length < 2) continue;
+
+    let first = spans[0].span.start < today ? today : spans[0].span.start;
+    let last = spans[0].span.end;
+    for (const { span } of spans) {
+      if (span.start < first) first = span.start < today ? today : span.start;
+      if (span.end > last) last = span.end;
+    }
+    if (last > horizon) last = horizon;
+
+    let open: RoomConflict | null = null;
+    let openKey = "";
+    for (let day = first; day <= last; day = addDays(day, 1)) {
+      const here = spans.filter((s) => s.span.start <= day && s.span.end >= day);
+      const key =
+        here.length > 1
+          ? here
+              .map((s) => s.entry.stage.id)
+              .sort()
+              .join("|")
+          : "";
+
+      if (open && key === openKey) {
+        open.to = day;
+        continue;
+      }
+      if (open) conflicts.push(open);
+      open = key
+        ? {
+            unitId: lane.unitId,
+            unitName: lane.unitName,
+            from: day,
+            to: day,
+            entries: here.map((s) => s.entry),
+          }
+        : null;
+      openKey = key;
+    }
+    if (open) conflicts.push(open);
+  }
+
+  return conflicts.sort(
+    (a, b) =>
+      compareDate(a.from, b.from) || byName.compare(a.unitName, b.unitName),
+  );
+}
+
+/** Room names in reading order — "Room 4" before "Room 10". */
+export function compareRoomNames(a: string, b: string): number {
+  return byName.compare(a, b);
 }
 
 /** Local `YYYY-MM-DD` — the app never derives a day from `toISOString()`. */

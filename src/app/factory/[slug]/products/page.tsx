@@ -5,7 +5,7 @@ import { ProductsPanel } from "@/components/factory/admin/products-panel";
 import { getFactoryContext } from "@/lib/factory/context";
 
 export const metadata: Metadata = {
-  title: "Products · FactoryOS",
+  title: "Customer orders · FactoryOS",
 };
 
 /**

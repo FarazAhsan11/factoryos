@@ -5,7 +5,7 @@ import { getFactoryContext, unitWords } from "@/lib/factory/context";
 import { resolveLogView } from "@/lib/factory/log-tabs";
 
 export const metadata: Metadata = {
-  title: "Shop floor · FactoryOS",
+  title: "Operations · FactoryOS",
 };
 
 export default async function ShiftLogPage({

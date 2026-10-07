@@ -4,7 +4,7 @@ import { PipelineWorkspace } from "@/components/factory/pipeline/pipeline-worksp
 import { getFactoryContext, unitWords } from "@/lib/factory/context";
 
 export const metadata: Metadata = {
-  title: "Pipeline · FactoryOS",
+  title: "Batch pipeline · FactoryOS",
 };
 
 export default async function PipelinePage({

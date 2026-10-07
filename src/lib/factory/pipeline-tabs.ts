@@ -11,9 +11,8 @@ import type { AdminTab } from "@/lib/factory/admin-tabs";
  * is visible on screen — the same choice the sidebar makes in `nav.ts`.
  */
 export const PIPELINE_TABS: AdminTab[] = [
-  { value: "board", label: "Kanban board", ready: true },
+  { value: "board", label: "Batch pipeline", ready: true },
   { value: "schedule", label: "Schedule", ready: true },
-  { value: "families", label: "Batch families", ready: true },
   { value: "gantt", label: "Gantt", ready: false },
   { value: "archive", label: "Archive", ready: false },
 ];

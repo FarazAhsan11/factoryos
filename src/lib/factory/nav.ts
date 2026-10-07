@@ -1,5 +1,4 @@
 import {
-  Activity,
   Boxes,
   CalendarRange,
   ClipboardList,
@@ -78,9 +77,9 @@ const MANAGER_UP: FactoryRole[] = ["super_admin", "admin", "manager"];
  * the setup everything else reads from.
  *
  * Every name says what the screen is *for* on a factory floor rather than
- * what widget it is: "Room schedule", not "Schedule tab"; "Shift handover",
- * not "Shift report". A group exists only where its screens are one job seen
- * from several sides (the plan read by batch, by room, by family); a screen
+ * what widget it is: "Room schedule", not "Schedule tab". A group exists only
+ * where its screens are one job seen from several sides (the plan read by
+ * batch, by room); a screen
  * that stands alone stays a single link, one click away.
  */
 export const FACTORY_NAV: NavSection[] = [
@@ -99,7 +98,7 @@ export const FACTORY_NAV: NavSection[] = [
   {
     label: "Operations",
     items: [
-      // From order to plan. The order book comes first because a batch is
+      // From order to plan. Customer orders come first because a batch is
       // raised there, with its customer order, before it can be planned.
       {
         label: "Production planning",
@@ -107,25 +106,19 @@ export const FACTORY_NAV: NavSection[] = [
         children: [
           {
             href: "/products",
-            label: "Order book",
+            label: "Customer orders",
             roles: MANAGER_UP,
             ready: true,
           },
           {
             href: "/pipeline?tab=board",
-            label: "Batch board",
+            label: "Batch pipeline",
             roles: ALL,
             ready: true,
           },
           {
             href: "/pipeline?tab=schedule",
             label: (u) => `${u.singular} schedule`,
-            roles: ALL,
-            ready: true,
-          },
-          {
-            href: "/pipeline?tab=families",
-            label: "Batch families",
             roles: ALL,
             ready: true,
           },
@@ -144,9 +137,9 @@ export const FACTORY_NAV: NavSection[] = [
         ],
       },
       // What the floor records, shift by shift: filing it, handing it over,
-      // and looking back through all of it.
+      // looking back through all of it, and every room at a glance.
       {
-        label: "Shop floor",
+        label: "Operations",
         icon: ClipboardList,
         children: [
           {
@@ -157,13 +150,21 @@ export const FACTORY_NAV: NavSection[] = [
           },
           {
             href: "/log?tab=report",
-            label: "Shift handover",
+            label: "Shift report",
             roles: SUPERVISOR_UP,
             ready: true,
           },
           {
             href: "/data",
             label: "Log history",
+            roles: ALL,
+            ready: true,
+          },
+          // Every room at a glance, from the latest thing each one logged
+          // today. Everyone, because it is read by whoever is walking the floor.
+          {
+            href: "/floor",
+            label: "Floor status",
             roles: ALL,
             ready: true,
           },
@@ -183,15 +184,6 @@ export const FACTORY_NAV: NavSection[] = [
   {
     label: "Quality & maintenance",
     items: [
-      // Every room at a glance, from the latest thing each one logged today.
-      // Everyone, because it is read by whoever is walking the floor.
-      {
-        href: "/floor",
-        label: "Floor status",
-        icon: Activity,
-        roles: ALL,
-        ready: true,
-      },
       {
         href: "/actions",
         label: "Issues & CAPA",

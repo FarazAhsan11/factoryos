@@ -90,6 +90,10 @@ const PROCESSES = [
   { name: "Liquid Sachet Fill", category: "production", machine: true },
   { name: "Liquid Sachet Pack", category: "production", machine: true },
   { name: "Pouches", category: "production", machine: true },
+  // The stage routes New batch prefills (src/lib/factory/stage-templates.ts).
+  { name: "Metal Detection", category: "production", machine: true },
+  { name: "Packing - Unit Cartons", category: "production", machine: true },
+  { name: "Packing - Shipper Box", category: "production", machine: false },
   // Preparatory steps the room measures in its own units, not against a speed.
   { name: "Milling", category: "preparatory" },
   { name: "Granulation", category: "preparatory" },

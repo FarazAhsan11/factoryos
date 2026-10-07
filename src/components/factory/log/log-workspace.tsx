@@ -22,8 +22,8 @@ import { cn } from "@/lib/utils";
  * same job, done minutes apart, and they were two clicks and a page load
  * away from each other.
  *
- * Which of the two is open is chosen in the rail (Shop floor → Production log
- * / Shift handover) and carried in `?tab=`. The rail switches it by rewriting
+ * Which of the two is open is chosen in the rail (Operations → Production log
+ * / Shift report) and carried in `?tab=`. The rail switches it by rewriting
  * the URL, so this component is never remounted by the switch — the half-typed
  * entry and grid below survive a look at the handover, as they did when the
  * choice was a tab strip on this page.

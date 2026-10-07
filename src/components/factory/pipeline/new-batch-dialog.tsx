@@ -22,7 +22,7 @@ import { toast } from "sonner";
 
 import {
   BATCH_TYPES,
-  BULK_UNITS,
+  BULK_UNIT_OPTIONS,
   PACK_UNITS,
   PRIORITIES,
   PRIORITY_LABELS,
@@ -38,6 +38,7 @@ import {
   type PairedLotValues,
   type StagePlanParsed,
   type StagePlanValues,
+  type StageDraftValues,
   type StageUnit,
 } from "@/app/factory/[slug]/pipeline/schemas";
 import {
@@ -49,6 +50,11 @@ import {
   issueJob,
 } from "@/lib/factory/batch-stage-queries";
 import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
+import {
+  isUntouchedPlan,
+  manufacturingRoute,
+  packingRoute,
+} from "@/lib/factory/stage-templates";
 import type {
   BatchModel,
   WorkOrderMode,
@@ -460,6 +466,59 @@ export function NewBatchDialog({
   function selectType(next: BatchType, onChange: (value: BatchType) => void) {
     onChange(next);
     if (next === "packing") setValue("overagePct", undefined);
+    reroute({ batchType: next });
+  }
+
+  /**
+   * Loads the standard route into a plan (`stage-templates.ts`) — but only
+   * while the plan holds nothing typed, so picking a unit never wipes a plan
+   * someone has started filling in.
+   */
+  function loadRoute(target: typeof plan, stages: StageDraftValues[]) {
+    if (!isUntouchedPlan(target.getValues("stages"))) return;
+    target.setValue("stages", stages, { shouldDirty: true });
+  }
+
+  /**
+   * Re-reads the route once a unit, the parent or the type changes. Called
+   * from the change itself with the new value, since the watched values only
+   * catch up on the next render.
+   *
+   * Bulk Production runs the manufacturing route for its bulk unit; a Single
+   * Batch runs it and then the packing route for its pack unit; a Finished
+   * Lot runs the packing route for its pack unit and its parent's bulk unit.
+   */
+  function reroute(
+    changed: Partial<
+      Pick<NewBatchValues, "batchType" | "bulkUnit" | "packUnit" | "parentJobId">
+    >,
+  ) {
+    const v = { ...getValues(), ...changed };
+    const kind = v.batchType ?? defaultType;
+    const parentBulk = bulkSources.find((j) => j.id === v.parentJobId)?.bulk_unit;
+    loadRoute(
+      plan,
+      kind === "manufacturing"
+        ? manufacturingRoute(v.bulkUnit, plannable)
+        : kind === "combined"
+          ? [
+              ...manufacturingRoute(v.bulkUnit, plannable),
+              ...packingRoute(v.bulkUnit, v.packUnit, plannable),
+            ]
+          : packingRoute(parentBulk, v.packUnit, plannable),
+    );
+    // The paired lot packs this bulk, so its route follows the bulk unit too.
+    if (withLot && "bulkUnit" in changed) {
+      loadRoute(
+        lotPlan,
+        packingRoute(v.bulkUnit, lotForm.getValues("packUnit"), plannable),
+      );
+    }
+  }
+
+  /** The paired lot's route: this bulk's unit, the lot's own pack unit. */
+  function rerouteLot(packUnit: string) {
+    loadRoute(lotPlan, packingRoute(getValues("bulkUnit"), packUnit, plannable));
   }
 
   const type = (batchType ?? defaultType) as BatchType;
@@ -887,13 +946,13 @@ export function NewBatchDialog({
                           <SelectField
                             id="nb-bulk-unit"
                             value={field.value ?? ""}
-                            onChange={field.onChange}
+                            onChange={(v) => {
+                              field.onChange(v);
+                              reroute({ bulkUnit: v as NewBatchValues["bulkUnit"] });
+                            }}
                             onBlur={field.onBlur}
                             clearable
-                            options={BULK_UNITS.map((unit) => ({
-                              value: unit,
-                              label: unit,
-                            }))}
+                            options={BULK_UNIT_OPTIONS}
                           />
                         )}
                       />
@@ -982,13 +1041,13 @@ export function NewBatchDialog({
                           <SelectField
                             id="nb-bulk-unit-combined"
                             value={field.value ?? ""}
-                            onChange={field.onChange}
+                            onChange={(v) => {
+                              field.onChange(v);
+                              reroute({ bulkUnit: v as NewBatchValues["bulkUnit"] });
+                            }}
                             onBlur={field.onBlur}
                             clearable
-                            options={BULK_UNITS.map((unit) => ({
-                              value: unit,
-                              label: unit,
-                            }))}
+                            options={BULK_UNIT_OPTIONS}
                           />
                         )}
                       />
@@ -1049,7 +1108,10 @@ export function NewBatchDialog({
                           <SelectField
                             id="nb-pack-unit-combined"
                             value={field.value ?? ""}
-                            onChange={field.onChange}
+                            onChange={(v) => {
+                              field.onChange(v);
+                              reroute({ packUnit: v as NewBatchValues["packUnit"] });
+                            }}
                             onBlur={field.onBlur}
                             clearable
                             options={PACK_UNITS.map((unit) => ({
@@ -1101,7 +1163,10 @@ export function NewBatchDialog({
                         <SelectField
                           id="nb-parent"
                           value={field.value ?? ""}
-                          onChange={field.onChange}
+                          onChange={(v) => {
+                            field.onChange(v);
+                            reroute({ parentJobId: v });
+                          }}
                           onBlur={field.onBlur}
                           // Not a placeholder: drawing bulk from outside the
                           // plant is a real answer, so it stays a named row.
@@ -1158,7 +1223,10 @@ export function NewBatchDialog({
                           <SelectField
                             id="nb-pack-unit"
                             value={field.value ?? ""}
-                            onChange={field.onChange}
+                            onChange={(v) => {
+                              field.onChange(v);
+                              reroute({ packUnit: v as NewBatchValues["packUnit"] });
+                            }}
                             onBlur={field.onBlur}
                             clearable
                             options={PACK_UNITS.map((unit) => ({
@@ -1392,7 +1460,10 @@ export function NewBatchDialog({
                           <SelectField
                             id="nb-lot-pack-unit"
                             value={field.value ?? ""}
-                            onChange={field.onChange}
+                            onChange={(v) => {
+                              field.onChange(v);
+                              rerouteLot(v);
+                            }}
                             onBlur={field.onBlur}
                             ariaInvalid={Boolean(lotErrors.packUnit)}
                             clearable

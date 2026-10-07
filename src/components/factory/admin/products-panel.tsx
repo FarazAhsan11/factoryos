@@ -364,7 +364,7 @@ export function ProductsPanel({
     <div className="space-y-5">
       <PanelHeader
         icon={Package}
-        title="Products"
+        title="Customer orders"
         description="The batch catalogue and the customer order behind each batch. A batch number typed into the shift log resolves to a product here, and a scheduled date puts it on the pipeline board."
         count={products.length}
         action={

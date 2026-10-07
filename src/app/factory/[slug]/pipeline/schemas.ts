@@ -80,6 +80,18 @@ export const BULK_UNITS = [
 
 export type BulkUnit = (typeof BULK_UNITS)[number];
 
+/**
+ * The bulk unit picker's options. Powder is weighed and liquid measured, so
+ * their *values* stay `kg` and `litres` — what a quantity is counted in — and
+ * only the label names the dose form the plant's stage sheets use, which is
+ * also what picks the stage route (`stage-templates.ts`).
+ */
+export const BULK_UNIT_OPTIONS = BULK_UNITS.map((unit) => ({
+  value: unit,
+  label:
+    unit === "kg" ? "Powder (kg)" : unit === "litres" ? "Liquid (litres)" : unit,
+}));
+
 /** What finished goods are counted in on a packing batch. */
 export const PACK_UNITS = [
   "bottles",
@@ -467,10 +479,19 @@ export type StageParsed = z.output<typeof stageSchema>;
  * a per-stage tolerance (the batch's is inherited — see the note in
  * `PlanStagesDialog`) and a pack size (a packing detail edited on the plan).
  */
-export const stageDraftSchema = stageSchema.omit({
-  tolerancePct: true,
-  packSize: true,
-});
+export const stageDraftSchema = stageSchema
+  .omit({
+    tolerancePct: true,
+    packSize: true,
+  })
+  .extend({
+    /**
+     * The route stage a row was loaded for when the factory has no activity
+     * by that name (`stage-templates.ts`) — shown on the row so the planner
+     * knows what to pick. Display only; never saved.
+     */
+    templateName: z.string().optional(),
+  });
 
 /**
  * A whole plan written in New batch, and whether to issue the batch with it.

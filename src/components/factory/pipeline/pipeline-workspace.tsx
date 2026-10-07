@@ -6,7 +6,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LayoutGrid } from "lucide-react";
 import { toast } from "sonner";
 
-import { BatchFamilies } from "@/components/factory/pipeline/batch-families";
 import { JobDetailDialog } from "@/components/factory/pipeline/job-detail-dialog";
 import { EditBatchDialog } from "@/components/factory/pipeline/edit-batch-dialog";
 import { PlanStagesDialog } from "@/components/factory/pipeline/plan-stages-dialog";
@@ -64,10 +63,10 @@ export function PipelineWorkspace({
   // in the URL, so it survives a reload and a shared link.
   const tab = resolvePipelineTab(useSearchParams().get("tab") ?? undefined);
   /**
-   * The families view opens New batch itself, pre-set to Packing with the
+   * The board's + Lot opens New batch itself, pre-set to Packing with the
    * parent filled — the prototype's `quickAddPackingFor`. Held here rather
-   * than inside the families view so there is one dialog on the page, not one
-   * per family card.
+   * than inside the board so there is one dialog on the page, not one per
+   * row.
    */
   const [packingParent, setPackingParent] = useState<string | null>(null);
   const [newBatchOpen, setNewBatchOpen] = useState(false);
@@ -152,9 +151,7 @@ export function PipelineWorkspace({
           <h1 className="text-2xl font-semibold tracking-tight text-ink">
             {tab === "schedule"
               ? `${units.singular} schedule`
-              : tab === "families"
-                ? "Batch families"
-                : "Batch board"}
+              : "Batch pipeline"}
           </h1>
           {/* Not on the Schedule: "use Plan stages on the batch" is an
               instruction about the board, and the Schedule is a room view
@@ -226,16 +223,6 @@ export function PipelineWorkspace({
           canManage={canManage}
           showWorkOrder={workOrderMode === "stage"}
           onRefresh={refresh}
-        />
-      ) : tab === "families" ? (
-        <BatchFamilies
-          jobs={jobs}
-          canManage={canManage}
-          onOpen={setDetailJob}
-          onAddPacking={(parentId) => {
-            setPackingParent(parentId);
-            setNewBatchOpen(true);
-          }}
         />
       ) : (
         <PipelineBoard

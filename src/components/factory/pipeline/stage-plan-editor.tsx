@@ -139,6 +139,11 @@ export function StagePlanEditor({
             {fields.map((field, index) => {
               const rowErrors = errors.stages?.[index];
               const isLast = index === fields.length - 1;
+              // A route stage this factory has no activity for: the row keeps
+              // its place in the route and says what belongs there.
+              const missing = !rows[index]?.processId
+                ? rows[index]?.templateName
+                : undefined;
               const needsLabel =
                 repeated.has(rows[index]?.processId ?? "") ||
                 Boolean(rowErrors?.label);
@@ -215,7 +220,9 @@ export function StagePlanEditor({
                               onBlur={f.onBlur}
                               disabled={disabled}
                               ariaInvalid={Boolean(rowErrors?.processId)}
-                              placeholder="Pick the activity…"
+                              placeholder={
+                                missing ? `${missing} — pick…` : "Pick the activity…"
+                              }
                               searchPlaceholder="Activity name…"
                               emptyMessage="No activity matches that."
                               className={CONTROL}
@@ -374,6 +381,14 @@ export function StagePlanEditor({
                           </label>
                         )}
                       </div>
+                    )}
+
+                    {missing && (
+                      <p className="text-[11px] text-warn-ink">
+                        No &ldquo;{missing}&rdquo; activity in Plant setup →
+                        Process stages. Add it there, pick the activity it is
+                        called here, or remove this stage.
+                      </p>
                     )}
 
                     {messages.length > 0 && (

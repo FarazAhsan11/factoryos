@@ -1,7 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import {
   CalendarPlus,
   Check,
@@ -28,24 +33,28 @@ import {
   pipelineKeys,
 } from "@/lib/factory/pipeline-queries";
 import {
+  DEFAULT_PRODUCT_PAGE_SIZE,
   createProduct,
   deleteProduct,
-  fetchProducts,
+  fetchBatchNos,
+  fetchCustomerNames,
+  fetchProductCounts,
+  fetchProductPage,
   productKeys,
-  productStatus,
-  statusMeta,
   toProductRow,
   updateProduct,
-  type Product,
+  type ProductListParams,
+  type ProductPage,
   type ProductPatch,
-  type ProductStatus,
+  type ProductRow,
+  type ProductScope,
 } from "@/lib/factory/product-queries";
+import { TablePagination } from "@/components/factory/data/table-pagination";
 import { DateField } from "@/components/ui/date-picker";
 import {
   EmptyState,
   FIELD,
   PANEL,
-  PanelHeader,
 } from "@/components/factory/admin/settings-ui";
 import { cn } from "@/lib/utils";
 
@@ -56,10 +65,10 @@ import { cn } from "@/lib/utils";
  * Retired chip — retiring is a manual act about whether the shift log may
  * still name a batch, while finishing is what the board says happened to it.
  * A batch can be finished and still active, or retired without ever running.
+ * The database decides which half a batch is in (`is_finished`, 0047), so the
+ * table can page one half at a time.
  */
-type Scope = "open" | "finished";
-
-const SCOPES: { value: Scope; label: string; hint: string }[] = [
+const SCOPES: { value: ProductScope; label: string; hint: string }[] = [
   {
     value: "open",
     label: "Open",
@@ -71,6 +80,9 @@ const SCOPES: { value: Scope; label: string; hint: string }[] = [
     hint: "Batches whose every pipeline job has been signed off.",
   },
 ];
+
+/** How long typing pauses before the server is asked. */
+const SEARCH_DELAY_MS = 300;
 
 /** 540000 → "540,000"; 2.85 stays "2.85". */
 function formatQty(qty: number) {
@@ -109,24 +121,60 @@ export function ProductsPanel({
   canManage: boolean;
 }) {
   const queryClient = useQueryClient();
-  const queryKey = productKeys.all(factoryId);
+  const pagesKey = productKeys.pages(factoryId);
+  // What is typed, and what the server was last asked: the second trails the
+  // first by `SEARCH_DELAY_MS`, so a request goes out when typing pauses rather
+  // than once per keystroke.
   const [search, setSearch] = useState("");
-  const [scope, setScope] = useState<Scope>("open");
+  const [appliedSearch, setAppliedSearch] = useState("");
+  const [scope, setScope] = useState<ProductScope>("open");
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(DEFAULT_PRODUCT_PAGE_SIZE);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editQty, setEditQty] = useState("");
   const [editingDateId, setEditingDateId] = useState<string | null>(null);
   const [editDate, setEditDate] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
+  useEffect(
+    () => () => {
+      if (searchTimer.current) clearTimeout(searchTimer.current);
+    },
+    [],
+  );
+
+  // One page of one half of the catalogue. The previous page stays on screen
+  // (dimmed) while the next loads, so paging never flashes an empty table.
+  const params: ProductListParams = {
+    scope,
+    search: appliedSearch,
+    page,
+    pageSize,
+  };
   const {
-    data: products = [],
+    data: current,
     isPending,
     isError,
     error,
+    isPlaceholderData,
   } = useQuery({
-    queryKey,
-    queryFn: () => fetchProducts(factoryId),
+    queryKey: productKeys.page(factoryId, params),
+    queryFn: () => fetchProductPage(factoryId, params),
+    placeholderData: keepPreviousData,
   });
+  const products = current?.rows ?? [];
+  const total = current?.total ?? 0;
+
+  /** The two pills' numbers — the whole catalogue, whatever is searched. */
+  const { data: counts } = useQuery({
+    queryKey: productKeys.counts(factoryId),
+    queryFn: () => fetchProductCounts(factoryId),
+  });
+  const openCount = counts?.open ?? 0;
+  const finishedCount = counts?.finished ?? 0;
+  const catalogueSize = openCount + finishedCount;
 
   /**
    * Which batches are already on the pipeline board.
@@ -162,33 +210,6 @@ export function ProductsPanel({
       ),
     [jobs],
   );
-
-  /**
-   * Which batches the board has signed off.
-   *
-   * A batch counts as finished only when it has at least one pipeline job and
-   * *every* one of them is finished — a batch run as three work orders is not
-   * done because the first one is. A batch with no job at all hasn't been
-   * planned yet, which is the other half of the Open pill, not this one.
-   */
-  const finished = useMemo(() => {
-    const done = new Map<string, boolean>();
-    for (const job of jobs) {
-      done.set(
-        job.product_id,
-        (done.get(job.product_id) ?? true) && job.status === "finished",
-      );
-    }
-    return new Set(
-      [...done].filter(([, complete]) => complete).map(([id]) => id),
-    );
-  }, [jobs]);
-
-  /** Each batch's card status — one card per batch (0016's unique index). */
-  const jobStatus = useMemo(
-    () => new Map(jobs.map((job) => [job.product_id, job.status])),
-    [jobs],
-  );
   /**
    * The day each card joined the board (`planned_at`, as a local day) — what
    * Planned for shows for a batch that was put there rather than scheduled.
@@ -200,38 +221,32 @@ export function ProductsPanel({
       ),
     [jobs],
   );
-  function statusOf(id: string): ProductStatus {
-    return productStatus(jobStatus.get(id));
-  }
 
   /**
    * Customer code → name, from what the catalogue already holds, so the form
    * can fill the name in once it has seen the code. The list is newest first
    * and the first spelling found wins — the one somebody chose most recently.
+   * Read as its own two-column query: the table itself holds one page.
    */
+  const { data: customerRows = [] } = useQuery({
+    queryKey: productKeys.customers(factoryId),
+    queryFn: () => fetchCustomerNames(factoryId),
+  });
   const customers = useMemo(() => {
     const map = new Map<string, string>();
-    for (const p of products) {
-      const code = p.customer_code?.trim().toLowerCase();
-      if (code && p.customer_name && !map.has(code)) {
-        map.set(code, p.customer_name);
-      }
+    for (const row of customerRows) {
+      const code = row.customer_code.trim().toLowerCase();
+      if (code && !map.has(code)) map.set(code, row.customer_name);
     }
     return map;
-  }, [products]);
+  }, [customerRows]);
 
-  /* The catalogue grows monotonically — every batch ever made stays in it, so
-     by the second month the rows anyone actually works with are outnumbered by
-     history. The pills split it on the one fact that decides that: whether the
-     board is still carrying the batch. */
-  const scoped = useMemo(
-    () => products.filter((p) => finished.has(p.id) === (scope === "finished")),
-    [products, finished, scope],
-  );
-  const finishedCount = useMemo(
-    () => products.filter((p) => finished.has(p.id)).length,
-    [products, finished],
-  );
+  // Every batch number on file, so the import can name the ones it will skip.
+  const { data: batchNos = [] } = useQuery({
+    queryKey: productKeys.batchNos(factoryId),
+    queryFn: () => fetchBatchNos(factoryId),
+    enabled: canManage,
+  });
 
   // Read from the cache rather than kept as a copy, so a save — including
   // its optimistic patch — shows in the open dialog straight away.
@@ -239,8 +254,16 @@ export function ProductsPanel({
     ? (products.find((p) => p.id === editId) ?? null)
     : null;
 
+  /** Everything under the catalogue's key: the pages, the counts, the rest. */
   function refresh() {
-    return queryClient.invalidateQueries({ queryKey });
+    return queryClient.invalidateQueries({ queryKey: productKeys.all(factoryId) });
+  }
+
+  /** Applies `fn` to every cached page — the optimistic edits' one entry point. */
+  function patchPages(fn: (page: ProductPage) => ProductPage) {
+    queryClient.setQueriesData<ProductPage>({ queryKey: pagesKey }, (old) =>
+      old ? fn(old) : old,
+    );
   }
 
   const add = useMutation({
@@ -257,15 +280,20 @@ export function ProductsPanel({
     mutationFn: ({ id, values }: { id: string; values: ProductPatch }) =>
       updateProduct(id, values),
     onMutate: async ({ id, values }) => {
-      await queryClient.cancelQueries({ queryKey });
-      const previous = queryClient.getQueryData<Product[]>(queryKey);
-      queryClient.setQueryData<Product[]>(queryKey, (old) =>
-        (old ?? []).map((p) => (p.id === id ? { ...p, ...values } : p)),
-      );
+      await queryClient.cancelQueries({ queryKey: pagesKey });
+      const previous = queryClient.getQueriesData<ProductPage>({
+        queryKey: pagesKey,
+      });
+      patchPages((old) => ({
+        ...old,
+        rows: old.rows.map((p) => (p.id === id ? { ...p, ...values } : p)),
+      }));
       return { previous };
     },
     onError: (e: Error, _vars, context) => {
-      queryClient.setQueryData(queryKey, context?.previous);
+      context?.previous.forEach(([key, data]) =>
+        queryClient.setQueryData(key, data),
+      );
       toast.error(e.message);
     },
     onSuccess: () => {
@@ -278,44 +306,48 @@ export function ProductsPanel({
   const remove = useMutation({
     mutationFn: (id: string) => deleteProduct(id),
     onMutate: async (id) => {
-      await queryClient.cancelQueries({ queryKey });
-      const previous = queryClient.getQueryData<Product[]>(queryKey);
-      queryClient.setQueryData<Product[]>(queryKey, (old) =>
-        (old ?? []).filter((p) => p.id !== id),
-      );
+      await queryClient.cancelQueries({ queryKey: pagesKey });
+      const previous = queryClient.getQueriesData<ProductPage>({
+        queryKey: pagesKey,
+      });
+      patchPages((old) => ({
+        ...old,
+        rows: old.rows.filter((p) => p.id !== id),
+        total: Math.max(0, old.total - 1),
+      }));
       return { previous };
     },
     onError: (e: Error, _vars, context) => {
-      queryClient.setQueryData(queryKey, context?.previous);
+      context?.previous.forEach(([key, data]) =>
+        queryClient.setQueryData(key, data),
+      );
       toast.error(e.message);
     },
     onSettled: () => refresh(),
   });
 
-  // A real catalogue runs to hundreds of batches, so filter in the client —
-  // the list is already loaded and cached. The customer and the sales order
-  // are searched too: "everything for Phytologic" is a question the list
-  // gets asked.
-  const visible = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    if (!term) return scoped;
-    return scoped.filter((p) =>
-      [
-        p.batch_no,
-        p.code,
-        p.name,
-        p.work_order,
-        p.customer_code,
-        p.customer_name,
-        p.sales_order_no,
-        statusMeta(productStatus(jobStatus.get(p.id))).label,
-      ]
-        .filter(Boolean)
-        .some((field) => field!.toLowerCase().includes(term)),
-    );
-  }, [scoped, search, jobStatus]);
+  /** Typing sets the box at once and the question to the server a beat later. */
+  function onSearch(value: string) {
+    setSearch(value);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => {
+      setAppliedSearch(value);
+      setPage(0);
+    }, SEARCH_DELAY_MS);
+  }
 
-  function saveQty(product: Product) {
+  function changeScope(next: ProductScope) {
+    setScope(next);
+    setPage(0);
+  }
+
+  function goToPage(next: number) {
+    setPage(next);
+    // The new page starts at its top, not wherever the last one was left.
+    scrollRef.current?.scrollTo({ top: 0 });
+  }
+
+  function saveQty(product: ProductRow) {
     const value = Number(editQty);
     if (!Number.isFinite(value) || value < 0) {
       toast.error("Enter a valid quantity.");
@@ -336,7 +368,7 @@ export function ProductsPanel({
    * database re-checks it either way; this is what turns "check_violation"
    * into a sentence before the round-trip.
    */
-  function saveDate(product: Product) {
+  function saveDate(product: ProductRow) {
     const value = editDate.trim();
     if (value === (product.planned_for ?? "")) {
       setEditingDateId(null);
@@ -353,7 +385,10 @@ export function ProductsPanel({
   }
 
   /** The Edit dialog's save. Rejects on failure so the form stays open. */
-  async function saveDetails(product: Product, values: ProductValues) {
+  async function saveDetails(
+    product: { id: string; batch_no: string },
+    values: ProductValues,
+  ) {
     await patch.mutateAsync({ id: product.id, values: toProductRow(values) });
     toast.success(`Batch ${product.batch_no} updated.`);
   }
@@ -361,33 +396,17 @@ export function ProductsPanel({
   const today = todayKey();
 
   return (
-    <div className="space-y-5">
-      <PanelHeader
-        icon={Package}
-        title="Customer orders"
-        description="The batch catalogue and the customer order behind each batch. A batch number typed into the shift log resolves to a product here, and a scheduled date puts it on the pipeline board."
-        count={products.length}
-        action={
-          canManage ? (
-            <>
-              <ProductImportDialog
-                factoryId={factoryId}
-                // The catalogue is already loaded here, so the dialog can name
-                // the batches it will skip before writing anything.
-                existingBatchNos={products.map((p) => p.batch_no)}
-                onImported={refresh}
-              />
-              <AddProductDialog
-                customers={customers}
-                onAdd={(values) => add.mutateAsync(values).then(() => {})}
-              />
-            </>
-          ) : undefined
-        }
-      />
-
-      {products.length > 0 && (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+    /* Fills the workspace frame from `lg` up rather than growing the page: the
+       title and filters stay put, the table takes the rest and scrolls inside
+       itself — one scrollbar pair, header row pinned — and the pager sits
+       under it. Below `lg` the page scrolls as usual. */
+    <div className="flex flex-col gap-4 lg:min-h-0 lg:flex-1">
+      {/* One row, and no title above it — the rail already says where this
+          is. The pills and search sit on the left and right of it, and the
+          import and add buttons end it. */}
+      <div className="flex shrink-0 flex-wrap items-center gap-3">
+        {(!counts || catalogueSize > 0) && (
+        <>
           {/* Which half of the catalogue is on screen. Not a tab strip: it
               filters one table rather than swapping panels, so the search box
               beside it keeps applying to whatever is showing. */}
@@ -395,14 +414,12 @@ export function ProductsPanel({
             {SCOPES.map((option) => {
               const on = scope === option.value;
               const count =
-                option.value === "finished"
-                  ? finishedCount
-                  : products.length - finishedCount;
+                option.value === "finished" ? finishedCount : openCount;
               return (
                 <button
                   key={option.value}
                   type="button"
-                  onClick={() => setScope(option.value)}
+                  onClick={() => changeScope(option.value)}
                   aria-pressed={on}
                   title={option.hint}
                   className={cn(
@@ -426,18 +443,37 @@ export function ProductsPanel({
             })}
           </div>
 
-          <div className="relative min-w-0 flex-1">
+          <div className="hidden flex-1 sm:block" />
+
+          <div className="relative w-full sm:w-72">
             <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-ink-5" />
             <input
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => onSearch(e.target.value)}
               placeholder="Search batch, product, customer, SO or status…"
               aria-label="Search the catalogue"
               className={cn(FIELD, "pr-3.5 pl-10")}
             />
           </div>
-        </div>
-      )}
+        </>
+        )}
+
+        {canManage && (
+          <div className="flex shrink-0 items-center gap-2 sm:ml-auto">
+            <ProductImportDialog
+              factoryId={factoryId}
+              // Every batch number on file, so the dialog can name the ones it
+              // will skip before writing anything.
+              existingBatchNos={batchNos}
+              onImported={refresh}
+            />
+            <AddProductDialog
+              customers={customers}
+              onAdd={(values) => add.mutateAsync(values).then(() => {})}
+            />
+          </div>
+        )}
+      </div>
 
       {isPending ? (
         <TableSkeleton />
@@ -445,7 +481,17 @@ export function ProductsPanel({
         <p className="rounded-xl bg-danger-soft px-4 py-3 text-sm text-danger-deep">
           Could not load the catalogue: {(error as Error).message}
         </p>
-      ) : products.length === 0 ? (
+      ) : products.length === 0 && appliedSearch ? (
+        <EmptyState
+          icon={Search}
+          title={`Nothing matches “${appliedSearch}”.`}
+          hint={
+            scope === "finished"
+              ? "Only finished batches are being searched."
+              : "Only open batches are being searched — try the Finished pill."
+          }
+        />
+      ) : products.length === 0 && catalogueSize === 0 ? (
         <EmptyState
           icon={Package}
           title="No products yet."
@@ -455,7 +501,7 @@ export function ProductsPanel({
               : "A manager fills the catalogue."
           }
         />
-      ) : scoped.length === 0 ? (
+      ) : products.length === 0 ? (
         // An empty pill is not an empty catalogue — say which one is empty,
         // or the screen reads as "your products are gone".
         <EmptyState
@@ -471,26 +517,19 @@ export function ProductsPanel({
               : "Add a batch with Add product, or switch to Finished to see the completed ones."
           }
         />
-      ) : visible.length === 0 ? (
-        <EmptyState
-          icon={Search}
-          title={`Nothing matches “${search}”.`}
-          hint={
-            scope === "finished"
-              ? "Only finished batches are being searched."
-              : "Only open batches are being searched — try the Finished pill."
-          }
-        />
       ) : (
-        // Scrolls both ways inside itself, capped to the viewport, so the
-        // header row can stick to its top — a sticky header only sticks
-        // within its nearest scrolling box, and this one has to scroll
-        // sideways anyway.
+        // The card holds the scroll box and the pager, so the pager is never
+        // scrolled away and nothing is left hanging below the table.
         <div
           className={cn(
             PANEL,
-            "scrollbar-slim max-h-[max(20rem,calc(100dvh-20rem))] overflow-auto",
+            "flex flex-col transition-opacity lg:min-h-0 lg:flex-1",
+            isPlaceholderData && "opacity-60",
           )}
+        >
+        <div
+          ref={scrollRef}
+          className="scrollbar-slim max-h-[70dvh] overflow-auto lg:max-h-none lg:min-h-0 lg:flex-1"
         >
           <table className="w-full min-w-max text-sm">
             <thead>
@@ -525,16 +564,16 @@ export function ProductsPanel({
               </tr>
             </thead>
             <tbody>
-              {visible.map((product) => {
+              {products.map((product) => {
                 const editing = editingId === product.id;
                 const editingDate = editingDateId === product.id;
                 const promoted = onBoard.has(product.id);
-                const status = statusOf(product.id);
+                const status = product.status;
                 // A finished batch can't be late any more, whatever the date.
                 const pastDue =
                   product.due_date !== null &&
                   product.due_date < today &&
-                  !finished.has(product.id);
+                  !product.is_finished;
                 // The pinned batch cell paints its own ground, or the
                 // scrolling columns would show through it.
                 const rowBg = product.active ? "bg-surface" : "bg-sunken";
@@ -817,11 +856,25 @@ export function ProductsPanel({
             </tbody>
           </table>
         </div>
+
+        <div className="shrink-0 border-t border-line bg-gradient-to-b from-surface to-sunken px-3 py-2.5">
+        <TablePagination
+          page={current?.page ?? page}
+          pageSize={pageSize}
+          total={total}
+          onPageChange={goToPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(0);
+          }}
+        />
+        </div>
+        </div>
       )}
 
       <EditProductDialog
         product={editProduct}
-        status={editProduct ? statusOf(editProduct.id) : "received"}
+        status={editProduct?.status ?? "received"}
         customers={customers}
         onSave={saveDetails}
         onClose={() => setEditId(null)}

@@ -28,14 +28,12 @@ export default async function FactoryProductsPage({
   if (!canManage) redirect(`/factory/${slug}`);
 
   return (
-    /* Fills the workspace frame from `lg` up rather than growing the page —
-       see the note on <main> in FactoryShell. The panel scrolls inside it,
-       so a catalogue of hundreds of batches never grows the shell. The inset
-       padding keeps a focus ring from being clipped by the scroll box. */
-    <div className="mx-auto flex w-full max-w-6xl flex-col lg:min-h-0 lg:flex-1">
-      <div className="scrollbar-slim -mx-1 min-h-0 flex-1 px-1 pb-1 lg:overflow-y-auto">
-        <ProductsPanel factoryId={factory.id} canManage={canManage} />
-      </div>
+    /* Fills the workspace frame from `lg` up rather than growing the page:
+       the table then has a bounded box to scroll inside, which is what makes
+       its header row stay put. Wide, like the data table — every field is a
+       column and the rest is white space. */
+    <div className="mx-auto flex w-full max-w-[1600px] flex-col lg:min-h-0 lg:flex-1">
+      <ProductsPanel factoryId={factory.id} canManage={canManage} />
     </div>
   );
 }

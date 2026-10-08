@@ -54,6 +54,21 @@ const COLUMNS = `id, batch_no, code, name, work_order, required_qty, planned_for
 
 export const productKeys = {
   all: (factoryId: string) => ["factory_products", factoryId] as const,
+  /**
+   * Customer orders' pages, under `all` so the one `invalidateQueries` every
+   * save already makes reaches them — and apart from it, so the full list the
+   * rest of the app reads is never confused with one page of it.
+   */
+  pages: (factoryId: string) =>
+    ["factory_products", factoryId, "page"] as const,
+  page: (factoryId: string, params: ProductListParams) =>
+    ["factory_products", factoryId, "page", params] as const,
+  counts: (factoryId: string) =>
+    ["factory_products", factoryId, "counts"] as const,
+  customers: (factoryId: string) =>
+    ["factory_products", factoryId, "customers"] as const,
+  batchNos: (factoryId: string) =>
+    ["factory_products", factoryId, "batch-nos"] as const,
 };
 
 /** Received, then one of the board's four columns. */
@@ -181,6 +196,172 @@ export async function fetchProducts(factoryId: string): Promise<Product[]> {
 
   if (error) throw new Error(error.message);
   return (data ?? []) as Product[];
+}
+
+/* ── Customer orders: the catalogue, filtered and paged on the server ──────
+   The table used to load every batch and filter in the browser. Open vs
+   Finished is not something a page of rows can answer, so the database derives
+   it (`factory_products_expanded`, 0047) and the table asks for one page of one
+   half at a time. */
+
+/** Which half of the catalogue — see `is_finished` in the view. */
+export type ProductScope = "open" | "finished";
+
+export const DEFAULT_PRODUCT_PAGE_SIZE = 50;
+
+export interface ProductListParams {
+  scope: ProductScope;
+  /** Free text; blank is no filter. */
+  search: string;
+  /** Zero-based, like `.range()`. */
+  page: number;
+  pageSize: number;
+}
+
+/** A catalogue row plus what the board says about it — derived, never stored. */
+export interface ProductRow extends Product {
+  status: ProductStatus;
+  is_finished: boolean;
+}
+
+export interface ProductPage {
+  rows: ProductRow[];
+  /** Total in this scope matching the search — drives the pager. */
+  total: number;
+  /**
+   * The page these rows are, zero-based. Usually the one asked for; fewer if
+   * that page no longer exists — the last row of the last page was deleted, or
+   * a search narrowed the list under it — and then the last page there is.
+   */
+  page: number;
+}
+
+const ROW_COLUMNS = `${COLUMNS}, status, is_finished`;
+
+/** The columns free-text search looks through — the same ones it always did. */
+const SEARCH_COLUMNS = [
+  "batch_no",
+  "code",
+  "name",
+  "work_order",
+  "customer_code",
+  "customer_name",
+  "sales_order_no",
+  "status_label",
+];
+
+/**
+ * PostgREST's `or=(…)` is a comma/parenthesis-delimited grammar, so those
+ * characters come out of the term or the filter stops parsing. `%` and `_` stay:
+ * they reach `ilike` as wildcards and only ever widen a match.
+ */
+function sanitizeSearch(term: string): string {
+  return term
+    .trim()
+    .replace(/[,()"\\]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export async function fetchProductPage(
+  factoryId: string,
+  params: ProductListParams,
+): Promise<ProductPage> {
+  const { scope, search, page, pageSize } = params;
+  const supabase = createClient();
+  const start = page * pageSize;
+
+  let query = supabase
+    .from("factory_products_expanded")
+    .select(ROW_COLUMNS, { count: "exact" })
+    .eq("factory_id", factoryId)
+    .eq("is_finished", scope === "finished");
+
+  const term = sanitizeSearch(search);
+  if (term) {
+    query = query.or(SEARCH_COLUMNS.map((c) => `${c}.ilike.%${term}%`).join(","));
+  }
+
+  const { data, error, count } = await query
+    .order("created_at", { ascending: false })
+    // Two batches added in one import share a timestamp; without a stable
+    // tiebreaker the same row can land on two pages and another on none.
+    .order("id", { ascending: false })
+    .range(start, start + pageSize - 1);
+
+  if (error) throw new Error(error.message);
+  const total = count ?? 0;
+  // Asked for a page that is no longer there: give the last one instead of an
+  // empty table with a pager that says there are rows.
+  if ((data ?? []).length === 0 && total > 0 && page > 0) {
+    return fetchProductPage(factoryId, {
+      ...params,
+      page: Math.ceil(total / pageSize) - 1,
+    });
+  }
+  return { rows: (data ?? []) as unknown as ProductRow[], total, page };
+}
+
+/** The two pills' counts — the whole catalogue, whatever is typed in search. */
+export async function fetchProductCounts(
+  factoryId: string,
+): Promise<Record<ProductScope, number>> {
+  const supabase = createClient();
+  const count = async (finished: boolean) => {
+    const { count, error } = await supabase
+      .from("factory_products_expanded")
+      .select("id", { count: "exact", head: true })
+      .eq("factory_id", factoryId)
+      .eq("is_finished", finished);
+    if (error) throw new Error(error.message);
+    return count ?? 0;
+  };
+  const [open, finished] = await Promise.all([count(false), count(true)]);
+  return { open, finished };
+}
+
+/**
+ * Customer code → name, newest spelling first, for the forms to fill a name in
+ * from a code the catalogue has already seen. Two narrow columns rather than
+ * the whole table, since the table itself is no longer in memory.
+ */
+export async function fetchCustomerNames(
+  factoryId: string,
+): Promise<{ customer_code: string; customer_name: string }[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("factory_products")
+    .select("customer_code, customer_name")
+    .eq("factory_id", factoryId)
+    .not("customer_code", "is", null)
+    .not("customer_name", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(1000);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as { customer_code: string; customer_name: string }[];
+}
+
+/**
+ * Every batch number on file, for the bulk import to name the ones it will
+ * skip. Read a thousand at a time — that is where PostgREST stops, and a list
+ * that quietly stopped there would let a re-pasted sheet through as "new".
+ */
+export async function fetchBatchNos(factoryId: string): Promise<string[]> {
+  const supabase = createClient();
+  const out: string[] = [];
+  const step = 1000;
+  for (let from = 0; ; from += step) {
+    const { data, error } = await supabase
+      .from("factory_products")
+      .select("batch_no")
+      .eq("factory_id", factoryId)
+      .order("id")
+      .range(from, from + step - 1);
+    if (error) throw new Error(error.message);
+    out.push(...(data ?? []).map((r: { batch_no: string }) => r.batch_no));
+    if ((data ?? []).length < step) break;
+  }
+  return out;
 }
 
 export async function createProduct(

@@ -24,7 +24,14 @@ import {
   maintenanceKeys,
 } from "@/lib/factory/maintenance-queries";
 import { fetchPipelineJobs } from "@/lib/factory/pipeline-queries";
-import { fetchProducts, productKeys } from "@/lib/factory/product-queries";
+import {
+  DEFAULT_PRODUCT_PAGE_SIZE,
+  fetchProductCounts,
+  fetchProductPage,
+  fetchProducts,
+  productKeys,
+  type ProductListParams,
+} from "@/lib/factory/product-queries";
 import {
   fetchSetupItems,
   setupKeys,
@@ -116,7 +123,22 @@ const WARMERS: Record<string, Warm> = {
     stages(client, factoryId);
   },
   "/products": (client, factoryId) => {
-    products(client, factoryId);
+    // The table holds one page now, so warm exactly the one it opens on —
+    // same params, same key — and the two pills' counts.
+    const first: ProductListParams = {
+      scope: "open",
+      search: "",
+      page: 0,
+      pageSize: DEFAULT_PRODUCT_PAGE_SIZE,
+    };
+    void client.prefetchQuery({
+      queryKey: productKeys.page(factoryId, first),
+      queryFn: () => fetchProductPage(factoryId, first),
+    });
+    void client.prefetchQuery({
+      queryKey: productKeys.counts(factoryId),
+      queryFn: () => fetchProductCounts(factoryId),
+    });
   },
   "/data": (client, factoryId) => {
     setupList(client, factoryId, "factory_units");

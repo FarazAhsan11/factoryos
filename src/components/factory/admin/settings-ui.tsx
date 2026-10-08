@@ -39,7 +39,8 @@ export function PanelHeader({
 }: {
   icon: LucideIcon;
   title: string;
-  description: string;
+  /** A line under the title. Optional — some screens are better without one. */
+  description?: string;
   /** Rendered as a chip beside the title. Omit for a settings form. */
   count?: number;
   /** Import buttons and the like, aligned right. */
@@ -69,9 +70,11 @@ export function PanelHeader({
               </span>
             )}
           </h2>
-          <p className="mt-0.5 text-[0.8125rem] leading-snug text-ink-4">
-            {description}
-          </p>
+          {description && (
+            <p className="mt-0.5 text-[0.8125rem] leading-snug text-ink-4">
+              {description}
+            </p>
+          )}
         </div>
       </div>
       {action && (

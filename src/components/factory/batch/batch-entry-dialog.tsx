@@ -163,7 +163,7 @@ export function BatchEntryDialog({
               </Group>
             )}
 
-            <p className="mt-4 flex items-center gap-1.5 border-t border-line-soft pt-3 text-[11px] text-ink-5">
+            <p className="mt-4 flex items-center gap-1.5 border-t border-line-soft pt-3 text-[0.6875rem] text-ink-5">
               <ShieldCheck className="size-3 shrink-0" aria-hidden />
               Filed {formatDateTime(entry.created_at)}
               {entry.amended_at &&
@@ -186,7 +186,7 @@ function Group({
 }) {
   return (
     <section className="mb-3 rounded-xl border border-line-soft bg-sunken p-3.5 last:mb-0">
-      <h3 className="mb-2 text-[10px] font-bold tracking-[0.08em] text-ink-5 uppercase">
+      <h3 className="mb-2 text-[0.625rem] font-bold tracking-[0.08em] text-ink-5 uppercase">
         {title}
       </h3>
       <dl className="space-y-1.5">{children}</dl>
@@ -212,12 +212,12 @@ function Row({
     <div className="flex items-baseline justify-between gap-3">
       <dt className="shrink-0 text-xs text-ink-4">
         {label}
-        {hint && <span className="ml-1 text-[10px] text-ink-6">({hint})</span>}
+        {hint && <span className="ml-1 text-[0.625rem] text-ink-6">({hint})</span>}
       </dt>
       <dd
         className={cn(
           "min-w-0 truncate text-right text-xs font-medium text-ink-2",
-          mono && "font-mono text-[12.5px]",
+          mono && "font-mono text-[0.7812rem]",
           strong && "font-semibold text-ink",
         )}
       >

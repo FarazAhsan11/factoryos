@@ -52,7 +52,7 @@ export function EditProductDialog({
             <Pencil className="size-4 shrink-0 text-brand" />
             Edit product
           </DialogTitle>
-          <DialogDescription className="font-mono text-[12.5px]">
+          <DialogDescription className="font-mono text-[0.7812rem]">
             Batch {product?.batch_no}
             {product?.code && ` · ${product.code}`}
           </DialogDescription>

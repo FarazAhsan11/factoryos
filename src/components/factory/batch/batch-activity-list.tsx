@@ -46,7 +46,7 @@ export function BatchActivityList({
           learned: auto layout sizes each column to whatever happens to be in
           it, so the headings stop sitting over their own figures the moment
           one comment runs long. */}
-      <table className="w-full min-w-[1040px] table-fixed border-collapse text-[12px]">
+      <table className="w-full min-w-[1040px] table-fixed border-collapse text-[0.75rem]">
         <colgroup>
           <col className="w-[124px]" />
           <col className="w-[92px]" />
@@ -103,7 +103,7 @@ export function BatchActivityList({
                 style={{ boxShadow: `inset 4px 0 0 0 ${tone(entry)}` }}
               >
                 <span className="block truncate">{entry.log_date}</span>
-                <span className="block truncate text-[10.5px] text-ink-5 capitalize">
+                <span className="block truncate text-[0.6562rem] text-ink-5 capitalize">
                   {entry.shift}
                 </span>
               </Td>
@@ -117,7 +117,7 @@ export function BatchActivityList({
                   {entry.process?.name ?? "—"}
                 </span>
                 {entry.action_flag && (
-                  <span className="mt-0.5 flex items-center gap-1 text-[10px] font-bold tracking-wide text-danger-deep uppercase">
+                  <span className="mt-0.5 flex items-center gap-1 text-[0.625rem] font-bold tracking-wide text-danger-deep uppercase">
                     <Flag className="size-2.5 shrink-0" aria-hidden />
                     {entry.action_flag}
                   </span>
@@ -125,7 +125,7 @@ export function BatchActivityList({
                 {/* An amended row is a corrected row, and on a batch record
                     that is the fact somebody is looking for. */}
                 {entry.amended_at && !entry.action_flag && (
-                  <span className="mt-0.5 flex items-center gap-1 text-[10px] font-semibold text-violet">
+                  <span className="mt-0.5 flex items-center gap-1 text-[0.625rem] font-semibold text-violet">
                     <PenLine className="size-2.5 shrink-0" aria-hidden />
                     Amended
                   </span>
@@ -152,7 +152,7 @@ export function BatchActivityList({
                 {fmt(entry.qty)}
                 {/* A preparatory room made "3 drums", not "3". */}
                 {entry.qty_unit && entry.qty !== null && (
-                  <span className="ml-1 text-[9px] font-medium text-ink-5">
+                  <span className="ml-1 text-[0.5625rem] font-medium text-ink-5">
                     {entry.qty_unit}
                   </span>
                 )}
@@ -199,7 +199,7 @@ function Th({
       className={cn(
         // Wraps at spaces, never inside a word — a heading split into
         // "REJECTE / D" reads as a typo in a record people sign.
-        "sticky top-0 z-10 px-2.5 py-2 text-[10px] leading-tight font-bold tracking-[0.06em] break-normal uppercase",
+        "sticky top-0 z-10 px-2.5 py-2 text-[0.625rem] leading-tight font-bold tracking-[0.06em] break-normal uppercase",
         "bg-[linear-gradient(180deg,var(--color-ink)_0%,#1d2140_100%)] text-white/85",
         align === "right" ? "text-right" : "text-left",
       )}

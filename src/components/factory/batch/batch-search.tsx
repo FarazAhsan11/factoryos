@@ -155,14 +155,14 @@ export function BatchSearch({
                   onClick={() => choose(product)}
                   className="flex w-full items-baseline gap-2.5 rounded-xl px-3 py-2 text-left transition hover:bg-brand-tint focus-visible:bg-brand-tint focus-visible:outline-none"
                 >
-                  <span className="font-mono text-[13px] font-semibold text-ink">
+                  <span className="font-mono text-[0.8125rem] font-semibold text-ink">
                     {product.batch_no}
                   </span>
                   <span className="min-w-0 flex-1 truncate text-xs text-ink-4">
                     {product.name}
                   </span>
                   {product.code && (
-                    <span className="shrink-0 font-mono text-[11px] text-ink-5">
+                    <span className="shrink-0 font-mono text-[0.6875rem] text-ink-5">
                       {product.code}
                     </span>
                   )}
@@ -171,7 +171,7 @@ export function BatchSearch({
                       screen useless for exactly the batches most often asked
                       about. */}
                   {!product.active && (
-                    <span className="shrink-0 rounded-full bg-sunken-2 px-1.5 py-0.5 text-[9.5px] font-semibold text-ink-4">
+                    <span className="shrink-0 rounded-full bg-sunken-2 px-1.5 py-0.5 text-[0.5938rem] font-semibold text-ink-4">
                       Retired
                     </span>
                   )}

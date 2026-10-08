@@ -59,7 +59,7 @@ export function StageStrip({
         return (
           <span key={stage.id} className="flex items-center gap-1">
             {i > 0 && (
-              <span aria-hidden className="text-[10px] text-ink-6">
+              <span aria-hidden className="text-[0.625rem] text-ink-6">
                 ›
               </span>
             )}
@@ -74,7 +74,7 @@ export function StageStrip({
                   : ""
               }${stage.is_final ? " · completes the order" : ""}`}
               className={cn(
-                "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold whitespace-nowrap",
+                "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[0.625rem] font-semibold whitespace-nowrap",
                 style.className,
               )}
             >

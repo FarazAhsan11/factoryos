@@ -144,7 +144,7 @@ function OpenPanel({
         <>
           <div className="flex items-center gap-3">
             <span className="h-px flex-1 bg-line-soft" />
-            <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-ink-6">
+            <span className="text-[0.625rem] font-bold uppercase tracking-[0.6px] text-ink-6">
               or
             </span>
             <span className="h-px flex-1 bg-line-soft" />
@@ -315,7 +315,7 @@ function ResolveDirectPanel({
       </Field>
       {/* Said before the click, not discovered after it: this is a shortcut
           through the record, not around it. */}
-      <p className="text-[11px] text-ink-4">
+      <p className="text-[0.6875rem] text-ink-4">
         Recorded as resolved without an investigation, under your name. If it
         comes back, re-open it and it takes the full route.
       </p>
@@ -595,7 +595,7 @@ function ClosePanel({
   // only a supervisor and up gets the form for it.
   if (!canReview(role)) {
     return (
-      <p className="rounded-2xl border border-line bg-surface p-4 text-[13px] text-ink-3">
+      <p className="rounded-2xl border border-line bg-surface p-4 text-[0.8125rem] text-ink-3">
         The fix is recorded. A supervisor or above signs it off
         {action.verify_due_at && (
           <>
@@ -661,7 +661,7 @@ function ClosedPanel({
   role: FactoryRole;
 }) {
   return (
-    <p className="rounded-2xl border border-teal-line bg-teal-soft p-4 text-[13px] text-teal-deep">
+    <p className="rounded-2xl border border-teal-line bg-teal-soft p-4 text-[0.8125rem] text-teal-deep">
       {/* Two different things ended here, and saying which is the whole point
           of having recorded it: one issue was investigated and its fix
           verified, the other was small enough not to need either. */}
@@ -822,10 +822,10 @@ function RevertPanel({
 function Legend({ title, hint }: { title: string; hint: string }) {
   return (
     <div>
-      <p className="text-[10px] font-bold uppercase tracking-[0.6px] text-ink-5">
+      <p className="text-[0.625rem] font-bold uppercase tracking-[0.6px] text-ink-5">
         {title}
       </p>
-      <p className="mt-0.5 text-[11.5px] text-ink-4">{hint}</p>
+      <p className="mt-0.5 text-[0.7188rem] text-ink-4">{hint}</p>
     </div>
   );
 }
@@ -854,7 +854,7 @@ function Field({
         </span>
         {children}
       </label>
-      {error && <p className="text-[11.5px] text-danger">{error}</p>}
+      {error && <p className="text-[0.7188rem] text-danger">{error}</p>}
     </div>
   );
 }

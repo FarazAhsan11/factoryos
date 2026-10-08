@@ -183,7 +183,7 @@ export function EmployeesPanel({
         <div className={cn(PANEL, "overflow-x-auto")}>
           <table className="w-full min-w-[640px] text-sm">
             <thead>
-              <tr className="border-b border-line bg-sunken-2 text-left text-[10px] font-bold tracking-[0.07em] text-ink-3 uppercase">
+              <tr className="border-b border-line bg-sunken-2 text-left text-[0.625rem] font-bold tracking-[0.07em] text-ink-3 uppercase">
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Email</th>
                 <th className="px-4 py-3">Role</th>
@@ -261,7 +261,7 @@ export function EmployeesPanel({
                     <td className="px-4 py-3">
                       <span
                         className={cn(
-                          "inline-block rounded-full px-2 py-0.5 text-[11px] font-medium",
+                          "inline-block rounded-full px-2 py-0.5 text-[0.6875rem] font-medium",
                           STATUS[status].className,
                         )}
                       >

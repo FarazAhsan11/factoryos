@@ -174,7 +174,7 @@ export function DataTableWorkspace({
     <div className="lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
       <div className="mb-4 flex shrink-0 flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-5">
+          <p className="text-[0.6875rem] font-bold uppercase tracking-[0.09em] text-ink-5">
             Shift log
           </p>
           <h1 className="mt-1 flex items-center gap-2.5 text-2xl font-semibold tracking-tight text-ink">
@@ -212,7 +212,7 @@ export function DataTableWorkspace({
             <SlidersHorizontal className="size-3.5" />
             Filters
             {activeCount > 0 && (
-              <span className="rounded-full bg-brand px-1.5 text-[10px] font-bold text-white">
+              <span className="rounded-full bg-brand px-1.5 text-[0.625rem] font-bold text-white">
                 {activeCount}
               </span>
             )}

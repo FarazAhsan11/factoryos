@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 export const CONTROL =
   "h-11 w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-ink shadow-[0_1px_2px_rgba(20,22,43,0.04)] outline-none transition placeholder:text-placeholder hover:border-ink-6 focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12 disabled:cursor-not-allowed disabled:opacity-60";
 
-export const MONO = "font-mono text-[13px]";
+export const MONO = "font-mono text-[0.8125rem]";
 
 /**
  * The band a group of fields sits in. Sections used to be separated by
@@ -44,11 +44,11 @@ export function SectionTitle({
           <Icon className="size-3.5" />
         </span>
       )}
-      <span className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-2">
+      <span className="text-[0.6875rem] font-bold uppercase tracking-[0.09em] text-ink-2">
         {children}
       </span>
       {hint && (
-        <span className="truncate text-[10px] font-semibold text-brand">
+        <span className="truncate text-[0.625rem] font-semibold text-brand">
           {hint}
         </span>
       )}
@@ -105,12 +105,12 @@ export function Field({
         >
           {label}
           {note && (
-            <span className="ml-1 text-[10px] font-normal text-ink-5">
+            <span className="ml-1 text-[0.625rem] font-normal text-ink-5">
               {note}
             </span>
           )}
           {optional && (
-            <span className="ml-1 text-[10px] font-normal text-ink-5">
+            <span className="ml-1 text-[0.625rem] font-normal text-ink-5">
               (optional)
             </span>
           )}

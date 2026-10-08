@@ -16,7 +16,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const FIELD =
-  "w-full rounded-xl border border-line bg-sunken px-3.5 py-3 text-[15px] text-ink outline-none transition placeholder:text-ink-5 focus:border-brand focus:bg-surface focus:ring-4 focus:ring-brand/12";
+  "w-full rounded-xl border border-line bg-sunken px-3.5 py-3 text-[0.9375rem] text-ink outline-none transition placeholder:text-ink-5 focus:border-brand focus:bg-surface focus:ring-4 focus:ring-brand/12";
 const LABEL = "text-xs font-semibold uppercase tracking-wide text-ink-5";
 
 /**
@@ -73,7 +73,7 @@ export function OnboardingWizard({
             </div>
             <span className="text-lg font-bold tracking-tight">FactoryOS</span>
           </div>
-          <h1 className="mt-6 text-[28px] font-bold leading-tight">
+          <h1 className="mt-6 text-[1.75rem] font-bold leading-tight">
             Welcome to FactoryOS
           </h1>
           <p className="mt-1.5 text-sm text-placeholder">

@@ -20,7 +20,7 @@ import { SelectField } from "@/components/ui/select-field";
 import { cn } from "@/lib/utils";
 
 const LABEL =
-  "block text-[11px] font-bold uppercase tracking-[0.06em] text-ink-2";
+  "block text-[0.6875rem] font-bold uppercase tracking-[0.06em] text-ink-2";
 
 const EMPTY: KaizenIdeaValues = {
   idea: "",
@@ -85,13 +85,13 @@ export function KaizenForm({
       className="flex flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-card lg:h-full"
     >
       <header className="shrink-0 border-b border-line-soft bg-gradient-to-b from-warn-tint to-surface px-5 py-4">
-        <h2 className="flex items-center gap-2 text-[15px] font-semibold text-ink">
+        <h2 className="flex items-center gap-2 text-[0.9375rem] font-semibold text-ink">
           <span className="grid size-7 place-items-center rounded-lg bg-warn-soft">
             <Lightbulb className="size-4 text-warn-deep" />
           </span>
           Kaizen — continuous improvement
         </h2>
-        <p className="mt-1 text-[13px] text-ink-4">
+        <p className="mt-1 text-[0.8125rem] text-ink-4">
           Spotted something that would make the job easier, safer or faster? Say
           it here — a supervisor reviews every one.
         </p>
@@ -120,7 +120,7 @@ export function KaizenForm({
             <p
               role={errors.idea ? "alert" : undefined}
               className={cn(
-                "text-[11px]",
+                "text-[0.6875rem]",
                 errors.idea ? "text-danger-deep" : "text-ink-5",
               )}
             >
@@ -132,7 +132,7 @@ export function KaizenForm({
             {remaining < 200 && (
               <span
                 className={cn(
-                  "shrink-0 font-mono text-[11px]",
+                  "shrink-0 font-mono text-[0.6875rem]",
                   remaining < 0 ? "text-danger-deep" : "text-ink-5",
                 )}
               >
@@ -198,7 +198,7 @@ export function KaizenForm({
           <span className="grid size-7 shrink-0 place-items-center rounded-full bg-surface text-ink-4 ring-1 ring-line">
             <UserRound className="size-4" />
           </span>
-          <p className="text-[13px] text-ink-3">
+          <p className="text-[0.8125rem] text-ink-3">
             Submitted as{" "}
             <strong className="font-semibold text-ink">{userName}</strong>
             <span className="ml-1 text-ink-5">

@@ -126,7 +126,7 @@ export function AmendEntryDialog({
 
         {entry?.amend_note && (
           <div className="rounded-xl border border-line bg-surface p-3">
-            <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.6px] text-ink-5">
+            <p className="mb-1 text-[0.625rem] font-bold uppercase tracking-[0.6px] text-ink-5">
               Existing amendments
             </p>
             <p className="whitespace-pre-line text-xs text-ink-3">

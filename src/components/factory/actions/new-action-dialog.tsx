@@ -225,7 +225,7 @@ export function NewActionDialog({
                 onChange={(dueAt) => set("dueAt", dueAt)}
                 placeholder="Use the priority's own window"
               />
-              <p className="mt-1 text-[11px] text-ink-5">
+              <p className="mt-1 text-[0.6875rem] text-ink-5">
                 Leave blank and it&rsquo;s due in {window?.within} — the{" "}
                 {window?.label.toLowerCase()} window — escalating{" "}
                 {window?.within} after that.
@@ -290,7 +290,7 @@ function Field({
       >
         {label}
         {note && (
-          <span className="ml-1 text-[10px] font-normal text-ink-5">
+          <span className="ml-1 text-[0.625rem] font-normal text-ink-5">
             {note}
           </span>
         )}

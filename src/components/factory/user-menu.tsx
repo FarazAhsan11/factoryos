@@ -55,7 +55,7 @@ export function UserMenu({
           <span className="block max-w-[10rem] truncate text-sm leading-tight font-semibold text-ink">
             {display}
           </span>
-          <span className="block text-[11px] leading-tight text-ink-5">
+          <span className="block text-[0.6875rem] leading-tight text-ink-5">
             {roleLabel}
           </span>
         </span>
@@ -71,7 +71,7 @@ export function UserMenu({
           </div>
         </div>
         <div className="px-2 pb-2">
-          <span className="inline-flex items-center rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-semibold text-brand">
+          <span className="inline-flex items-center rounded-full bg-brand-soft px-2 py-0.5 text-[0.6875rem] font-semibold text-brand">
             {roleLabel}
           </span>
         </div>

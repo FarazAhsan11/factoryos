@@ -18,7 +18,7 @@ const FILTER_CONTROL =
 const FILTER_SIZE = "h-9 rounded-lg px-2.5 text-xs font-medium";
 
 const FILTER_LABEL =
-  "block text-[10px] font-bold uppercase tracking-[0.07em] text-ink-4";
+  "block text-[0.625rem] font-bold uppercase tracking-[0.07em] text-ink-4";
 
 function Group({
   label,

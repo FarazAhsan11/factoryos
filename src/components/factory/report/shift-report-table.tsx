@@ -81,7 +81,7 @@ export function ShiftReportTable({
           pretending otherwise is what broke the headings; the sheet is wider
           than the window and scrolls, which is what a wide sheet does. Headings
           still wrap at spaces — "TARGET / SPEED" — but never inside a word. */}
-      <table className="w-full min-w-[1614px] table-fixed border-collapse text-[12px]">
+      <table className="w-full min-w-[1614px] table-fixed border-collapse text-[0.75rem]">
         <colgroup>
           {/* The edit column. Not hidden here for print — `display:none` on a
               `<col>` is not honoured the way it is on a cell, and the `th`/`td`
@@ -238,7 +238,7 @@ function AddButton({ room, onAdd }: { room: string; onAdd: () => void }) {
       type="button"
       onClick={onAdd}
       title={`Add an entry for ${room}`}
-      className="inline-flex h-6 items-center gap-1 rounded-md border border-line bg-surface px-1.5 text-[10px] font-semibold text-ink-5 opacity-70 transition group-hover/room:opacity-100 hover:border-brand hover:bg-brand-tint hover:text-brand focus-visible:opacity-100 print:hidden"
+      className="inline-flex h-6 items-center gap-1 rounded-md border border-line bg-surface px-1.5 text-[0.625rem] font-semibold text-ink-5 opacity-70 transition group-hover/room:opacity-100 hover:border-brand hover:bg-brand-tint hover:text-brand focus-visible:opacity-100 print:hidden"
     >
       <Plus className="size-3" aria-hidden />
       Add entry
@@ -277,14 +277,14 @@ function IdleRow({
        is the status, and it fits in a sentence. */
     <tr className="group/room border-t border-line-soft bg-sunken-2/70 print:bg-surface">
       <td className="print:hidden" />
-      <Td className="text-[12px] font-medium text-ink-4" title={room.name}>
+      <Td className="text-[0.75rem] font-medium text-ink-4" title={room.name}>
         {room.name}
       </Td>
       <td colSpan={15} className="px-3 py-2">
         <div className="flex flex-wrap items-center gap-2.5">
           <span
             className={cn(
-              "rounded-full px-2 py-0.5 text-[10px] font-bold tracking-[0.07em] uppercase ring-1",
+              "rounded-full px-2 py-0.5 text-[0.625rem] font-bold tracking-[0.07em] uppercase ring-1",
               held
                 ? "bg-warn-soft text-warn-deep ring-warn-line"
                 : "bg-sunken-2 text-ink-4 ring-line",
@@ -292,7 +292,7 @@ function IdleRow({
           >
             {room.idleStatus}
           </span>
-          <span className="text-[11px] text-ink-5">
+          <span className="text-[0.6875rem] text-ink-5">
             Nothing logged this shift.
           </span>
           <AddButton room={room.name} onAdd={onAdd} />
@@ -327,7 +327,7 @@ function RoomBlock({
         <td className="print:hidden" />
         <td colSpan={16} className="px-3 py-2">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.07em] text-ink">
+            <span className="flex items-center gap-2 text-[0.75rem] font-bold uppercase tracking-[0.07em] text-ink">
               <span
                 aria-hidden
                 className="h-3.5 w-1 rounded-full bg-brand print:hidden"
@@ -432,7 +432,7 @@ function EntryRow({
           the same: it is what the CSV export and the printed sheet are read
           by, where there are no bands to look up to. */}
       <Td
-        className="text-[11px] text-ink-5"
+        className="text-[0.6875rem] text-ink-5"
         title={first ? room.name : undefined}
       >
         {first ? room.name : ""}
@@ -443,21 +443,21 @@ function EntryRow({
           {entry.process_name ?? "—"}
         </span>
         {entry.action_flag && (
-          <span className="mt-0.5 flex items-center gap-1 text-[10.5px] font-bold uppercase tracking-wide text-danger-deep">
+          <span className="mt-0.5 flex items-center gap-1 text-[0.6562rem] font-bold uppercase tracking-wide text-danger-deep">
             <Flag className="size-3 shrink-0" />
             {entry.action_flag}
           </span>
         )}
       </Td>
 
-      <Td className="font-mono text-[11px]">{entry.equipment_no || "—"}</Td>
+      <Td className="font-mono text-[0.6875rem]">{entry.equipment_no || "—"}</Td>
       <Td align="right" className="font-mono">
         {formatRunTime(entry.duration_minutes)}
       </Td>
 
       <Td title={entry.product_name ?? ""}>{entry.product_name ?? "—"}</Td>
-      <Td className="font-mono text-[11px]">{entry.product_code || "—"}</Td>
-      <Td className="font-mono text-[11px]">{entry.batch_no || "—"}</Td>
+      <Td className="font-mono text-[0.6875rem]">{entry.product_code || "—"}</Td>
+      <Td className="font-mono text-[0.6875rem]">{entry.batch_no || "—"}</Td>
 
       <Td align="right" className="font-mono font-semibold text-brand-deep">
         {formatQty(entry.qty)}
@@ -465,7 +465,7 @@ function EntryRow({
             handover the bare number is the one thing nobody can go back and
             ask about. */}
         {entry.qty_unit && entry.qty !== null && (
-          <span className="ml-1 text-[9px] font-medium text-ink-5">
+          <span className="ml-1 text-[0.5625rem] font-medium text-ink-5">
             {entry.qty_unit}
           </span>
         )}
@@ -482,7 +482,7 @@ function EntryRow({
           <span className="text-ink-6">—</span>
         ) : (
           <div className="min-w-[72px]">
-            <span className="font-mono text-[10.5px] font-semibold tabular-nums text-ink-3">
+            <span className="font-mono text-[0.6562rem] font-semibold tabular-nums text-ink-3">
               {pct}%
             </span>
             <span className="mt-1 block h-2 w-full overflow-hidden rounded-full bg-sunken-2 ring-1 ring-line-soft ring-inset">
@@ -545,7 +545,7 @@ function Th({
         // "REQUIRE / D" is worse — it reads as a typo in a document people
         // sign. `break-normal` is what forbids the second; the column widths
         // above are what make the first unnecessary.
-        "sticky top-0 z-10 px-3 py-2 text-[10px] leading-tight font-bold tracking-[0.06em] break-normal uppercase",
+        "sticky top-0 z-10 px-3 py-2 text-[0.625rem] leading-tight font-bold tracking-[0.06em] break-normal uppercase",
         // A deep indigo band rather than flat near-black: it belongs to the
         // same family as everything else on the page, and the gradient keeps
         // a sixteen-column header from reading as a solid bar of ink.

@@ -144,7 +144,7 @@ export function BatchFamilies({
 
       {shownStandalone.length > 0 && (
         <section className="space-y-2">
-          <h3 className="text-[11px] font-bold tracking-[0.07em] text-ink-5 uppercase">
+          <h3 className="text-[0.6875rem] font-bold tracking-[0.07em] text-ink-5 uppercase">
             Standalone batches
           </h3>
           {shownStandalone.map((job) => (
@@ -197,15 +197,15 @@ function FamilyGroup({
                 className="size-2 shrink-0 rounded-full"
                 style={{ background: status.accent }}
               />
-              <span className="font-mono text-[13px] font-semibold text-ink">
+              <span className="font-mono text-[0.8125rem] font-semibold text-ink">
                 {parent.batch_no}
               </span>
-              <span className="truncate text-[13px] font-semibold text-ink-2">
+              <span className="truncate text-[0.8125rem] font-semibold text-ink-2">
                 {parent.product_name}
               </span>
               <BatchTypeBadge type="manufacturing" />
             </span>
-            <span className="mt-0.5 block text-[11px] text-ink-5">
+            <span className="mt-0.5 block text-[0.6875rem] text-ink-5">
               {parent.unit_name ?? "No room yet"} ·{" "}
               {fmt(parent.required_qty)} {parent.bulk_unit ?? "units"} bulk
               {parent.overage_pct > 0 && ` · +${parent.overage_pct}% overage`}
@@ -217,7 +217,7 @@ function FamilyGroup({
 
         <div className="flex shrink-0 items-center gap-2">
           <span
-            className="rounded-md px-2 py-0.5 text-[10px] font-bold uppercase"
+            className="rounded-md px-2 py-0.5 text-[0.625rem] font-bold uppercase"
             style={{ background: status.tint, color: status.accent }}
           >
             {status.label}
@@ -225,7 +225,7 @@ function FamilyGroup({
           <button
             type="button"
             onClick={() => onOpen(parent)}
-            className="rounded-lg border border-line bg-surface px-2.5 py-1 text-[11px] font-semibold text-ink-3 transition hover:border-ink-6 hover:text-ink"
+            className="rounded-lg border border-line bg-surface px-2.5 py-1 text-[0.6875rem] font-semibold text-ink-3 transition hover:border-ink-6 hover:text-ink"
           >
             Details
           </button>
@@ -236,7 +236,7 @@ function FamilyGroup({
         <div className="space-y-2.5 p-4">
           {allocation && (
             <div className="space-y-1.5">
-              <div className="flex flex-wrap items-baseline justify-between gap-2 text-[11px]">
+              <div className="flex flex-wrap items-baseline justify-between gap-2 text-[0.6875rem]">
                 <span className="font-semibold text-ink-3">
                   Bulk allocation
                 </span>
@@ -266,7 +266,7 @@ function FamilyGroup({
               </div>
               <p
                 className={cn(
-                  "inline-block rounded-md px-2 py-1 text-[11px] font-semibold",
+                  "inline-block rounded-md px-2 py-1 text-[0.6875rem] font-semibold",
                   allocation.ok
                     ? "bg-teal-soft text-teal-deep"
                     : "bg-warn-tint text-warn-ink",
@@ -331,21 +331,21 @@ function PackingChildRow({
       <Package className="size-4 shrink-0 text-brand" aria-hidden />
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-2">
-          <span className="font-mono text-[12px] font-semibold text-ink">
+          <span className="font-mono text-[0.75rem] font-semibold text-ink">
             {job.batch_no}
           </span>
-          <span className="truncate text-[12px] font-semibold text-ink-2">
+          <span className="truncate text-[0.75rem] font-semibold text-ink-2">
             {job.product_name}
           </span>
           {job.pack_size && (
-            <span className="text-[10px] text-ink-5">
+            <span className="text-[0.625rem] text-ink-5">
               {formatPackSize(job.pack_size)} per{" "}
               {packUnitSingular(job.pack_unit)}
               {job.market && ` · ${job.market}`}
             </span>
           )}
         </span>
-        <span className="mt-0.5 block text-[11px] text-ink-5">
+        <span className="mt-0.5 block text-[0.6875rem] text-ink-5">
           {job.unit_name ?? "No room"} ·{" "}
           {job.required_qty
             ? `${fmt(job.required_qty)} ${job.pack_unit ?? "containers"}`
@@ -354,7 +354,7 @@ function PackingChildRow({
         </span>
       </span>
       <span
-        className="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase"
+        className="shrink-0 rounded-md px-2 py-0.5 text-[0.625rem] font-bold uppercase"
         style={{ background: status.tint, color: status.accent }}
       >
         {status.label}
@@ -380,15 +380,15 @@ function StandaloneRow({
     >
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-2">
-          <span className="font-mono text-[13px] font-semibold text-ink">
+          <span className="font-mono text-[0.8125rem] font-semibold text-ink">
             {job.batch_no}
           </span>
-          <span className="truncate text-[13px] font-semibold text-ink-2">
+          <span className="truncate text-[0.8125rem] font-semibold text-ink-2">
             {job.product_name}
           </span>
           <BatchTypeBadge type={job.batch_type} />
         </span>
-        <span className="mt-0.5 block text-[11px] text-ink-5">
+        <span className="mt-0.5 block text-[0.6875rem] text-ink-5">
           {job.unit_name ?? "No room yet"} · {fmt(job.required_qty)} required
           {/* A packing run whose bulk came from outside the board — the
               prototype's "no parent — external bulk". Said out loud so it
@@ -397,7 +397,7 @@ function StandaloneRow({
         </span>
       </span>
       <span
-        className="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase"
+        className="shrink-0 rounded-md px-2 py-0.5 text-[0.625rem] font-bold uppercase"
         style={{ background: status.tint, color: status.accent }}
       >
         {status.label}

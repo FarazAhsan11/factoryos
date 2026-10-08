@@ -275,7 +275,7 @@ export function EquipmentPanel({
                       !item.active && "bg-sunken text-ink-5",
                     )}
                   >
-                    <td className="px-4 py-3 font-mono text-[13px] font-medium text-ink">
+                    <td className="px-4 py-3 font-mono text-[0.8125rem] font-medium text-ink">
                       {editing ? (
                         <input
                           autoFocus
@@ -291,7 +291,7 @@ export function EquipmentPanel({
                             if (e.key === "Escape") setEditingId(null);
                           }}
                           aria-label={`Equipment number for ${item.name}`}
-                          className="h-8 w-32 rounded-lg border border-line px-2 font-mono text-[13px] outline-none focus:border-brand"
+                          className="h-8 w-32 rounded-lg border border-line px-2 font-mono text-[0.8125rem] outline-none focus:border-brand"
                         />
                       ) : (
                         item.equipment_no
@@ -350,7 +350,7 @@ export function EquipmentPanel({
                                     values: { active: !item.active },
                                   })
                                 }
-                                className="shrink-0 rounded-full bg-sunken-2 px-2 py-0.5 text-[11px] font-medium text-ink-3 transition hover:bg-line"
+                                className="shrink-0 rounded-full bg-sunken-2 px-2 py-0.5 text-[0.6875rem] font-medium text-ink-3 transition hover:bg-line"
                               >
                                 {item.active ? "Active" : "Retired"}
                               </button>

@@ -36,7 +36,7 @@ import { cn } from "@/lib/utils";
 const FIELD =
   "h-9 w-full rounded-lg border border-line bg-surface px-2.5 text-sm text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)] outline-none transition placeholder:text-placeholder hover:border-line-strong focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12";
 const MONO = "font-mono tracking-tight";
-const LABEL = "text-[10px] font-semibold tracking-[0.03em] text-ink-5 uppercase";
+const LABEL = "text-[0.625rem] font-semibold tracking-[0.03em] text-ink-5 uppercase";
 
 const fmt = (n: number | null | undefined) =>
   Number(n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -363,7 +363,7 @@ export function StageEditDialog({
               />
             </div>
 
-            <label className="flex cursor-pointer items-center gap-2 text-[11px] text-ink-3">
+            <label className="flex cursor-pointer items-center gap-2 text-[0.6875rem] text-ink-3">
               <input
                 type="checkbox"
                 className="size-3.5 cursor-pointer rounded border-ink-6 accent-brand"
@@ -374,7 +374,7 @@ export function StageEditDialog({
           </fieldset>
 
           {firstError && (
-            <p role="alert" className="text-[11px] text-danger-deep">
+            <p role="alert" className="text-[0.6875rem] text-danger-deep">
               {firstError}
             </p>
           )}

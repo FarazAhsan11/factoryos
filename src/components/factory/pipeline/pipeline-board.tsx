@@ -196,7 +196,7 @@ export function PipelineBoard({
             clearable
             clearLabel="All statuses"
             ariaLabel="Filter by status"
-            className="h-9 w-44 text-[13px]"
+            className="h-9 w-44 text-[0.8125rem]"
           />
           <SelectField
             value={type}
@@ -205,7 +205,7 @@ export function PipelineBoard({
             clearable
             clearLabel="All types"
             ariaLabel="Filter by batch type"
-            className="h-9 w-44 text-[13px]"
+            className="h-9 w-44 text-[0.8125rem]"
           />
         </div>
       </div>
@@ -319,7 +319,7 @@ function BatchRow({
               type="button"
               onClick={() => onOpen(job)}
               title={`Open details for batch ${job.batch_no}`}
-              className="max-w-full truncate rounded text-left text-[14px] font-semibold text-ink outline-none transition hover:text-brand-deep hover:underline focus-visible:ring-4 focus-visible:ring-brand/12"
+              className="max-w-full truncate rounded text-left text-[0.875rem] font-semibold text-ink outline-none transition hover:text-brand-deep hover:underline focus-visible:ring-4 focus-visible:ring-brand/12"
             >
               {job.product_name}
             </button>
@@ -329,7 +329,7 @@ function BatchRow({
               <BatchTypeBadge type={job.batch_type} />
             )}
             {isBulk && lots.length > 0 && (
-              <span className="rounded-md bg-brand-soft px-1.5 py-0.5 text-[10px] font-bold text-brand-deep">
+              <span className="rounded-md bg-brand-soft px-1.5 py-0.5 text-[0.625rem] font-bold text-brand-deep">
                 {lots.length} lot{lots.length === 1 ? "" : "s"}
               </span>
             )}
@@ -350,7 +350,7 @@ function BatchRow({
                   style={{ width: `${percent}%`, background: status.accent }}
                 />
               </span>
-              <span className="w-9 font-mono text-[11px] font-semibold tabular-nums text-ink-4">
+              <span className="w-9 font-mono text-[0.6875rem] font-semibold tabular-nums text-ink-4">
                 {percent}%
               </span>
             </span>
@@ -374,7 +374,7 @@ function BatchRow({
           {/* Where the batch is in its own route: which stage is running,
               which are done, and which one finishes the order. */}
           <div>
-            <p className="text-[10px] font-bold tracking-[0.07em] text-ink-5 uppercase">
+            <p className="text-[0.625rem] font-bold tracking-[0.07em] text-ink-5 uppercase">
               Stages
             </p>
             {stages.length > 0 ? (
@@ -383,7 +383,7 @@ function BatchRow({
               <p className="mt-1 text-xs text-ink-5">No stages planned yet.</p>
             )}
             {percent !== null && (
-              <p className="mt-1.5 font-mono text-[11px] tabular-nums text-ink-4">
+              <p className="mt-1.5 font-mono text-[0.6875rem] tabular-nums text-ink-4">
                 {fmt(job.produced_qty)} / {fmt(job.required_qty)} made
                 <span
                   className="ml-1 font-semibold"
@@ -398,7 +398,7 @@ function BatchRow({
           {isBulk && (
             <div>
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <p className="text-[10px] font-bold tracking-[0.07em] text-ink-5 uppercase">
+                <p className="text-[0.625rem] font-bold tracking-[0.07em] text-ink-5 uppercase">
                   Finished lots
                 </p>
                 {/* Over-allocation is badged, never blocked — as in Batch
@@ -409,7 +409,7 @@ function BatchRow({
                     straight at the mismatch. */}
                 {allocation &&
                   (allocation.ok ? (
-                    <p className="font-mono text-[11px] tabular-nums text-ink-4">
+                    <p className="font-mono text-[0.6875rem] tabular-nums text-ink-4">
                       {fmt(allocation.allocated)} / {fmt(allocation.allowance)}{" "}
                       {job.bulk_unit ?? "units"} of bulk allocated (
                       {allocation.pct}%)
@@ -417,7 +417,7 @@ function BatchRow({
                   ) : (
                     <p
                       title="Lots need containers × pack size, in this bulk's unit. Check the pack size is in the same unit as the bulk."
-                      className="inline-flex items-center gap-1 rounded-md bg-warn-tint px-2 py-0.5 text-[11px] font-semibold text-warn-ink ring-1 ring-warn-line"
+                      className="inline-flex items-center gap-1 rounded-md bg-warn-tint px-2 py-0.5 text-[0.6875rem] font-semibold text-warn-ink ring-1 ring-warn-line"
                     >
                       <AlertTriangle className="size-3" aria-hidden />
                       Lots need {fmt(allocation.allocated)}{" "}
@@ -492,12 +492,12 @@ function LotRow({
             type="button"
             onClick={() => onOpen(job)}
             title={`Open details for batch ${job.batch_no}`}
-            className="max-w-full truncate rounded text-left text-[13px] font-semibold text-ink outline-none transition hover:text-brand-deep hover:underline focus-visible:ring-4 focus-visible:ring-brand/12"
+            className="max-w-full truncate rounded text-left text-[0.8125rem] font-semibold text-ink outline-none transition hover:text-brand-deep hover:underline focus-visible:ring-4 focus-visible:ring-brand/12"
           >
             {job.product_name}
           </button>
           {job.pack_size && (
-            <span className="text-[11px] text-ink-5">
+            <span className="text-[0.6875rem] text-ink-5">
               {formatPackSize(job.pack_size)} per{" "}
               {packUnitSingular(job.pack_unit)}
               {job.market && ` · ${job.market}`}
@@ -537,14 +537,14 @@ function MetaLine({
     job.due_date !== null && job.status !== "finished" && job.due_date < today;
 
   return (
-    <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12px] text-ink-5">
-      <span className="font-mono text-[11.5px] font-semibold text-ink-4">
+    <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[0.75rem] text-ink-5">
+      <span className="font-mono text-[0.7188rem] font-semibold text-ink-4">
         {job.batch_no}
       </span>
       {job.product_code && (
         <>
           <Dot />
-          <span className="font-mono text-[11.5px]">{job.product_code}</span>
+          <span className="font-mono text-[0.7188rem]">{job.product_code}</span>
         </>
       )}
       {quantity && (
@@ -600,26 +600,26 @@ function RowAlerts({ job }: { job: PipelineJob }) {
       {job.flagged_count > 0 && (
         <span
           title={`${job.flagged_count} flagged shift-log entr${job.flagged_count === 1 ? "y" : "ies"}`}
-          className="inline-flex items-center gap-0.5 rounded-full bg-warn-soft px-1.5 py-0.5 text-[10px] font-bold text-warn-deep ring-1 ring-warn-line"
+          className="inline-flex items-center gap-0.5 rounded-full bg-warn-soft px-1.5 py-0.5 text-[0.625rem] font-bold text-warn-deep ring-1 ring-warn-line"
         >
           <AlertTriangle className="size-2.5" aria-hidden />
           {job.flagged_count}
         </span>
       )}
       {job.quarantine_no ? (
-        <span className="rounded-md bg-danger-soft px-1.5 py-0.5 text-[10.5px] font-semibold text-danger-deep ring-1 ring-danger-line">
+        <span className="rounded-md bg-danger-soft px-1.5 py-0.5 text-[0.6562rem] font-semibold text-danger-deep ring-1 ring-danger-line">
           Quarantined — {job.quarantine_no}
         </span>
       ) : (
         job.status === "hold" &&
         job.hold_reason && (
-          <span className="rounded-md bg-warn-tint px-1.5 py-0.5 text-[10.5px] font-semibold text-warn-ink ring-1 ring-warn-line">
+          <span className="rounded-md bg-warn-tint px-1.5 py-0.5 text-[0.6562rem] font-semibold text-warn-ink ring-1 ring-warn-line">
             Held — {job.hold_reason.toLowerCase()} issue flagged
           </span>
         )
       )}
       {note && (
-        <span className="text-[11px] font-medium text-warn-ink">{note}</span>
+        <span className="text-[0.6875rem] font-medium text-warn-ink">{note}</span>
       )}
     </>
   );
@@ -629,7 +629,7 @@ function StatusChip({ job }: { job: PipelineJob }) {
   const status = statusStyle(job.status);
   return (
     <span
-      className="rounded-full px-2.5 py-1 text-[10px] font-bold tracking-[0.05em] whitespace-nowrap uppercase"
+      className="rounded-full px-2.5 py-1 text-[0.625rem] font-bold tracking-[0.05em] whitespace-nowrap uppercase"
       style={{ background: status.tint, color: status.accent }}
     >
       {status.label}

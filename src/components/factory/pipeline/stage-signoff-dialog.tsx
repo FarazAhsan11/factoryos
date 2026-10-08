@@ -188,7 +188,7 @@ export function StageSignOffDialog({
               {...register("notes")}
             />
             {errors.notes?.message && (
-              <p role="alert" className="text-[11px] text-danger-deep">
+              <p role="alert" className="text-[0.6875rem] text-danger-deep">
                 {errors.notes.message}
               </p>
             )}
@@ -230,7 +230,7 @@ function Figure({
   return (
     <div>
       <p className={cn("font-mono text-lg font-bold", tone)}>{value}</p>
-      <p className="text-[10px] text-ink-5">{label}</p>
+      <p className="text-[0.625rem] text-ink-5">{label}</p>
     </div>
   );
 }

@@ -223,7 +223,7 @@ export function BatchRecordWorkspace({
                   </span>
                   {job && <BatchTypeBadge type={job.batch_type} />}
                   {!product.active && (
-                    <span className="rounded-full bg-sunken-2 px-2 py-0.5 text-[10px] font-semibold text-ink-4 ring-1 ring-line">
+                    <span className="rounded-full bg-sunken-2 px-2 py-0.5 text-[0.625rem] font-semibold text-ink-4 ring-1 ring-line">
                       Retired
                     </span>
                   )}
@@ -282,7 +282,7 @@ export function BatchRecordWorkspace({
                   {item.label}
                   <span
                     className={cn(
-                      "rounded-full px-1.5 py-0.5 font-mono text-[10px] font-bold tabular-nums",
+                      "rounded-full px-1.5 py-0.5 font-mono text-[0.625rem] font-bold tabular-nums",
                       active
                         ? "bg-brand-soft text-brand-deep"
                         : "bg-sunken-2 text-ink-5",
@@ -386,12 +386,12 @@ function Fact({
 }) {
   return (
     <div>
-      <dt className="text-[10px] font-bold tracking-[0.07em] text-ink-5 uppercase">
+      <dt className="text-[0.625rem] font-bold tracking-[0.07em] text-ink-5 uppercase">
         {label}
       </dt>
       <dd
         className={cn(
-          "font-mono text-[15px] font-semibold tabular-nums",
+          "font-mono text-[0.9375rem] font-semibold tabular-nums",
           tone ?? "text-ink-2",
           text && "capitalize",
         )}

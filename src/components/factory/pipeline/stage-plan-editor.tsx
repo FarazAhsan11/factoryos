@@ -20,9 +20,9 @@ import { SelectField } from "@/components/ui/select-field";
 import { cn } from "@/lib/utils";
 
 const INPUT =
-  "h-9 w-full rounded-lg border border-line bg-surface px-2.5 text-[13px] text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)] outline-none transition placeholder:text-placeholder hover:border-line-strong focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12 aria-invalid:border-danger";
-const CONTROL = "h-9 rounded-lg px-2.5 text-[13px]";
-const HEAD = "text-[10px] font-semibold tracking-[0.04em] text-ink-5 uppercase";
+  "h-9 w-full rounded-lg border border-line bg-surface px-2.5 text-[0.8125rem] text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)] outline-none transition placeholder:text-placeholder hover:border-line-strong focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12 aria-invalid:border-danger";
+const CONTROL = "h-9 rounded-lg px-2.5 text-[0.8125rem]";
+const HEAD = "text-[0.625rem] font-semibold tracking-[0.04em] text-ink-5 uppercase";
 
 /**
  * The one-line row's columns: activity, room, [work order], start, end, target,
@@ -116,16 +116,16 @@ export function StagePlanEditor({
     // dialog's — rather than by the screen's.
     <section className="@container space-y-2.5">
       <div>
-        <p className="flex items-center gap-1.5 text-[11px] font-bold tracking-[0.04em] text-ink-2 uppercase">
+        <p className="flex items-center gap-1.5 text-[0.6875rem] font-bold tracking-[0.04em] text-ink-2 uppercase">
           <ListChecks className="size-3.5" aria-hidden />
           Stages
           {fields.length > 0 && (
-            <span className="rounded-full bg-sunken-2 px-1.5 py-0.5 text-[10px] text-ink-4">
+            <span className="rounded-full bg-sunken-2 px-1.5 py-0.5 text-[0.625rem] text-ink-4">
               {fields.length}
             </span>
           )}
         </p>
-        <p className="mt-0.5 text-[11px] text-ink-5">
+        <p className="mt-0.5 text-[0.6875rem] text-ink-5">
           Rooms and dates can be left blank and scheduled later. The last stage
           completes the order{orderLabel ? ` — ${orderLabel}` : ""}.
         </p>
@@ -205,7 +205,7 @@ export function StagePlanEditor({
                     <span
                       title={isLast ? "Completes the order" : `Stage ${index + 1}`}
                       className={cn(
-                        "grid size-6 place-items-center rounded-md font-mono text-[11px] font-bold",
+                        "grid size-6 place-items-center rounded-md font-mono text-[0.6875rem] font-bold",
                         isLast
                           ? "bg-teal-soft text-teal-deep"
                           : "bg-sunken-2 text-ink-4",
@@ -400,7 +400,7 @@ export function StagePlanEditor({
                           </span>
                         )}
                         {index > 0 && (
-                          <label className="flex cursor-pointer items-center gap-2 text-[11px] text-ink-4">
+                          <label className="flex cursor-pointer items-center gap-2 text-[0.6875rem] text-ink-4">
                             <input
                               type="checkbox"
                               disabled={disabled}
@@ -414,7 +414,7 @@ export function StagePlanEditor({
                     )}
 
                     {missing && (
-                      <p className="text-[11px] text-warn-ink">
+                      <p className="text-[0.6875rem] text-warn-ink">
                         No &ldquo;{missing}&rdquo; activity in Plant setup →
                         Process stages. Add it there, pick the activity it is
                         called here, or remove this stage.
@@ -422,7 +422,7 @@ export function StagePlanEditor({
                     )}
 
                     {messages.length > 0 && (
-                      <p role="alert" className="text-[11px] text-danger-deep">
+                      <p role="alert" className="text-[0.6875rem] text-danger-deep">
                         {messages.join(" · ")}
                       </p>
                     )}
@@ -476,16 +476,16 @@ export function StagePlanEditor({
           {...register("issue")}
         />
         <span>
-          <span className="flex items-center gap-1.5 text-[12.5px] font-semibold">
+          <span className="flex items-center gap-1.5 text-[0.7812rem] font-semibold">
             <Rocket className="size-3.5" aria-hidden />
             Issue for production when added
           </span>
-          <span className="mt-0.5 block text-[11px] font-normal opacity-80">
+          <span className="mt-0.5 block text-[0.6875rem] font-normal opacity-80">
             Operators can log against it straight away. Every stage needs a
             target.
           </span>
           {errors.issue?.message && (
-            <span role="alert" className="mt-1 block text-[11px] text-danger-deep">
+            <span role="alert" className="mt-1 block text-[0.6875rem] text-danger-deep">
               {errors.issue.message}
             </span>
           )}

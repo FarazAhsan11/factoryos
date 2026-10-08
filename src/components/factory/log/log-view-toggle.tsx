@@ -66,7 +66,7 @@ export function LogViewToggle({
             title={HINTS[view.value]}
             onClick={() => select(view.value)}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-lg px-3 py-1 text-[13px] font-semibold transition-[color,background-color,box-shadow] duration-150",
+              "inline-flex items-center gap-1.5 rounded-lg px-3 py-1 text-[0.8125rem] font-semibold transition-[color,background-color,box-shadow] duration-150",
               active
                 ? "bg-surface text-brand-deep shadow-[0_1px_3px_rgba(20,22,43,0.12)] ring-1 ring-line"
                 : "text-ink-4 hover:bg-surface/60 hover:text-ink",

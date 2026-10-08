@@ -147,13 +147,13 @@ function Body({
 
       <div className="flex flex-wrap gap-1.5">
         <span
-          className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+          className="rounded-full px-2 py-0.5 text-[0.625rem] font-bold uppercase tracking-wide"
           style={{ background: status.tint, color: status.ink }}
         >
           {status.label}
         </span>
         {idea.reviewed_by_name && idea.reviewed_at && (
-          <span className="rounded-full bg-sunken-2 px-2 py-0.5 text-[10px] font-semibold text-ink-3">
+          <span className="rounded-full bg-sunken-2 px-2 py-0.5 text-[0.625rem] font-semibold text-ink-3">
             {idea.reviewed_by_name} · {timeAgo(idea.reviewed_at, now)}
           </span>
         )}
@@ -167,7 +167,7 @@ function Body({
         <div className="space-y-2">
           <label
             htmlFor="k-review-note"
-            className="block text-[10px] font-bold uppercase tracking-[0.6px] text-ink-5"
+            className="block text-[0.625rem] font-bold uppercase tracking-[0.6px] text-ink-5"
           >
             Reviewer&rsquo;s note{" "}
             <span className="font-normal normal-case tracking-normal text-ink-4">
@@ -194,10 +194,10 @@ function Body({
       ) : (
         idea.review_note && (
           <div className="space-y-1">
-            <p className="text-[10px] font-bold uppercase tracking-[0.6px] text-ink-5">
+            <p className="text-[0.625rem] font-bold uppercase tracking-[0.6px] text-ink-5">
               Reviewer&rsquo;s note
             </p>
-            <p className="rounded-xl bg-surface px-3.5 py-2.5 text-[13px] break-words whitespace-pre-line text-ink-3">
+            <p className="rounded-xl bg-surface px-3.5 py-2.5 text-[0.8125rem] break-words whitespace-pre-line text-ink-3">
               {idea.review_note}
             </p>
           </div>

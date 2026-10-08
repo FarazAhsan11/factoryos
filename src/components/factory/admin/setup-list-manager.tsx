@@ -389,7 +389,7 @@ export function SetupListManager({
                         </span>
                       )}
                       {c.hint && (
-                        <span className="mt-1 block text-[11px] leading-snug text-ink-5">
+                        <span className="mt-1 block text-[0.6875rem] leading-snug text-ink-5">
                           {c.hint}
                         </span>
                       )}
@@ -522,10 +522,10 @@ export function SetupListManager({
                             label: c.label,
                             hint: c.hint,
                           }))}
-                          className="h-7 w-auto shrink-0 rounded-full bg-sunken py-0 pr-2 pl-2.5 text-[11px] font-semibold text-ink-3"
+                          className="h-7 w-auto shrink-0 rounded-full bg-sunken py-0 pr-2 pl-2.5 text-[0.6875rem] font-semibold text-ink-3"
                         />
                       ) : (
-                        <span className="shrink-0 rounded-full bg-sunken-2 px-2 py-0.5 text-[11px] font-medium text-ink-3">
+                        <span className="shrink-0 rounded-full bg-sunken-2 px-2 py-0.5 text-[0.6875rem] font-medium text-ink-3">
                           {categoryList.find((c) => c.value === item.category)
                             ?.label ?? item.category}
                         </span>
@@ -538,7 +538,7 @@ export function SetupListManager({
                         return on ? (
                           <span
                             key={f.key}
-                            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-semibold text-brand-deep ring-1 ring-brand-line"
+                            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-soft px-2 py-0.5 text-[0.6875rem] font-semibold text-brand-deep ring-1 ring-brand-line"
                           >
                             <Icon className="size-3" />
                             {f.on}
@@ -559,7 +559,7 @@ export function SetupListManager({
                           aria-pressed={on}
                           title={on ? f.on : f.off}
                           className={cn(
-                            "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium transition",
+                            "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[0.6875rem] font-medium transition",
                             on
                               ? "bg-brand-soft text-brand-deep ring-1 ring-brand-line hover:brightness-95"
                               : "bg-sunken-2 text-ink-5 ring-1 ring-line hover:bg-line",
@@ -581,7 +581,7 @@ export function SetupListManager({
                               active: !item.active,
                             })
                           }
-                          className="shrink-0 rounded-full bg-sunken-2 px-2 py-0.5 text-[11px] font-medium text-ink-3 transition hover:bg-line"
+                          className="shrink-0 rounded-full bg-sunken-2 px-2 py-0.5 text-[0.6875rem] font-medium text-ink-3 transition hover:bg-line"
                         >
                           {item.active ? "Active" : "Retired"}
                         </button>

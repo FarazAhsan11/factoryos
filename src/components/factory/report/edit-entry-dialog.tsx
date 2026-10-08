@@ -706,7 +706,7 @@ function EditEntryForm({
           {(batchNo ?? "").trim() !== "" && (
             <p
               className={cn(
-                "rounded-xl px-3.5 py-2 text-[11px]",
+                "rounded-xl px-3.5 py-2 text-[0.6875rem]",
                 product
                   ? "bg-teal-soft text-teal-deep"
                   : "border border-dashed border-ink-6 bg-sunken text-ink-4",
@@ -1038,7 +1038,7 @@ function EditEntryForm({
                       <button
                         type="button"
                         onClick={() => removeOperator(i)}
-                        className="text-[11px] font-semibold text-ink-5 transition hover:text-danger-deep"
+                        className="text-[0.6875rem] font-semibold text-ink-5 transition hover:text-danger-deep"
                       >
                         Remove
                       </button>
@@ -1140,7 +1140,7 @@ function EditEntryForm({
               {errors.note.message}
             </p>
           ) : (
-            <p className="mt-1.5 text-[11px] text-ink-5">
+            <p className="mt-1.5 text-[0.6875rem] text-ink-5">
               Appended to this entry&rsquo;s amendment history and stamped with
               your name — it is the only record of what the row used to say.
             </p>
@@ -1148,7 +1148,7 @@ function EditEntryForm({
 
           {entry.amend_note && (
             <div className="mt-3 rounded-xl border border-line bg-surface p-3">
-              <p className="mb-1 text-[10px] font-bold tracking-[0.6px] text-ink-5 uppercase">
+              <p className="mb-1 text-[0.625rem] font-bold tracking-[0.6px] text-ink-5 uppercase">
                 Earlier amendments
               </p>
               <p className="text-xs whitespace-pre-line text-ink-3">
@@ -1182,7 +1182,7 @@ function EditHeader({
   return (
     <header className="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-line bg-surface px-5 py-3.5">
       <div className="min-w-0">
-        <DialogTitle className="flex items-center gap-2 text-[15px] font-semibold text-ink">
+        <DialogTitle className="flex items-center gap-2 text-[0.9375rem] font-semibold text-ink">
           <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-brand-soft to-brand-line text-brand">
             <PenLine className="size-4" />
           </span>
@@ -1195,7 +1195,7 @@ function EditHeader({
         </DialogDescription>
       </div>
       <div className="flex items-center gap-2">
-        <span className="hidden items-center gap-1 rounded-full bg-teal-soft px-2.5 py-1 text-[10px] font-semibold text-teal-deep ring-1 ring-teal-line/70 sm:inline-flex">
+        <span className="hidden items-center gap-1 rounded-full bg-teal-soft px-2.5 py-1 text-[0.625rem] font-semibold text-teal-deep ring-1 ring-teal-line/70 sm:inline-flex">
           <ShieldCheck className="size-3" />
           Audit-protected
         </span>
@@ -1226,7 +1226,7 @@ function EditFooter({
        button acts on is the last thing above it, and the count has to stay
        reachable from anywhere in a form this tall. */
     <footer className="sticky bottom-0 -mx-4 -mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur-sm sm:-mx-5 sm:-mb-5 sm:px-5">
-      <p className="flex items-center gap-1.5 text-[11px] text-ink-5">
+      <p className="flex items-center gap-1.5 text-[0.6875rem] text-ink-5">
         <ShieldCheck className="size-3 shrink-0" aria-hidden />
         {changeCount === 0
           ? "Nothing changed yet."
@@ -1259,7 +1259,7 @@ function CategoryNote({ category }: { category: ProcessCategory }) {
   const meta = PROCESS_CATEGORIES.find((c) => c.value === category);
   if (!meta) return null;
   return (
-    <p className="mt-3 rounded-xl bg-sunken px-3 py-2 text-[11px] text-ink-4">
+    <p className="mt-3 rounded-xl bg-sunken px-3 py-2 text-[0.6875rem] text-ink-4">
       <span className="font-bold tracking-[0.06em] text-ink-2 uppercase">
         {meta.label}
       </span>{" "}
@@ -1380,11 +1380,11 @@ function ChangeSummary({ changes }: { changes: FieldChange[] }) {
             <span className="min-w-[7.5rem] font-semibold text-ink-2">
               {change.label}
             </span>
-            <span className="font-mono text-[11.5px] text-ink-5 line-through decoration-danger/60">
+            <span className="font-mono text-[0.7188rem] text-ink-5 line-through decoration-danger/60">
               {change.from}
             </span>
             <ArrowRight className="size-3 shrink-0 text-ink-5" aria-hidden />
-            <span className="font-mono text-[11.5px] font-semibold text-ink">
+            <span className="font-mono text-[0.7188rem] font-semibold text-ink">
               {change.to}
             </span>
           </li>

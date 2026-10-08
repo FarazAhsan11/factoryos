@@ -34,7 +34,7 @@ export function InfoTip({
       <Popover.Portal>
         {/* Above the dialog it opens from (z-50). */}
         <Popover.Positioner side="bottom" align="start" sideOffset={6} className="z-60">
-          <Popover.Popup className="w-72 max-w-(--available-width) rounded-xl border border-line bg-surface px-3.5 py-3 text-[12px] leading-snug font-normal tracking-normal text-ink-3 normal-case shadow-lift outline-none">
+          <Popover.Popup className="w-72 max-w-(--available-width) rounded-xl border border-line bg-surface px-3.5 py-3 text-[0.75rem] leading-snug font-normal tracking-normal text-ink-3 normal-case shadow-lift outline-none">
             {children}
           </Popover.Popup>
         </Popover.Positioner>

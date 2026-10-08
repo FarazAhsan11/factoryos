@@ -156,7 +156,7 @@ function Calendar({
         >
           <ChevronLeft className="size-4" />
         </button>
-        <p className="text-[13px] font-semibold text-ink">
+        <p className="text-[0.8125rem] font-semibold text-ink">
           {view.toLocaleDateString(undefined, {
             month: "long",
             year: "numeric",
@@ -177,7 +177,7 @@ function Calendar({
           <span
             key={day}
             aria-hidden
-            className="grid h-7 place-items-center text-[10px] font-bold tracking-[0.06em] text-ink-5 uppercase"
+            className="grid h-7 place-items-center text-[0.625rem] font-bold tracking-[0.06em] text-ink-5 uppercase"
           >
             {day}
           </span>
@@ -198,7 +198,7 @@ function Calendar({
               aria-current={isToday ? "date" : undefined}
               aria-pressed={isSelected}
               className={cn(
-                "grid h-9 place-items-center rounded-lg text-[13px] tabular-nums transition",
+                "grid h-9 place-items-center rounded-lg text-[0.8125rem] tabular-nums transition",
                 isSelected
                   ? "bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] font-bold text-white shadow-brand-sm"
                   : disabled
@@ -414,7 +414,7 @@ export function DateTimeField({
           {selected ? (
             <>
               {longDate(selected)}
-              <span className="ml-1.5 font-mono text-[13px] text-ink-4">
+              <span className="ml-1.5 font-mono text-[0.8125rem] text-ink-4">
                 {timePart || "09:00"}
               </span>
             </>
@@ -517,7 +517,7 @@ function NumberColumn({
 
   return (
     <div className="min-w-0 flex-1">
-      <p className="mb-1 text-center text-[10px] font-bold tracking-[0.06em] text-ink-5 uppercase">
+      <p className="mb-1 text-center text-[0.625rem] font-bold tracking-[0.06em] text-ink-5 uppercase">
         {label}
       </p>
       <ul
@@ -545,7 +545,7 @@ function NumberColumn({
                 onClick={() => onPick(value)}
                 aria-pressed={on}
                 className={cn(
-                  "w-full rounded-lg py-1.5 text-center font-mono text-[13px] tabular-nums transition",
+                  "w-full rounded-lg py-1.5 text-center font-mono text-[0.8125rem] tabular-nums transition",
                   on
                     ? "bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] font-bold text-white shadow-brand-sm"
                     : "text-ink-3 hover:bg-surface hover:text-brand-deep",
@@ -700,7 +700,7 @@ export function TimeField({
             {/* Said, not just enforced: a picker that silently offers eight
                 hours out of twenty-four looks broken until you know why. */}
             {bounded && windowNote && (
-              <p className="mb-2 rounded-lg bg-sunken px-2 py-1.5 text-[10.5px] leading-snug font-medium text-ink-4">
+              <p className="mb-2 rounded-lg bg-sunken px-2 py-1.5 text-[0.6562rem] leading-snug font-medium text-ink-4">
                 {windowNote}
               </p>
             )}

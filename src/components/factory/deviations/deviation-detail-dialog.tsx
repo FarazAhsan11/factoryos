@@ -405,14 +405,14 @@ function Step({
         />
         <span
           className={cn(
-            "truncate text-[13px]",
+            "truncate text-[0.8125rem]",
             done ? "font-medium text-ink" : "text-ink-5",
           )}
         >
           {label}
         </span>
       </span>
-      <span className="shrink-0 font-mono text-[11px] tabular-nums text-ink-4">
+      <span className="shrink-0 font-mono text-[0.6875rem] tabular-nums text-ink-4">
         {done ? at : "—"}
       </span>
     </li>

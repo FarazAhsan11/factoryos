@@ -73,7 +73,7 @@ export function MaintenancePhaseStepper({
             >
               <span
                 className={cn(
-                  "flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold",
+                  "flex size-5 shrink-0 items-center justify-center rounded-full text-[0.625rem] font-bold",
                   done
                     ? "bg-teal text-white"
                     : active
@@ -85,7 +85,7 @@ export function MaintenancePhaseStepper({
               </span>
               <span
                 className={cn(
-                  "truncate text-[11px] font-semibold",
+                  "truncate text-[0.6875rem] font-semibold",
                   done
                     ? "text-teal-deep"
                     : active

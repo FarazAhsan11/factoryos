@@ -72,7 +72,7 @@ export const GRID_SPAN = GRID_COLUMNS.length;
  * outline a spreadsheet draws round its active cell.
  */
 export const INPUT =
-  "block h-10 w-full rounded-none border-0 bg-transparent px-3 text-[12.5px] text-ink outline-none transition-[background-color,box-shadow] placeholder:text-ink-6 hover:bg-brand-tint/60 focus:bg-surface focus:shadow-[inset_0_0_0_2px_var(--color-brand)] aria-invalid:bg-danger-soft/50 aria-invalid:shadow-[inset_0_0_0_1.5px_var(--color-danger)]";
+  "block h-10 w-full rounded-none border-0 bg-transparent px-3 text-[0.7812rem] text-ink outline-none transition-[background-color,box-shadow] placeholder:text-ink-6 hover:bg-brand-tint/60 focus:bg-surface focus:shadow-[inset_0_0_0_2px_var(--color-brand)] aria-invalid:bg-danger-soft/50 aria-invalid:shadow-[inset_0_0_0_1.5px_var(--color-danger)]";
 
 /**
  * The same, for the combobox and the time picker — both bring their own
@@ -80,7 +80,7 @@ export const INPUT =
  * the source, because every other form in the app wants the boxed version.
  */
 export const PICKER =
-  "h-10 w-full gap-1.5 rounded-none border-0 bg-transparent px-3 text-[12.5px] shadow-none hover:bg-brand-tint/60 focus-visible:ring-0 focus-visible:shadow-[inset_0_0_0_2px_var(--color-brand)] data-popup-open:bg-surface data-popup-open:ring-0 data-popup-open:shadow-[inset_0_0_0_2px_var(--color-brand)] aria-invalid:ring-0 aria-invalid:bg-danger-soft/50 aria-invalid:shadow-[inset_0_0_0_1.5px_var(--color-danger)] [&_svg]:size-3.5";
+  "h-10 w-full gap-1.5 rounded-none border-0 bg-transparent px-3 text-[0.7812rem] shadow-none hover:bg-brand-tint/60 focus-visible:ring-0 focus-visible:shadow-[inset_0_0_0_2px_var(--color-brand)] data-popup-open:bg-surface data-popup-open:ring-0 data-popup-open:shadow-[inset_0_0_0_2px_var(--color-brand)] aria-invalid:ring-0 aria-invalid:bg-danger-soft/50 aria-invalid:shadow-[inset_0_0_0_1.5px_var(--color-danger)] [&_svg]:size-3.5";
 
 /** A batch the gate would refuse: amber, the colour of the note saying why. */
 export const WARN = "bg-warn-tint shadow-[inset_0_-2px_0_var(--color-warn)]";
@@ -128,7 +128,7 @@ export function Static({
     <span
       title={title}
       className={cn(
-        "flex h-10 items-center bg-brand-tint/70 px-3 text-[12.5px] text-ink-3",
+        "flex h-10 items-center bg-brand-tint/70 px-3 text-[0.7812rem] text-ink-3",
         className,
       )}
     >
@@ -161,7 +161,7 @@ export function Note({
   return (
     <p
       className={cn(
-        "flex items-start gap-1.5 text-[11.5px] leading-snug font-medium",
+        "flex items-start gap-1.5 text-[0.7188rem] leading-snug font-medium",
         tone === "warn" ? "text-warn-ink" : "text-danger-deep",
       )}
     >
@@ -194,7 +194,7 @@ export function StripField({
     >
       <span
         className={cn(
-          "flex items-center border-r px-2 text-[9.5px] font-bold tracking-[0.06em] whitespace-nowrap uppercase",
+          "flex items-center border-r px-2 text-[0.5938rem] font-bold tracking-[0.06em] whitespace-nowrap uppercase",
           tone === "warn"
             ? "border-warn-line bg-warn-tint text-warn-deep"
             : "border-line bg-sunken-2 text-ink-5",
@@ -209,4 +209,4 @@ export function StripField({
 
 /** A control inside a `StripField`, which draws the box round it. */
 export const STRIP_CONTROL =
-  "h-8 rounded-none border-0 bg-transparent px-2 text-[12px] shadow-none focus-visible:ring-0 data-popup-open:ring-0 aria-invalid:ring-0";
+  "h-8 rounded-none border-0 bg-transparent px-2 text-[0.75rem] shadow-none focus-visible:ring-0 data-popup-open:ring-0 aria-invalid:ring-0";

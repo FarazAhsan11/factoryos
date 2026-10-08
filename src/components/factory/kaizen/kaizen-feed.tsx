@@ -88,7 +88,7 @@ export function KaizenFeed({
        and is read the same way, so it scrolls the same way too. */
     <aside className="flex flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-card lg:h-full">
       <header className="flex shrink-0 items-center justify-between gap-2 border-b border-line-soft px-4 py-3.5">
-        <h2 className="flex items-center gap-2 text-[15px] font-semibold text-ink">
+        <h2 className="flex items-center gap-2 text-[0.9375rem] font-semibold text-ink">
           <span className="grid size-7 place-items-center rounded-lg bg-warn-soft text-warn-deep">
             <Lightbulb className="size-4" />
           </span>
@@ -98,7 +98,7 @@ export function KaizenFeed({
             A total count of every idea ever submitted only goes up. */}
         <span
           className={cn(
-            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold",
+            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.625rem] font-semibold",
             waiting > 0
               ? "bg-warn-soft text-warn-deep ring-1 ring-warn-line"
               : "bg-teal-soft text-teal-deep ring-1 ring-teal-line/70",
@@ -122,7 +122,7 @@ export function KaizenFeed({
               onClick={() => setFilter(key)}
               aria-pressed={filter === key}
               className={cn(
-                "shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition",
+                "shrink-0 rounded-full border px-2.5 py-1 text-[0.6875rem] font-semibold transition",
                 filter === key
                   ? "border-brand bg-brand text-white shadow-brand-sm"
                   : "border-line bg-surface text-ink-3 hover:border-ink-6 hover:text-ink",
@@ -218,7 +218,7 @@ function IdeaRow({
       <div className="min-w-0 flex-1 space-y-1.5">
         <p
           title={idea.idea}
-          className="line-clamp-4 text-[13px] leading-snug break-words text-ink"
+          className="line-clamp-4 text-[0.8125rem] leading-snug break-words text-ink"
         >
           {idea.idea}
         </p>
@@ -237,7 +237,7 @@ function IdeaRow({
           )}
         </div>
 
-        <p className="text-[11px] break-words text-ink-5">
+        <p className="text-[0.6875rem] break-words text-ink-5">
           {idea.submitted_by_name ?? "Unknown"} · {timeAgo(idea.created_at, now)}
           {idea.reviewed_by_name && ` · reviewed by ${idea.reviewed_by_name}`}
         </p>
@@ -246,7 +246,7 @@ function IdeaRow({
             lives only inside a dialog is a reason the person who submitted it
             never reads. */}
         {idea.review_note && (
-          <p className="line-clamp-3 text-[11px] break-words whitespace-pre-line italic text-ink-4">
+          <p className="line-clamp-3 text-[0.6875rem] break-words whitespace-pre-line italic text-ink-4">
             ↳ {idea.review_note}
           </p>
         )}
@@ -288,7 +288,7 @@ function Chip({
 }) {
   return (
     <span
-      className="rounded-full px-2 py-0.5 text-[9.5px] font-semibold"
+      className="rounded-full px-2 py-0.5 text-[0.5938rem] font-semibold"
       style={{ background: tint, color: ink }}
     >
       {children}

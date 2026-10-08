@@ -156,7 +156,7 @@ export function ScheduleCalendar({
             className="sticky top-0 z-30 grid border-b border-line bg-sunken-2"
             style={{ gridTemplateColumns: columns }}
           >
-            <div className="sticky left-0 z-10 flex items-end border-r border-line bg-sunken-2 px-3 py-2 text-[10px] font-bold tracking-[0.08em] text-ink-5 uppercase">
+            <div className="sticky left-0 z-10 flex items-end border-r border-line bg-sunken-2 px-3 py-2 text-[0.625rem] font-bold tracking-[0.08em] text-ink-5 uppercase">
               {unitWord}
             </div>
             {days.map((day, i) => {
@@ -171,7 +171,7 @@ export function ScheduleCalendar({
                 >
                   <p
                     className={cn(
-                      "text-[10px] font-bold tracking-[0.06em] uppercase",
+                      "text-[0.625rem] font-bold tracking-[0.06em] uppercase",
                       isToday ? "text-brand-deep" : "text-ink-5",
                     )}
                   >
@@ -180,7 +180,7 @@ export function ScheduleCalendar({
                   </p>
                   <p
                     className={cn(
-                      "mt-0.5 text-[11.5px] font-semibold tabular-nums",
+                      "mt-0.5 text-[0.7188rem] font-semibold tabular-nums",
                       isToday ? "text-brand-deep" : "text-ink-3",
                     )}
                   >
@@ -330,13 +330,13 @@ function RoomRow({
         style={{ gridColumn: 1, gridRow: "1 / -1" }}
       >
         <p className="text-sm font-semibold text-ink">{lane.unitName}</p>
-        <p className="text-[10.5px] text-ink-5">
+        <p className="text-[0.6562rem] text-ink-5">
           {lane.stages.length} stage{lane.stages.length === 1 ? "" : "s"} to
           run
         </p>
         <div className="flex flex-wrap gap-1">
           {clashDays > 0 && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-danger-soft px-1.5 py-0.5 text-[10px] font-bold text-danger-deep ring-1 ring-danger-line">
+            <span className="inline-flex items-center gap-1 rounded-full bg-danger-soft px-1.5 py-0.5 text-[0.625rem] font-bold text-danger-deep ring-1 ring-danger-line">
               <AlertTriangle className="size-3" aria-hidden />
               Clash · {clashDays} day{clashDays === 1 ? "" : "s"}
             </span>
@@ -347,7 +347,7 @@ function RoomRow({
             <button
               type="button"
               onClick={onShowAll}
-              className="inline-flex items-center gap-0.5 rounded-full border border-line bg-surface px-1.5 py-0.5 text-[10px] font-semibold text-ink-4 transition hover:border-brand-line hover:text-brand-deep"
+              className="inline-flex items-center gap-0.5 rounded-full border border-line bg-surface px-1.5 py-0.5 text-[0.625rem] font-semibold text-ink-4 transition hover:border-brand-line hover:text-brand-deep"
             >
               {undated} undated
               <ChevronRight className="size-3" aria-hidden />
@@ -357,7 +357,7 @@ function RoomRow({
             <button
               type="button"
               onClick={() => onJump(elsewhere)}
-              className="inline-flex items-center gap-0.5 rounded-full border border-line bg-surface px-1.5 py-0.5 text-[10px] font-semibold text-ink-4 transition hover:border-brand-line hover:text-brand-deep"
+              className="inline-flex items-center gap-0.5 rounded-full border border-line bg-surface px-1.5 py-0.5 text-[0.625rem] font-semibold text-ink-4 transition hover:border-brand-line hover:text-brand-deep"
             >
               {elsewhere > end ? "Next" : "Last"} {formatDay(elsewhere)}
               <ChevronRight className="size-3" aria-hidden />
@@ -404,7 +404,7 @@ function RoomRow({
               key={`more-${days[i]}`}
               type="button"
               onClick={onShowAll}
-              className="relative z-10 mx-1 mb-1 self-start rounded-md border border-dashed border-danger-line bg-surface px-1.5 py-0.5 text-[10.5px] font-semibold text-danger-deep transition hover:bg-danger-soft"
+              className="relative z-10 mx-1 mb-1 self-start rounded-md border border-dashed border-danger-line bg-surface px-1.5 py-0.5 text-[0.6562rem] font-semibold text-danger-deep transition hover:bg-danger-soft"
               style={{ gridColumn: i + 2, gridRow: rowCount }}
             >
               +{n} more
@@ -485,7 +485,7 @@ function StageBar({
     >
       {/* Three lines — batch, stage, product — so a one-day bar never trades
           the stage name for the batch number beside it. */}
-      <span className="flex min-w-0 items-center gap-1 text-[11.5px] leading-tight">
+      <span className="flex min-w-0 items-center gap-1 text-[0.7188rem] leading-tight">
         {clipLeft && <ChevronLeft className="size-3 shrink-0 opacity-70" />}
         {running && <Cog className="size-3 shrink-0" aria-hidden />}
         <span className="truncate font-mono font-bold tracking-tight">
@@ -507,10 +507,10 @@ function StageBar({
           <ChevronRight className="ml-auto size-3 shrink-0 opacity-70" />
         )}
       </span>
-      <span className="truncate text-[11.5px] leading-tight font-semibold">
+      <span className="truncate text-[0.7188rem] leading-tight font-semibold">
         {name}
       </span>
-      <span className="truncate text-[10.5px] leading-tight opacity-80">
+      <span className="truncate text-[0.6562rem] leading-tight opacity-80">
         {job?.product_name ?? "Unnamed batch"}
       </span>
       {pct !== null && (
@@ -610,7 +610,7 @@ function ConflictBanner({
 
 function Legend() {
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10.5px] text-ink-4">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.6562rem] text-ink-4">
       <span className="inline-flex items-center gap-1.5">
         <span className="h-2.5 w-4 rounded-sm bg-brand" aria-hidden />
         Running

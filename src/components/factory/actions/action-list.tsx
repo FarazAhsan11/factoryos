@@ -82,7 +82,7 @@ export function ActionList({
               <div className="flex shrink-0 flex-wrap items-center gap-1.5">
                 {/* Escalated first — it is the reason this row is being read. */}
                 {action.is_escalated && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-violet-soft px-2 py-0.5 text-[10px] font-bold tracking-wide text-violet-deep uppercase ring-1 ring-violet-line">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-violet-soft px-2 py-0.5 text-[0.625rem] font-bold tracking-wide text-violet-deep uppercase ring-1 ring-violet-line">
                     <ArrowUpRight className="size-3" />
                     Escalated
                   </span>
@@ -90,7 +90,7 @@ export function ActionList({
                 {/* Only when it isn't already escalated: an escalated action is
                     overdue by definition, and saying both is noise. */}
                 {action.is_overdue && !action.is_escalated && (
-                  <span className="rounded-full bg-danger-soft px-2 py-0.5 text-[10px] font-bold tracking-wide text-danger-deep uppercase ring-1 ring-danger-line">
+                  <span className="rounded-full bg-danger-soft px-2 py-0.5 text-[0.625rem] font-bold tracking-wide text-danger-deep uppercase ring-1 ring-danger-line">
                     Overdue
                   </span>
                 )}
@@ -98,7 +98,7 @@ export function ActionList({
                     urgent, but it isn't done either — and this is the state
                     an issue quietly dies in. */}
                 {action.is_verify_overdue && (
-                  <span className="rounded-full bg-warn-soft px-2 py-0.5 text-[10px] font-bold tracking-wide text-warn-deep uppercase ring-1 ring-warn-line">
+                  <span className="rounded-full bg-warn-soft px-2 py-0.5 text-[0.625rem] font-bold tracking-wide text-warn-deep uppercase ring-1 ring-warn-line">
                     Sign-off late
                   </span>
                 )}
@@ -107,13 +107,13 @@ export function ActionList({
                     investigated, the difference is the only thing worth
                     knowing about the row. */}
                 {action.resolved_direct && (
-                  <span className="rounded-full bg-sunken-2 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-ink-4 uppercase ring-1 ring-line">
+                  <span className="rounded-full bg-sunken-2 px-2 py-0.5 text-[0.625rem] font-semibold tracking-wide text-ink-4 uppercase ring-1 ring-line">
                     No CAPA
                   </span>
                 )}
                 <span
                   className={cn(
-                    "rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1",
+                    "rounded-full px-2 py-0.5 text-[0.625rem] font-semibold ring-1",
                     STAGE_PILL[action.status],
                   )}
                 >
@@ -155,7 +155,7 @@ export function ActionList({
                   <span className="text-ink-4">{action.product_name}</span>
                 )}
                 {action.product_code && (
-                  <span className="font-mono text-[11px] text-ink-5">
+                  <span className="font-mono text-[0.6875rem] text-ink-5">
                     {action.product_code}
                   </span>
                 )}
@@ -182,7 +182,7 @@ export function ActionList({
               {/* Whichever clock is actually running. Showing the fix
                   deadline on an issue whose fix is already in would be
                   answering a question nobody is asking. */}
-              <span className="font-mono text-[11px] tabular-nums text-ink-5">
+              <span className="font-mono text-[0.6875rem] tabular-nums text-ink-5">
                 {action.status === "closed" ? (
                   <>
                     Closed {action.closed_at && relativeTime(action.closed_at, now)}
@@ -220,7 +220,7 @@ export function ActionList({
             {/* The one number that turns "overdue" into something actionable:
                 how long before this becomes a management problem. */}
             {action.is_overdue && !action.is_escalated && (
-              <p className="mt-2 flex items-center gap-1.5 rounded-lg bg-warn-tint px-2 py-1 text-[11px] font-medium text-warn-deep ring-1 ring-warn-line">
+              <p className="mt-2 flex items-center gap-1.5 rounded-lg bg-warn-tint px-2 py-1 text-[0.6875rem] font-medium text-warn-deep ring-1 ring-warn-line">
                 <AlertTriangle className="size-3 shrink-0" />
                 Escalates {relativeTime(action.escalates_at, now)}
               </p>

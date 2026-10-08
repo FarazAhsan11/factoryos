@@ -101,11 +101,11 @@ export function JobDetailDialog({
             {job?.product_name}
           </DialogTitle>
           <DialogDescription className="break-words">
-            <span className="rounded-md bg-sunken-2 px-1.5 py-0.5 font-mono text-[11px] font-bold text-ink-4 ring-1 ring-line">
+            <span className="rounded-md bg-sunken-2 px-1.5 py-0.5 font-mono text-[0.6875rem] font-bold text-ink-4 ring-1 ring-line">
               {job?.batch_no}
             </span>
             {job?.product_code && (
-              <span className="ml-1.5 font-mono text-[11px]">
+              <span className="ml-1.5 font-mono text-[0.6875rem]">
                 {job.product_code}
               </span>
             )}
@@ -143,7 +143,7 @@ export function JobDetailDialog({
                       ? `${job.stages_without_target} stage${job.stages_without_target === 1 ? "" : "s"} still need a target`
                       : "Ready to issue for production"}
               </p>
-              <p className="mt-0.5 text-[11px] text-ink-5">
+              <p className="mt-0.5 text-[0.6875rem] text-ink-5">
                 {job.issued_at
                   ? "Issued — operators can log against this batch."
                   : "Nothing can be logged against this batch until it is issued. Downtime is always allowed."}
@@ -271,7 +271,7 @@ export function JobDetailDialog({
                   >
                     <span className="min-w-0 flex-1 truncate text-sm text-ink">
                       {p.name}
-                      <span className="mt-0.5 block text-[11px] text-ink-5">
+                      <span className="mt-0.5 block text-[0.6875rem] text-ink-5">
                         {p.entries} entr{p.entries === 1 ? "y" : "ies"}
                         {p.minutes > 0 && ` · ${formatMinutes(p.minutes)}`}
                         {p.rejected > 0 && (
@@ -302,12 +302,12 @@ export function JobDetailDialog({
                   >
                     <span className="min-w-0 flex-1 truncate text-sm text-ink">
                       {r.name}
-                      <span className="mt-0.5 block text-[11px] text-ink-5">
+                      <span className="mt-0.5 block text-[0.6875rem] text-ink-5">
                         {r.entries} entr{r.entries === 1 ? "y" : "ies"} · last
                         used {shortDate(r.lastDate)}
                       </span>
                     </span>
-                    <span className="shrink-0 font-mono text-[12px] text-ink-3">
+                    <span className="shrink-0 font-mono text-[0.75rem] text-ink-3">
                       {formatMinutes(r.minutes)}
                     </span>
                   </li>
@@ -326,29 +326,29 @@ export function JobDetailDialog({
                     className="border-b border-line-soft px-3.5 py-2.5 transition last:border-0 hover:bg-sunken"
                   >
                     <div className="flex items-center gap-2">
-                      <span className="shrink-0 rounded-full bg-danger-soft px-1.5 py-0.5 text-[10px] font-semibold text-danger-deep ring-1 ring-danger-line">
+                      <span className="shrink-0 rounded-full bg-danger-soft px-1.5 py-0.5 text-[0.625rem] font-semibold text-danger-deep ring-1 ring-danger-line">
                         {e.action_flag}
                       </span>
                       <span className="min-w-0 flex-1 truncate text-sm text-ink">
                         {e.process?.name ?? "—"}
                       </span>
-                      <span className="shrink-0 text-[11px] text-ink-5">
+                      <span className="shrink-0 text-[0.6875rem] text-ink-5">
                         {shortDate(e.log_date)}
                         {e.unit?.name && ` · ${e.unit.name}`}
                       </span>
                     </div>
                     {e.comment && (
-                      <p className="mt-1 text-[11px] break-words italic text-ink-4">
+                      <p className="mt-1 text-[0.6875rem] break-words italic text-ink-4">
                         {e.comment}
                       </p>
                     )}
                     {e.operators?.length > 0 && (
-                      <p className="mt-0.5 text-[11px] text-ink-5">
+                      <p className="mt-0.5 text-[0.6875rem] text-ink-5">
                         {e.operators.join(" / ")}
                       </p>
                     )}
                     {e.amend_note && (
-                      <p className="mt-0.5 text-[11px] break-words whitespace-pre-line text-violet">
+                      <p className="mt-0.5 text-[0.6875rem] break-words whitespace-pre-line text-violet">
                         ↳ {e.amend_note}
                       </p>
                     )}
@@ -415,7 +415,7 @@ function TabButton({
       <Icon className="size-4" />
       {children}
       {count !== undefined && count > 0 && (
-        <span className="rounded-full bg-danger-soft px-1.5 text-[10px] font-bold text-danger-deep ring-1 ring-danger-line">
+        <span className="rounded-full bg-danger-soft px-1.5 text-[0.625rem] font-bold text-danger-deep ring-1 ring-danger-line">
           {count}
         </span>
       )}
@@ -449,7 +449,7 @@ function FamilyPanel({ job }: { job: PipelineJob }) {
           }
         />
         {job.parent_batch_no && (
-          <span className="text-[11px] text-ink-4">
+          <span className="text-[0.6875rem] text-ink-4">
             Bulk from{" "}
             <span className="font-mono font-semibold text-brand">
               {job.parent_batch_no}
@@ -458,14 +458,14 @@ function FamilyPanel({ job }: { job: PipelineJob }) {
           </span>
         )}
         {job.market && (
-          <span className="text-[11px] text-ink-5">{job.market}</span>
+          <span className="text-[0.6875rem] text-ink-5">{job.market}</span>
         )}
       </div>
 
       {/* A parent's side of the family: what its packing runs have claimed. */}
       {allocation && (
         <div className="space-y-1">
-          <div className="flex items-baseline justify-between gap-3 text-[11px]">
+          <div className="flex items-baseline justify-between gap-3 text-[0.6875rem]">
             <span className="text-ink-4">
               Bulk allocated to {job.child_count} packing run
               {job.child_count === 1 ? "" : "s"}
@@ -487,7 +487,7 @@ function FamilyPanel({ job }: { job: PipelineJob }) {
             />
           </div>
           {!allocation.ok && (
-            <p className="text-[11px] font-medium text-warn-ink">
+            <p className="text-[0.6875rem] font-medium text-warn-ink">
               ⚠ The packing runs ask for more bulk than this batch will make.
             </p>
           )}
@@ -496,7 +496,7 @@ function FamilyPanel({ job }: { job: PipelineJob }) {
 
       {/* A child's side: what it has drawn down of what it was given. */}
       {isPacking && remaining !== null && (
-        <p className="text-[11px] text-ink-4">
+        <p className="text-[0.6875rem] text-ink-4">
           Bulk{" "}
           <span className="font-mono text-ink">
             {fmt(job.bulk_consumed)} / {fmt(job.bulk_qty_received)}

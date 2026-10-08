@@ -114,7 +114,7 @@ export function MaintenanceTable({
               />
             </td>
             <td
-              className="max-w-[24rem] min-w-[14rem] px-3 py-2.5 align-middle text-[13px]"
+              className="max-w-[24rem] min-w-[14rem] px-3 py-2.5 align-middle text-[0.8125rem]"
               title={r.description}
             >
               <span className="block truncate font-medium text-ink">

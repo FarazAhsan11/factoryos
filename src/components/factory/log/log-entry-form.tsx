@@ -832,14 +832,14 @@ export function LogEntryForm({
       className="flex flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-card lg:h-full"
     >
       <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-line-soft bg-surface px-5 py-2.5">
-        <h2 className="flex items-center gap-2 text-[15px] font-semibold text-ink">
+        <h2 className="flex items-center gap-2 text-[0.9375rem] font-semibold text-ink">
           <span className="grid size-7 place-items-center rounded-lg bg-gradient-to-br from-brand-soft to-brand-line text-brand">
             <Plus className="size-4" />
           </span>
           New entry
         </h2>
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1 rounded-full bg-teal-soft px-2.5 py-1 text-[10px] font-semibold text-teal-deep ring-1 ring-teal-line/70">
+          <span className="inline-flex items-center gap-1 rounded-full bg-teal-soft px-2.5 py-1 text-[0.625rem] font-semibold text-teal-deep ring-1 ring-teal-line/70">
             <ShieldCheck className="size-3" />
             Audit-protected
           </span>
@@ -850,7 +850,7 @@ export function LogEntryForm({
               onClick={() => toggleQuick()}
               title="Quick mode: fewer fields for routine hourly entries"
               className={cn(
-                "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition",
+                "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[0.6875rem] font-semibold transition",
                 quick
                   ? "border-brand bg-brand-soft text-brand-deep shadow-[0_0_0_3px_rgba(79,70,229,0.10)]"
                   : "border-line bg-surface text-ink-4 hover:border-ink-6 hover:text-ink",
@@ -1207,7 +1207,7 @@ export function LogEntryForm({
             </Field>
 
             {product && (
-              <p className="mt-2 text-[11px] text-ink-4">
+              <p className="mt-2 text-[0.6875rem] text-ink-4">
                 Accumulative for this batch &amp; activity:{" "}
                 <span className="font-mono font-semibold text-teal">
                   {runningTotal.toLocaleString(undefined, {
@@ -1394,7 +1394,7 @@ export function LogEntryForm({
             </FieldRow>
 
             {product && (
-              <p className="mt-2 text-[11px] text-ink-4">
+              <p className="mt-2 text-[0.6875rem] text-ink-4">
                 Accumulative for this batch &amp; activity:{" "}
                 <span className="font-mono font-semibold text-teal">
                   {runningTotal.toLocaleString(undefined, {
@@ -1463,7 +1463,7 @@ export function LogEntryForm({
                       <button
                         type="button"
                         onClick={() => removeOperator(i)}
-                        className="text-[11px] font-semibold text-ink-5 transition hover:text-danger-deep"
+                        className="text-[0.6875rem] font-semibold text-ink-5 transition hover:text-danger-deep"
                       >
                         Remove
                       </button>
@@ -1559,7 +1559,7 @@ export function LogEntryForm({
           on the card it sits in. It still goes full width on a phone, where
           there is no second column to share the row with. */}
       <footer className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-line-soft bg-gradient-to-b from-surface to-sunken px-4 py-3 sm:px-5">
-        <p className="flex items-center gap-1.5 text-[11px] text-ink-5">
+        <p className="flex items-center gap-1.5 text-[0.6875rem] text-ink-5">
           <ShieldCheck className="size-3 shrink-0" aria-hidden />
           Corrections are amendments, not deletes.
         </p>
@@ -1652,7 +1652,7 @@ function CategoryBadge({ category }: { category?: string }) {
   return (
     <span
       className={cn(
-        "mt-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ring-1",
+        "mt-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.625rem] font-bold uppercase tracking-wide ring-1",
         style.className,
       )}
     >
@@ -1721,7 +1721,7 @@ function SlowReason({
       >
         {children}
       </Field>
-      <p className="text-[11px] text-warn-ink">
+      <p className="text-[0.6875rem] text-warn-ink">
         This is what the Pareto chart in OEE &amp; Downtime is built from — an
         unexplained slow run is a gap in the analysis later.
       </p>

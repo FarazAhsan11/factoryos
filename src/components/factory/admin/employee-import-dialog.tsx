@@ -259,10 +259,10 @@ export function EmployeeImportDialog({
                       <span className="min-w-0 flex-1 truncate text-xs text-ink-4">
                         {r.email}
                       </span>
-                      <span className="shrink-0 rounded-full bg-sunken-2 px-2 py-0.5 text-[11px] text-ink-3">
+                      <span className="shrink-0 rounded-full bg-sunken-2 px-2 py-0.5 text-[0.6875rem] text-ink-3">
                         {r.role}
                       </span>
-                      <span className="shrink-0 rounded-full bg-brand-soft px-2 py-0.5 text-[11px] text-brand">
+                      <span className="shrink-0 rounded-full bg-brand-soft px-2 py-0.5 text-[0.6875rem] text-brand">
                         {SHIFT_LABELS[r.defaultShift]}
                       </span>
                     </li>

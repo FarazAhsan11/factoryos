@@ -625,7 +625,7 @@ export function LogGridRow({
           <span className="flex h-10 items-center gap-1.5 pr-1.5 pl-3.5">
             <span
               className={cn(
-                "min-w-0 flex-1 truncate text-[12.5px]",
+                "min-w-0 flex-1 truncate text-[0.7812rem]",
                 primary ? "font-semibold text-ink" : "text-ink-4",
               )}
             >
@@ -696,7 +696,7 @@ export function LogGridRow({
             >
               {product.name}
               {product.code && (
-                <span className="ml-1.5 font-mono text-[11px] text-ink-5">
+                <span className="ml-1.5 font-mono text-[0.6875rem] text-ink-5">
                   {product.code}
                 </span>
               )}
@@ -869,7 +869,7 @@ export function LogGridRow({
                   <Popover.Popup className="w-76 rounded-xl border border-line bg-surface p-3 shadow-lift">
                     <div className="space-y-2.5">
                       {employees.length === 0 && (
-                        <p className="rounded-lg bg-sunken px-2.5 py-2 text-[11px] text-ink-4">
+                        <p className="rounded-lg bg-sunken px-2.5 py-2 text-[0.6875rem] text-ink-4">
                           No one on the roster yet — use &ldquo;Not on the
                           list…&rdquo; to type a name.
                         </p>
@@ -891,7 +891,7 @@ export function LogGridRow({
                               <button
                                 type="button"
                                 onClick={() => removeOperator(i)}
-                                className="text-[11px] font-semibold text-ink-5 transition hover:text-danger-deep"
+                                className="text-[0.6875rem] font-semibold text-ink-5 transition hover:text-danger-deep"
                               >
                                 Remove
                               </button>
@@ -904,7 +904,7 @@ export function LogGridRow({
                           <button
                             type="button"
                             onClick={() => addOperator({ name: "" })}
-                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand"
+                            className="inline-flex items-center gap-1 text-[0.6875rem] font-semibold text-brand"
                           >
                             <Plus className="size-3" /> Add operator
                           </button>
@@ -1056,7 +1056,7 @@ export function LogGridRow({
               type="button"
               onClick={save}
               disabled={isSubmitting}
-              className="inline-flex h-7 items-center gap-1.5 rounded-lg bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-3 text-[12px] font-semibold text-white shadow-brand transition hover:brightness-[1.06] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-70"
+              className="inline-flex h-7 items-center gap-1.5 rounded-lg bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-3 text-[0.75rem] font-semibold text-white shadow-brand transition hover:brightness-[1.06] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-70"
             >
               {isSubmitting && <Loader2 className="size-3 animate-spin" />}
               {isSubmitting ? "Logging…" : "Log"}

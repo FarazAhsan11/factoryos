@@ -255,7 +255,7 @@ function Initiation({
       </dl>
 
       <Section label="Description of problem">
-        <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-ink-2">
+        <p className="whitespace-pre-wrap text-[0.8125rem] leading-relaxed text-ink-2">
           {request.description}
         </p>
       </Section>
@@ -324,7 +324,7 @@ function Engineering({ request }: { request: MaintenanceRequest }) {
 
       {request.work_details && (
         <Section label="Details of maintenance work carried out">
-          <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-ink-2">
+          <p className="whitespace-pre-wrap text-[0.8125rem] leading-relaxed text-ink-2">
             {request.work_details}
           </p>
         </Section>
@@ -388,7 +388,7 @@ function Qa({ request }: { request: MaintenanceRequest }) {
 
       {request.qa_remarks && (
         <Section label="Remarks">
-          <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-ink-2">
+          <p className="whitespace-pre-wrap text-[0.8125rem] leading-relaxed text-ink-2">
             {request.qa_remarks}
           </p>
         </Section>
@@ -424,7 +424,7 @@ function Answer({
 }) {
   return (
     <div className="rounded-2xl border border-line bg-surface p-3.5">
-      <p className="text-[10px] font-bold uppercase tracking-[0.5px] text-ink-5">
+      <p className="text-[0.625rem] font-bold uppercase tracking-[0.5px] text-ink-5">
         {question}
       </p>
       <p
@@ -503,7 +503,7 @@ function Section({
 }) {
   return (
     <section className="space-y-1.5">
-      <p className="text-[10px] font-bold tracking-[0.07em] text-ink-4 uppercase">
+      <p className="text-[0.625rem] font-bold tracking-[0.07em] text-ink-4 uppercase">
         {label}
       </p>
       {children}
@@ -520,10 +520,10 @@ function Fact({
 }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[10px] font-bold tracking-[0.07em] text-ink-5 uppercase">
+      <dt className="text-[0.625rem] font-bold tracking-[0.07em] text-ink-5 uppercase">
         {label}
       </dt>
-      <dd className="mt-0.5 truncate text-[13px] text-ink">{children}</dd>
+      <dd className="mt-0.5 truncate text-[0.8125rem] text-ink">{children}</dd>
     </div>
   );
 }
@@ -596,7 +596,7 @@ function Badge({
   return (
     <span
       className={cn(
-        "rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase ring-1 ring-current/15",
+        "rounded-full px-2 py-0.5 text-[0.625rem] font-bold tracking-wide uppercase ring-1 ring-current/15",
         className,
       )}
     >

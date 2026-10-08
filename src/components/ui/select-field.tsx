@@ -214,7 +214,7 @@ export function SelectField({
               </div>
             )}
 
-            <Combobox.Empty className="px-3.5 py-6 text-center text-[13px] text-ink-5 empty:hidden">
+            <Combobox.Empty className="px-3.5 py-6 text-center text-[0.8125rem] text-ink-5 empty:hidden">
               {emptyMessage}
             </Combobox.Empty>
 
@@ -232,7 +232,7 @@ export function SelectField({
                       {/* A nameless group holds a row that is not part of any
                           section — it gets no heading. */}
                       {group.label && (
-                        <Combobox.GroupLabel className="px-2.5 pt-2 pb-1 text-[10px] font-bold tracking-[0.07em] text-ink-5 uppercase">
+                        <Combobox.GroupLabel className="px-2.5 pt-2 pb-1 text-[0.625rem] font-bold tracking-[0.07em] text-ink-5 uppercase">
                           {group.label}
                         </Combobox.GroupLabel>
                       )}
@@ -262,7 +262,7 @@ function Row({ item }: { item: SelectOption }) {
       <span className="col-start-2 min-w-0">
         <span className="block truncate">{item.label}</span>
         {item.hint && (
-          <span className="mt-0.5 block truncate text-[11px] font-normal text-ink-5">
+          <span className="mt-0.5 block truncate text-[0.6875rem] font-normal text-ink-5">
             {item.hint}
           </span>
         )}
@@ -270,7 +270,7 @@ function Row({ item }: { item: SelectOption }) {
       {item.meta && (
         // Capped so an over-long meta truncates itself instead of squeezing the
         // label to nothing — sentences belong in `hint`.
-        <span className="col-start-3 max-w-40 truncate font-mono text-[11px] font-normal text-ink-5">
+        <span className="col-start-3 max-w-40 truncate font-mono text-[0.6875rem] font-normal text-ink-5">
           {item.meta}
         </span>
       )}

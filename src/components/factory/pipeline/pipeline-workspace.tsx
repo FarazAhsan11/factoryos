@@ -161,7 +161,10 @@ export function PipelineWorkspace({
           )}
         </div>
 
-        {canManage && (
+        {/* Not on the Schedule: it is a room view, and raising a batch is the
+            board's job — the schedule only plans the stages of batches that
+            already exist. */}
+        {canManage && tab !== "schedule" && (
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             {/* Secondary, and kept: picking twenty already-catalogued batches
                 off a list is still the fastest way to fill the board, and the
@@ -210,7 +213,9 @@ export function PipelineWorkspace({
           </p>
           <p className="mt-1 text-xs text-ink-5">
             {canManage
-              ? "Use New batch to raise one, or From catalogue to pick several."
+              ? tab === "schedule"
+                ? "Raise a batch from Batch pipeline and it appears here."
+                : "Use New batch to raise one, or From catalogue to pick several."
               : "A manager adds batches from the product catalogue."}
           </p>
         </div>

@@ -74,11 +74,11 @@ import { cn } from "@/lib/utils";
 import { formatDay } from "@/lib/factory/dates";
 
 const FIELD =
-  "h-9 w-full rounded-lg border border-line bg-surface px-2.5 text-[13px] text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)] outline-none transition placeholder:text-placeholder hover:border-line-strong focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12";
+  "h-9 w-full rounded-lg border border-line bg-surface px-2.5 text-[0.8125rem] text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)] outline-none transition placeholder:text-placeholder hover:border-line-strong focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12";
 const MONO = "font-mono tracking-tight";
 /** SelectField's size, to match `FIELD` — one control height in the dialog. */
-const CONTROL = "h-9 rounded-lg px-2.5 text-[13px]";
-const LABEL = "text-[10.5px] font-semibold tracking-[0.03em] text-ink-4 uppercase";
+const CONTROL = "h-9 rounded-lg px-2.5 text-[0.8125rem]";
+const LABEL = "text-[0.6562rem] font-semibold tracking-[0.03em] text-ink-4 uppercase";
 
 function fmt(n: number) {
   return Number(n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -592,7 +592,7 @@ export function NewBatchDialog({
       >
         <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-full max-w-[min(62rem,calc(100vw-2rem))] flex-col gap-0 overflow-hidden p-0">
           <DialogHeader className="shrink-0 gap-1 border-b border-line bg-surface px-5 pt-4 pr-12 pb-3">
-            <DialogTitle className="text-[15px] text-ink">New batch</DialogTitle>
+            <DialogTitle className="text-[0.9375rem] text-ink">New batch</DialogTitle>
             <DialogDescription className="text-xs">
               It lands in Planned and moves itself as entries are logged
               against it.
@@ -817,7 +817,7 @@ export function NewBatchDialog({
                     the catalogue's, and editing it in two places is how the
                     two stop agreeing. */}
                 {picked && !picked.required_qty && (
-                  <p className="rounded-lg border border-warn-line bg-warn-tint px-3 py-2 text-[11px] text-warn-ink">
+                  <p className="rounded-lg border border-warn-line bg-warn-tint px-3 py-2 text-[0.6875rem] text-warn-ink">
                     Batch {picked.batch_no} has no required quantity. Set it in
                     Products, or this batch shows no progress and counts as
                     nothing against its bulk.
@@ -1054,7 +1054,7 @@ export function NewBatchDialog({
                   {/* An empty list looks like a broken control otherwise: the
                       only option is "external bulk" and nothing says why. */}
                   {bulkSources.length === 0 && (
-                    <p className="mt-1.5 text-[11px] text-ink-5">
+                    <p className="mt-1.5 text-[0.6875rem] text-ink-5">
                       No manufacturing batches on the board yet — add one first
                       to link this run to its bulk.
                     </p>
@@ -1159,11 +1159,11 @@ export function NewBatchDialog({
                     className="mt-0.5 size-4 shrink-0 accent-[var(--color-brand)]"
                   />
                   <span>
-                    <span className="flex items-center gap-1.5 text-[12.5px] font-semibold">
+                    <span className="flex items-center gap-1.5 text-[0.7812rem] font-semibold">
                       <Package className="size-3.5" aria-hidden />
                       Also add a finished lot from this bulk
                     </span>
-                    <span className="mt-0.5 block text-[11px] font-normal opacity-80">
+                    <span className="mt-0.5 block text-[0.6875rem] font-normal opacity-80">
                       {picked
                         ? "Both batches are checked together and added in one go, the lot already drawing on this bulk."
                         : "Pick the bulk batch above first."}
@@ -1283,7 +1283,7 @@ export function NewBatchDialog({
                     </Summary>
                   )}
                   {lotPicked && !lotPicked.required_qty && (
-                    <p className="mt-2 rounded-xl border border-warn-line bg-warn-tint px-3 py-2 text-[11px] text-warn-ink">
+                    <p className="mt-2 rounded-xl border border-warn-line bg-warn-tint px-3 py-2 text-[0.6875rem] text-warn-ink">
                       Batch {lotPicked.batch_no} has no required quantity. Set
                       it in Products, or this lot counts as nothing against its
                       bulk.
@@ -1377,7 +1377,7 @@ export function NewBatchDialog({
                     </p>
                   )}
 
-                  <p className="mt-3 text-[11px] text-ink-5">
+                  <p className="mt-3 text-[0.6875rem] text-ink-5">
                     Takes the bulk&rsquo;s priority; its due date is its own,
                     from Products.
                   </p>
@@ -1491,7 +1491,7 @@ function TypeSection({
 }) {
   return (
     <section className={cn("rounded-xl border p-3.5", tone)}>
-      <p className="mb-2.5 flex items-center gap-1.5 text-[10.5px] font-bold tracking-[0.04em] text-ink-2 uppercase">
+      <p className="mb-2.5 flex items-center gap-1.5 text-[0.6562rem] font-bold tracking-[0.04em] text-ink-2 uppercase">
         <Icon className="size-3.5" aria-hidden />
         {title}
         {info && <InfoTip label={`About ${title.toLowerCase()}`}>{info}</InfoTip>}
@@ -1532,12 +1532,12 @@ function Field({
       <label htmlFor={htmlFor} className={LABEL}>
         {label}
         {optional && (
-          <span className="ml-1 text-[10px] font-normal normal-case text-ink-6">
+          <span className="ml-1 text-[0.625rem] font-normal normal-case text-ink-6">
             optional
           </span>
         )}
         {note && (
-          <span className="ml-1 text-[10px] font-normal normal-case text-ink-6">
+          <span className="ml-1 text-[0.625rem] font-normal normal-case text-ink-6">
             ({note})
           </span>
         )}
@@ -1550,7 +1550,7 @@ function Field({
       </div>
       <div className="mt-auto">{children}</div>
       {error && (
-        <p role="alert" className="text-[11px] text-danger-deep">
+        <p role="alert" className="text-[0.6875rem] text-danger-deep">
           {error}
         </p>
       )}
@@ -1594,14 +1594,14 @@ function Stat({
 }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[10px] font-semibold tracking-[0.04em] text-ink-5 uppercase">
+      <dt className="text-[0.625rem] font-semibold tracking-[0.04em] text-ink-5 uppercase">
         {label}
       </dt>
       <dd
         title={title ?? value}
         className={cn(
-          "mt-0.5 flex items-center gap-1.5 text-[12.5px] font-medium text-ink",
-          mono && "font-mono text-[12px]",
+          "mt-0.5 flex items-center gap-1.5 text-[0.7812rem] font-medium text-ink",
+          mono && "font-mono text-[0.75rem]",
         )}
       >
         {Icon && <Icon className="size-3.5 shrink-0 text-ink-5" aria-hidden />}

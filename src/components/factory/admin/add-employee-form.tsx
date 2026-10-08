@@ -72,7 +72,7 @@ export function AddEmployeeForm({
       onSubmit={handleSubmit(onSubmit)}
       className="rounded-2xl border border-line bg-sunken p-4 shadow-[inset_0_1px_2px_rgb(20_22_43/0.04)]"
     >
-      <p className="mb-3 text-[11px] font-bold tracking-[0.07em] text-ink-4 uppercase">
+      <p className="mb-3 text-[0.6875rem] font-bold tracking-[0.07em] text-ink-4 uppercase">
         Add someone to this factory
       </p>
 

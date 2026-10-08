@@ -54,12 +54,12 @@ export function ShiftReportSummary({
     >
       {figures.map((figure) => (
         <div key={figure.label} className="flex items-baseline gap-1.5">
-          <dt className="text-[10px] font-bold tracking-[0.07em] text-ink-5 uppercase">
+          <dt className="text-[0.625rem] font-bold tracking-[0.07em] text-ink-5 uppercase">
             {figure.label}
           </dt>
           <dd
             className={cn(
-              "font-mono text-[15px] leading-none font-semibold tabular-nums tracking-tight",
+              "font-mono text-[0.9375rem] leading-none font-semibold tabular-nums tracking-tight",
               figure.tone,
             )}
           >

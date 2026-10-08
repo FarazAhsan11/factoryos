@@ -185,7 +185,7 @@ export function FactorySidebar({
               <p className="truncate text-sm font-semibold text-ink">
                 {factoryName}
               </p>
-              <p className="truncate text-[11px] text-ink-5">
+              <p className="truncate text-[0.6875rem] text-ink-5">
                 {slug || "factory"} · workspace
               </p>
             </div>
@@ -237,7 +237,7 @@ export function FactorySidebar({
               {section.label && (
                 <p
                   className={cn(
-                    "px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-5",
+                    "px-3 pb-2 text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-ink-5",
                     icons && "lg:hidden",
                   )}
                 >
@@ -495,7 +495,7 @@ function NavGroupItem({
           style={{ top: flyout.top, left: flyout.left }}
         >
           <div className="w-60 animate-in fade-in-0 slide-in-from-left-1 rounded-xl border border-line bg-surface p-1.5 shadow-xl shadow-ink/10 duration-150">
-            <p className="flex items-center gap-2 px-2.5 pb-1.5 pt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-5">
+            <p className="flex items-center gap-2 px-2.5 pb-1.5 pt-1 text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-ink-5">
               <Icon className="size-3.5" aria-hidden />
               {group.label}
             </p>
@@ -537,7 +537,7 @@ function SubLink({
   linkProps: LinkProps;
 }) {
   const row =
-    "relative flex w-full items-center gap-2 rounded-lg px-2.5 py-[7px] text-[13px] transition-colors duration-150";
+    "relative flex w-full items-center gap-2 rounded-lg px-2.5 py-[7px] text-[0.8125rem] transition-colors duration-150";
 
   if (!link.ready) {
     return (
@@ -583,7 +583,7 @@ function Soon({ hidden }: { hidden: boolean }) {
   return (
     <span
       className={cn(
-        "rounded-full bg-sunken-2 px-1.5 py-0.5 text-[10px] font-medium text-ink-5",
+        "rounded-full bg-sunken-2 px-1.5 py-0.5 text-[0.625rem] font-medium text-ink-5",
         hidden && "lg:hidden",
       )}
     >

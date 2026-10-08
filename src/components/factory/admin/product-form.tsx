@@ -343,14 +343,14 @@ export function ProductForm({
               <div className="min-w-0">
                 <label htmlFor="pf-planned" className="text-xs font-medium text-ink-3">
                   Plan for{" "}
-                  <span className="text-[10px] font-normal text-ink-5">(optional)</span>
+                  <span className="text-[0.625rem] font-normal text-ink-5">(optional)</span>
                 </label>
-                <p className="mt-0.5 text-[11.5px] leading-snug text-ink-5">
+                <p className="mt-0.5 text-[0.7188rem] leading-snug text-ink-5">
                   {plannedLocked ??
                     "Joins the pipeline board as Planned on this day. Unlike Exp. start it moves the batch — leave it blank to add it from New batch instead."}
                 </p>
                 {errors.plannedFor?.message && (
-                  <p role="alert" className="mt-1 text-[11.5px] text-danger-deep">
+                  <p role="alert" className="mt-1 text-[0.7188rem] text-danger-deep">
                     {errors.plannedFor.message}
                   </p>
                 )}
@@ -439,7 +439,7 @@ function Section({
 }) {
   return (
     <section>
-      <h3 className="mb-2.5 text-[10px] font-bold tracking-[0.08em] text-ink-5 uppercase">
+      <h3 className="mb-2.5 text-[0.625rem] font-bold tracking-[0.08em] text-ink-5 uppercase">
         {title}
       </h3>
       {children}
@@ -472,11 +472,11 @@ function Field({
       </label>
       {children}
       {error ? (
-        <p role="alert" className="text-[11.5px] text-danger-deep">
+        <p role="alert" className="text-[0.7188rem] text-danger-deep">
           {error}
         </p>
       ) : (
-        hint && <p className="text-[11px] text-ink-5">{hint}</p>
+        hint && <p className="text-[0.6875rem] text-ink-5">{hint}</p>
       )}
     </div>
   );

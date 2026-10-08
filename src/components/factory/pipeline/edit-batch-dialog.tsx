@@ -37,7 +37,7 @@ import { cn } from "@/lib/utils";
 const FIELD =
   "h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)] outline-none transition placeholder:text-placeholder hover:border-line-strong focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12";
 const MONO = "font-mono tracking-tight";
-const LABEL = "text-[11px] font-semibold tracking-[0.02em] text-ink-4 uppercase";
+const LABEL = "text-[0.6875rem] font-semibold tracking-[0.02em] text-ink-4 uppercase";
 
 const TYPE_ICONS: Record<BatchType, typeof Package> = {
   manufacturing: Beaker,
@@ -182,13 +182,13 @@ export function EditBatchDialog({
                   <TypeIcon className="size-4" aria-hidden />
                 </span>
                 <span className="min-w-0">
-                  <span className="block text-[10px] font-bold tracking-[0.07em] text-ink-5 uppercase">
+                  <span className="block text-[0.625rem] font-bold tracking-[0.07em] text-ink-5 uppercase">
                     Batch type
                   </span>
-                  <span className="block text-[14px] font-semibold text-brand-deep">
+                  <span className="block text-[0.875rem] font-semibold text-brand-deep">
                     {meta.label}
                   </span>
-                  <span className="mt-0.5 block text-[11px] leading-snug text-ink-4">
+                  <span className="mt-0.5 block text-[0.6875rem] leading-snug text-ink-4">
                     {meta.description}
                   </span>
                 </span>
@@ -397,7 +397,7 @@ export function EditBatchDialog({
                   />
                 </Field>
                 {bulkSources.length === 0 && (
-                  <p className="mt-1.5 text-[11px] text-ink-5">
+                  <p className="mt-1.5 text-[0.6875rem] text-ink-5">
                     No manufacturing batches on the board yet — add one to link
                     this run to its bulk.
                   </p>
@@ -512,7 +512,7 @@ export function EditBatchDialog({
                 className={cn(FIELD, MONO, "sm:max-w-[12rem]")}
                 {...register("tolerancePct", { valueAsNumber: true })}
               />
-              <p className="mt-2.5 text-[11px] leading-snug text-ink-4">
+              <p className="mt-2.5 text-[0.6875rem] leading-snug text-ink-4">
                 Applies to every stage in this batch&rsquo;s plan that
                 hasn&rsquo;t been given its own. A stage already past the new
                 ceiling isn&rsquo;t unwound — entries already filed stay — but
@@ -629,7 +629,7 @@ function SubHead({
   return (
     <p
       className={cn(
-        "mb-2 flex items-center gap-1.5 text-[10.5px] font-semibold tracking-[0.04em] text-ink-4 uppercase",
+        "mb-2 flex items-center gap-1.5 text-[0.6562rem] font-semibold tracking-[0.04em] text-ink-4 uppercase",
         className,
       )}
     >
@@ -652,7 +652,7 @@ function TypeSection({
 }) {
   return (
     <section className={cn("rounded-2xl border p-3.5", tone)}>
-      <p className="mb-2.5 flex items-center gap-1.5 text-[11px] font-bold tracking-[0.04em] text-ink-2 uppercase">
+      <p className="mb-2.5 flex items-center gap-1.5 text-[0.6875rem] font-bold tracking-[0.04em] text-ink-2 uppercase">
         <Icon className="size-3.5" aria-hidden />
         {title}
       </p>
@@ -688,19 +688,19 @@ function Field({
       <label htmlFor={htmlFor} className={LABEL}>
         {label}
         {optional && (
-          <span className="ml-1 text-[10px] font-normal normal-case text-ink-6">
+          <span className="ml-1 text-[0.625rem] font-normal normal-case text-ink-6">
             optional
           </span>
         )}
         {note && (
-          <span className="ml-1 text-[10px] font-normal normal-case text-ink-6">
+          <span className="ml-1 text-[0.625rem] font-normal normal-case text-ink-6">
             ({note})
           </span>
         )}
       </label>
       <div className="mt-auto">{children}</div>
       {error && (
-        <p role="alert" className="text-[11px] text-danger-deep">
+        <p role="alert" className="text-[0.6875rem] text-danger-deep">
           {error}
         </p>
       )}

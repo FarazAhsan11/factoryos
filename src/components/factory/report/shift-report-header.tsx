@@ -65,7 +65,7 @@ export function ShiftReportHeader({
         </span>
 
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-5">
+          <p className="text-[0.6875rem] font-bold uppercase tracking-[0.09em] text-ink-5">
             {factoryName} · {unitWord} summary
           </p>
           <h2 className="mt-0.5 text-lg font-semibold tracking-tight text-ink">
@@ -115,10 +115,10 @@ function Fact({
         <Icon className="size-3.5" />
       </span>
       <div>
-        <dt className="text-[10px] font-bold uppercase tracking-[0.07em] text-ink-5">
+        <dt className="text-[0.625rem] font-bold uppercase tracking-[0.07em] text-ink-5">
           {label}
         </dt>
-        <dd className="text-[13px] font-semibold text-ink">{children}</dd>
+        <dd className="text-[0.8125rem] font-semibold text-ink">{children}</dd>
       </div>
     </div>
   );

@@ -56,7 +56,7 @@ export function BatchTypeBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold tracking-[0.02em] uppercase ring-1",
+        "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[0.625rem] font-bold tracking-[0.02em] uppercase ring-1",
         style.className,
         style.ring,
         className,
@@ -86,7 +86,7 @@ export function ParentBatchLink({
   return (
     <p
       className={cn(
-        "font-mono text-[10px] font-semibold text-brand",
+        "font-mono text-[0.625rem] font-semibold text-brand",
         className,
       )}
       title={`Bulk from batch ${batchNo}`}

@@ -130,7 +130,7 @@ export function ScheduleView({
             );
           })}
         </div>
-        <p className="text-[11px] text-ink-5">{hint}</p>
+        <p className="text-[0.6875rem] text-ink-5">{hint}</p>
       </div>
 
       {/* Stages nobody has roomed cannot be drawn in a room, so they are

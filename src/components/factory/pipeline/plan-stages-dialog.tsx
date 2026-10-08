@@ -59,7 +59,7 @@ import { cn } from "@/lib/utils";
 const FIELD =
   "h-9 w-full rounded-lg border border-line bg-surface px-2.5 text-sm text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)] outline-none transition placeholder:text-placeholder hover:border-line-strong focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12";
 const MONO = "font-mono tracking-tight";
-const LABEL = "text-[10px] font-semibold tracking-[0.03em] text-ink-5 uppercase";
+const LABEL = "text-[0.625rem] font-semibold tracking-[0.03em] text-ink-5 uppercase";
 
 function fmt(n: number | null | undefined) {
   return Number(n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -408,7 +408,7 @@ export function PlanStagesDialog({
 
           {canManage && !issued && (
             <div className="flex shrink-0 items-center justify-between gap-3 border-t border-line bg-surface px-5 py-3.5">
-              <p className="text-[11px] text-ink-5">
+              <p className="text-[0.6875rem] text-ink-5">
                 Issuing releases the batch to the floor.
               </p>
               <button
@@ -521,7 +521,7 @@ function StageRow({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-2.5">
-          <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-md bg-sunken-2 font-mono text-[11px] font-bold text-ink-4">
+          <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-md bg-sunken-2 font-mono text-[0.6875rem] font-bold text-ink-4">
             {index + 1}
           </span>
           <div className="min-w-0">
@@ -532,12 +532,12 @@ function StageRow({
                   reordered. Named for what it does rather than "Final",
                   which said nothing about the consequence. */}
               {stage.is_final && (
-                <span className="rounded-full bg-brand-soft px-1.5 py-0.5 text-[10px] font-semibold text-brand-deep ring-1 ring-brand-line">
+                <span className="rounded-full bg-brand-soft px-1.5 py-0.5 text-[0.625rem] font-semibold text-brand-deep ring-1 ring-brand-line">
                   Completes the order
                 </span>
               )}
             </p>
-            <p className="mt-0.5 text-[11px] text-ink-5">
+            <p className="mt-0.5 text-[0.6875rem] text-ink-5">
               {stage.unit_name ?? "No room"}
               {" · "}
               {/* Where and when, together: they are the two halves of the
@@ -612,7 +612,7 @@ function StageRow({
               }}
             />
           </div>
-          <p className="font-mono text-[10.5px] tabular-nums text-ink-4">
+          <p className="font-mono text-[0.6562rem] tabular-nums text-ink-4">
             {fmt(stage.accumulated_qty)} / {fmt(stage.target_qty)}{" "}
             {stage.target_unit}
             <span
@@ -629,7 +629,7 @@ function StageRow({
             </span>
           </p>
           {over && ceiling !== null && (
-            <p className="text-[11px] font-medium text-danger-deep">
+            <p className="text-[0.6875rem] font-medium text-danger-deep">
               Past the {fmt(ceiling)} {stage.target_unit} this stage accepts.
               Entries already filed stay; raise this target, or the
               batch&rsquo;s tolerance, to make the plan agree with them.
@@ -639,7 +639,7 @@ function StageRow({
       )}
 
       {done && (
-        <p className="mt-2 text-[11px] text-teal-deep">
+        <p className="mt-2 text-[0.6875rem] text-teal-deep">
           Signed off
           {stage.completed_by_name ? ` by ${stage.completed_by_name}` : ""}
           {stage.yield_pct !== null ? ` · yield ${stage.yield_pct}%` : ""}
@@ -651,7 +651,7 @@ function StageRow({
       {/* The target was changed after the fact. Shown because yield is
           accumulated ÷ target, and a lowered target flatters it. */}
       {stage.previous_target_qty !== null && (
-        <p className="mt-1.5 text-[11px] text-warn-ink">
+        <p className="mt-1.5 text-[0.6875rem] text-warn-ink">
           Target changed from {fmt(stage.previous_target_qty)}.
         </p>
       )}
@@ -696,7 +696,7 @@ function StageRow({
               {/* Meaningless on the first stage, which has nothing before
                   it to overlap and is startable regardless. */}
               {index > 0 && (
-                <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-ink-4">
+                <label className="flex cursor-pointer items-center gap-1.5 text-[0.6875rem] text-ink-4">
                   <input
                     type="checkbox"
                     checked={editParallel}
@@ -785,7 +785,7 @@ function AddStageForm({
       })}
       className="rounded-xl border border-dashed border-line-strong bg-sunken p-3.5"
     >
-      <p className="mb-2.5 text-[10px] font-bold tracking-[0.05em] text-ink-4 uppercase">
+      <p className="mb-2.5 text-[0.625rem] font-bold tracking-[0.05em] text-ink-4 uppercase">
         Add the next stage
       </p>
 
@@ -960,7 +960,7 @@ function AddStageForm({
         </div>
       </div>
 
-      <label className="mt-2.5 flex cursor-pointer items-center gap-2 text-[11px] text-ink-3">
+      <label className="mt-2.5 flex cursor-pointer items-center gap-2 text-[0.6875rem] text-ink-3">
         <input
           type="checkbox"
           className="size-3.5 cursor-pointer rounded border-ink-6 accent-brand"
@@ -969,7 +969,7 @@ function AddStageForm({
         Can run in parallel with the stage before it
       </label>
 
-      <p className="mt-2 text-[10.5px] text-ink-5">
+      <p className="mt-2 text-[0.6562rem] text-ink-5">
         Label or work order only where the batch runs this activity more than
         once — Packing 30&rsquo;s, 60&rsquo;s, 120&rsquo;s. The stage added
         last completes the order. The room and date are the plan&rsquo;s
@@ -978,7 +978,7 @@ function AddStageForm({
       </p>
 
       {firstError && (
-        <p role="alert" className="mt-2 text-[11px] text-danger-deep">
+        <p role="alert" className="mt-2 text-[0.6875rem] text-danger-deep">
           {firstError}
         </p>
       )}

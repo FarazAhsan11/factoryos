@@ -49,7 +49,7 @@ export function BatchSummary({
 
   if (!query) {
     return (
-      <p className={cn("text-[11px] italic text-ink-5", className)}>
+      <p className={cn("text-[0.6875rem] italic text-ink-5", className)}>
         Type a batch number to pull in its product.
       </p>
     );
@@ -61,7 +61,7 @@ export function BatchSummary({
   // field blank, which loses the one detail that ties this to a run.
   if (!product) {
     return (
-      <p className={cn("text-[11px] italic text-warn-deep", className)}>
+      <p className={cn("text-[0.6875rem] italic text-warn-deep", className)}>
         No batch “{query}” in the catalogue — it will be saved as typed.
       </p>
     );
@@ -70,7 +70,7 @@ export function BatchSummary({
   return (
     <dl
       className={cn(
-        "grid gap-1 rounded-xl border border-brand-soft bg-brand-tint p-3 text-[11.5px]",
+        "grid gap-1 rounded-xl border border-brand-soft bg-brand-tint p-3 text-[0.7188rem]",
         className,
       )}
     >
@@ -100,7 +100,7 @@ function Row({
       <dd
         className={cn(
           "truncate font-medium text-ink",
-          mono && "font-mono text-[12px]",
+          mono && "font-mono text-[0.75rem]",
         )}
       >
         {value}

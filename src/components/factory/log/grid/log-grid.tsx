@@ -112,8 +112,8 @@ export function LogGrid({
             <Sheet className="size-4" />
           </span>
           <div className="min-w-0">
-            <h2 className="text-[15px] font-semibold text-ink">Quick grid</h2>
-            <p className="truncate text-[11px] text-ink-5">
+            <h2 className="text-[0.9375rem] font-semibold text-ink">Quick grid</h2>
+            <p className="truncate text-[0.6875rem] text-ink-5">
               Every {units.singular.toLowerCase()} on one sheet — fill a line
               and press Log, or Enter.
             </p>
@@ -121,18 +121,18 @@ export function LogGrid({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {running && shiftTimes && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-brand-soft px-2.5 py-1 text-[10px] font-semibold text-brand-deep ring-1 ring-brand-line">
+            <span className="inline-flex items-center gap-1 rounded-full bg-brand-soft px-2.5 py-1 text-[0.625rem] font-semibold text-brand-deep ring-1 ring-brand-line">
               {running === "morning" ? "Morning" : "Afternoon"} shift ·{" "}
               {shiftTimes[running].startTime} – {shiftTimes[running].endTime}
             </span>
           )}
           {loggedCount > 0 && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-teal-soft px-2.5 py-1 text-[10px] font-semibold text-teal-deep ring-1 ring-teal-line/70">
+            <span className="inline-flex items-center gap-1 rounded-full bg-teal-soft px-2.5 py-1 text-[0.625rem] font-semibold text-teal-deep ring-1 ring-teal-line/70">
               <Check className="size-3" />
               {loggedCount} logged
             </span>
           )}
-          <span className="inline-flex items-center gap-1 rounded-full bg-teal-soft px-2.5 py-1 text-[10px] font-semibold text-teal-deep ring-1 ring-teal-line/70">
+          <span className="inline-flex items-center gap-1 rounded-full bg-teal-soft px-2.5 py-1 text-[0.625rem] font-semibold text-teal-deep ring-1 ring-teal-line/70">
             <ShieldCheck className="size-3" />
             Audit-protected
           </span>
@@ -143,7 +143,7 @@ export function LogGrid({
           and the whole sheet moves together going across. */}
       <div className="scrollbar-slim min-h-[320px] overflow-auto lg:min-h-0 lg:flex-1">
         <table
-          className="table-fixed border-separate border-spacing-0 text-[12.5px]"
+          className="table-fixed border-separate border-spacing-0 text-[0.7812rem]"
           style={{ width: GRID_WIDTH, minWidth: "100%" }}
         >
           <colgroup>
@@ -159,7 +159,7 @@ export function LogGrid({
                   key={column.key}
                   scope="col"
                   className={cn(
-                    "sticky top-0 z-[3] border-b border-line bg-sunken-2 px-3 py-2.5 text-[10px] leading-tight font-bold tracking-[0.07em] whitespace-nowrap text-ink-4 uppercase",
+                    "sticky top-0 z-[3] border-b border-line bg-sunken-2 px-3 py-2.5 text-[0.625rem] leading-tight font-bold tracking-[0.07em] whitespace-nowrap text-ink-4 uppercase",
                     column.align === "right" ? "text-right" : "text-left",
                   )}
                 >
@@ -189,7 +189,7 @@ export function LogGrid({
         </table>
       </div>
 
-      <footer className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-line-soft bg-gradient-to-b from-surface to-sunken px-5 py-2.5 text-[11px] text-ink-5">
+      <footer className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-line-soft bg-gradient-to-b from-surface to-sunken px-5 py-2.5 text-[0.6875rem] text-ink-5">
         <p className="flex items-center gap-1.5">
           <ShieldCheck className="size-3 shrink-0" aria-hidden />
           Corrections are amendments, not deletes — made from the activity feed
@@ -344,7 +344,7 @@ function RoomBlock({
           <button
             type="button"
             onClick={() => onAddRow(unit.id)}
-            className="sticky left-0 inline-flex h-7 items-center gap-1 px-3.5 text-[11px] font-semibold text-brand/80 transition hover:text-brand"
+            className="sticky left-0 inline-flex h-7 items-center gap-1 px-3.5 text-[0.6875rem] font-semibold text-brand/80 transition hover:text-brand"
           >
             <Plus className="size-3" aria-hidden />
             Add row for {unit.name}
@@ -434,7 +434,7 @@ function LoggedRow({
               title={`${unitName} — logged at ${filedAt}`}
               className="shadow-[inset_3px_0_0_0_var(--color-teal)]"
             >
-              <span className="flex h-9 items-center gap-1.5 pl-3.5 text-[12px] text-teal-deep">
+              <span className="flex h-9 items-center gap-1.5 pl-3.5 text-[0.75rem] text-teal-deep">
                 <Check className="size-3.5 shrink-0" aria-hidden />
                 <span className="truncate">{unitName}</span>
               </span>
@@ -446,7 +446,7 @@ function LoggedRow({
             <Cell
               key={column.key}
             >
-              <span className="flex h-9 items-center justify-end gap-1 px-3 text-[11px] font-semibold text-teal-deep">
+              <span className="flex h-9 items-center justify-end gap-1 px-3 text-[0.6875rem] font-semibold text-teal-deep">
                 Logged {filedAt}
               </span>
             </Cell>
@@ -460,7 +460,7 @@ function LoggedRow({
           >
             <span
               className={cn(
-                "flex h-9 items-center px-3 text-[12px] text-ink-3",
+                "flex h-9 items-center px-3 text-[0.75rem] text-ink-3",
                 column.align === "right" && "justify-end",
               )}
             >

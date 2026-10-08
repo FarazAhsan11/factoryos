@@ -329,7 +329,7 @@ function Body({
                   <li
                     key={entry.id}
                     className={cn(
-                      "rounded-xl px-3 py-2 text-[13px]",
+                      "rounded-xl px-3 py-2 text-[0.8125rem]",
                       entry.is_system
                         ? "bg-sunken-2 text-ink-4 italic"
                         : "border border-line bg-surface text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)]",
@@ -338,7 +338,7 @@ function Body({
                     <span className="break-words whitespace-pre-wrap">
                       {entry.note}
                     </span>
-                    <span className="mt-0.5 block text-[10.5px] not-italic text-ink-5">
+                    <span className="mt-0.5 block text-[0.6562rem] not-italic text-ink-5">
                       {formatDue(entry.created_at)}
                     </span>
                   </li>
@@ -350,7 +350,7 @@ function Body({
               <div className="space-y-2 rounded-2xl border border-line bg-surface p-3.5">
                 <label
                   htmlFor="action-note"
-                  className="block text-[10px] font-bold uppercase tracking-[0.6px] text-ink-5"
+                  className="block text-[0.625rem] font-bold uppercase tracking-[0.6px] text-ink-5"
                 >
                   Add note{" "}
                   <span className="font-normal normal-case">
@@ -487,17 +487,17 @@ function Fact({
 }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[10px] font-bold tracking-[0.07em] text-ink-5 uppercase">
+      <dt className="text-[0.625rem] font-bold tracking-[0.07em] text-ink-5 uppercase">
         {label}
       </dt>
-      <dd className="mt-0.5 truncate text-[13px] text-ink">{children}</dd>
+      <dd className="mt-0.5 truncate text-[0.8125rem] text-ink">{children}</dd>
     </div>
   );
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[10px] font-bold tracking-[0.07em] text-ink-4 uppercase">
+    <p className="text-[0.625rem] font-bold tracking-[0.07em] text-ink-4 uppercase">
       {children}
     </p>
   );
@@ -535,7 +535,7 @@ function TabButton({
       {count !== undefined && count > 0 && (
         <span
           className={cn(
-            "rounded-full px-1.5 text-[10px] font-bold",
+            "rounded-full px-1.5 text-[0.625rem] font-bold",
             active ? "bg-brand-soft text-brand" : "bg-line text-ink-4",
           )}
         >
@@ -556,7 +556,7 @@ function Badge({
   return (
     <span
       className={cn(
-        "rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase ring-1 ring-current/15",
+        "rounded-full px-2 py-0.5 text-[0.625rem] font-bold tracking-wide uppercase ring-1 ring-current/15",
         className,
       )}
     >

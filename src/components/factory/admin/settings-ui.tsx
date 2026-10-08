@@ -61,15 +61,15 @@ export function PanelHeader({
           <Icon className="size-[18px]" />
         </span>
         <div className="min-w-0">
-          <h2 className="flex items-center gap-2 text-[15px] font-semibold text-ink">
+          <h2 className="flex items-center gap-2 text-[0.9375rem] font-semibold text-ink">
             {title}
             {count !== undefined && (
-              <span className="rounded-full bg-sunken-2 px-2 py-0.5 text-[11px] font-bold tabular-nums text-ink-4">
+              <span className="rounded-full bg-sunken-2 px-2 py-0.5 text-[0.6875rem] font-bold tabular-nums text-ink-4">
                 {count}
               </span>
             )}
           </h2>
-          <p className="mt-0.5 text-[13px] leading-snug text-ink-4">
+          <p className="mt-0.5 text-[0.8125rem] leading-snug text-ink-4">
             {description}
           </p>
         </div>
@@ -104,7 +104,7 @@ export function Composer({
         className,
       )}
     >
-      <p className="mb-3 text-[11px] font-bold tracking-[0.07em] text-ink-4 uppercase">
+      <p className="mb-3 text-[0.6875rem] font-bold tracking-[0.07em] text-ink-4 uppercase">
         {title}
       </p>
       {children}
@@ -142,6 +142,6 @@ export function EmptyState({
 
 /** Column heading for the panels that render a real table. */
 export const TH =
-  "sticky top-0 z-10 whitespace-nowrap border-b border-line bg-sunken-2 px-3.5 py-2.5 text-left text-[10px] font-bold tracking-[0.07em] text-ink-3 uppercase";
+  "sticky top-0 z-10 whitespace-nowrap border-b border-line bg-sunken-2 px-3.5 py-2.5 text-left text-[0.625rem] font-bold tracking-[0.07em] text-ink-3 uppercase";
 
 export const TD = "px-3.5 py-2.5 align-middle";

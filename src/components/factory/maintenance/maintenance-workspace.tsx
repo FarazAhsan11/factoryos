@@ -142,7 +142,7 @@ export function MaintenanceWorkspace({
     <div className="flex flex-col lg:min-h-0 lg:flex-1">
       <div className="mb-5 flex shrink-0 flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-[11px] font-bold tracking-[0.09em] text-ink-5 uppercase">
+          <p className="text-[0.6875rem] font-bold tracking-[0.09em] text-ink-5 uppercase">
             Equipment &amp; facility
           </p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">
@@ -200,7 +200,7 @@ export function MaintenanceWorkspace({
                 {label}
                 <span
                   className={cn(
-                    "rounded-full px-1.5 text-[10px] font-bold tabular-nums",
+                    "rounded-full px-1.5 text-[0.625rem] font-bold tabular-nums",
                     active
                       ? "bg-brand-soft text-brand-deep"
                       : "bg-line text-ink-4",
@@ -231,7 +231,7 @@ export function MaintenanceWorkspace({
           Urgent only
           <span
             className={cn(
-              "rounded-full px-1.5 text-[10px] font-bold tabular-nums",
+              "rounded-full px-1.5 text-[0.625rem] font-bold tabular-nums",
               urgent
                 ? "bg-danger-line text-danger-deep"
                 : "bg-sunken-2 text-ink-4",
@@ -327,7 +327,7 @@ export function RequestRow({
               {/* The request number is the document's name — the thing said
                   out loud on the floor — so it reads as an identifier rather
                   than as the smallest grey text on the row. */}
-              <span className="rounded-md bg-sunken-2 px-1.5 py-0.5 font-mono text-[10.5px] font-bold text-ink-4 ring-1 ring-line">
+              <span className="rounded-md bg-sunken-2 px-1.5 py-0.5 font-mono text-[0.6562rem] font-bold text-ink-4 ring-1 ring-line">
                 {request.request_no}
               </span>
               <span className="font-mono text-sm font-semibold text-ink transition group-hover:text-brand-deep">
@@ -355,7 +355,7 @@ export function RequestRow({
           <div className="flex shrink-0 flex-wrap items-center gap-1.5">
             <span
               className={cn(
-                "rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase ring-1 ring-current/15",
+                "rounded-full px-2 py-0.5 text-[0.625rem] font-bold tracking-wide uppercase ring-1 ring-current/15",
                 meta.pill,
               )}
             >
@@ -363,7 +363,7 @@ export function RequestRow({
             </span>
             <span
               className={cn(
-                "rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase ring-1 ring-current/15",
+                "rounded-full px-2 py-0.5 text-[0.625rem] font-bold tracking-wide uppercase ring-1 ring-current/15",
                 STATUS_PILL[request.status],
               )}
             >
@@ -373,7 +373,7 @@ export function RequestRow({
           </div>
         </div>
 
-        <p className="mt-2 line-clamp-2 text-[13px] break-words whitespace-pre-wrap text-ink-2">
+        <p className="mt-2 line-clamp-2 text-[0.8125rem] break-words whitespace-pre-wrap text-ink-2">
           {request.description}
         </p>
 
@@ -405,7 +405,7 @@ export function RequestRow({
                 as something outstanding rather than as a blank. */}
             {request.assigned_to ?? "Unassigned"}
           </span>
-          <span className="font-mono text-[11px] tabular-nums text-ink-5">
+          <span className="font-mono text-[0.6875rem] tabular-nums text-ink-5">
             <Downtime request={request} />
             {request.reported_by && `${request.reported_by} · `}
             {formatRaised(request.created_at)}

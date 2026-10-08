@@ -20,7 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const HEAD =
-  "px-3 py-2 text-[10px] font-bold tracking-[0.06em] text-ink-5 uppercase";
+  "px-3 py-2 text-[0.625rem] font-bold tracking-[0.06em] text-ink-5 uppercase";
 const CELL = "px-3 py-2.5 align-middle";
 const MONO = "font-mono tracking-tight tabular-nums";
 
@@ -84,7 +84,7 @@ export function ScheduleQueue({
         >
           <header className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-sunken px-4 py-2.5">
             <h3 className="text-sm font-semibold text-ink">{lane.unitName}</h3>
-            <p className="text-[11px] text-ink-5">
+            <p className="text-[0.6875rem] text-ink-5">
               {lane.pending} planned · {lane.stages.length} total
               {lane.nextDate ? ` · from ${formatShortDate(lane.nextDate)}` : ""}
             </p>
@@ -179,7 +179,7 @@ function QueueRow({
         running && "bg-teal-soft/25",
       )}
     >
-      <td className={cn(CELL, MONO, "text-[11px] text-ink-5")}>{index}</td>
+      <td className={cn(CELL, MONO, "text-[0.6875rem] text-ink-5")}>{index}</td>
 
       <td className={CELL}>
         <button
@@ -187,17 +187,17 @@ function QueueRow({
           onClick={onOpen}
           className={cn(
             MONO,
-            "text-[13px] font-semibold text-brand underline-offset-2 hover:underline",
+            "text-[0.8125rem] font-semibold text-brand underline-offset-2 hover:underline",
           )}
         >
           {job?.batch_no ?? "—"}
         </button>
         {stage.work_order && (
-          <p className={cn(MONO, "text-[10px] text-ink-5")}>{stage.work_order}</p>
+          <p className={cn(MONO, "text-[0.625rem] text-ink-5")}>{stage.work_order}</p>
         )}
       </td>
 
-      <td className={cn(CELL, MONO, "text-[11px] text-ink-4")}>
+      <td className={cn(CELL, MONO, "text-[0.6875rem] text-ink-4")}>
         {job?.product_code ?? "—"}
       </td>
 
@@ -207,22 +207,22 @@ function QueueRow({
           onClick={onOpen}
           className="block max-w-[280px] text-left"
         >
-          <span className="line-clamp-1 text-[13px] font-medium text-ink hover:text-brand-deep">
+          <span className="line-clamp-1 text-[0.8125rem] font-medium text-ink hover:text-brand-deep">
             {job?.product_name ?? "Unnamed batch"}
           </span>
           <span className="mt-0.5 flex flex-wrap items-center gap-1.5">
-            <span className="text-[11px] text-ink-4">{stageName(stage)}</span>
+            <span className="text-[0.6875rem] text-ink-4">{stageName(stage)}</span>
             {job && <BatchTypeBadge type={job.batch_type} />}
           </span>
         </button>
       </td>
 
-      <td className={cn(CELL, MONO, "text-right text-[12px] text-ink-3")}>
+      <td className={cn(CELL, MONO, "text-right text-[0.75rem] text-ink-3")}>
         {fmt(stage.target_qty)}
-        <span className="ml-1 text-[10px] text-ink-5">{stage.target_unit}</span>
+        <span className="ml-1 text-[0.625rem] text-ink-5">{stage.target_unit}</span>
       </td>
 
-      <td className={cn(CELL, "text-[12px] whitespace-nowrap")}>
+      <td className={cn(CELL, "text-[0.75rem] whitespace-nowrap")}>
         <span
           className={cn(
             stage.is_behind_plan ? "font-semibold text-warn-ink" : "text-ink-3",
@@ -247,18 +247,18 @@ function QueueRow({
             placeholder="Add estimate"
             disabled={patch.isPending}
             className={cn(
-              "h-8 text-[12px]",
+              "h-8 text-[0.75rem]",
               stage.is_overrunning && "border-warn-line text-warn-ink",
             )}
           />
         ) : (
-          <span className="text-[12px] text-ink-3">
+          <span className="text-[0.75rem] text-ink-3">
             {formatShortDate(stage.est_finish_date)}
           </span>
         )}
       </td>
 
-      <td className={cn(CELL, "text-[12px] whitespace-nowrap text-ink-4")}>
+      <td className={cn(CELL, "text-[0.75rem] whitespace-nowrap text-ink-4")}>
         {formatShortDate(job?.due_date ?? null)}
       </td>
 
@@ -282,7 +282,7 @@ function QueueRow({
             }}
             maxLength={500}
             placeholder={canManage ? "Add planning comment…" : "—"}
-            className="w-full rounded-lg border border-transparent bg-transparent px-2 py-1 text-[12px] text-ink-3 outline-none transition placeholder:text-placeholder hover:border-line focus:border-brand focus:bg-surface focus:ring-4 focus:ring-brand/12 disabled:cursor-default"
+            className="w-full rounded-lg border border-transparent bg-transparent px-2 py-1 text-[0.75rem] text-ink-3 outline-none transition placeholder:text-placeholder hover:border-line focus:border-brand focus:bg-surface focus:ring-4 focus:ring-brand/12 disabled:cursor-default"
           />
           {patch.isPending && (
             <Loader2 className="size-3.5 shrink-0 animate-spin text-ink-5" />

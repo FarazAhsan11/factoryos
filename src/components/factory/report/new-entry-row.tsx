@@ -770,7 +770,7 @@ export function NewEntryRow({
                               <button
                                 type="button"
                                 onClick={() => remove(i)}
-                                className="text-[10px] font-semibold text-ink-5 hover:text-danger-deep"
+                                className="text-[0.625rem] font-semibold text-ink-5 hover:text-danger-deep"
                               >
                                 Remove
                               </button>
@@ -782,7 +782,7 @@ export function NewEntryRow({
                         <button
                           type="button"
                           onClick={() => append({ name: "" })}
-                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand"
+                          className="inline-flex items-center gap-1 text-[0.6875rem] font-semibold text-brand"
                         >
                           <Plus className="size-3" /> Add operator
                         </button>
@@ -1028,14 +1028,14 @@ export function NewEntryRow({
 
             <div className="ml-auto flex items-center gap-2">
               {logged > 0 && (
-                <span className="text-[11px] font-medium text-teal-deep">
+                <span className="text-[0.6875rem] font-medium text-teal-deep">
                   {logged} logged
                 </span>
               )}
               <button
                 type="button"
                 onClick={onDone}
-                className="inline-flex h-8 items-center gap-1 rounded-md border border-line bg-surface px-2.5 text-[12px] font-semibold text-ink-4 transition hover:border-ink-6 hover:text-ink"
+                className="inline-flex h-8 items-center gap-1 rounded-md border border-line bg-surface px-2.5 text-[0.75rem] font-semibold text-ink-4 transition hover:border-ink-6 hover:text-ink"
               >
                 <X className="size-3" /> {logged > 0 ? "Done" : "Cancel"}
               </button>
@@ -1043,7 +1043,7 @@ export function NewEntryRow({
                 type="button"
                 onClick={save}
                 disabled={isSubmitting}
-                className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-3.5 text-[12px] font-semibold text-white shadow-brand transition hover:brightness-[1.06] disabled:opacity-70"
+                className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-3.5 text-[0.75rem] font-semibold text-white shadow-brand transition hover:brightness-[1.06] disabled:opacity-70"
               >
                 {isSubmitting && <Loader2 className="size-3 animate-spin" />}
                 {isSubmitting
@@ -1103,7 +1103,7 @@ export function NewEntryRow({
  * row of seventeen mixed cells read as a line.
  */
 const INPUT =
-  "block h-9 w-full rounded-none border-0 bg-transparent px-3 text-[12px] text-ink outline-none transition-[background-color,box-shadow] placeholder:text-ink-6 hover:bg-brand-tint/40 focus:bg-surface focus:shadow-[inset_0_0_0_2px_var(--color-brand)]";
+  "block h-9 w-full rounded-none border-0 bg-transparent px-3 text-[0.75rem] text-ink outline-none transition-[background-color,box-shadow] placeholder:text-ink-6 hover:bg-brand-tint/40 focus:bg-surface focus:shadow-[inset_0_0_0_2px_var(--color-brand)]";
 
 /**
  * The same, for the combobox — which brings its own rounded, bordered,
@@ -1111,7 +1111,7 @@ const INPUT =
  * changed, because every other form in the app wants the boxed version.
  */
 const SELECT =
-  "h-9 w-full rounded-none border-0 bg-transparent px-3 text-[12px] shadow-none hover:bg-brand-tint/40 focus-visible:ring-0 focus-visible:shadow-[inset_0_0_0_2px_var(--color-brand)] data-popup-open:bg-surface data-popup-open:ring-0 data-popup-open:shadow-[inset_0_0_0_2px_var(--color-brand)] aria-invalid:ring-0 aria-invalid:bg-danger-soft/50 aria-invalid:shadow-[inset_0_0_0_1.5px_var(--color-danger)]";
+  "h-9 w-full rounded-none border-0 bg-transparent px-3 text-[0.75rem] shadow-none hover:bg-brand-tint/40 focus-visible:ring-0 focus-visible:shadow-[inset_0_0_0_2px_var(--color-brand)] data-popup-open:bg-surface data-popup-open:ring-0 data-popup-open:shadow-[inset_0_0_0_2px_var(--color-brand)] aria-invalid:ring-0 aria-invalid:bg-danger-soft/50 aria-invalid:shadow-[inset_0_0_0_1.5px_var(--color-danger)]";
 
 /** A cell that fails validation — the red a spreadsheet's data check uses. */
 const INVALID = "bg-danger-soft/50 shadow-[inset_0_0_0_1.5px_var(--color-danger)]";
@@ -1127,7 +1127,7 @@ const RESOLVED = "shadow-[inset_0_-2px_0_var(--color-teal)]";
  * so the control itself goes flat and borderless inside that box.
  */
 const STRIP_CONTROL =
-  "h-8 rounded-none border-0 bg-transparent px-2 text-[12px] shadow-none focus-visible:ring-0 data-popup-open:ring-0 aria-invalid:ring-0";
+  "h-8 rounded-none border-0 bg-transparent px-2 text-[0.75rem] shadow-none focus-visible:ring-0 data-popup-open:ring-0 aria-invalid:ring-0";
 
 function Cell({
   children,
@@ -1176,7 +1176,7 @@ function Static({
     <span
       title={title}
       className={cn(
-        "flex h-9 items-center bg-sunken/60 px-3 text-[12px] text-ink-3",
+        "flex h-9 items-center bg-sunken/60 px-3 text-[0.75rem] text-ink-3",
         className,
       )}
     >
@@ -1254,7 +1254,7 @@ function StripField({
     >
       <span
         className={cn(
-          "flex items-center border-r px-2 text-[9.5px] font-bold tracking-[0.06em] whitespace-nowrap uppercase",
+          "flex items-center border-r px-2 text-[0.5938rem] font-bold tracking-[0.06em] whitespace-nowrap uppercase",
           tone === "warn"
             ? "border-warn-line bg-warn-tint text-warn-deep"
             : "border-line bg-sunken-2 text-ink-5",
@@ -1277,7 +1277,7 @@ function Note({
   return (
     <p
       className={cn(
-        "flex items-start gap-1.5 text-[11px] leading-snug font-medium",
+        "flex items-start gap-1.5 text-[0.6875rem] leading-snug font-medium",
         tone === "warn" ? "text-warn-ink" : "text-danger-deep",
       )}
     >

@@ -55,12 +55,12 @@ export function Field({
       <label htmlFor={htmlFor} className="block text-xs font-medium text-ink-3">
         {label}
         {required && <span className="ml-0.5 text-danger">*</span>}
-        {note && <span className="ml-1 text-[10px] text-ink-5">{note}</span>}
+        {note && <span className="ml-1 text-[0.625rem] text-ink-5">{note}</span>}
       </label>
-      {hint && <p className="text-[11px] leading-snug text-ink-5">{hint}</p>}
+      {hint && <p className="text-[0.6875rem] leading-snug text-ink-5">{hint}</p>}
       {children}
       {error && (
-        <p role="alert" className="text-[11.5px] text-danger">
+        <p role="alert" className="text-[0.7188rem] text-danger">
           {error}
         </p>
       )}
@@ -206,7 +206,7 @@ export function Group({
 }) {
   return (
     <section className={cn("space-y-3", className)}>
-      <p className="text-[10px] font-bold tracking-[0.09em] text-ink-4 uppercase">
+      <p className="text-[0.625rem] font-bold tracking-[0.09em] text-ink-4 uppercase">
         {title}
       </p>
       {children}
@@ -248,12 +248,12 @@ export function Fact({
 }) {
   return (
     <div className={cn("min-w-0", wide && "sm:col-span-2 lg:col-span-3")}>
-      <dt className="text-[10px] font-bold tracking-[0.07em] text-ink-5 uppercase">
+      <dt className="text-[0.625rem] font-bold tracking-[0.07em] text-ink-5 uppercase">
         {label}
       </dt>
       <dd
         className={cn(
-          "mt-0.5 text-[13px] text-ink",
+          "mt-0.5 text-[0.8125rem] text-ink",
           mono && "font-mono",
           wide ? "break-words whitespace-pre-wrap" : "truncate",
         )}
@@ -278,7 +278,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        "rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase ring-1 ring-current/15",
+        "rounded-full px-2 py-0.5 text-[0.625rem] font-bold tracking-wide uppercase ring-1 ring-current/15",
         className,
       )}
     >
@@ -300,7 +300,7 @@ export function SaveBar({
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft pt-4">
-      <p className="text-[11px] text-ink-5">{children}</p>
+      <p className="text-[0.6875rem] text-ink-5">{children}</p>
       <button
         type="submit"
         disabled={pending}

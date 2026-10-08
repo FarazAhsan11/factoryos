@@ -127,7 +127,7 @@ export function FloorWorkspace({
     <div className="flex flex-col">
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="flex items-center gap-2 text-[11px] font-bold tracking-[0.09em] text-ink-5 uppercase">
+          <p className="flex items-center gap-2 text-[0.6875rem] font-bold tracking-[0.09em] text-ink-5 uppercase">
             {live ? (
               <>
                 <span className="relative flex size-2" aria-hidden>
@@ -188,7 +188,7 @@ export function FloorWorkspace({
                 )}
               >
                 {label}
-                <span className="font-mono text-[11px] text-ink-5 tabular-nums">
+                <span className="font-mono text-[0.6875rem] text-ink-5 tabular-nums">
                   {count}
                 </span>
               </button>

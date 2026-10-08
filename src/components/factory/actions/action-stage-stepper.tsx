@@ -89,7 +89,7 @@ export function ActionStageStepper({
 
             <span
               className={cn(
-                "absolute top-9 whitespace-nowrap text-[10.5px] font-semibold",
+                "absolute top-9 whitespace-nowrap text-[0.6562rem] font-semibold",
                 i === 0
                   ? "left-0"
                   : last

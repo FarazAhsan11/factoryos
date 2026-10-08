@@ -15,10 +15,10 @@ import { cn } from "@/lib/utils";
  * sideways with the record's number pinned, and the header row sticks.
  */
 
-export const CELL = "px-3 py-2.5 align-middle text-[13px] whitespace-nowrap";
+export const CELL = "px-3 py-2.5 align-middle text-[0.8125rem] whitespace-nowrap";
 /** A free-text column: capped and truncated, so one long note can't widen the sheet. */
 export const TEXT_CELL =
-  "max-w-[18rem] min-w-[10rem] px-3 py-2.5 align-middle text-[13px]";
+  "max-w-[18rem] min-w-[10rem] px-3 py-2.5 align-middle text-[0.8125rem]";
 export const TH =
   "sticky top-0 z-20 bg-sunken-2 px-3 py-2.5 shadow-[inset_0_-1px_0_var(--color-line)]";
 /** The pinned column's header — above both the sticky row and the pinned cells. */
@@ -44,7 +44,7 @@ export function RegisterTable({
     <div className="scrollbar-slim h-full overflow-auto rounded-2xl border border-line bg-surface shadow-card max-lg:max-h-[75svh]">
       <table className="w-full min-w-max text-sm">
         <thead>
-          <tr className="text-left text-[10px] font-bold tracking-[0.07em] whitespace-nowrap text-ink-3 uppercase">
+          <tr className="text-left text-[0.625rem] font-bold tracking-[0.07em] whitespace-nowrap text-ink-3 uppercase">
             {head}
           </tr>
         </thead>
@@ -108,7 +108,7 @@ export function PinnedCell({
       className={cn(
         "sticky left-0 z-10 shadow-[inset_-1px_0_0_var(--color-line)]",
         CELL,
-        "bg-surface font-mono text-[12.5px] font-semibold text-ink group-hover:bg-brand-tint group-focus-visible:bg-brand-tint",
+        "bg-surface font-mono text-[0.7812rem] font-semibold text-ink group-hover:bg-brand-tint group-focus-visible:bg-brand-tint",
         className,
       )}
     >

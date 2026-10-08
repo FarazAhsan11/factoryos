@@ -227,14 +227,14 @@ function BatchProgress({
           <BatchTypeBadge type={job.batch_type} />
           {column && (
             <span
-              className="rounded-full px-2 py-0.5 text-[10.5px] font-semibold"
+              className="rounded-full px-2 py-0.5 text-[0.6562rem] font-semibold"
               style={{ background: column.tint, color: column.accent }}
             >
               {column.label}
             </span>
           )}
           {job.quarantine_no && (
-            <span className="rounded-full bg-danger-soft px-2 py-0.5 text-[10.5px] font-semibold text-danger-deep ring-1 ring-danger-line">
+            <span className="rounded-full bg-danger-soft px-2 py-0.5 text-[0.6562rem] font-semibold text-danger-deep ring-1 ring-danger-line">
               Quarantined · {job.quarantine_no}
             </span>
           )}
@@ -242,7 +242,7 @@ function BatchProgress({
         <p className="mt-1 text-sm font-semibold text-ink">
           {job.product_name}
           {job.product_code && (
-            <span className="ml-1.5 font-mono text-[11px] font-normal text-ink-5">
+            <span className="ml-1.5 font-mono text-[0.6875rem] font-normal text-ink-5">
               {job.product_code}
             </span>
           )}
@@ -265,7 +265,7 @@ function BatchProgress({
         </div>
         <Bar pct={percent ?? 0} tone="var(--color-brand)" className="mt-2 h-2" />
         {job.due_date && (
-          <p className="mt-2 text-[11px] text-ink-5">
+          <p className="mt-2 text-[0.6875rem] text-ink-5">
             Due {formatDay(job.due_date)}
           </p>
         )}
@@ -320,7 +320,7 @@ function StageLine({
       )}
     >
       <div className="flex items-start gap-2.5">
-        <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-md bg-sunken-2 font-mono text-[11px] font-bold text-ink-4">
+        <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-md bg-sunken-2 font-mono text-[0.6875rem] font-bold text-ink-4">
           {index + 1}
         </span>
         <div className="min-w-0 flex-1">
@@ -328,17 +328,17 @@ function StageLine({
             <Icon className={cn("size-3.5 shrink-0", style.tone)} aria-hidden />
             {stageName(stage)}
             {current && (
-              <span className="rounded-full bg-brand-soft px-1.5 py-0.5 text-[10px] font-semibold text-brand-deep ring-1 ring-brand-line">
+              <span className="rounded-full bg-brand-soft px-1.5 py-0.5 text-[0.625rem] font-semibold text-brand-deep ring-1 ring-brand-line">
                 This room
               </span>
             )}
             {stage.is_final && (
-              <span className="rounded-full bg-sunken-2 px-1.5 py-0.5 text-[10px] font-semibold text-ink-4 ring-1 ring-line">
+              <span className="rounded-full bg-sunken-2 px-1.5 py-0.5 text-[0.625rem] font-semibold text-ink-4 ring-1 ring-line">
                 Completes the order
               </span>
             )}
           </p>
-          <p className="mt-0.5 text-[11px] text-ink-5">
+          <p className="mt-0.5 text-[0.6875rem] text-ink-5">
             {style.label}
             {" · "}
             {stage.unit_name ?? "No room"}
@@ -360,7 +360,7 @@ function StageLine({
           {pct !== null ? (
             <div className="mt-2 space-y-1">
               <Bar pct={pct} tone={tone} />
-              <p className="font-mono text-[10.5px] text-ink-4 tabular-nums">
+              <p className="font-mono text-[0.6562rem] text-ink-4 tabular-nums">
                 {fmtQty(stage.accumulated_qty)} / {fmtQty(stage.target_qty)}{" "}
                 {stage.target_unit}
                 <span className="ml-1 font-semibold" style={{ color: tone }}>
@@ -369,7 +369,7 @@ function StageLine({
               </p>
             </div>
           ) : (
-            <p className="mt-1 text-[11px] text-ink-5 italic">No target set</p>
+            <p className="mt-1 text-[0.6875rem] text-ink-5 italic">No target set</p>
           )}
         </div>
       </div>
@@ -453,7 +453,7 @@ function Group({
 }) {
   return (
     <section>
-      <h3 className="mb-1.5 text-[10.5px] font-bold tracking-[0.08em] text-ink-5 uppercase">
+      <h3 className="mb-1.5 text-[0.6562rem] font-bold tracking-[0.08em] text-ink-5 uppercase">
         {title}
       </h3>
       {items.length === 0 ? (
@@ -481,7 +481,7 @@ function Group({
                       {stageName(stage)}
                     </span>
                   </p>
-                  <p className="mt-0.5 truncate text-[11px] text-ink-5">
+                  <p className="mt-0.5 truncate text-[0.6875rem] text-ink-5">
                     {job?.product_name ?? "Unnamed batch"}
                     {showDate && stage.planned_date && (
                       <span
@@ -505,7 +505,7 @@ function Group({
                   </p>
                 </div>
                 <div className="w-28 shrink-0 text-right">
-                  <p className="font-mono text-[11px] text-ink-4 tabular-nums">
+                  <p className="font-mono text-[0.6875rem] text-ink-4 tabular-nums">
                     {stage.target_qty
                       ? `${fmtQty(stage.accumulated_qty)} / ${fmtQty(stage.target_qty)}`
                       : style.label}

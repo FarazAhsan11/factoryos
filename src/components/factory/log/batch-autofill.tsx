@@ -110,7 +110,7 @@ export function BatchAutofill({
             }
           />
           {job.parent_batch_no && (
-            <span className="font-mono text-[10px] font-semibold text-brand">
+            <span className="font-mono text-[0.625rem] font-semibold text-brand">
               ← {job.parent_batch_no} bulk
             </span>
           )}
@@ -118,7 +118,7 @@ export function BatchAutofill({
       )}
 
       {waitingForBulk && (
-        <p className="rounded-lg bg-warn-tint px-2.5 py-1.5 text-[11px] font-medium text-warn-ink ring-1 ring-warn-line">
+        <p className="rounded-lg bg-warn-tint px-2.5 py-1.5 text-[0.6875rem] font-medium text-warn-ink ring-1 ring-warn-line">
           {job?.parent_batch_no
             ? `Waiting for bulk from ${job.parent_batch_no} — this run isn’t released yet.`
             : "This packing run is still Planned — its bulk may not be available yet."}
@@ -141,13 +141,13 @@ export function BatchAutofill({
           unknown remainder, not a full one, and a confident "0 remaining"
           would stop a shift that has bulk sitting in front of it. */}
       {isPacking && remaining !== null && job && (
-        <dl className="grid gap-1 rounded-lg bg-surface px-2.5 py-2 text-[11px]">
+        <dl className="grid gap-1 rounded-lg bg-surface px-2.5 py-2 text-[0.6875rem]">
           <Row label="Bulk received" value={fmt(job.bulk_qty_received!)} mono />
           <Row label="Consumed" value={fmt(job.bulk_consumed!)} mono />
           <div className="flex items-baseline justify-between gap-3">
             <dt className="text-ink-4">Remaining</dt>
             <dd
-              className="font-mono text-[12px] font-semibold"
+              className="font-mono text-[0.75rem] font-semibold"
               style={{
                 color:
                   remaining < Number(job.bulk_qty_received) * 0.1
@@ -169,7 +169,7 @@ export function BatchAutofill({
               style={{ width: `${capped}%`, background: tone }}
             />
           </div>
-          <p className="text-[11px] font-medium" style={{ color: tone }}>
+          <p className="text-[0.6875rem] font-medium" style={{ color: tone }}>
             {pct}% complete — {fmt(runningTotal)} of {fmt(required)} required
           </p>
         </div>
@@ -193,7 +193,7 @@ function Row({
       <dd
         className={cn(
           "truncate font-medium text-ink",
-          mono && "font-mono text-[12px]",
+          mono && "font-mono text-[0.75rem]",
         )}
       >
         {value}

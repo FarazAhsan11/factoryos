@@ -89,9 +89,9 @@ const COLUMNS: Column[] = [
 ];
 
 const TH =
-  "sticky top-0 z-20 whitespace-nowrap border-b border-line bg-sunken-2 px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-[0.07em] text-ink-3";
+  "sticky top-0 z-20 whitespace-nowrap border-b border-line bg-sunken-2 px-3 py-2.5 text-left text-[0.625rem] font-bold uppercase tracking-[0.07em] text-ink-3";
 const TD = "px-3 py-2.5 align-middle";
-const MONO = "font-mono text-[11.5px]";
+const MONO = "font-mono text-[0.7188rem]";
 
 /** A hairline opening a column band. See `Column.group`. */
 const BAND = "border-l border-line";
@@ -334,7 +334,7 @@ function TotalsRow({
   // pinned to the top: a total you have to scroll to the end of the page to
   // read is a total nobody reads.
   const TF =
-    "sticky bottom-0 z-10 border-t-2 border-ink-5 bg-sunken-2 px-2.5 py-3 text-[11px] font-semibold text-ink";
+    "sticky bottom-0 z-10 border-t-2 border-ink-5 bg-sunken-2 px-2.5 py-3 text-[0.6875rem] font-semibold text-ink";
 
   if (error) {
     return (
@@ -483,7 +483,7 @@ function Row({
             has no glyph for ☀. */}
         <span
           className={cn(
-            "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide ring-1",
+            "inline-flex items-center rounded-full px-2 py-0.5 text-[0.625rem] font-bold tracking-wide ring-1",
             row.shift === "morning"
               ? "bg-warn-soft text-warn-deep ring-warn-line"
               : "bg-brand-soft text-brand-deep ring-brand-line",
@@ -551,7 +551,7 @@ function Row({
             kind of number across every row is exactly the mistake the unit
             prevents. */}
         {row.qty_unit && produced > 0 && (
-          <span className="ml-1 text-[10px] font-medium text-ink-5">
+          <span className="ml-1 text-[0.625rem] font-medium text-ink-5">
             {row.qty_unit}
           </span>
         )}
@@ -597,7 +597,7 @@ function Row({
       >
         {num(row.accumulative)}
         {row.is_overrun && (
-          <span className="block text-[10px] font-semibold text-warn-deep">
+          <span className="block text-[0.625rem] font-semibold text-warn-deep">
             +{num(row.overrun_qty)}
           </span>
         )}
@@ -614,7 +614,7 @@ function Row({
         {target > 0 ? `${num(target)} ${row.speed_unit ?? ""}`.trim() : DASH}
       </td>
 
-      <td className={cn(TD, "whitespace-nowrap text-[11px]")}>
+      <td className={cn(TD, "whitespace-nowrap text-[0.6875rem]")}>
         {actual > 0 ? (
           <>
             <span className={cn(MONO, "text-ink-2")}>{num(actual)}</span>
@@ -639,7 +639,7 @@ function Row({
       </td>
 
       <td
-        className={cn(TD, "max-w-[140px] truncate text-[11px] text-ink-4")}
+        className={cn(TD, "max-w-[140px] truncate text-[0.6875rem] text-ink-4")}
         title={row.slow_reason ?? undefined}
       >
         {row.slow_reason ?? DASH}
@@ -652,7 +652,7 @@ function Row({
       {/* Truncated, with the full list on hover: an entry run by five people
           would otherwise stretch the column past everything beside it. */}
       <td
-        className={cn(TD, "max-w-[140px] truncate text-[11.5px] text-ink-2")}
+        className={cn(TD, "max-w-[140px] truncate text-[0.7188rem] text-ink-2")}
         title={row.operators?.join(" / ") || undefined}
       >
         {row.operators?.length ? (
@@ -674,7 +674,7 @@ function Row({
         {row.action_flag ? (
           <span
             className={cn(
-              "inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold",
+              "inline-block rounded-full px-2 py-0.5 text-[0.625rem] font-semibold",
               FLAG_STYLE[row.action_flag] ?? "bg-sunken-2 text-ink-3",
             )}
           >
@@ -689,7 +689,7 @@ function Row({
             batch and not a problem that went away when someone described it. */}
         {row.needs_overrun_note ? (
           <span
-            className="ml-1 inline-block rounded-full bg-warn-soft px-2 py-0.5 text-[10px] font-bold text-warn-deep"
+            className="ml-1 inline-block rounded-full bg-warn-soft px-2 py-0.5 text-[0.625rem] font-bold text-warn-deep"
             title={
               row.overage_pct > 0
                 ? `Over the ${num(row.allowed_qty)} allowed (${num(row.required_qty)} +${row.overage_pct}% overage) by ${num(row.overrun_qty)} — needs a manager's explanation`
@@ -700,7 +700,7 @@ function Row({
           </span>
         ) : row.is_overrun ? (
           <span
-            className="ml-1 inline-block rounded-full bg-sunken-2 px-2 py-0.5 text-[10px] font-semibold text-ink-3"
+            className="ml-1 inline-block rounded-full bg-sunken-2 px-2 py-0.5 text-[0.625rem] font-semibold text-ink-3"
             title={row.overrun_note ?? undefined}
           >
             Overrun explained
@@ -715,7 +715,7 @@ function Row({
         <span className="block truncate">{row.comment ?? DASH}</span>
         {row.amended_at && (
           <span
-            className="mt-0.5 block text-[10px] font-semibold text-violet"
+            className="mt-0.5 block text-[0.625rem] font-semibold text-violet"
             title={row.amend_note ?? undefined}
           >
             ↳ Amended
@@ -726,7 +726,7 @@ function Row({
             can read is a control on paper only. */}
         {row.overrun_note && (
           <span
-            className="mt-0.5 block truncate text-[10px] text-warn-deep"
+            className="mt-0.5 block truncate text-[0.625rem] text-warn-deep"
             title={`${row.overrun_note}${
               row.overrun_cleared_by_name
                 ? ` — ${row.overrun_cleared_by_name}`
@@ -753,7 +753,7 @@ function Row({
             type="button"
             onClick={onExplainOverrun}
             title="Record why this batch went past its required quantity"
-            className="mb-1 inline-flex h-7 items-center gap-1 rounded-lg border border-warn-line bg-warn-soft px-2 text-[11px] font-semibold text-warn-deep transition hover:border-warn-deep hover:bg-warn-line"
+            className="mb-1 inline-flex h-7 items-center gap-1 rounded-lg border border-warn-line bg-warn-soft px-2 text-[0.6875rem] font-semibold text-warn-deep transition hover:border-warn-deep hover:bg-warn-line"
           >
             <TrendingUp className="size-3" />
             Explain
@@ -764,14 +764,14 @@ function Row({
             type="button"
             onClick={onAmend}
             title="Attach a correction note — the original entry is preserved"
-            className="inline-flex h-7 items-center gap-1 rounded-lg border border-line bg-surface px-2 text-[11px] font-medium text-ink-4 transition hover:border-warn-deep hover:bg-warn-tint hover:text-warn-deep"
+            className="inline-flex h-7 items-center gap-1 rounded-lg border border-line bg-surface px-2 text-[0.6875rem] font-medium text-ink-4 transition hover:border-warn-deep hover:bg-warn-tint hover:text-warn-deep"
           >
             <PencilLine className="size-3" />
             Amend
           </button>
         ) : (
           <span
-            className="text-[10px] text-ink-6"
+            className="text-[0.625rem] text-ink-6"
             title="Only the operator who filed this entry, or a manager, can amend it"
           >
             —

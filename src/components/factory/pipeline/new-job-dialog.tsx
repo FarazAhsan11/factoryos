@@ -208,7 +208,7 @@ export function NewJobDialog({
                             onChange={() => toggle(product.id)}
                             className="size-4 shrink-0 cursor-pointer rounded border-ink-6 accent-brand"
                           />
-                          <span className="shrink-0 font-mono text-[12px] font-medium text-ink">
+                          <span className="shrink-0 font-mono text-[0.75rem] font-medium text-ink">
                             {product.batch_no}
                           </span>
                           <span className="min-w-0 flex-1 truncate text-sm text-ink-2">
@@ -221,12 +221,12 @@ export function NewJobDialog({
                           {product.planned_for && (
                             <span
                               title={`Scheduled to join Planned on ${product.planned_for}`}
-                              className="shrink-0 rounded-full bg-violet-soft px-1.5 py-0.5 text-[10px] font-semibold text-violet-deep ring-1 ring-violet-line"
+                              className="shrink-0 rounded-full bg-violet-soft px-1.5 py-0.5 text-[0.625rem] font-semibold text-violet-deep ring-1 ring-violet-line"
                             >
                               {formatDay(product.planned_for)}
                             </span>
                           )}
-                          <span className="shrink-0 font-mono text-[11px] text-ink-4">
+                          <span className="shrink-0 font-mono text-[0.6875rem] text-ink-4">
                             {fmt(product.required_qty)}
                           </span>
                         </label>

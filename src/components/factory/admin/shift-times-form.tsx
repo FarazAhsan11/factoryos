@@ -32,7 +32,7 @@ import { TimeField } from "@/components/ui/date-picker";
 
 const FIELD =
   "h-10 w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-brand focus:ring-4 focus:ring-brand/12 disabled:bg-sunken disabled:text-ink-5";
-const LABEL = "text-[11px] font-semibold uppercase tracking-wide text-ink-5";
+const LABEL = "text-[0.6875rem] font-semibold uppercase tracking-wide text-ink-5";
 
 /**
  * Admin → Shift times. Both shifts are edited together and saved in one go,

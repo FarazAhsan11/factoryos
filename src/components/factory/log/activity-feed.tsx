@@ -101,16 +101,16 @@ export function ActivityFeed({
     <aside className="flex flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-card lg:h-full">
       <header className="flex shrink-0 items-center justify-between gap-2 border-b border-line-soft px-4 py-3.5">
         <div className="flex items-baseline gap-2">
-          <h2 className="text-[15px] font-semibold text-ink">Shift activity</h2>
+          <h2 className="text-[0.9375rem] font-semibold text-ink">Shift activity</h2>
           {entries.length > 0 && (
-            <span className="text-[11px] font-medium text-ink-5">
+            <span className="text-[0.6875rem] font-medium text-ink-5">
               {entries.length} today
             </span>
           )}
         </div>
         <span
           title="Entries appear here the moment they are filed, and are never edited in place"
-          className="inline-flex items-center gap-1.5 rounded-full bg-teal-soft px-2 py-0.5 text-[10px] font-semibold text-teal-deep ring-1 ring-teal-line/70"
+          className="inline-flex items-center gap-1.5 rounded-full bg-teal-soft px-2 py-0.5 text-[0.625rem] font-semibold text-teal-deep ring-1 ring-teal-line/70"
         >
           <span className="relative flex size-1.5">
             <span className="absolute inline-flex size-full animate-ping rounded-full bg-teal opacity-75" />
@@ -266,7 +266,7 @@ function FeedRow({
           badges sit opposite it on the same line, so a flagged entry is
           visible without reading a word of the card. */}
       <div className="flex items-start justify-between gap-2">
-        <p className="min-w-0 font-mono text-[11px] font-medium tracking-tight text-ink-4">
+        <p className="min-w-0 font-mono text-[0.6875rem] font-medium tracking-tight text-ink-4">
           {entry.start_time?.slice(0, 5) ?? "—"}
           {entry.end_time && ` → ${entry.end_time.slice(0, 5)}`}
           {entry.duration_minutes > 0 && (
@@ -315,7 +315,7 @@ function FeedRow({
               type="button"
               onClick={onAmend}
               title="Attach a correction note — the original entry is preserved"
-              className="rounded-md border border-line bg-surface px-1.5 py-0.5 text-[9.5px] font-semibold text-ink-5 opacity-0 transition hover:border-warn-deep hover:bg-warn-tint hover:text-warn-deep focus-visible:opacity-100 group-hover:opacity-100"
+              className="rounded-md border border-line bg-surface px-1.5 py-0.5 text-[0.5938rem] font-semibold text-ink-5 opacity-0 transition hover:border-warn-deep hover:bg-warn-tint hover:text-warn-deep focus-visible:opacity-100 group-hover:opacity-100"
             >
               Amend
             </button>
@@ -328,13 +328,13 @@ function FeedRow({
           than one sentence: the product name is the longest string on the
           card and used to push the activity onto a line by itself, which read
           as two different things. */}
-      <p className="mt-1 text-[13px] leading-snug font-semibold break-words text-ink">
+      <p className="mt-1 text-[0.8125rem] leading-snug font-semibold break-words text-ink">
         {entry.unit?.name ?? "—"}
         <span className="font-normal text-ink-4"> · </span>
         {entry.process?.name ?? "—"}
       </p>
       {(entry.batch_no || entry.product) && (
-        <p className="mt-0.5 line-clamp-2 text-[11.5px] leading-snug break-words text-ink-4">
+        <p className="mt-0.5 line-clamp-2 text-[0.7188rem] leading-snug break-words text-ink-4">
           {entry.batch_no && (
             <span className="font-mono font-medium text-ink-3">
               {entry.batch_no}
@@ -397,7 +397,7 @@ function FeedRow({
           The people and the machine, last: needed to follow an entry up,
           never the reason anyone stops at one. */}
       {(people || entry.equipment_no) && (
-        <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-ink-5">
+        <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[0.6875rem] text-ink-5">
           {people && (
             <span className="inline-flex min-w-0 items-center gap-1">
               <Users className="size-3 shrink-0 text-ink-6" aria-hidden />
@@ -427,14 +427,14 @@ function FeedRow({
         entry.amend_note) && (
         <div className="mt-1.5 space-y-1 border-l-2 border-line-soft pl-2">
           {entry.slow_reason && (
-            <p className="text-[11px] leading-snug break-words text-ink-4">
+            <p className="text-[0.6875rem] leading-snug break-words text-ink-4">
               Ran slow: <em>{entry.slow_reason}</em>
             </p>
           )}
           {/* Once explained, the reason and the name stay on the entry. The
               flag is gone; the record of why is not. */}
           {overrun?.overrun_note && (
-            <p className="text-[11px] leading-snug break-words text-warn-deep">
+            <p className="text-[0.6875rem] leading-snug break-words text-warn-deep">
               Overrun: {overrun.overrun_note}
               {overrun.overrun_cleared_by_name && (
                 <span className="text-warn-ink">
@@ -445,12 +445,12 @@ function FeedRow({
             </p>
           )}
           {entry.comment && (
-            <p className="line-clamp-3 text-[11px] leading-snug break-words italic text-ink-4">
+            <p className="line-clamp-3 text-[0.6875rem] leading-snug break-words italic text-ink-4">
               {entry.comment}
             </p>
           )}
           {entry.amend_note && (
-            <p className="line-clamp-3 text-[11px] leading-snug break-words whitespace-pre-line text-violet">
+            <p className="line-clamp-3 text-[0.6875rem] leading-snug break-words whitespace-pre-line text-violet">
               {entry.amend_note}
             </p>
           )}
@@ -462,7 +462,7 @@ function FeedRow({
 
 /** Every badge on a feed card, so none of them drifts a pixel from the rest. */
 const BADGE =
-  "rounded-full px-1.5 py-0.5 text-[9.5px] font-bold whitespace-nowrap";
+  "rounded-full px-1.5 py-0.5 text-[0.5938rem] font-bold whitespace-nowrap";
 
 /**
  * One measurement, labelled.
@@ -486,12 +486,12 @@ function Stat({
 }) {
   return (
     <div className="min-w-0 rounded-lg bg-sunken px-2 py-1 ring-1 ring-line-soft/60">
-      <dt className="text-[9px] font-semibold tracking-[0.05em] text-ink-5 uppercase">
+      <dt className="text-[0.5625rem] font-semibold tracking-[0.05em] text-ink-5 uppercase">
         {label}
       </dt>
       <dd
         className={cn(
-          "truncate font-mono text-[12px] font-semibold tracking-tight",
+          "truncate font-mono text-[0.75rem] font-semibold tracking-tight",
           tone ?? "text-ink-2",
         )}
       >

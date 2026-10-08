@@ -228,7 +228,7 @@ function Row({
   return (
     <div className="flex items-baseline justify-between gap-3">
       <dt className="text-xs text-warn-ink">{label}</dt>
-      <dd className="text-right text-[13px] text-ink">{children}</dd>
+      <dd className="text-right text-[0.8125rem] text-ink">{children}</dd>
     </div>
   );
 }

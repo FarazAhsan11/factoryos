@@ -131,6 +131,31 @@
   html {
     @apply font-sans;
   }
+
+  /* ── Display scale ────────────────────────────────────────────────────
+     Everything is sized in rem — Tailwind's spacing, `text-sm`, `size-4`, and
+     the `text-[0.75rem]`-style sizes (they were px until they were converted
+     to rem, so one number could move them all) — so this is the one knob for
+     "the app looks too big on this screen". Designed at 16px on a wide
+     display; a laptop gives the data more room at a smaller root. Browser
+     zoom still works on top of it. Keyed on viewport width because that is
+     what a small or highly-scaled laptop screen changes. */
+  @media (max-width: 1600px) {
+    html {
+      font-size: 15px;
+    }
+  }
+  @media (max-width: 1366px) {
+    html {
+      font-size: 14px;
+    }
+  }
+  /* A printed sheet is laid out for paper, not for the screen it came from. */
+  @media print {
+    html {
+      font-size: 16px;
+    }
+  }
 }
 
 /* ─────────────────────────────────────────────────────────────────────────

@@ -65,7 +65,7 @@ export function ActionStageTabs({
               {STAGE_LABELS[key]}
               <span
                 className={cn(
-                  "rounded-full px-1.5 text-[10px] font-bold tabular-nums",
+                  "rounded-full px-1.5 text-[0.625rem] font-bold tabular-nums",
                   active
                     ? "bg-brand-soft text-brand-deep"
                     : "bg-line text-ink-4",
@@ -96,7 +96,7 @@ export function ActionStageTabs({
         Needs attention
         <span
           className={cn(
-            "rounded-full px-1.5 text-[10px] font-bold tabular-nums",
+            "rounded-full px-1.5 text-[0.625rem] font-bold tabular-nums",
             attention ? "bg-warn-line text-warn-ink" : "bg-sunken-2 text-ink-4",
           )}
         >

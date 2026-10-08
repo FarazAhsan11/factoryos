@@ -117,7 +117,7 @@ export function ActionStageTimeline({
               <div className="flex flex-wrap items-baseline gap-x-2">
                 <p
                   className={cn(
-                    "text-[13px] font-semibold",
+                    "text-[0.8125rem] font-semibold",
                     skipped
                       ? "text-ink-5 line-through"
                       : done || active
@@ -128,17 +128,17 @@ export function ActionStageTimeline({
                   {STAGE_LABELS[stage]}
                 </p>
                 {skipped && (
-                  <span className="text-[11px] text-ink-5">Skipped</span>
+                  <span className="text-[0.6875rem] text-ink-5">Skipped</span>
                 )}
                 {stamp && (
-                  <span className="text-[11px] text-ink-5">
+                  <span className="text-[0.6875rem] text-ink-5">
                     {formatDue(stamp)}
                   </span>
                 )}
               </div>
 
               {active && (
-                <p className="mt-0.5 text-[11.5px] text-ink-4">
+                <p className="mt-0.5 text-[0.7188rem] text-ink-4">
                   {blurbFor(action, stage)}
                 </p>
               )}
@@ -292,7 +292,7 @@ function Evidence({
 
   return (
     <div>
-      <dt className="flex items-center justify-between gap-2 text-[10px] font-bold tracking-[0.07em] text-ink-5 uppercase">
+      <dt className="flex items-center justify-between gap-2 text-[0.625rem] font-bold tracking-[0.07em] text-ink-5 uppercase">
         {row.label}
         {editable && !editing && (
           <button
@@ -301,7 +301,7 @@ function Evidence({
               setDraft(row.value);
               setEditing(true);
             }}
-            className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-ink-4 transition hover:bg-surface hover:text-brand"
+            className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[0.625rem] font-semibold normal-case tracking-normal text-ink-4 transition hover:bg-surface hover:text-brand"
           >
             <Pencil className="size-3" />
             Edit
@@ -315,12 +315,12 @@ function Evidence({
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             rows={3}
-            className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[13px] text-ink outline-none transition hover:border-line-strong focus:border-brand focus:ring-4 focus:ring-brand/12"
+            className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[0.8125rem] text-ink outline-none transition hover:border-line-strong focus:border-brand focus:ring-4 focus:ring-brand/12"
           />
           {/* The previous text is kept in the thread, so this is a correction
               with a paper trail rather than an overwrite. Saying so is what
               makes it safe to use. */}
-          <p className="text-[10.5px] text-ink-5">
+          <p className="text-[0.6562rem] text-ink-5">
             The current text is kept in the notes below.
           </p>
           <div className="flex gap-2">
@@ -328,7 +328,7 @@ function Evidence({
               type="button"
               onClick={save}
               disabled={saving || draft.trim() === row.value.trim()}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-brand px-3 text-[11.5px] font-semibold text-white transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-40"
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-brand px-3 text-[0.7188rem] font-semibold text-white transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-40"
             >
               {saving && <Loader2 className="size-3 animate-spin" />}
               Save
@@ -337,14 +337,14 @@ function Evidence({
               type="button"
               onClick={() => setEditing(false)}
               disabled={saving}
-              className="h-8 rounded-lg border border-line bg-surface px-3 text-[11.5px] font-medium text-ink-3 transition hover:border-brand hover:text-brand disabled:opacity-40"
+              className="h-8 rounded-lg border border-line bg-surface px-3 text-[0.7188rem] font-medium text-ink-3 transition hover:border-brand hover:text-brand disabled:opacity-40"
             >
               Cancel
             </button>
           </div>
         </div>
       ) : (
-        <dd className="text-[13px] break-words whitespace-pre-wrap text-ink">
+        <dd className="text-[0.8125rem] break-words whitespace-pre-wrap text-ink">
           {row.value}
         </dd>
       )}

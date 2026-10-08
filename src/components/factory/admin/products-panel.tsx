@@ -82,7 +82,7 @@ function day(iso: string | null) {
   return iso ? formatDay(iso) : null;
 }
 
-const CELL = "px-4 py-3 align-top text-[13px] whitespace-nowrap";
+const CELL = "px-4 py-3 align-top text-[0.8125rem] whitespace-nowrap";
 /* Every field is a column, so the table runs wider than the screen. The batch
    number stays pinned while the rest scroll, so a row is still identifiable
    wherever it is scrolled to. */
@@ -494,7 +494,7 @@ export function ProductsPanel({
         >
           <table className="w-full min-w-max text-sm">
             <thead>
-              <tr className="text-left text-[10px] font-bold tracking-[0.07em] whitespace-nowrap text-ink-3 uppercase">
+              <tr className="text-left text-[0.625rem] font-bold tracking-[0.07em] whitespace-nowrap text-ink-3 uppercase">
                 {/* Pinned on both axes, so it sits above the scrolling
                     header cells and the pinned batch cells alike. */}
                 <th
@@ -550,7 +550,7 @@ export function ProductsPanel({
                       className={cn(
                         STICKY_LEFT,
                         rowBg,
-                        "px-4 py-3 align-top font-mono text-[13px] font-medium whitespace-nowrap text-ink",
+                        "px-4 py-3 align-top font-mono text-[0.8125rem] font-medium whitespace-nowrap text-ink",
                       )}
                     >
                       {product.batch_no}
@@ -567,7 +567,7 @@ export function ProductsPanel({
                       </span>
                       {packingParent.has(product.id) && (
                         <span
-                          className="ml-1.5 font-mono text-[10px] font-semibold text-brand"
+                          className="ml-1.5 font-mono text-[0.625rem] font-semibold text-brand"
                           title={`Packing run of batch ${packingParent.get(product.id)}`}
                         >
                           ← {packingParent.get(product.id)}
@@ -595,7 +595,7 @@ export function ProductsPanel({
                       />
                     </td>
 
-                    <td className="px-4 py-3 text-right align-top font-mono text-[13px] text-ink">
+                    <td className="px-4 py-3 text-right align-top font-mono text-[0.8125rem] text-ink">
                       {editing ? (
                         <span className="inline-flex items-center gap-1">
                           <input
@@ -642,7 +642,7 @@ export function ProductsPanel({
                       )}
                     </td>
 
-                    <td className="min-w-[180px] px-4 py-3 align-top text-[13px]">
+                    <td className="min-w-[180px] px-4 py-3 align-top text-[0.8125rem]">
                       <Val value={product.customer_name} />
                     </td>
                     <td className={CELL}>
@@ -701,7 +701,7 @@ export function ProductsPanel({
                         on the board (frozen — the schedule has been acted on),
                         and no schedule at all, which is not a gap but the
                         other way of working: New job, by hand, on the day. */}
-                    <td className="px-4 py-3 align-top text-[13px]">
+                    <td className="px-4 py-3 align-top text-[0.8125rem]">
                       {editingDate ? (
                         <span className="inline-flex items-center gap-1">
                           <DateField
@@ -710,7 +710,7 @@ export function ProductsPanel({
                             onChange={setEditDate}
                             ariaLabel={`Planned date for batch ${product.batch_no}`}
                             placeholder="Not scheduled"
-                            className="h-8 w-44 rounded-lg px-2 text-[13px]"
+                            className="h-8 w-44 rounded-lg px-2 text-[0.8125rem]"
                           />
                           <IconButton
                             label="Save planned date"
@@ -792,7 +792,7 @@ export function ProductsPanel({
                                 values: { active: !product.active },
                               })
                             }
-                            className="shrink-0 rounded-full bg-sunken-2 px-2 py-0.5 text-[11px] font-medium text-ink-3 transition hover:bg-line"
+                            className="shrink-0 rounded-full bg-sunken-2 px-2 py-0.5 text-[0.6875rem] font-medium text-ink-3 transition hover:bg-line"
                           >
                             {product.active ? "Active" : "Retired"}
                           </button>
@@ -862,7 +862,7 @@ function Val({
 }) {
   if (!value) return <span className="text-ink-6">—</span>;
   return (
-    <span className={cn("text-ink-2", mono && "font-mono text-[12.5px]")}>
+    <span className={cn("text-ink-2", mono && "font-mono text-[0.7812rem]")}>
       {value}
     </span>
   );

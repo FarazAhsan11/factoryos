@@ -491,7 +491,7 @@ function RiskConclusionCard({
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-sunken px-4 py-3">
       <div>
-        <p className="text-[10px] font-bold tracking-[0.07em] text-ink-5 uppercase">
+        <p className="text-[0.625rem] font-bold tracking-[0.07em] text-ink-5 uppercase">
           Risk conclusion
         </p>
         <p className="mt-0.5 text-xs text-ink-4">
@@ -864,7 +864,7 @@ export function CloseOutTab({
                   <span className="block text-sm font-semibold text-ink">
                     {d.label}
                   </span>
-                  <span className="block text-[11px] text-ink-5">{d.hint}</span>
+                  <span className="block text-[0.6875rem] text-ink-5">{d.hint}</span>
                 </span>
               </label>
             ))}

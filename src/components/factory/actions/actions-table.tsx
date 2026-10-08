@@ -117,7 +117,7 @@ export function ActionsTable({
           >
             <PinnedCell
               spine={PRIORITY_SPINE[action.priority]}
-              className="max-w-[22rem] font-sans text-[13px]"
+              className="max-w-[22rem] font-sans text-[0.8125rem]"
             >
               <span className="min-w-0 truncate" title={action.title}>
                 {action.title}
@@ -194,7 +194,7 @@ export function ActionsTable({
             >
               {formatDue(action.due_at)}
               {fixRunning && (
-                <span className="ml-1.5 text-[11px] text-ink-5">
+                <span className="ml-1.5 text-[0.6875rem] text-ink-5">
                   {relativeTime(action.due_at, now)}
                 </span>
               )}
@@ -209,7 +209,7 @@ export function ActionsTable({
               {action.verify_due_at ? (
                 <>
                   {formatDue(action.verify_due_at)}
-                  <span className="ml-1.5 text-[11px] text-ink-5">
+                  <span className="ml-1.5 text-[0.6875rem] text-ink-5">
                     {relativeTime(action.verify_due_at, now)}
                   </span>
                 </>

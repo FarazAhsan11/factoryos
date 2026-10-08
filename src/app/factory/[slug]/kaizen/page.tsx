@@ -47,7 +47,7 @@ export default async function KaizenPage({
         <h1 className="text-xl font-semibold tracking-tight text-ink">
           Kaizen
         </h1>
-        <p className="mt-0.5 text-[13px] text-ink-4">
+        <p className="mt-0.5 text-[0.8125rem] text-ink-4">
           Improvement ideas from the floor. Anyone may raise one; a supervisor
           takes it through review.
         </p>

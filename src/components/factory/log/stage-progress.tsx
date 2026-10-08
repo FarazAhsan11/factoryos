@@ -58,7 +58,7 @@ export function StageProgress({
         over ? "border-danger-line bg-danger-tint" : "border-line bg-sunken",
       )}
     >
-      <div className="flex items-baseline justify-between gap-2 text-[11px]">
+      <div className="flex items-baseline justify-between gap-2 text-[0.6875rem]">
         <span className="font-medium text-ink-3">{stageName(stage)}</span>
         <span className="font-mono text-ink-4">
           {made.toLocaleString(undefined, { maximumFractionDigits: 2 })} /{" "}
@@ -79,7 +79,7 @@ export function StageProgress({
           target that has been reached, and on an over-tolerance entry both are
           true at once. */}
       {over && ceiling !== null ? (
-        <p className="text-[11px] font-medium text-danger-deep">
+        <p className="text-[0.6875rem] font-medium text-danger-deep">
           Over what this stage accepts by{" "}
           <strong className="font-mono font-semibold">
             {excess.toLocaleString(undefined, { maximumFractionDigits: 2 })}{" "}
@@ -94,7 +94,7 @@ export function StageProgress({
         </p>
       ) : (
         pct >= 100 && (
-          <p className="text-[11px] font-medium" style={{ color: tone }}>
+          <p className="text-[0.6875rem] font-medium" style={{ color: tone }}>
             Stage target reached — a supervisor can sign it off on the Pipeline.
           </p>
         )

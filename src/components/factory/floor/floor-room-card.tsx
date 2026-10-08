@@ -54,7 +54,7 @@ export function FloorRoomCard({
       <div className="flex items-center justify-between gap-2">
         <p
           className={cn(
-            "truncate text-[11px] font-bold tracking-[0.09em] uppercase",
+            "truncate text-[0.6875rem] font-bold tracking-[0.09em] uppercase",
             latest ? "text-ink-4" : "text-ink-5",
           )}
         >
@@ -77,7 +77,7 @@ export function FloorRoomCard({
           )}
         />
         {batchNo ? (
-          <span className="font-mono text-[15px] font-bold tracking-tight text-ink">
+          <span className="font-mono text-[0.9375rem] font-bold tracking-tight text-ink">
             {batchNo}
           </span>
         ) : (
@@ -97,13 +97,13 @@ export function FloorRoomCard({
       ) : (
         <>
           {productName && (
-            <p className="line-clamp-1 text-[13px] text-ink-3">{productName}</p>
+            <p className="line-clamp-1 text-[0.8125rem] text-ink-3">{productName}</p>
           )}
 
           <div className="flex flex-wrap items-center gap-1.5">
             <span
               className={cn(
-                "inline-flex max-w-full items-center gap-1 truncate rounded-md px-2 py-0.5 text-[11.5px] font-semibold ring-1",
+                "inline-flex max-w-full items-center gap-1 truncate rounded-md px-2 py-0.5 text-[0.7188rem] font-semibold ring-1",
                 stopped
                   ? "bg-warn-tint text-warn-ink ring-warn-line/70"
                   : "bg-brand-soft text-brand-deep ring-brand-line/70",
@@ -115,7 +115,7 @@ export function FloorRoomCard({
           </div>
 
           {stopped && latest.comment && (
-            <p className="line-clamp-2 text-[11.5px] text-ink-4 italic">
+            <p className="line-clamp-2 text-[0.7188rem] text-ink-4 italic">
               {latest.comment}
             </p>
           )}
@@ -131,7 +131,7 @@ export function FloorRoomCard({
           ) : (
             !stopped &&
             latest.qty !== null && (
-              <p className="text-[11.5px] text-ink-4">
+              <p className="text-[0.7188rem] text-ink-4">
                 <span className="font-mono font-semibold text-ink">
                   {fmtQty(latest.qty)}
                 </span>{" "}
@@ -152,7 +152,7 @@ function TimeRange({ entry }: { entry: FloorEntry }) {
   const end = clock(entry.end_time);
   if (!start && !end) return null;
   return (
-    <span className="shrink-0 font-mono text-[10.5px] text-ink-5 tabular-nums">
+    <span className="shrink-0 font-mono text-[0.6562rem] text-ink-5 tabular-nums">
       {start ?? "…"}–{end ?? "…"}
     </span>
   );
@@ -179,14 +179,14 @@ function ProgressLine({
 
   return (
     <div className="mt-auto space-y-1.5 pt-1">
-      {label && <p className="truncate text-[10.5px] text-ink-5">{label}</p>}
+      {label && <p className="truncate text-[0.6562rem] text-ink-5">{label}</p>}
       <div className="h-1.5 overflow-hidden rounded-full bg-sunken-2 ring-1 ring-line-soft ring-inset">
         <div
           className="h-full rounded-full transition-[width] duration-500"
           style={{ width: `${Math.min(100, progress.pct)}%`, background: tone }}
         />
       </div>
-      <p className="flex flex-wrap items-baseline gap-x-3 text-[11.5px] text-ink-5">
+      <p className="flex flex-wrap items-baseline gap-x-3 text-[0.7188rem] text-ink-5">
         <span>
           <span className="font-semibold text-ink">{progress.pct}%</span>{" "}
           progress
@@ -209,19 +209,19 @@ function Badges({ room }: { room: FloorRoom }) {
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {openIssues > 0 && (
-        <span className="inline-flex items-center gap-1 rounded-md bg-danger-soft px-1.5 py-0.5 text-[10.5px] font-semibold text-danger-deep ring-1 ring-danger-line">
+        <span className="inline-flex items-center gap-1 rounded-md bg-danger-soft px-1.5 py-0.5 text-[0.6562rem] font-semibold text-danger-deep ring-1 ring-danger-line">
           <AlertTriangle className="size-3" aria-hidden />
           {openIssues} open issue{openIssues === 1 ? "" : "s"}
         </span>
       )}
       {quarantine && (
-        <span className="inline-flex items-center gap-1 rounded-md bg-danger-soft px-1.5 py-0.5 text-[10.5px] font-semibold text-danger-deep ring-1 ring-danger-line">
+        <span className="inline-flex items-center gap-1 rounded-md bg-danger-soft px-1.5 py-0.5 text-[0.6562rem] font-semibold text-danger-deep ring-1 ring-danger-line">
           <ShieldAlert className="size-3" aria-hidden />
           Quarantined · {quarantine}
         </span>
       )}
       {held && (
-        <span className="inline-flex items-center gap-1 rounded-md bg-warn-tint px-1.5 py-0.5 text-[10.5px] font-semibold text-warn-ink ring-1 ring-warn-line/70">
+        <span className="inline-flex items-center gap-1 rounded-md bg-warn-tint px-1.5 py-0.5 text-[0.6562rem] font-semibold text-warn-ink ring-1 ring-warn-line/70">
           <PauseCircle className="size-3" aria-hidden />
           Batch on hold
         </span>

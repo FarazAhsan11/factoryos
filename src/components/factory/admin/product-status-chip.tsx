@@ -19,7 +19,7 @@ export function ProductStatusChip({
     <span
       title={title}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10.5px] font-semibold whitespace-nowrap",
+        "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[0.6562rem] font-semibold whitespace-nowrap",
         className,
       )}
       style={{ background: meta.tint, color: meta.accent }}

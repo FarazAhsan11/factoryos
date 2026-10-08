@@ -18,7 +18,7 @@ export function UnissuedNotice({ count }: { count: number }) {
     <Popover.Root>
       <Popover.Trigger
         aria-label={`${count} batch${one ? "" : "es"} not issued yet — details`}
-        className="inline-flex h-7 items-center gap-1 rounded-full bg-warn-tint pr-2 pl-1.5 text-[11px] font-bold text-warn-ink ring-1 ring-warn-line transition outline-none hover:brightness-95 focus-visible:ring-4 focus-visible:ring-brand/12 data-popup-open:brightness-95"
+        className="inline-flex h-7 items-center gap-1 rounded-full bg-warn-tint pr-2 pl-1.5 text-[0.6875rem] font-bold text-warn-ink ring-1 ring-warn-line transition outline-none hover:brightness-95 focus-visible:ring-4 focus-visible:ring-brand/12 data-popup-open:brightness-95"
       >
         <Info className="size-4" aria-hidden />
         {count}

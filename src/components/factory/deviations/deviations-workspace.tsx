@@ -132,7 +132,7 @@ export function DeviationsWorkspace({
     <div className="flex flex-col lg:min-h-0 lg:flex-1">
       <div className="mb-5 flex shrink-0 flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-[11px] font-bold tracking-[0.09em] text-ink-5 uppercase">
+          <p className="text-[0.6875rem] font-bold tracking-[0.09em] text-ink-5 uppercase">
             Quality assurance
           </p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">
@@ -179,7 +179,7 @@ export function DeviationsWorkspace({
                 {label}
                 <span
                   className={cn(
-                    "rounded-full px-1.5 text-[10px] font-bold tabular-nums",
+                    "rounded-full px-1.5 text-[0.625rem] font-bold tabular-nums",
                     active
                       ? "bg-brand-soft text-brand-deep"
                       : "bg-line text-ink-4",

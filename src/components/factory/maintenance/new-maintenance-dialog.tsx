@@ -237,7 +237,7 @@ export function NewMaintenanceDialog({
                   {/* Says where the list comes from rather than silently
                     offering an empty dropdown — the fix is one tab away. */}
                   {activeDepartments.length === 0 && (
-                    <p className="mt-1 text-[11px] text-ink-5">
+                    <p className="mt-1 text-[0.6875rem] text-ink-5">
                       Add them in Admin &amp; Settings → Departments.
                     </p>
                   )}
@@ -390,11 +390,11 @@ function Field({
       <label htmlFor={htmlFor} className="block text-xs font-medium text-ink-3">
         {label}
         {required && <span className="ml-0.5 text-danger">*</span>}
-        {note && <span className="ml-1 text-[10px] text-ink-5">{note}</span>}
+        {note && <span className="ml-1 text-[0.625rem] text-ink-5">{note}</span>}
       </label>
       {children}
       {error && (
-        <p role="alert" className="text-[11.5px] text-danger">
+        <p role="alert" className="text-[0.7188rem] text-danger">
           {error}
         </p>
       )}

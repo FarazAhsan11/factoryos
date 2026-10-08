@@ -138,7 +138,7 @@ export function InitiationFields({
               />
             )}
             {locked && (
-              <p className="text-[11px] text-ink-5">
+              <p className="text-[0.6875rem] text-ink-5">
                 The type is part of the case number — raise a new case to
                 change it.
               </p>
@@ -374,7 +374,7 @@ export function InitiationFields({
             {/* Resolved from the machine register, exactly as the shift log
                 resolves it — so a typo shows up as "not in the register". */}
             {(equipmentNo ?? "").trim() && (
-              <p className="text-[11px] text-ink-5">
+              <p className="text-[0.6875rem] text-ink-5">
                 {equipment ? equipment.name : "Not in the machine register."}
               </p>
             )}
@@ -474,7 +474,7 @@ export function InitiationFields({
                     <span className="block text-sm font-semibold text-ink">
                       {d.label}
                     </span>
-                    <span className="block text-[11px] text-ink-5">
+                    <span className="block text-[0.6875rem] text-ink-5">
                       {d.hint}
                     </span>
                   </span>

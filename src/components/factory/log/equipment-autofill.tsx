@@ -44,7 +44,7 @@ export function EquipmentAutofill({
           // Retired, not missing. The entry is still allowed — a machine can
           // be logged against on the day it is taken out of service — but the
           // supervisor reading it should know it is off the register.
-          <span className="ml-2 rounded-full bg-sunken-2 px-1.5 py-0.5 text-[10px] font-semibold text-ink-4">
+          <span className="ml-2 rounded-full bg-sunken-2 px-1.5 py-0.5 text-[0.625rem] font-semibold text-ink-4">
             Retired
           </span>
         )}

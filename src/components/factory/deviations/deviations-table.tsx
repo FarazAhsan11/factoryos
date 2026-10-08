@@ -130,7 +130,7 @@ export function DeviationsTable({
             <td className={cn(CELL, "font-mono")}>
               <Val value={d.batch_no} />
             </td>
-            <td className="max-w-[18rem] px-3 py-2.5 align-middle text-[13px]">
+            <td className="max-w-[18rem] px-3 py-2.5 align-middle text-[0.8125rem]">
               <span className="block truncate">
                 <Val value={d.product_name} />
               </span>

@@ -24,6 +24,16 @@ const INPUT =
 const CONTROL = "h-9 rounded-lg px-2.5 text-[13px]";
 const HEAD = "text-[10px] font-semibold tracking-[0.04em] text-ink-5 uppercase";
 
+/**
+ * The one-line row's columns: activity, room, [work order], start, end, target,
+ * unit. The header row and every stage share it, so they cannot drift. Written
+ * out in full — Tailwind finds classes by scanning for whole strings.
+ */
+const ROW_COLS =
+  "@3xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1.1fr)_7.5rem_7.5rem_5.5rem_6rem]";
+const ROW_COLS_WO =
+  "@3xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1.1fr)_6rem_7.5rem_7.5rem_5.5rem_6rem]";
+
 type PlanForm = UseFormReturn<StagePlanValues, unknown, StagePlanParsed>;
 
 /**
@@ -31,10 +41,13 @@ type PlanForm = UseFormReturn<StagePlanValues, unknown, StagePlanParsed>;
  * New batch.
  *
  * The same route the plan dialog builds one stage at a time, as a list of
- * rows: what and where on the first line, when and how much on the second.
- * Two lines rather than one table row so it fits the dialog's own width — a
- * route is eight fields across, and a dialog widened to hold them on one line
- * stretches every other field in the form with it.
+ * rows. Given room (the container is at least `@3xl`, 48rem) a stage is **one
+ * line** — activity, room, start, end, target, unit — under a single header
+ * row, which is what lets a five-stage route be read at a glance instead of
+ * scrolled. Narrower than that, the same fields wrap onto a second line and
+ * carry their own labels. The dialog is widened to give New batch the room;
+ * the fields above the plan are held to their old width so they don't stretch
+ * with it.
  *
  * Nothing here is saved until the whole dialog is. The rows are a field array
  * on their own form (`stagePlanSchema`), validated beside the batch, so one
@@ -119,7 +132,7 @@ export function StagePlanEditor({
       </div>
 
       {fields.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-line-strong bg-surface px-4 py-5 text-center">
+        <div className="rounded-xl border border-dashed border-line-strong bg-surface px-4 py-4 text-center">
           <p className="text-xs text-ink-5">
             No stages yet. Add them now, or plan them later from the board.
           </p>
@@ -135,6 +148,28 @@ export function StagePlanEditor({
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-line bg-surface">
+          {/* Column headers, once — the cells' own labels are for the
+              narrow layout. The spacers are the order controls' and the
+              remove button's widths, so the columns sit under their names. */}
+          <div className="hidden gap-2.5 border-b border-line-soft bg-sunken/60 px-3 py-2 @3xl:flex">
+            <span className="w-[68px] shrink-0" aria-hidden />
+            <div
+              className={cn(
+                "grid min-w-0 flex-1 gap-2",
+                showWorkOrder ? ROW_COLS_WO : ROW_COLS,
+              )}
+              aria-hidden
+            >
+              <span className={HEAD}>Activity</span>
+              <span className={HEAD}>Room</span>
+              {showWorkOrder && <span className={HEAD}>Work order</span>}
+              <span className={HEAD}>Start</span>
+              <span className={HEAD}>End</span>
+              <span className={HEAD}>Target</span>
+              <span className={HEAD}>Unit</span>
+            </div>
+            <span className="w-8 shrink-0" aria-hidden />
+          </div>
           <ol className="divide-y divide-line-soft">
             {fields.map((field, index) => {
               const rowErrors = errors.stages?.[index];
@@ -160,13 +195,13 @@ export function StagePlanEditor({
                 <li
                   key={field.id}
                   className={cn(
-                    "flex gap-2.5 px-3 py-3",
+                    "flex gap-2.5 px-3 py-2.5",
                     messages.length > 0 && "bg-danger-soft/40",
                   )}
                 >
                   {/* Position and order. The flag marks the stage that
                       completes the order — the last one. */}
-                  <div className="flex shrink-0 flex-col items-center gap-1 pt-5">
+                  <div className="flex shrink-0 flex-col items-center gap-1 pt-5 @3xl:h-9 @3xl:flex-row @3xl:gap-0.5 @3xl:pt-0">
                     <span
                       title={isLast ? "Completes the order" : `Stage ${index + 1}`}
                       className={cn(
@@ -199,16 +234,15 @@ export function StagePlanEditor({
                   </div>
 
                   <div className="min-w-0 flex-1 space-y-2">
-                    {/* What, and where. */}
+                    {/* The stage. One line at @3xl; otherwise what and where
+                        take a line each and the rest wrap in pairs. */}
                     <div
                       className={cn(
-                        "grid gap-2",
-                        showWorkOrder
-                          ? "@md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_7rem]"
-                          : "@md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]",
+                        "grid grid-cols-2 gap-2",
+                        showWorkOrder ? ROW_COLS_WO : ROW_COLS,
                       )}
                     >
-                      <Cell label="Activity">
+                      <Cell label="Activity" wide>
                         <Controller
                           name={`stages.${index}.processId`}
                           control={control}
@@ -235,7 +269,7 @@ export function StagePlanEditor({
                           )}
                         />
                       </Cell>
-                      <Cell label="Room">
+                      <Cell label="Room" wide>
                         <Controller
                           name={`stages.${index}.unitId`}
                           control={control}
@@ -259,7 +293,7 @@ export function StagePlanEditor({
                         />
                       </Cell>
                       {showWorkOrder && (
-                        <Cell label="Work order">
+                        <Cell label="Work order" wide>
                           <input
                             id={`${idPrefix}-wo-${index}`}
                             placeholder="—"
@@ -270,10 +304,6 @@ export function StagePlanEditor({
                           />
                         </Cell>
                       )}
-                    </div>
-
-                    {/* When, and how much. */}
-                    <div className="grid grid-cols-2 gap-2 @md:grid-cols-4">
                       <Cell label="Start">
                         <Controller
                           name={`stages.${index}.plannedDate`}
@@ -403,7 +433,7 @@ export function StagePlanEditor({
                     onClick={() => remove(index)}
                     disabled={disabled}
                     aria-label={`Remove stage ${index + 1}`}
-                    className="mt-5 grid size-8 shrink-0 place-items-center rounded-lg text-ink-6 transition hover:bg-danger-soft hover:text-danger-deep"
+                    className="mt-5 grid size-8 shrink-0 place-items-center rounded-lg text-ink-6 transition hover:bg-danger-soft hover:text-danger-deep @3xl:mt-0.5"
                   >
                     <X className="size-4" />
                   </button>
@@ -432,7 +462,7 @@ export function StagePlanEditor({
           above are checked for before anything is saved. */}
       <label
         className={cn(
-          "flex cursor-pointer items-start gap-2.5 rounded-xl border px-3 py-2.5 transition select-none",
+          "flex cursor-pointer items-start gap-2.5 rounded-xl border px-3 py-2 transition select-none",
           issue
             ? "border-teal-line bg-teal-soft text-teal-deep"
             : "border-line bg-surface text-ink-3 hover:border-line-strong",
@@ -446,7 +476,7 @@ export function StagePlanEditor({
           {...register("issue")}
         />
         <span>
-          <span className="flex items-center gap-1.5 text-[13px] font-semibold">
+          <span className="flex items-center gap-1.5 text-[12.5px] font-semibold">
             <Rocket className="size-3.5" aria-hidden />
             Issue for production when added
           </span>
@@ -468,14 +498,23 @@ export function StagePlanEditor({
 /** One labelled field of a stage row. */
 function Cell({
   label,
+  wide,
   children,
 }: {
   label: string;
+  /** Takes the full width of the narrow layout — activity, room, work order. */
+  wide?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-w-0 space-y-1">
-      <span className={cn(HEAD, "block")}>{label}</span>
+    <div
+      className={cn(
+        "min-w-0 space-y-1 @3xl:space-y-0",
+        wide && "col-span-2 @3xl:col-span-1",
+      )}
+    >
+      {/* The header row names the columns once the row is one line. */}
+      <span className={cn(HEAD, "block @3xl:sr-only")}>{label}</span>
       {children}
     </div>
   );

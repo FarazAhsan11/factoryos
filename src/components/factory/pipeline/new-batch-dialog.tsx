@@ -1,19 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  Controller,
-  useForm,
-  useWatch,
-  type Control,
-} from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
-  Beaker,
   CalendarDays,
   Loader2,
-  Lock,
   Package,
   Plus,
   RefreshCw,
@@ -21,7 +14,6 @@ import {
 import { toast } from "sonner";
 
 import {
-  BATCH_TYPES,
   BULK_UNIT_OPTIONS,
   PACK_UNITS,
   PRIORITIES,
@@ -67,6 +59,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { SelectField } from "@/components/ui/select-field";
+import { InfoTip } from "@/components/factory/pipeline/info-tip";
 import {
   createBatchJob,
   deletePipelineJob,
@@ -81,22 +74,11 @@ import { cn } from "@/lib/utils";
 import { formatDay } from "@/lib/factory/dates";
 
 const FIELD =
-  "h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)] outline-none transition placeholder:text-placeholder hover:border-line-strong focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12";
+  "h-9 w-full rounded-lg border border-line bg-surface px-2.5 text-[13px] text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)] outline-none transition placeholder:text-placeholder hover:border-line-strong focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12";
 const MONO = "font-mono tracking-tight";
-const LABEL = "text-[11px] font-semibold tracking-[0.02em] text-ink-4 uppercase";
-
-const TYPE_ICONS: Record<BatchType, typeof Package> = {
-  manufacturing: Beaker,
-  packing: Package,
-  combined: RefreshCw,
-};
-
-/**
- * What a split-batch company chooses between. With the bulk and the packed lot
- * numbered separately there is no batch that is both, so Single Batch is not
- * offered at all.
- */
-const SPLIT_TYPES = BATCH_TYPES.filter((t) => t.value !== "combined");
+/** SelectField's size, to match `FIELD` — one control height in the dialog. */
+const CONTROL = "h-9 rounded-lg px-2.5 text-[13px]";
+const LABEL = "text-[10.5px] font-semibold tracking-[0.03em] text-ink-4 uppercase";
 
 function fmt(n: number) {
   return Number(n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -120,8 +102,14 @@ const longDay = formatDay;
  * each answer needs a different half-dozen questions. Which types are on
  * offer is the company's batch number model (Admin → Company, 0042): a
  * single-batch company is never asked — every batch is a Single Batch — and a
- * split-batch company picks Bulk Production or Finished Lot from two tabs,
- * each opening its own form.
+ * split-batch company raises Bulk Production, with its Finished Lot added from
+ * the checkbox at the end of the form. There is no tab for the lot: the
+ * checkbox asks the same questions, so a second way in only showed the same
+ * data twice. (A lot is still opened directly, with its bulk chosen, by
+ * `presetParentId` — "+ Lot" on the board.)
+ *
+ * Tolerance and overage are not asked here. Both stay optional on the batch
+ * and are left blank; tolerance is set per batch in Edit batch.
  *
  * The batch itself is **picked**, never typed. Products owns the
  * batch number, product name, code, work order and required quantity, and the
@@ -156,7 +144,7 @@ export function NewBatchDialog({
   presetParentId?: string | null;
   /**
    * Admin → Company (0042). `single` asks for no type — the batch is a Single
-   * Batch; `split` asks for Bulk Production or Finished Lot, as tabs.
+   * Batch; `split` raises Bulk Production (the lot is the checkbox at the end).
    */
   batchModel?: BatchModel;
   /**
@@ -210,7 +198,6 @@ export function NewBatchDialog({
     packSize,
     parentJobId,
     bulkUnit,
-    overagePct,
     packUnitWatch,
   ] = useWatch({
     control,
@@ -220,7 +207,6 @@ export function NewBatchDialog({
       "packSize",
       "parentJobId",
       "bulkUnit",
-      "overagePct",
       "packUnit",
     ],
   });
@@ -457,19 +443,6 @@ export function NewBatchDialog({
   });
 
   /**
-   * Switches the batch type — from a type card or a split-model tab alike.
-   *
-   * A packing run never carries overage (`refineBatch` refuses one), and its
-   * section has no overage box, so a number typed under another type would
-   * fail the form on a field nobody can see. Cleared on the way in instead.
-   */
-  function selectType(next: BatchType, onChange: (value: BatchType) => void) {
-    onChange(next);
-    if (next === "packing") setValue("overagePct", undefined);
-    reroute({ batchType: next });
-  }
-
-  /**
    * Loads the standard route into a plan (`stage-templates.ts`) — but only
    * while the plan holds nothing typed, so picking a unit never wipes a plan
    * someone has started filling in.
@@ -524,7 +497,6 @@ export function NewBatchDialog({
   const type = (batchType ?? defaultType) as BatchType;
   const isManufacturing = type === "manufacturing";
   const isPacking = type === "packing";
-  const meta = BATCH_TYPES.find((t) => t.value === type);
 
   // Containers come from the catalogue, pack size from this form — the two
   // halves of "how much bulk does this run need", from the two places that
@@ -545,17 +517,10 @@ export function NewBatchDialog({
         typeof lotPackSize === "number" ? lotPackSize : undefined,
       )
     : null;
-  // The same allowance the families bar measures against (0032): the bulk
-  // target plus its declared overage, floored.
+  // What the families bar measures against (0032). A batch raised here
+  // declares no overage, so it is the bulk target itself.
   const bulkAllowance = picked?.required_qty
-    ? Math.floor(
-        picked.required_qty *
-          (1 +
-            (typeof overagePct === "number" && !Number.isNaN(overagePct)
-              ? overagePct
-              : 0) /
-              100),
-      )
+    ? Math.floor(picked.required_qty)
     : null;
 
   const busy = create.isPending;
@@ -625,10 +590,10 @@ export function NewBatchDialog({
           setOpen(next);
         }}
       >
-        <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col gap-0 overflow-hidden p-0">
-          <DialogHeader className="shrink-0 gap-1.5 border-b border-line bg-surface px-5 pt-5 pr-12 pb-4">
-            <DialogTitle className="text-ink">New batch</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-full max-w-[min(62rem,calc(100vw-2rem))] flex-col gap-0 overflow-hidden p-0">
+          <DialogHeader className="shrink-0 gap-1 border-b border-line bg-surface px-5 pt-4 pr-12 pb-3">
+            <DialogTitle className="text-[15px] text-ink">New batch</DialogTitle>
+            <DialogDescription className="text-xs">
               It lands in Planned and moves itself as entries are logged
               against it.
             </DialogDescription>
@@ -638,230 +603,78 @@ export function NewBatchDialog({
             onSubmit={submit}
             className="flex min-h-0 flex-1 flex-col"
           >
-            {/* ── Split model — the type as tabs ───────────────────────
-                A split-batch company raises the bulk and the packed lot as
-                separate batches, so the choice is one of two forms rather
-                than one of three cards: tabs, above everything, and the
-                tab's own form below. */}
-            {split && (
-              <Controller
-                name="batchType"
-                control={control}
-                render={({ field }) => (
-                  <div
-                    role="tablist"
-                    aria-label="Batch type"
-                    className="flex shrink-0 gap-1 border-b border-line bg-surface px-5"
-                  >
-                    {SPLIT_TYPES.map((option) => {
-                      const Icon = TYPE_ICONS[option.value];
-                      const on = field.value === option.value;
-                      return (
-                        <button
-                          key={option.value}
-                          type="button"
-                          role="tab"
-                          aria-selected={on}
-                          onClick={() =>
-                            selectType(option.value, field.onChange)
-                          }
-                          className={cn(
-                            "-mb-px inline-flex items-center gap-2 border-b-2 px-3 py-3 text-sm font-semibold transition",
-                            on
-                              ? "border-brand text-brand-deep"
-                              : "border-transparent text-ink-4 hover:text-ink",
-                          )}
-                        >
-                          <Icon
-                            className={cn(
-                              "size-4",
-                              on ? "text-brand" : "text-ink-5",
-                            )}
-                            aria-hidden
-                          />
-                          {option.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              />
-            )}
-
-            <div className="scrollbar-slim min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
-              {/* What the open tab is for. A single-batch company is never
-                  asked for a type — every batch it raises is a Single Batch —
-                  so there is nothing to choose and nothing to explain. */}
-              {split && meta && (
-                <p className="text-[11px] text-ink-5">
-                  {meta.description} {meta.hint}
-                </p>
-              )}
-
-              {/* ── The batch ──────────────────────────────────────────── */}
-              <section className="space-y-3">
-                <p className={LABEL}>Which batch?</p>
-
-                <Field
-                  label="Batch"
-                  htmlFor="nb-product"
-                  error={errors.productId?.message}
+            <div className="scrollbar-slim @container min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-3.5">
+              {/* ── The batch ──────────────────────────────────────────────
+                  Everything that is *this batch's* and not the type's: which
+                  one, how urgent, and — for a bulk batch, whose only own field
+                  is the unit — what its bulk is counted in. Then what the
+                  catalogue already knows about it, read back as a strip. */}
+              <section className="space-y-3 rounded-xl border border-line bg-surface p-3.5">
+                <div
+                  className={cn(
+                    "grid gap-3",
+                    isManufacturing ? "@3xl:grid-cols-4" : "@3xl:grid-cols-3",
+                  )}
                 >
-                  <Controller
-                    name="productId"
-                    control={control}
-                    render={({ field }) => (
-                      <SelectField
-                        id="nb-product"
-                        value={field.value ?? ""}
-                        onChange={(id) => {
-                          field.onChange(id);
-                          // The card's due date is the order's (0041), read
-                          // from Products and never typed here — so every
-                          // pick replaces it, including with a blank.
-                          setValue(
-                            "dueDate",
-                            products.find((p) => p.id === id)?.due_date ?? "",
-                          );
-                          // Starts as what Products already holds, so saving
-                          // without touching it changes nothing.
-                          setValue(
-                            "workOrder",
-                            products.find((p) => p.id === id)?.work_order ?? "",
-                          );
-                        }}
-                        onBlur={field.onBlur}
-                        ariaInvalid={Boolean(errors.productId)}
-                        placeholder="Select a batch…"
-                        // The catalogue runs to hundreds of rows, so this is
-                        // the picker the search box exists for. The code and
-                        // work order are searchable through `meta` even
-                        // though the row shows only the number and the name.
-                        searchPlaceholder="Batch number, code or product…"
-                        emptyMessage="No batch matches that."
-                        options={available
-                          // Not the batch already chosen as the paired lot.
-                          .filter((p) => !pairing || p.id !== lotProductId)
-                          .map((product) => ({
-                          value: product.id,
-                          label: `${product.batch_no} — ${product.name}`,
-                          meta: product.code || product.work_order || undefined,
-                        }))}
-                      />
-                    )}
-                  />
-                </Field>
-
-                {/* Read back, never re-typed. The catalogue owns the batch
-                    number, the product name, the code, the work order and the
-                    required quantity; the shift log resolves entries against
-                    that same row. A second copy typed here would be a second
-                    place the name can be spelt differently. */}
-                {picked ? (
-                  <dl className="grid gap-1.5 rounded-xl border border-brand-soft bg-brand-tint p-3.5 text-xs">
-                    <Row label="Product" value={picked.name} />
-                    <Row label="Code" value={picked.code || "—"} mono />
-                    <Row
-                      label={
-                        isPacking
-                          ? "Containers to fill"
-                          : isManufacturing
-                            ? "Bulk target"
-                            : "Required qty"
-                      }
-                      value={
-                        picked.required_qty ? fmt(picked.required_qty) : "Not set"
-                      }
-                      mono
-                    />
-                  </dl>
-                ) : (
-                  <p className="rounded-xl border border-dashed border-line-strong bg-surface px-3.5 py-3 text-xs text-ink-5">
-                    {available.length === 0
-                      ? "Every active batch is already on the board. Add more in Products."
-                      : "Pick a batch and its product details fill in from Products."}
-                  </p>
-                )}
-
-                {/* A packing run with no quantity contributes nothing to its
-                    parent's allocation, so the family bar would silently
-                    under-read. Said here, but fixed in Admin — that column is
-                    the catalogue's, and editing it in two places is how the
-                    two stop agreeing. */}
-                {picked && !picked.required_qty && (
-                  <p className="rounded-xl border border-warn-line bg-warn-tint px-3.5 py-2.5 text-[11px] text-warn-ink">
-                    Batch {picked.batch_no} has no required quantity. Set it in
-                    Products, or this batch shows no
-                    progress and counts as nothing against its bulk.
-                  </p>
-                )}
-
-
-                {/* ── Tolerance ──────────────────────────────────────────
-                    Sits with priority and the due date rather than in a type
-                    section, because unlike overage it belongs to every batch
-                    type: a packing stage has a target like any other, and 600
-                    bottles against a 500-bottle run is the same mistake as 26
-                    kg against a 20 kg mix.
-
-                    Worth the sentence underneath. This dialog now carries two
-                    percentages, and the difference between them is the whole
-                    point: overage is extra deliberately *made* and raises a
-                    flag; tolerance is how far past a stage's plan an entry may
-                    be *recorded*, and it stops the entry. */}
-                {/* Only where the company tracks one work order per batch
-                    (Admin → Company). Per-stage work orders are asked when
-                    the plan is made, not here. */}
-                {perBatchWo && (
                   <Field
-                    label="Work order"
-                    note="saved on the batch"
-                    optional
-                    htmlFor="nb-wo"
-                    error={errors.workOrder?.message}
+                    label="Batch"
+                    htmlFor="nb-product"
+                    error={errors.productId?.message}
+                    className="@3xl:col-span-2"
                   >
-                    <input
-                      id="nb-wo"
-                      placeholder={
-                        picked ? `Same as batch — ${picked.batch_no}` : "e.g. 46000"
-                      }
-                      autoComplete="off"
-                      className={cn(FIELD, MONO, "sm:max-w-[16rem]")}
-                      {...register("workOrder")}
+                    <Controller
+                      name="productId"
+                      control={control}
+                      render={({ field }) => (
+                        <SelectField
+                          className={CONTROL}
+                          id="nb-product"
+                          value={field.value ?? ""}
+                          onChange={(id) => {
+                            field.onChange(id);
+                            // The card's due date is the order's (0041), read
+                            // from Products and never typed here — so every
+                            // pick replaces it, including with a blank.
+                            setValue(
+                              "dueDate",
+                              products.find((p) => p.id === id)?.due_date ?? "",
+                            );
+                            // Starts as what Products already holds, so saving
+                            // without touching it changes nothing.
+                            setValue(
+                              "workOrder",
+                              products.find((p) => p.id === id)?.work_order ?? "",
+                            );
+                          }}
+                          onBlur={field.onBlur}
+                          ariaInvalid={Boolean(errors.productId)}
+                          placeholder="Select a batch…"
+                          // The catalogue runs to hundreds of rows, so this is
+                          // the picker the search box exists for. The code and
+                          // work order are searchable through `meta` even
+                          // though the row shows only the number and the name.
+                          searchPlaceholder="Batch number, code or product…"
+                          emptyMessage="No batch matches that."
+                          options={available
+                            // Not the batch already chosen as the paired lot.
+                            .filter((p) => !pairing || p.id !== lotProductId)
+                            .map((product) => ({
+                            value: product.id,
+                            label: `${product.batch_no} — ${product.name}`,
+                            meta: product.code || product.work_order || undefined,
+                          }))}
+                        />
+                      )}
                     />
                   </Field>
-                )}
 
-                <Field
-                  label="Stage tolerance %"
-                  note="how far past a planned stage the log will accept"
-                  optional
-                  htmlFor="nb-tolerance"
-                  error={errors.tolerancePct?.message}
-                >
-                  <input
-                    id="nb-tolerance"
-                    type="number"
-                    step="any"
-                    min={0}
-                    max={100}
-                    placeholder="e.g. 5"
-                    className={cn(FIELD, MONO, "sm:max-w-[12rem]")}
-                    {...register("tolerancePct", { valueAsNumber: true })}
-                  />
-                </Field>
-                {/* Outside the Field, like OverageNote: the inline error
-                    belongs directly under the input, and the explanation
-                    under both. */}
-                <ToleranceNote control={control} />
-
-                <div className="grid gap-3 sm:grid-cols-2">
                   <Field label="Priority" htmlFor="nb-priority">
                     <Controller
                       name="priority"
                       control={control}
                       render={({ field }) => (
                         <SelectField
+                          className={CONTROL}
                           id="nb-priority"
                           value={field.value ?? ""}
                           onChange={field.onChange}
@@ -874,76 +687,37 @@ export function NewBatchDialog({
                       )}
                     />
                   </Field>
-                  {/* Read-only: the customer's due date, owned by the batch's
-                      row in Products. Shown here so the planner sees it, but
-                      changed only there — one place for the date to live. */}
-                  <Field label="Due date" note="from Products">
-                    <div
-                      aria-readonly
-                      title="Set on the batch in Products"
-                      className={cn(
-                        FIELD,
-                        "flex cursor-not-allowed items-center gap-2 bg-sunken text-ink-3 hover:border-line",
-                      )}
-                    >
-                      <CalendarDays
-                        className="size-4 shrink-0 text-ink-5"
-                        aria-hidden
-                      />
-                      <span
-                        className={cn(
-                          "min-w-0 flex-1 truncate",
-                          !picked?.due_date && "text-ink-5",
-                        )}
-                      >
-                        {picked
-                          ? picked.due_date
-                            ? longDay(picked.due_date)
-                            : "No due date in Products"
-                          : "Pick a batch first"}
-                      </span>
-                      <Lock className="size-3.5 shrink-0 text-ink-5" aria-hidden />
-                    </div>
-                  </Field>
-                </div>
-              </section>
 
-              {/* ── Manufacturing ──────────────────────────────────────── */}
-              {isManufacturing && (
-                <TypeSection
-                  icon={Beaker}
-                  title="Bulk production details"
-                  tone="border-warn-line bg-warn-tint"
-                >
-                  {/* Two fields, and neither is obvious from its label — the
-                      section said what it was called and not what it was for.
-                      Both exist to make this batch's bulk *divisible*: the
-                      unit is what its packing runs are measured back in, and
-                      the overage is the slack they are allowed to eat. */}
-                  <p className="mb-2.5 text-[11px] leading-snug text-ink-4">
-                    This batch produces bulk that packing batches draw from.
-                    {picked?.required_qty ? (
-                      <>
-                        {" "}
-                        Its target is{" "}
-                        <strong className="font-semibold text-ink-2">
-                          {fmt(picked.required_qty)}
-                        </strong>
-                        , from the catalogue.
-                      </>
-                    ) : null}
-                  </p>
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  {isManufacturing && (
                     <Field
                       label="Bulk unit"
                       htmlFor="nb-bulk-unit"
                       error={errors.bulkUnit?.message}
+                      info={
+                        <>
+                          This batch produces bulk that finished lots draw
+                          from, and its required quantity is the bulk target
+                          {picked?.required_qty ? (
+                            <>
+                              {" "}
+                              (
+                              <strong className="font-semibold text-ink-2">
+                                {fmt(picked.required_qty)}
+                              </strong>
+                              , from the catalogue)
+                            </>
+                          ) : null}
+                          . The bulk unit is what its finished lots are
+                          measured back in.
+                        </>
+                      }
                     >
                       <Controller
                         name="bulkUnit"
                         control={control}
                         render={({ field }) => (
                           <SelectField
+                            className={CONTROL}
                             id="nb-bulk-unit"
                             value={field.value ?? ""}
                             onChange={(v) => {
@@ -957,77 +731,137 @@ export function NewBatchDialog({
                         )}
                       />
                     </Field>
-                    <Field
-                      label="Overage %"
-                      note="extra made on purpose"
-                      htmlFor="nb-overage"
-                      error={errors.overagePct?.message}
-                    >
-                      <input
-                        id="nb-overage"
-                        type="number"
-                        step="any"
-                        min={0}
-                        max={100}
-                        placeholder="e.g. 4"
-                        className={cn(FIELD, MONO)}
-                        {...register("overagePct", { valueAsNumber: true })}
-                      />
-                    </Field>
+                  )}
+                </div>
+
+                {/* Read back, never re-typed — the catalogue owns these. The
+                    due date is the customer's, set in Products and only shown
+                    here, so one place holds it. A work order, where the
+                    company tracks one per batch (Admin → Company), is the one
+                    thing here that is typed; per-stage ones are asked when the
+                    plan is made. */}
+                {(picked || perBatchWo) && (
+                  <div
+                    className={cn(
+                      "grid items-end gap-3",
+                      perBatchWo && "@3xl:grid-cols-4",
+                    )}
+                  >
+                    {picked && (
+                      <Summary
+                        className={cn(
+                          "@3xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]",
+                          perBatchWo && "@3xl:col-span-3",
+                        )}
+                      >
+                        <Stat label="Product" value={picked.name} />
+                        <Stat label="Code" value={picked.code || "—"} mono />
+                        <Stat
+                          label={
+                            isPacking
+                              ? "Containers to fill"
+                              : isManufacturing
+                                ? "Bulk target"
+                                : "Required qty"
+                          }
+                          value={
+                            picked.required_qty
+                              ? fmt(picked.required_qty)
+                              : "Not set"
+                          }
+                          mono
+                        />
+                        <Stat
+                          label="Due date"
+                          value={
+                            picked.due_date
+                              ? longDay(picked.due_date)
+                              : "None in Products"
+                          }
+                          icon={CalendarDays}
+                          title="Set on the batch in Products"
+                        />
+                      </Summary>
+                    )}
+                    {perBatchWo && (
+                      <Field
+                        label="Work order"
+                        optional
+                        htmlFor="nb-wo"
+                        error={errors.workOrder?.message}
+                        className={cn(!picked && "@3xl:col-start-4")}
+                      >
+                        <input
+                          id="nb-wo"
+                          placeholder={
+                            picked ? `Same as ${picked.batch_no}` : "e.g. 46000"
+                          }
+                          autoComplete="off"
+                          className={cn(FIELD, MONO)}
+                          {...register("workOrder")}
+                        />
+                      </Field>
+                    )}
                   </div>
-                  <OverageNote control={control} required={picked?.required_qty} />
-                </TypeSection>
-              )}
+                )}
+                {!picked && available.length === 0 && (
+                  <p className="rounded-lg border border-dashed border-line-strong bg-sunken px-3 py-2.5 text-xs text-ink-5">
+                    Every active batch is already on the board. Add more in
+                    Products.
+                  </p>
+                )}
+
+                {/* A packing run with no quantity contributes nothing to its
+                    parent's allocation, so the family bar would silently
+                    under-read. Said here, but fixed in Admin — that column is
+                    the catalogue's, and editing it in two places is how the
+                    two stop agreeing. */}
+                {picked && !picked.required_qty && (
+                  <p className="rounded-lg border border-warn-line bg-warn-tint px-3 py-2 text-[11px] text-warn-ink">
+                    Batch {picked.batch_no} has no required quantity. Set it in
+                    Products, or this batch shows no progress and counts as
+                    nothing against its bulk.
+                  </p>
+                )}
+              </section>
 
               {/* ── Single batch ───────────────────────────────────────────
-                  A single batch manufactures too — it just packs under the
-                  same number — so it has the same reason to make a few percent
-                  extra, and the same need for the over-production flag to know
-                  that. It carries a pack size and unit for the same reason a
-                  finished lot does: it ends in containers, and nothing else
-                  says how many units go in one.
-
-                  So the block carries both halves under one heading — the
-                  bulk's (unit, overage) and the lot's (pack size, pack unit,
-                  market). Everything but a parent and the bulk received: a
-                  batch that makes its own bulk draws on nobody's, and the 0031
-                  family guard refuses a parent on anything but a finished lot. */}
+                  Both halves in one row — the bulk's unit and the lot's pack
+                  size, pack unit and market. Everything but a parent and the
+                  bulk received: a batch that makes its own bulk draws on
+                  nobody's, and the 0031 family guard refuses a parent on
+                  anything but a finished lot. */}
               {type === "combined" && (
                 <TypeSection
                   icon={RefreshCw}
                   title="Single batch details"
                   tone="border-teal-line bg-teal-soft"
+                  info={
+                    <>
+                      Made and packed under one number. The ordered quantity is
+                      read from the catalogue, never typed here
+                      {picked?.required_qty ? (
+                        <>
+                          {" "}
+                          (
+                          <strong className="font-semibold text-ink-2">
+                            {fmt(picked.required_qty)}
+                          </strong>
+                          ) — change it in Products.
+                        </>
+                      ) : picked ? (
+                        <>
+                          {" "}
+                          — and this batch has none yet. Set one in Products, or
+                          the stage plan has nothing to be measured against.
+                        </>
+                      ) : (
+                        "."
+                      )}
+                    </>
+                  }
                 >
-                  {/* The ordered quantity is read, not typed. It lives on the
-                      catalogue row as `required_qty`, and a second copy on the
-                      job would give the overrun check (0023) and the plan's
-                      own total different numbers to be right about. Shown here
-                      so the panel still answers "how many", with the one place
-                      it can be changed named. */}
-                  <p className="mb-2.5 text-[11px] leading-snug text-ink-4">
-                    Made and packed under one number.
-                    {picked?.required_qty ? (
-                      <>
-                        {" "}
-                        Ordered:{" "}
-                        <strong className="font-semibold text-ink-2">
-                          {fmt(picked.required_qty)}
-                        </strong>
-                        , from the catalogue — change it in Admin &amp; Settings
-                        → Products.
-                      </>
-                    ) : picked ? (
-                      <>
-                        {" "}
-                        This batch has no ordered quantity yet — set one in
-                        Products, or the stage plan has
-                        nothing to be measured against.
-                      </>
-                    ) : null}
-                  </p>
-
-                  <SubHead icon={Beaker}>Bulk production</SubHead>
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="grid gap-3 @3xl:grid-cols-4">
                     <Field
                       label="Bulk unit"
                       optional
@@ -1039,6 +873,7 @@ export function NewBatchDialog({
                         control={control}
                         render={({ field }) => (
                           <SelectField
+                            className={CONTROL}
                             id="nb-bulk-unit-combined"
                             value={field.value ?? ""}
                             onChange={(v) => {
@@ -1052,31 +887,6 @@ export function NewBatchDialog({
                         )}
                       />
                     </Field>
-                    <Field
-                      label="Overage %"
-                      note="extra made on purpose"
-                      optional
-                      htmlFor="nb-overage-combined"
-                      error={errors.overagePct?.message}
-                    >
-                      <input
-                        id="nb-overage-combined"
-                        type="number"
-                        step="any"
-                        min={0}
-                        max={100}
-                        placeholder="e.g. 4"
-                        className={cn(FIELD, MONO)}
-                        {...register("overagePct", { valueAsNumber: true })}
-                      />
-                    </Field>
-                  </div>
-                  <OverageNote control={control} required={picked?.required_qty} />
-
-                  <SubHead icon={Package} className="mt-4">
-                    Finished lot
-                  </SubHead>
-                  <div className="grid gap-3 sm:grid-cols-3">
                     <Field
                       label="Pack size"
                       note="units per container"
@@ -1106,6 +916,7 @@ export function NewBatchDialog({
                         control={control}
                         render={({ field }) => (
                           <SelectField
+                            className={CONTROL}
                             id="nb-pack-unit-combined"
                             value={field.value ?? ""}
                             onChange={(v) => {
@@ -1139,28 +950,39 @@ export function NewBatchDialog({
                 </TypeSection>
               )}
 
-              {/* ── Packing ────────────────────────────────────────────── */}
+              {/* ── Packing ──────────────────────────────────────────────── */}
               {isPacking && (
                 <TypeSection
                   icon={Package}
                   title="Finished lot details"
                   tone="border-brand-line bg-brand-tint"
+                  info={
+                    <>
+                      A finished lot fills containers from a manufacturing
+                      batch&rsquo;s bulk. Pack size — the units of bulk per
+                      container — is the only thing that converts one into the
+                      other.
+                    </>
+                  }
                 >
                   {/* The family link is made from the *child's* side, and
                       only here — a manufacturing batch has no children to
                       point at when it is created. The other way in is
                       "Add packing batch" on a family, which opens this dialog
                       with the parent already chosen. */}
-                  <Field
-                    label="Bulk from"
-                    htmlFor="nb-parent"
-                    error={errors.parentJobId?.message}
-                  >
+                  <div className="grid gap-3 @3xl:grid-cols-4">
+                    <Field
+                      label="Bulk from"
+                      htmlFor="nb-parent"
+                      error={errors.parentJobId?.message}
+                      className="@3xl:col-span-2"
+                    >
                     <Controller
                       name="parentJobId"
                       control={control}
                       render={({ field }) => (
                         <SelectField
+                          className={CONTROL}
                           id="nb-parent"
                           value={field.value ?? ""}
                           onChange={(v) => {
@@ -1183,17 +1005,7 @@ export function NewBatchDialog({
                         />
                       )}
                     />
-                  </Field>
-                  {/* An empty list looks like a broken control otherwise: the
-                      only option is "external bulk" and nothing says why. */}
-                  {bulkSources.length === 0 && (
-                    <p className="mt-1.5 text-[11px] text-ink-5">
-                      No manufacturing batches on the board yet — add one first
-                      to link this run to its bulk.
-                    </p>
-                  )}
-
-                  <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                    </Field>
                     <Field
                       label="Pack size"
                       note="units per container"
@@ -1221,6 +1033,7 @@ export function NewBatchDialog({
                         control={control}
                         render={({ field }) => (
                           <SelectField
+                            className={CONTROL}
                             id="nb-pack-unit"
                             value={field.value ?? ""}
                             onChange={(v) => {
@@ -1237,6 +1050,17 @@ export function NewBatchDialog({
                         )}
                       />
                     </Field>
+                  </div>
+                  {/* An empty list looks like a broken control otherwise: the
+                      only option is "external bulk" and nothing says why. */}
+                  {bulkSources.length === 0 && (
+                    <p className="mt-1.5 text-[11px] text-ink-5">
+                      No manufacturing batches on the board yet — add one first
+                      to link this run to its bulk.
+                    </p>
+                  )}
+
+                  <div className="mt-3 grid gap-3 @3xl:grid-cols-4">
                     <Field
                       label="Market"
                       optional
@@ -1250,62 +1074,47 @@ export function NewBatchDialog({
                         {...register("market")}
                       />
                     </Field>
+                    <Field
+                      label="Bulk qty received"
+                      note="if different"
+                      optional
+                      htmlFor="nb-bulk-received"
+                      error={errors.bulkQtyReceived?.message}
+                    >
+                      <input
+                        id="nb-bulk-received"
+                        type="number"
+                        step="any"
+                        min={0}
+                        placeholder={needed ? String(needed) : "e.g. 60000"}
+                        className={cn(FIELD, MONO)}
+                        {...register("bulkQtyReceived", { valueAsNumber: true })}
+                      />
+                    </Field>
+                    {/* The arithmetic said out loud while it is being typed —
+                        the same number the family allocation bar will show, so
+                        the two can never look like different calculations. */}
+                    {needed !== null && (
+                      <p className="flex items-center self-end rounded-xl bg-surface px-3 text-xs text-ink-3 @3xl:col-span-2 @3xl:h-10">
+                        <span className="truncate">
+                          Bulk needed:{" "}
+                          <strong className="font-mono font-semibold text-brand">
+                            {fmt(needed)}
+                          </strong>
+                          {parent ? (
+                            <>
+                              {" "}
+                              of {parent.batch_no}&rsquo;s{" "}
+                              {fmt(parent.required_qty)}{" "}
+                              {parent.bulk_unit ?? "units"}
+                            </>
+                          ) : null}
+                        </span>
+                      </p>
+                    )}
                   </div>
-
-                  <Field
-                    label="Bulk qty received"
-                    note="if it differs from what pack size implies"
-                    optional
-                    htmlFor="nb-bulk-received"
-                    error={errors.bulkQtyReceived?.message}
-                    className="mt-3"
-                  >
-                    <input
-                      id="nb-bulk-received"
-                      type="number"
-                      step="any"
-                      min={0}
-                      placeholder={needed ? String(needed) : "e.g. 60000"}
-                      className={cn(FIELD, MONO)}
-                      {...register("bulkQtyReceived", { valueAsNumber: true })}
-                    />
-                  </Field>
-
-                  {/* The arithmetic said out loud while it is being typed —
-                      the same number the family allocation bar will show, so
-                      the two can never look like different calculations. */}
-                  {needed !== null && (
-                    <p className="mt-3 rounded-xl bg-surface px-3 py-2 text-xs text-ink-3">
-                      Bulk needed:{" "}
-                      <strong className="font-mono font-semibold text-brand">
-                        {fmt(needed)}
-                      </strong>
-                      {parent ? (
-                        <>
-                          {" "}
-                          of {parent.batch_no}&rsquo;s{" "}
-                          {fmt(parent.required_qty)}{" "}
-                          {parent.bulk_unit ?? "units"}
-                        </>
-                      ) : null}
-                    </p>
-                  )}
                 </TypeSection>
               )}
-
-              <Field
-                label="Notes"
-                optional
-                htmlFor="nb-notes"
-                error={errors.notes?.message}
-              >
-                <input
-                  id="nb-notes"
-                  placeholder="Materials ready, setup scheduled…"
-                  className={FIELD}
-                  {...register("notes")}
-                />
-              </Field>
 
               {/* ── The plan ─────────────────────────────────────────────
                   Written here, with the batch, so a batch whose route is
@@ -1334,7 +1143,7 @@ export function NewBatchDialog({
                 <label
                   title={picked ? undefined : "Pick the bulk batch first"}
                   className={cn(
-                    "flex items-start gap-2.5 rounded-2xl border px-3.5 py-3 transition select-none",
+                    "flex items-start gap-2.5 rounded-xl border px-3 py-2.5 transition select-none",
                     !picked
                       ? "cursor-not-allowed border-dashed border-line-strong text-ink-6"
                       : withLot
@@ -1350,7 +1159,7 @@ export function NewBatchDialog({
                     className="mt-0.5 size-4 shrink-0 accent-[var(--color-brand)]"
                   />
                   <span>
-                    <span className="flex items-center gap-1.5 text-[13px] font-semibold">
+                    <span className="flex items-center gap-1.5 text-[12.5px] font-semibold">
                       <Package className="size-3.5" aria-hidden />
                       Also add a finished lot from this bulk
                     </span>
@@ -1369,68 +1178,39 @@ export function NewBatchDialog({
                   title={`Finished lot from ${picked?.batch_no ?? "this bulk"}`}
                   tone="border-brand-line bg-brand-tint"
                 >
-                  <Field
-                    label="Lot batch"
-                    htmlFor="nb-lot-product"
-                    error={lotErrors.productId?.message}
-                  >
-                    <Controller
-                      name="productId"
-                      control={lotForm.control}
-                      render={({ field }) => (
-                        <SelectField
-                          id="nb-lot-product"
-                          value={field.value ?? ""}
-                          onChange={field.onChange}
-                          onBlur={field.onBlur}
-                          ariaInvalid={Boolean(lotErrors.productId)}
-                          placeholder="Select the lot's batch…"
-                          searchPlaceholder="Batch number, code or product…"
-                          emptyMessage="No batch matches that."
-                          options={available
-                            .filter((p) => p.id !== productId)
-                            .map((product) => ({
-                              value: product.id,
-                              label: `${product.batch_no} — ${product.name}`,
-                              meta:
-                                product.code || product.work_order || undefined,
-                            }))}
-                        />
-                      )}
-                    />
-                  </Field>
-
-                  {lotPicked && (
-                    <dl className="mt-2.5 grid gap-1.5 rounded-xl bg-surface p-3 text-xs">
-                      <Row label="Product" value={lotPicked.name} />
-                      <Row
-                        label="Containers to fill"
-                        value={
-                          lotPicked.required_qty
-                            ? fmt(lotPicked.required_qty)
-                            : "Not set"
-                        }
-                        mono
+                  <div className="grid gap-3 @3xl:grid-cols-4">
+                    <Field
+                      label="Lot batch"
+                      htmlFor="nb-lot-product"
+                      error={lotErrors.productId?.message}
+                      className="@3xl:col-span-2"
+                    >
+                      <Controller
+                        name="productId"
+                        control={lotForm.control}
+                        render={({ field }) => (
+                          <SelectField
+                            className={CONTROL}
+                            id="nb-lot-product"
+                            value={field.value ?? ""}
+                            onChange={field.onChange}
+                            onBlur={field.onBlur}
+                            ariaInvalid={Boolean(lotErrors.productId)}
+                            placeholder="Select the lot's batch…"
+                            searchPlaceholder="Batch number, code or product…"
+                            emptyMessage="No batch matches that."
+                            options={available
+                              .filter((p) => p.id !== productId)
+                              .map((product) => ({
+                                value: product.id,
+                                label: `${product.batch_no} — ${product.name}`,
+                                meta:
+                                  product.code || product.work_order || undefined,
+                              }))}
+                          />
+                        )}
                       />
-                      <Row
-                        label="Due date"
-                        value={
-                          lotPicked.due_date
-                            ? longDay(lotPicked.due_date)
-                            : "No due date in Products"
-                        }
-                      />
-                    </dl>
-                  )}
-                  {lotPicked && !lotPicked.required_qty && (
-                    <p className="mt-2 rounded-xl border border-warn-line bg-warn-tint px-3 py-2 text-[11px] text-warn-ink">
-                      Batch {lotPicked.batch_no} has no required quantity. Set
-                      it in Products, or this lot counts as nothing against its
-                      bulk.
-                    </p>
-                  )}
-
-                  <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                    </Field>
                     <Field
                       label="Pack size"
                       note="units per container"
@@ -1458,6 +1238,7 @@ export function NewBatchDialog({
                         control={lotForm.control}
                         render={({ field }) => (
                           <SelectField
+                            className={CONTROL}
                             id="nb-lot-pack-unit"
                             value={field.value ?? ""}
                             onChange={(v) => {
@@ -1475,6 +1256,41 @@ export function NewBatchDialog({
                         )}
                       />
                     </Field>
+                  </div>
+
+                  {lotPicked && (
+                    <Summary className="mt-3 border-transparent bg-surface @3xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
+                      <Stat label="Product" value={lotPicked.name} />
+                      <Stat
+                        label="Containers to fill"
+                        value={
+                          lotPicked.required_qty
+                            ? fmt(lotPicked.required_qty)
+                            : "Not set"
+                        }
+                        mono
+                      />
+                      <Stat
+                        label="Due date"
+                        value={
+                          lotPicked.due_date
+                            ? longDay(lotPicked.due_date)
+                            : "None in Products"
+                        }
+                        icon={CalendarDays}
+                        title="Set on the batch in Products"
+                      />
+                    </Summary>
+                  )}
+                  {lotPicked && !lotPicked.required_qty && (
+                    <p className="mt-2 rounded-xl border border-warn-line bg-warn-tint px-3 py-2 text-[11px] text-warn-ink">
+                      Batch {lotPicked.batch_no} has no required quantity. Set
+                      it in Products, or this lot counts as nothing against its
+                      bulk.
+                    </p>
+                  )}
+
+                  <div className="mt-3 grid gap-3 @3xl:grid-cols-4">
                     <Field
                       label="Market"
                       optional
@@ -1488,28 +1304,50 @@ export function NewBatchDialog({
                         {...lotForm.register("market")}
                       />
                     </Field>
+                    <Field
+                      label="Bulk qty received"
+                      note="if different"
+                      optional
+                      htmlFor="nb-lot-bulk-received"
+                      error={lotErrors.bulkQtyReceived?.message}
+                    >
+                      <input
+                        id="nb-lot-bulk-received"
+                        type="number"
+                        step="any"
+                        min={0}
+                        placeholder={lotNeeded ? String(lotNeeded) : "e.g. 60000"}
+                        className={cn(FIELD, MONO)}
+                        {...lotForm.register("bulkQtyReceived", {
+                          valueAsNumber: true,
+                        })}
+                      />
+                    </Field>
+                    {/* Only where the company tracks one work order per batch
+                        (Admin → Company) — the lot has a work order of its own,
+                        just as the bulk above does. */}
+                    {perBatchWo && (
+                      <Field
+                        label="Work order"
+                        note="saved on the lot's batch"
+                        optional
+                        htmlFor="nb-lot-wo"
+                        error={lotErrors.workOrder?.message}
+                      >
+                        <input
+                          id="nb-lot-wo"
+                          placeholder={
+                            lotPicked
+                              ? `Same as ${lotPicked.batch_no}`
+                              : "e.g. 46001"
+                          }
+                          autoComplete="off"
+                          className={cn(FIELD, MONO)}
+                          {...lotForm.register("workOrder")}
+                        />
+                      </Field>
+                    )}
                   </div>
-
-                  <Field
-                    label="Bulk qty received"
-                    note="if it differs from what pack size implies"
-                    optional
-                    htmlFor="nb-lot-bulk-received"
-                    error={lotErrors.bulkQtyReceived?.message}
-                    className="mt-3"
-                  >
-                    <input
-                      id="nb-lot-bulk-received"
-                      type="number"
-                      step="any"
-                      min={0}
-                      placeholder={lotNeeded ? String(lotNeeded) : "e.g. 60000"}
-                      className={cn(FIELD, MONO)}
-                      {...lotForm.register("bulkQtyReceived", {
-                        valueAsNumber: true,
-                      })}
-                    />
-                  </Field>
 
                   {/* The arithmetic said out loud against the bulk beside it —
                       advisory, as in Batch families: over is badged, never
@@ -1539,35 +1377,9 @@ export function NewBatchDialog({
                     </p>
                   )}
 
-                  {/* Only where the company tracks one work order per batch
-                      (Admin → Company) — the lot has a work order of its own,
-                      just as the bulk above does. */}
-                  {perBatchWo && (
-                    <Field
-                      label="Work order"
-                      note="saved on the lot's batch"
-                      optional
-                      htmlFor="nb-lot-wo"
-                      error={lotErrors.workOrder?.message}
-                      className="mt-3"
-                    >
-                      <input
-                        id="nb-lot-wo"
-                        placeholder={
-                          lotPicked
-                            ? `Same as batch — ${lotPicked.batch_no}`
-                            : "e.g. 46001"
-                        }
-                        autoComplete="off"
-                        className={cn(FIELD, MONO, "sm:max-w-[16rem]")}
-                        {...lotForm.register("workOrder")}
-                      />
-                    </Field>
-                  )}
-
                   <p className="mt-3 text-[11px] text-ink-5">
-                    Takes the bulk&rsquo;s priority and stage tolerance; its
-                    due date is its own, from Products.
+                    Takes the bulk&rsquo;s priority; its due date is its own,
+                    from Products.
                   </p>
 
                   {/* The lot's own route — filling, labelling, packing — on
@@ -1586,9 +1398,24 @@ export function NewBatchDialog({
                   </div>
                 </TypeSection>
               )}
+
+              {/* Last — the one field nobody has to fill in. */}
+              <Field
+                label="Notes"
+                optional
+                htmlFor="nb-notes"
+                error={errors.notes?.message}
+              >
+                <input
+                  id="nb-notes"
+                  placeholder="Materials ready, setup scheduled…"
+                  className={FIELD}
+                  {...register("notes")}
+                />
+              </Field>
             </div>
 
-            <div className="flex shrink-0 justify-end gap-2 border-t border-line bg-surface px-5 py-3.5">
+            <div className="flex shrink-0 justify-end gap-2 border-t border-line bg-surface px-5 py-3">
               <button
                 type="button"
                 onClick={() => setOpen(false)}
@@ -1648,45 +1475,26 @@ function emptyLot(): PairedLotValues {
 }
 
 /** The tinted block a batch type's own fields live in. */
-/** One half of the Single batch block — which batch's fields sit below it. */
-function SubHead({
-  icon: Icon,
-  className,
-  children,
-}: {
-  icon: typeof Package;
-  className?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <p
-      className={cn(
-        "mb-2 flex items-center gap-1.5 text-[10.5px] font-semibold tracking-[0.04em] text-ink-4 uppercase",
-        className,
-      )}
-    >
-      <Icon className="size-3.5" aria-hidden />
-      {children}
-    </p>
-  );
-}
-
 function TypeSection({
   icon: Icon,
   title,
   tone,
+  info,
   children,
 }: {
   icon: typeof Package;
   title: string;
   tone: string;
+  /** What the section is for — folded behind an (i) rather than printed. */
+  info?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <section className={cn("rounded-2xl border p-3.5", tone)}>
-      <p className="mb-2.5 flex items-center gap-1.5 text-[11px] font-bold tracking-[0.04em] text-ink-2 uppercase">
+    <section className={cn("rounded-xl border p-3.5", tone)}>
+      <p className="mb-2.5 flex items-center gap-1.5 text-[10.5px] font-bold tracking-[0.04em] text-ink-2 uppercase">
         <Icon className="size-3.5" aria-hidden />
         {title}
+        {info && <InfoTip label={`About ${title.toLowerCase()}`}>{info}</InfoTip>}
       </p>
       {children}
     </section>
@@ -1697,6 +1505,7 @@ function Field({
   label,
   note,
   optional,
+  info,
   htmlFor,
   error,
   className,
@@ -1705,6 +1514,8 @@ function Field({
   label: string;
   note?: string;
   optional?: boolean;
+  /** Folded behind an (i) beside the label. */
+  info?: React.ReactNode;
   htmlFor?: string;
   error?: string;
   className?: string;
@@ -1716,7 +1527,8 @@ function Field({
        across — does not push its input a line lower than its neighbours'.
        Aligning on the label instead would only work while every label in the
        row happened to be the same length. */
-    <div className={cn("flex h-full flex-col gap-1.5", className)}>
+    <div className={cn("flex h-full flex-col gap-1", className)}>
+      <div className="flex items-center gap-1">
       <label htmlFor={htmlFor} className={LABEL}>
         {label}
         {optional && (
@@ -1730,6 +1542,12 @@ function Field({
           </span>
         )}
       </label>
+      {info && (
+        <InfoTip label={`About ${label.toLowerCase()}`} className="size-4">
+          {info}
+        </InfoTip>
+      )}
+      </div>
       <div className="mt-auto">{children}</div>
       {error && (
         <p role="alert" className="text-[11px] text-danger-deep">
@@ -1740,116 +1558,55 @@ function Field({
   );
 }
 
-/** One line of the read-back panel: what the catalogue says about the batch. */
-function Row({
+/** The read-back strip: what the catalogue already says about a batch. */
+function Summary({
+  className,
+  children,
+}: {
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <dl
+      className={cn(
+        "grid grid-cols-2 gap-x-4 gap-y-3 rounded-lg border border-brand-soft bg-brand-tint px-3.5 py-2.5",
+        className,
+      )}
+    >
+      {children}
+    </dl>
+  );
+}
+
+/** One figure of a `Summary`: a small label over its value. */
+function Stat({
   label,
   value,
   mono,
+  icon: Icon,
+  title,
 }: {
   label: string;
   value: string;
   mono?: boolean;
+  icon?: typeof Package;
+  title?: string;
 }) {
   return (
-    <div className="flex items-baseline justify-between gap-3">
-      <dt className="text-ink-4">{label}</dt>
+    <div className="min-w-0">
+      <dt className="text-[10px] font-semibold tracking-[0.04em] text-ink-5 uppercase">
+        {label}
+      </dt>
       <dd
+        title={title ?? value}
         className={cn(
-          "truncate font-medium text-ink",
+          "mt-0.5 flex items-center gap-1.5 text-[12.5px] font-medium text-ink",
           mono && "font-mono text-[12px]",
         )}
       >
-        {value}
+        {Icon && <Icon className="size-3.5 shrink-0 text-ink-5" aria-hidden />}
+        <span className="truncate">{value}</span>
       </dd>
     </div>
-  );
-}
-
-/**
- * What declaring an overage actually buys, with this batch's own numbers in
- * it.
- *
- * Worth the space because the field is otherwise indistinguishable from a
- * note-to-self. Since migration 0032 it moves the threshold the shift log's
- * over-production flag measures against, and that is a rule about other
- * people's screens — the operator who gets flagged is not the planner who
- * typed the 4.
- */
-/**
- * What the tolerance will actually do, in the batch's own terms.
- *
- * Spelt out because this dialog carries two percentages and they are one word
- * apart: overage is extra deliberately *made* against the work order and
- * raises a flag a manager clears; tolerance is how far past a single stage's
- * plan an entry may be *recorded*, and it refuses the entry outright. Someone
- * setting one while meaning the other gets a plant that either blocks nothing
- * or blocks everything.
- */
-function ToleranceNote({
-  control,
-}: {
-  control: Control<NewBatchValues, unknown, NewBatchParsed>;
-}) {
-  const pct = useWatch({ control, name: "tolerancePct" });
-  const value = typeof pct === "number" && !Number.isNaN(pct) ? pct : 0;
-
-  if (!value) {
-    return (
-      <p className="mt-2.5 text-[11px] leading-snug text-ink-4">
-        Left blank, every stage is held to its target exactly — an entry taking
-        a 20&nbsp;kg mixing stage past 20&nbsp;kg is refused. Set a few percent
-        if your rooms weigh and count with any slack.
-      </p>
-    );
-  }
-
-  return (
-    <p className="mt-2.5 text-[11px] leading-snug text-ink-4">
-      Each planned stage will accept up to{" "}
-      <strong className="font-semibold text-ink-2">its target +{value}%</strong>{" "}
-      — a stage planned for 20&nbsp;kg takes{" "}
-      <strong className="font-mono font-semibold text-ink-2">
-        {fmt(Math.round(20 * (1 + value / 100) * 100) / 100)}&nbsp;kg
-      </strong>
-      . An entry that would push it past that is refused, and the stage&rsquo;s
-      progress bar in the shift log turns red. A manager can raise the stage
-      target on the plan, or this tolerance on the batch — it is set once here
-      and every stage of the plan inherits it.
-    </p>
-  );
-}
-
-function OverageNote({
-  control,
-  required,
-}: {
-  control: Control<NewBatchValues, unknown, NewBatchParsed>;
-  required?: number | null;
-}) {
-  const pct = useWatch({ control, name: "overagePct" });
-  const value = typeof pct === "number" && !Number.isNaN(pct) ? pct : 0;
-
-  if (!value) {
-    return (
-      <p className="mt-2.5 text-[11px] leading-snug text-ink-4">
-        Leave blank if this batch must make exactly what was ordered. Any extra
-        is then flagged in the shift log for a manager to explain.
-      </p>
-    );
-  }
-
-  return (
-    <p className="mt-2.5 text-[11px] leading-snug text-ink-4">
-      The shift log won&rsquo;t flag over-production until this batch passes{" "}
-      {required ? (
-        <strong className="font-mono font-semibold text-ink-2">
-          {fmt(Math.floor(required * (1 + value / 100)))}
-        </strong>
-      ) : (
-        <>its required quantity +{value}%</>
-      )}
-      {required ? ` (${fmt(required)} +${value}%)` : ""} — so making the extra
-      on purpose doesn&rsquo;t raise a flag someone has to clear.
-    </p>
   );
 }

@@ -10,20 +10,33 @@ import {
   CheckCircle2,
   Circle,
   Cog,
+  Flag,
   Loader2,
   Play,
   Plus,
   Rocket,
-  Trash2,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
   STAGE_UNITS,
+  stageEditSchema,
   stageSchema,
   type StageParsed,
+  type StageUnit,
   type StageValues,
 } from "@/app/factory/[slug]/pipeline/schemas";
+import {
+  CONTROL,
+  Cell,
+  ColumnHeads,
+  HEAD,
+  INPUT,
+  ROW_COLS,
+  ROW_COLS_WO,
+  RoutePills,
+} from "@/components/factory/pipeline/stage-table-parts";
 import { StageSignOffDialog } from "@/components/factory/pipeline/stage-signoff-dialog";
 import {
   Dialog,
@@ -56,13 +69,49 @@ import { pipelineKeys, type PipelineJob } from "@/lib/factory/pipeline-queries";
 import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
 import { cn } from "@/lib/utils";
 
-const FIELD =
-  "h-9 w-full rounded-lg border border-line bg-surface px-2.5 text-sm text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)] outline-none transition placeholder:text-placeholder hover:border-line-strong focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12";
 const MONO = "font-mono tracking-tight";
-const LABEL = "text-[0.625rem] font-semibold tracking-[0.03em] text-ink-5 uppercase";
 
 function fmt(n: number | null | undefined) {
   return Number(n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+/** What a row holds while it is being edited — strings, as the fields are. */
+interface RowDraft {
+  unitId: string;
+  plannedDate: string;
+  estFinishDate: string;
+  targetQty: string;
+  targetUnit: StageUnit;
+  workOrder: string;
+  label: string;
+  canRunParallel: boolean;
+}
+
+function asUnit(unit: string | null | undefined): StageUnit {
+  return (STAGE_UNITS as readonly string[]).includes(unit ?? "")
+    ? (unit as StageUnit)
+    : "units";
+}
+
+/** A stage as the row's fields hold it — what "unchanged" is measured against. */
+function draftOf(stage: BatchStage): RowDraft {
+  return {
+    unitId: stage.unit_id ?? "",
+    plannedDate: stage.planned_date ?? "",
+    estFinishDate: stage.est_finish_date ?? "",
+    targetQty: stage.target_qty ? String(stage.target_qty) : "",
+    targetUnit: asUnit(stage.target_unit),
+    workOrder: stage.work_order ?? "",
+    label: stage.label ?? "",
+    canRunParallel: stage.can_run_parallel,
+  };
+}
+
+function changedKeys(draft: RowDraft, stage: BatchStage): (keyof RowDraft)[] {
+  const base = draftOf(stage);
+  return (Object.keys(draft) as (keyof RowDraft)[]).filter(
+    (key) => draft[key] !== base[key],
+  );
 }
 
 /**
@@ -73,8 +122,16 @@ function fmt(n: number | null | undefined) {
  * then **issued**, and only then does the shift log accept producing entries
  * against it (migration 0033). Downtime is never planned and never blocked.
  *
+ * Drawn the way New batch draws a plan — the route as pills, then one editable
+ * line per stage under a single header row — so the two read as one screen
+ * rather than a form and its after-the-fact cousin. The difference is that
+ * these rows are saved ones: a row is edited in place and kept with **Save**
+ * (dates and room are often changed together, and the finish must not be
+ * checked against a start that is half-edited), and the batch cannot be issued
+ * while a row holds unsaved changes, since issuing reads what is stored.
+ *
  * Two things on screen are derived and never typed. The **last stage carries
- * "Completes the order"** — reorder the plan and the badge moves — and each
+ * the flag, "Completes the order"** — reorder the plan and it moves — and each
  * stage's accumulated total comes from the shift log, so progress is a fact
  * about logged work rather than a second number to keep up to date.
  */
@@ -95,8 +152,11 @@ export function PlanStagesDialog({
 }) {
   const queryClient = useQueryClient();
   const [signOff, setSignOff] = useState<BatchStage | null>(null);
-  const [editing, setEditing] = useState<string | null>(null);
-  const [editQty, setEditQty] = useState("");
+  /** Rows with edits not yet saved, by stage id. */
+  const [drafts, setDrafts] = useState<Record<string, RowDraft>>({});
+  /** What saving a row said was wrong with it, by stage id. */
+  const [rowErrors, setRowErrors] = useState<Record<string, string[]>>({});
+  const [adding, setAdding] = useState(false);
 
   const { data: stages = [], isPending } = useQuery({
     queryKey: batchStageKeys.job(factoryId, job?.id ?? ""),
@@ -149,30 +209,22 @@ export function PlanStagesDialog({
   const patch = useMutation({
     mutationFn: ({
       id,
-      target,
-      unitId,
-      parallel,
-      plannedDate,
+      values,
     }: {
       id: string;
-      target: number;
-      unitId: string | null;
-      parallel: boolean;
-      plannedDate: string | null;
-    }) =>
-      updateBatchStage(id, {
-        target_qty: target,
-        unit_id: unitId,
-        can_run_parallel: parallel,
-        planned_date: plannedDate,
-        // `tolerance_pct` is deliberately not written here. The tolerance is
-        // decided once, on the batch, and every stage inherits it — a plan
-        // whose stages each carry their own ceiling is a plan nobody can read
-        // off the card. The column stays (null = inherit) for a plant that
-        // pins one stage by hand in SQL; the app never sets it.
-      }),
-    onSuccess: async () => {
-      setEditing(null);
+      values: Parameters<typeof updateBatchStage>[1];
+    }) => updateBatchStage(id, values),
+    onSuccess: async (_d, { id }) => {
+      setDrafts((current) => {
+        const next = { ...current };
+        delete next[id];
+        return next;
+      });
+      setRowErrors((current) => {
+        const next = { ...current };
+        delete next[id];
+        return next;
+      });
       await refresh();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -189,26 +241,6 @@ export function PlanStagesDialog({
     () => plannedOverOrder(stages, job?.required_qty, job?.overage_pct),
     [stages, job?.required_qty, job?.overage_pct],
   );
-
-  /** The room being picked in the inline edit row, alongside the target. */
-  const [editRoom, setEditRoom] = useState<string>("");
-  /**
-   * Whether the stage being edited may overlap the one before it.
-   *
-   * Editable after the fact, not only when the stage is added: a plan is
-   * rewritten as a batch is scheduled, and the one route out of a wrong answer
-   * used to be deleting the stage and re-adding it — impossible once anything
-   * has been logged against it (`batch_stages_guard_delete`).
-   */
-  const [editParallel, setEditParallel] = useState(false);
-  /**
-   * The day the stage being edited is planned to run.
-   *
-   * Held beside the target rather than behind a separate control, because a
-   * date is the half of scheduling that moves most: a machine frees up, a
-   * stage slips, and the plan is re-dated far more often than it is re-targeted.
-   */
-  const [editDate, setEditDate] = useState("");
 
   const move = useMutation({
     mutationFn: ({ a, b }: { a: BatchStage; b: BatchStage }) =>
@@ -245,27 +277,135 @@ export function PlanStagesDialog({
       // Issuing is the last thing anyone does on this dialog: the plan is
       // fixed, the batch is on the floor, and leaving the form open invites
       // an edit that the issued gate will only refuse.
-      setEditing(null);
-      onClose();
+      close();
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
+  function close() {
+    setDrafts({});
+    setRowErrors({});
+    setAdding(false);
+    onClose();
+  }
+
+  /** The row as it is on screen: its unsaved edits, else what is stored. */
+  const valueOf = (stage: BatchStage) => drafts[stage.id] ?? draftOf(stage);
+  const dirty = stages.filter((s) => {
+    const draft = drafts[s.id];
+    return draft ? changedKeys(draft, s).length > 0 : false;
+  });
+
+  function edit<K extends keyof RowDraft>(
+    stage: BatchStage,
+    key: K,
+    value: RowDraft[K],
+  ) {
+    setDrafts((current) => ({
+      ...current,
+      [stage.id]: { ...(current[stage.id] ?? draftOf(stage)), [key]: value },
+    }));
+    setRowErrors((current) => {
+      if (!current[stage.id]) return current;
+      const next = { ...current };
+      delete next[stage.id];
+      return next;
+    });
+  }
+
+  function discard(stage: BatchStage) {
+    setDrafts((current) => {
+      const next = { ...current };
+      delete next[stage.id];
+      return next;
+    });
+    setRowErrors((current) => {
+      const next = { ...current };
+      delete next[stage.id];
+      return next;
+    });
+  }
+
+  /**
+   * Checks one row against the same rules as the schedule's stage edit, then
+   * writes only what changed — so saving a room never touches a label, whose
+   * uniqueness is the database's to enforce.
+   */
+  async function save(stage: BatchStage) {
+    const draft = drafts[stage.id];
+    if (!draft) return;
+    const keys = changedKeys(draft, stage);
+    if (keys.length === 0) return;
+
+    const base = draftOf(stage);
+    const target = draft.targetQty.trim() === "" ? undefined : Number(draft.targetQty);
+    const problems: string[] = [];
+    // A planned target is not cleared by emptying the field — that would read
+    // as "no target" and quietly un-plan the stage.
+    if (base.targetQty !== "" && draft.targetQty.trim() === "") {
+      problems.push("Enter a target above zero.");
+    }
+    const parsed = stageEditSchema.safeParse({
+      unitId: draft.unitId,
+      plannedDate: draft.plannedDate,
+      estFinishDate: draft.estFinishDate,
+      canRunParallel: draft.canRunParallel,
+      targetQty: target,
+      targetUnit: draft.targetUnit,
+      label: draft.label,
+      workOrder: draft.workOrder,
+    });
+    if (!parsed.success) {
+      problems.push(...parsed.error.issues.map((i) => i.message));
+    }
+    if (problems.length > 0 || !parsed.success) {
+      setRowErrors((current) => ({ ...current, [stage.id]: problems }));
+      return;
+    }
+
+    const v = parsed.data;
+    const values: Parameters<typeof updateBatchStage>[1] = {};
+    if (keys.includes("unitId")) values.unit_id = v.unitId || null;
+    if (keys.includes("plannedDate")) values.planned_date = v.plannedDate || null;
+    if (keys.includes("estFinishDate"))
+      values.est_finish_date = v.estFinishDate || null;
+    if (keys.includes("targetQty")) values.target_qty = v.targetQty ?? null;
+    if (keys.includes("targetUnit")) values.target_unit = v.targetUnit;
+    if (keys.includes("workOrder")) values.work_order = v.workOrder?.trim() || null;
+    if (keys.includes("label")) values.label = v.label?.trim() || null;
+    if (keys.includes("canRunParallel"))
+      values.can_run_parallel = v.canRunParallel ?? false;
+    // `tolerance_pct` is deliberately never written here. The tolerance is
+    // decided once, on the batch, and every stage inherits it — a plan whose
+    // stages each carry their own ceiling is a plan nobody can read off the
+    // card. The column stays (null = inherit) for a plant that pins one stage
+    // by hand in SQL; the app never sets it.
+    await patch.mutateAsync({ id: stage.id, values }).catch(() => undefined);
+  }
+
+  async function saveAll() {
+    for (const stage of dirty) await save(stage);
+  }
+
   const missing = stagesWithoutTarget(stages);
   const issued = Boolean(job?.issued_at);
+  const saving = patch.isPending;
+  /** Which activities run twice — those rows get a label field. */
+  const repeated = new Set(
+    stages
+      .map((s) => s.process_id)
+      .filter((id, i, all) => all.indexOf(id) !== i),
+  );
 
   return (
     <>
       <Dialog
         open={job !== null}
         onOpenChange={(open) => {
-          if (!open) {
-            setEditing(null);
-            onClose();
-          }
+          if (!open) close();
         }}
       >
-        <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col gap-0 overflow-hidden p-0">
+        <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-full max-w-[min(62rem,calc(100vw-2rem))] flex-col gap-0 overflow-hidden p-0">
           <DialogHeader className="shrink-0 gap-1.5 border-b border-line bg-surface px-5 pt-5 pr-12 pb-4">
             <DialogTitle className="text-ink">
               Plan stages — {job?.batch_no}
@@ -325,107 +465,164 @@ export function PlanStagesDialog({
             </p>
           )}
 
-          <div className="scrollbar-slim min-h-0 flex-1 space-y-2.5 overflow-y-auto px-5 py-4">
+          <div className="scrollbar-slim @container min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
             {isPending ? (
               <p className="flex items-center justify-center gap-2 py-10 text-sm text-ink-5">
                 <Loader2 className="size-4 animate-spin" />
                 Loading the plan…
               </p>
-            ) : stages.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-line-strong bg-surface px-4 py-10 text-center text-sm text-ink-5">
-                No stages planned yet.
-                <br />
-                Add the first one below — Dispensing, Compression, Packing.
-              </p>
             ) : (
-              stages.map((stage, i) => (
-                <StageRow
-                  key={stage.id}
-                  stage={stage}
-                  index={i}
-                  canStart={stageIsNext(stages, i)}
-                  canManage={canManage}
-                  editing={editing === stage.id}
-                  editQty={editQty}
-                  onEditQty={setEditQty}
-                  rooms={rooms}
-                  editRoom={editRoom}
-                  onEditRoom={setEditRoom}
-                  editParallel={editParallel}
-                  onEditParallel={setEditParallel}
-                  editDate={editDate}
-                  onEditDate={setEditDate}
-                  onBeginEdit={() => {
-                    setEditing(stage.id);
-                    setEditQty(stage.target_qty ? String(stage.target_qty) : "");
-                    setEditRoom(stage.unit_id ?? "");
-                    setEditParallel(stage.can_run_parallel);
-                    setEditDate(stage.planned_date ?? "");
-                  }}
-                  onCancelEdit={() => setEditing(null)}
-                  onSaveEdit={() => {
-                    const value = Number(editQty);
-                    if (!value || value <= 0) {
-                      toast.error("Enter a target above zero.");
-                      return;
-                    }
-                    patch.mutate({
-                      id: stage.id,
-                      target: value,
-                      unitId: editRoom || null,
-                      parallel: editParallel,
-                      plannedDate: editDate || null,
-                    });
-                  }}
-                  onMoveUp={
-                    i > 0
-                      ? () => move.mutate({ a: stage, b: stages[i - 1] })
-                      : undefined
-                  }
-                  onMoveDown={
-                    i < stages.length - 1
-                      ? () => move.mutate({ a: stage, b: stages[i + 1] })
-                      : undefined
-                  }
-                  onStart={() => start.mutate(stage)}
-                  onSignOff={() => setSignOff(stage)}
-                  onRemove={() => remove.mutate(stage)}
-                />
-              ))
-            )}
+              <>
+                {stages.length > 0 && (
+                  <RoutePills
+                    steps={stages.map((stage) => ({
+                      key: stage.id,
+                      name: stage.process_name ?? "Stage",
+                      runLabel:
+                        stage.label?.trim() || stage.work_order?.trim() || undefined,
+                      error: Boolean(rowErrors[stage.id]),
+                    }))}
+                  />
+                )}
 
-            {canManage && (
-              <AddStageForm
-                processes={plannable}
-                rooms={rooms}
-                showWorkOrder={showWorkOrder}
-                onAdd={async (values) => {
-                  await add.mutateAsync(values);
-                }}
-              />
+                <div className="overflow-hidden rounded-xl border border-line bg-surface">
+                  {stages.length > 0 && (
+                    <ColumnHeads
+                      showWorkOrder={showWorkOrder}
+                      trailing="w-8"
+                    />
+                  )}
+
+                  {stages.length === 0 && !canManage && (
+                    <p className="px-4 py-10 text-center text-sm text-ink-5">
+                      No stages planned yet.
+                    </p>
+                  )}
+
+                  <ol className="divide-y divide-line-soft">
+                    {stages.map((stage, index) => (
+                      <StageRow
+                        key={stage.id}
+                        stage={stage}
+                        index={index}
+                        isLast={index === stages.length - 1}
+                        value={valueOf(stage)}
+                        isDirty={dirty.some((d) => d.id === stage.id)}
+                        problems={rowErrors[stage.id]}
+                        canStart={stageIsNext(stages, index)}
+                        canManage={canManage}
+                        showWorkOrder={showWorkOrder}
+                        needsLabel={
+                          repeated.has(stage.process_id) ||
+                          Boolean(valueOf(stage).label.trim())
+                        }
+                        rooms={rooms}
+                        busy={saving}
+                        onEdit={(key, value) => edit(stage, key, value)}
+                        onSave={() => save(stage)}
+                        onDiscard={() => discard(stage)}
+                        onMoveUp={
+                          index > 0
+                            ? () => move.mutate({ a: stage, b: stages[index - 1] })
+                            : undefined
+                        }
+                        onMoveDown={
+                          index < stages.length - 1
+                            ? () => move.mutate({ a: stage, b: stages[index + 1] })
+                            : undefined
+                        }
+                        onStart={() => start.mutate(stage)}
+                        onSignOff={() => setSignOff(stage)}
+                        onRemove={() => remove.mutate(stage)}
+                      />
+                    ))}
+                  </ol>
+
+                  {canManage &&
+                    (adding || stages.length === 0 ? (
+                      <AddStageRow
+                        processes={plannable}
+                        rooms={rooms}
+                        showWorkOrder={showWorkOrder}
+                        first={stages.length === 0}
+                        onAdd={async (values) => {
+                          await add.mutateAsync(values);
+                          setAdding(false);
+                        }}
+                        onCancel={
+                          stages.length > 0 ? () => setAdding(false) : undefined
+                        }
+                      />
+                    ) : (
+                      <div className="border-t border-line-soft bg-sunken/60 px-3 py-2">
+                        <button
+                          type="button"
+                          onClick={() => setAdding(true)}
+                          className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-ink-4 transition hover:bg-brand-tint hover:text-brand"
+                        >
+                          <Plus className="size-3.5" aria-hidden />
+                          Add stage
+                        </button>
+                      </div>
+                    ))}
+                </div>
+
+                <p className="text-[0.6875rem] text-ink-5">
+                  Label or work order only where the batch runs an activity more
+                  than once — Packing 30&rsquo;s, 60&rsquo;s, 120&rsquo;s. The
+                  last stage completes the order. Room and dates are the
+                  plan&rsquo;s intent — the shift log records where and when the
+                  work actually happened, and does not have to agree.
+                </p>
+              </>
             )}
           </div>
 
-          {canManage && !issued && (
-            <div className="flex shrink-0 items-center justify-between gap-3 border-t border-line bg-surface px-5 py-3.5">
-              <p className="text-[0.6875rem] text-ink-5">
-                Issuing releases the batch to the floor.
-              </p>
-              <button
-                type="button"
-                onClick={() => issue.mutate()}
-                disabled={
-                  issue.isPending || stages.length === 0 || missing.length > 0
-                }
-                className="inline-flex h-10 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-4 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
-              >
-                {issue.isPending ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Rocket className="size-4" />
+          {canManage && (dirty.length > 0 || !issued) && (
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-line bg-surface px-5 py-3.5">
+              <p
+                className={cn(
+                  "text-[0.6875rem]",
+                  dirty.length > 0 ? "font-medium text-warn-ink" : "text-ink-5",
                 )}
-                Issue for production
-              </button>
+              >
+                {dirty.length > 0
+                  ? `${dirty.length} stage${dirty.length === 1 ? " has" : "s have"} unsaved changes${issued ? "." : " — save before issuing."}`
+                  : "Issuing releases the batch to the floor."}
+              </p>
+              <div className="flex items-center gap-2">
+                {dirty.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={saveAll}
+                    disabled={saving}
+                    className="inline-flex h-10 items-center gap-2 rounded-xl border border-line bg-surface px-4 text-sm font-semibold text-ink-2 transition hover:border-brand hover:text-brand disabled:opacity-60"
+                  >
+                    {saving && <Loader2 className="size-4 animate-spin" />}
+                    Save {dirty.length > 1 ? `all ${dirty.length} changes` : "changes"}
+                  </button>
+                )}
+                {!issued && (
+                  <button
+                    type="button"
+                    onClick={() => issue.mutate()}
+                    disabled={
+                      issue.isPending ||
+                      stages.length === 0 ||
+                      missing.length > 0 ||
+                      dirty.length > 0
+                    }
+                    className="inline-flex h-10 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-4 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
+                  >
+                    {issue.isPending ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Rocket className="size-4" />
+                    )}
+                    Issue for production
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </DialogContent>
@@ -449,24 +646,27 @@ const STATUS_STYLE = {
   complete: { icon: CheckCircle2, tone: "text-teal", label: "Complete" },
 } as const;
 
+/**
+ * One saved stage as an editable line — the same columns as New batch, with a
+ * second line for what only a saved stage has: where it stands, its progress
+ * against the target, and the things that can be done to it (start, sign off).
+ */
 function StageRow({
   stage,
   index,
+  isLast,
+  value,
+  isDirty,
+  problems,
   canStart,
   canManage,
-  editing,
-  editQty,
-  onEditQty,
+  showWorkOrder,
+  needsLabel,
   rooms,
-  editRoom,
-  onEditRoom,
-  editParallel,
-  onEditParallel,
-  editDate,
-  onEditDate,
-  onBeginEdit,
-  onCancelEdit,
-  onSaveEdit,
+  busy,
+  onEdit,
+  onSave,
+  onDiscard,
   onMoveUp,
   onMoveDown,
   onStart,
@@ -475,21 +675,19 @@ function StageRow({
 }: {
   stage: BatchStage;
   index: number;
+  isLast: boolean;
+  value: RowDraft;
+  isDirty: boolean;
+  problems?: string[];
   canStart: boolean;
   canManage: boolean;
-  editing: boolean;
-  editQty: string;
-  onEditQty: (v: string) => void;
+  showWorkOrder: boolean;
+  needsLabel: boolean;
   rooms: { id: string; name: string }[];
-  editRoom: string;
-  onEditRoom: (v: string) => void;
-  editParallel: boolean;
-  onEditParallel: (v: boolean) => void;
-  editDate: string;
-  onEditDate: (v: string) => void;
-  onBeginEdit: () => void;
-  onCancelEdit: () => void;
-  onSaveEdit: () => void;
+  busy: boolean;
+  onEdit: <K extends keyof RowDraft>(key: K, value: RowDraft[K]) => void;
+  onSave: () => void;
+  onDiscard: () => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
   onStart: () => void;
@@ -511,243 +709,334 @@ function StageRow({
   const over = stage.is_over_tolerance;
   const done = stage.status === "complete";
   const started = Boolean(stage.started_at) || Number(stage.accumulated_qty) > 0;
+  const editable = canManage && !done;
+  const id = `ps-${stage.id}`;
 
   return (
-    <section
+    <li
       className={cn(
-        "rounded-xl border bg-surface p-3.5",
-        done ? "border-teal-line/60" : "border-line",
+        "flex gap-2.5 px-3 py-2.5",
+        problems && problems.length > 0 && "bg-danger-soft/40",
+        isDirty && !problems?.length && "bg-warn-tint/50",
+        done && "bg-teal-soft/30",
       )}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-2.5">
-          <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-md bg-sunken-2 font-mono text-[0.6875rem] font-bold text-ink-4">
-            {index + 1}
-          </span>
-          <div className="min-w-0">
-            <p className="flex flex-wrap items-center gap-1.5 text-sm font-semibold text-ink">
-              <Icon className={cn("size-3.5 shrink-0", style.tone)} aria-hidden />
-              {stageName(stage)}
-              {/* Derived from position, so it moves when the plan is
-                  reordered. Named for what it does rather than "Final",
-                  which said nothing about the consequence. */}
-              {stage.is_final && (
-                <span className="rounded-full bg-brand-soft px-1.5 py-0.5 text-[0.625rem] font-semibold text-brand-deep ring-1 ring-brand-line">
-                  Completes the order
-                </span>
-              )}
-            </p>
-            <p className="mt-0.5 text-[0.6875rem] text-ink-5">
-              {stage.unit_name ?? "No room"}
-              {" · "}
-              {/* Where and when, together: they are the two halves of the
-                  question a planner holds this board to answer — is Room 9
-                  double-booked on Thursday? A stage with neither reads
-                  "No room · Not scheduled", which is the honest state of a
-                  plan whose days have not been settled. */}
-              {stage.planned_date ? (
-                <span
-                  className={cn(
-                    stage.is_behind_plan && "font-semibold text-warn-ink",
-                  )}
-                >
-                  {formatReportDate(stage.planned_date)}
-                  {stage.is_behind_plan ? " · behind plan" : ""}
-                </span>
-              ) : (
-                "Not scheduled"
-              )}
-              {" · "}
-              {style.label}
-              {stage.target_qty
-                ? ` · target ${fmt(stage.target_qty)} ${stage.target_unit}`
-                : " · no target set"}
-              {/* The ceiling, not the percentage: "up to 21 kg" is the number
-                  an operator is actually held to, and "+5%" makes them do the
-                  arithmetic the log already did. The percentage comes along
-                  only to say where the ceiling came from. */}
-              {ceiling !== null && stage.effective_tolerance_pct > 0
-                ? ` · accepts up to ${fmt(ceiling)} (+${stage.effective_tolerance_pct}%${
-                    stage.tolerance_pct === null ? "" : ", this stage"
-                  })`
-                : ""}
-              {stage.pack_size ? ` · ${fmt(stage.pack_size)} per pack` : ""}
-              {stage.can_run_parallel ? " · runs in parallel" : ""}
-            </p>
-          </div>
-        </div>
-
-        {canManage && !done && (
-          <div className="flex shrink-0 items-center gap-0.5">
-            <IconButton onClick={onMoveUp} label="Move earlier">
-              <ArrowUp className="size-3.5" />
-            </IconButton>
-            <IconButton onClick={onMoveDown} label="Move later">
-              <ArrowDown className="size-3.5" />
-            </IconButton>
-            {/* Only while nothing has been logged against it: past that the
-                stage is the heading over audit-protected rows, and the
-                database refuses the delete anyway. */}
-            {!started && (
-              <IconButton onClick={onRemove} label="Remove stage" danger>
-                <Trash2 className="size-3.5" />
-              </IconButton>
-            )}
-          </div>
+      {/* Position and order. The flag marks the stage that completes the
+          order — derived from position, so it moves when the plan is
+          reordered. */}
+      <div className="flex shrink-0 flex-col items-center gap-1 pt-5 @3xl:h-9 @3xl:flex-row @3xl:gap-0.5 @3xl:pt-0">
+        <span
+          title={isLast ? "Completes the order" : `Stage ${index + 1}`}
+          className={cn(
+            "grid size-6 place-items-center rounded-md font-mono text-[0.6875rem] font-bold",
+            isLast ? "bg-teal-soft text-teal-deep" : "bg-sunken-2 text-ink-4",
+          )}
+        >
+          {isLast ? <Flag className="size-3" /> : index + 1}
+        </span>
+        {editable ? (
+          <>
+            <button
+              type="button"
+              onClick={onMoveUp}
+              disabled={!onMoveUp}
+              aria-label="Move earlier"
+              className="grid size-5 place-items-center rounded text-ink-5 transition hover:bg-sunken-2 hover:text-ink disabled:opacity-25"
+            >
+              <ArrowUp className="size-3" />
+            </button>
+            <button
+              type="button"
+              onClick={onMoveDown}
+              disabled={!onMoveDown}
+              aria-label="Move later"
+              className="grid size-5 place-items-center rounded text-ink-5 transition hover:bg-sunken-2 hover:text-ink disabled:opacity-25"
+            >
+              <ArrowDown className="size-3" />
+            </button>
+          </>
+        ) : (
+          <span className="w-[2.625rem] shrink-0" aria-hidden />
         )}
       </div>
 
-      {pct !== null && (
-        <div className="mt-2.5 space-y-1">
-          <div className="h-2 overflow-hidden rounded-full bg-sunken-2 ring-1 ring-line-soft ring-inset">
+      <div className="min-w-0 flex-1 space-y-2">
+        <div
+          className={cn(
+            "grid grid-cols-2 gap-2",
+            showWorkOrder ? ROW_COLS_WO : ROW_COLS,
+          )}
+        >
+          <Cell label="Activity" wide>
             <div
-              className="h-full rounded-full transition-[width] duration-500"
-              style={{
-                width: `${Math.min(100, pct)}%`,
-                background: over
-                  ? "var(--color-danger)"
-                  : pct >= 100
-                    ? "var(--color-teal)"
-                    : "var(--color-brand)",
-              }}
-            />
-          </div>
-          <p className="font-mono text-[0.6562rem] tabular-nums text-ink-4">
-            {fmt(stage.accumulated_qty)} / {fmt(stage.target_qty)}{" "}
-            {stage.target_unit}
-            <span
-              className="ml-1 font-semibold"
-              style={{
-                color: over
-                  ? "var(--color-danger)"
-                  : pct >= 100
-                    ? "var(--color-teal)"
-                    : "var(--color-brand)",
-              }}
+              title={stageName(stage)}
+              className="flex h-9 items-center gap-2 rounded-lg border border-line bg-sunken px-2.5 text-[0.8125rem] font-medium text-ink-2"
             >
-              {pct}%
-            </span>
-          </p>
-          {over && ceiling !== null && (
-            <p className="text-[0.6875rem] font-medium text-danger-deep">
-              Past the {fmt(ceiling)} {stage.target_unit} this stage accepts.
-              Entries already filed stay; raise this target, or the
-              batch&rsquo;s tolerance, to make the plan agree with them.
-            </p>
-          )}
-        </div>
-      )}
-
-      {done && (
-        <p className="mt-2 text-[0.6875rem] text-teal-deep">
-          Signed off
-          {stage.completed_by_name ? ` by ${stage.completed_by_name}` : ""}
-          {stage.yield_pct !== null ? ` · yield ${stage.yield_pct}%` : ""}
-          {stage.yield_acceptable === false ? " · yield not accepted" : ""}
-          {stage.yield_notes ? ` · ${stage.yield_notes}` : ""}
-        </p>
-      )}
-
-      {/* The target was changed after the fact. Shown because yield is
-          accumulated ÷ target, and a lowered target flatters it. */}
-      {stage.previous_target_qty !== null && (
-        <p className="mt-1.5 text-[0.6875rem] text-warn-ink">
-          Target changed from {fmt(stage.previous_target_qty)}.
-        </p>
-      )}
-
-      {canManage && !done && (
-        <div className="mt-2.5 flex flex-wrap items-center gap-2">
-          {editing ? (
-            <>
+              <Icon className={cn("size-3.5 shrink-0", style.tone)} aria-hidden />
+              <span className="truncate">{stage.process_name ?? "Stage"}</span>
+            </div>
+          </Cell>
+          <Cell label="Room" wide>
+            <SelectField
+              id={`${id}-room`}
+              ariaLabel="Assigned room"
+              value={value.unitId}
+              onChange={(v) => onEdit("unitId", v)}
+              disabled={!editable}
+              clearable
+              clearLabel="Not assigned"
+              placeholder="Not assigned"
+              className={CONTROL}
+              options={rooms.map((r) => ({ value: r.id, label: r.name }))}
+            />
+          </Cell>
+          {showWorkOrder && (
+            <Cell label="Work order" wide>
               <input
-                autoFocus
-                type="number"
-                step="any"
-                min={0}
-                value={editQty}
-                onChange={(e) => onEditQty(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") onSaveEdit();
-                  if (e.key === "Escape") onCancelEdit();
-                }}
-                placeholder="e.g. 210000"
-                className={cn(FIELD, MONO, "w-32")}
+                id={`${id}-wo`}
+                value={value.workOrder}
+                onChange={(e) => onEdit("workOrder", e.target.value)}
+                placeholder="—"
+                autoComplete="off"
+                disabled={!editable}
+                className={cn(INPUT, MONO)}
               />
-              <SelectField
-                ariaLabel="Assigned room"
-                value={editRoom}
-                onChange={onEditRoom}
-                clearable
-                clearLabel="No room"
-                placeholder="No room"
-                options={rooms.map((r) => ({ value: r.id, label: r.name }))}
-                className="w-40"
-              />
-              {/* Clearable, because "not scheduled yet" is a real answer a
-                  planner comes back to — not an unfilled field. */}
-              <DateField
-                ariaLabel="Planned date"
-                value={editDate}
-                onChange={onEditDate}
-                placeholder="Not scheduled"
-                className="w-44"
-              />
-              {/* Meaningless on the first stage, which has nothing before
-                  it to overlap and is startable regardless. */}
-              {index > 0 && (
-                <label className="flex cursor-pointer items-center gap-1.5 text-[0.6875rem] text-ink-4">
-                  <input
-                    type="checkbox"
-                    checked={editParallel}
-                    onChange={(e) => onEditParallel(e.target.checked)}
-                    className="size-3.5 accent-[var(--color-brand)]"
-                  />
-                  Can run in parallel with the stage before it
-                </label>
-              )}
-              <SmallButton onClick={onSaveEdit} primary>
-                Save
-              </SmallButton>
-              <SmallButton onClick={onCancelEdit}>Cancel</SmallButton>
-            </>
-          ) : (
-            <>
-              <SmallButton onClick={onBeginEdit}>
-                {stage.target_qty ? "Edit stage" : "Set target, room & date"}
-              </SmallButton>
-              {stage.status === "pending" && canStart && (
-                <SmallButton onClick={onStart}>
-                  <Play className="size-3" />
-                  Start
-                </SmallButton>
-              )}
-              {stage.status === "in_progress" && (
-                <SmallButton onClick={onSignOff} primary>
-                  <CheckCircle2 className="size-3" />
-                  Sign off
-                </SmallButton>
-              )}
-            </>
+            </Cell>
           )}
+          <Cell label="Start">
+            <DateField
+              id={`${id}-start`}
+              ariaLabel="Planned start"
+              value={value.plannedDate}
+              onChange={(v) => onEdit("plannedDate", v)}
+              disabled={!editable}
+              placeholder="—"
+              className={CONTROL}
+            />
+          </Cell>
+          <Cell label="End">
+            <DateField
+              id={`${id}-end`}
+              ariaLabel="Estimated finish"
+              value={value.estFinishDate}
+              onChange={(v) => onEdit("estFinishDate", v)}
+              disabled={!editable}
+              ariaInvalid={Boolean(problems?.length)}
+              placeholder="—"
+              className={CONTROL}
+            />
+          </Cell>
+          <Cell label="Target">
+            <input
+              id={`${id}-target`}
+              type="number"
+              step="any"
+              min={0}
+              value={value.targetQty}
+              onChange={(e) => onEdit("targetQty", e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && isDirty) {
+                  e.preventDefault();
+                  onSave();
+                }
+              }}
+              placeholder="—"
+              disabled={!editable}
+              className={cn(INPUT, MONO)}
+            />
+          </Cell>
+          <Cell label="Unit">
+            <SelectField
+              id={`${id}-unit`}
+              ariaLabel="Target unit"
+              value={value.targetUnit}
+              onChange={(v) => onEdit("targetUnit", asUnit(v))}
+              disabled={!editable}
+              searchable={false}
+              className={CONTROL}
+              options={STAGE_UNITS.map((u) => ({ value: u, label: u }))}
+            />
+          </Cell>
         </div>
+
+        {/* The occasional answers, and what can be done to a saved stage. */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          {needsLabel && (
+            <span className="flex items-center gap-2">
+              <label htmlFor={`${id}-label`} className={HEAD}>
+                Run label
+              </label>
+              <input
+                id={`${id}-label`}
+                value={value.label}
+                onChange={(e) => onEdit("label", e.target.value)}
+                placeholder="e.g. 30's"
+                disabled={!editable}
+                className={cn(INPUT, "h-8 w-36")}
+              />
+            </span>
+          )}
+          {index > 0 && (
+            <label className="flex cursor-pointer items-center gap-2 text-[0.6875rem] text-ink-4">
+              <input
+                type="checkbox"
+                checked={value.canRunParallel}
+                onChange={(e) => onEdit("canRunParallel", e.target.checked)}
+                disabled={!editable}
+                className="size-3.5 accent-[var(--color-brand)]"
+              />
+              Can start before the previous stage finishes
+            </label>
+          )}
+
+          <span className="text-[0.6875rem] text-ink-5">
+            {style.label}
+            {stage.planned_date && stage.is_behind_plan && (
+              <span className="font-semibold text-warn-ink">
+                {" "}
+                · behind plan since {formatReportDate(stage.planned_date)}
+              </span>
+            )}
+            {ceiling !== null && stage.effective_tolerance_pct > 0
+              ? ` · accepts up to ${fmt(ceiling)} (+${stage.effective_tolerance_pct}%${
+                  stage.tolerance_pct === null ? "" : ", this stage"
+                })`
+              : ""}
+            {stage.pack_size ? ` · ${fmt(stage.pack_size)} per pack` : ""}
+          </span>
+
+          <span className="ml-auto flex flex-wrap items-center gap-2">
+            {canManage && stage.status === "pending" && canStart && !isDirty && (
+              <SmallButton onClick={onStart}>
+                <Play className="size-3" />
+                Start
+              </SmallButton>
+            )}
+            {canManage && stage.status === "in_progress" && !isDirty && (
+              <SmallButton onClick={onSignOff} primary>
+                <CheckCircle2 className="size-3" />
+                Sign off
+              </SmallButton>
+            )}
+            {isDirty && (
+              <>
+                <SmallButton onClick={onSave} primary disabled={busy}>
+                  Save
+                </SmallButton>
+                <SmallButton onClick={onDiscard} disabled={busy}>
+                  Discard
+                </SmallButton>
+              </>
+            )}
+          </span>
+        </div>
+
+        {pct !== null && (
+          <div className="space-y-1">
+            <div className="h-2 overflow-hidden rounded-full bg-sunken-2 ring-1 ring-line-soft ring-inset">
+              <div
+                className="h-full rounded-full transition-[width] duration-500"
+                style={{
+                  width: `${Math.min(100, pct)}%`,
+                  background: over
+                    ? "var(--color-danger)"
+                    : pct >= 100
+                      ? "var(--color-teal)"
+                      : "var(--color-brand)",
+                }}
+              />
+            </div>
+            <p className="font-mono text-[0.6562rem] tabular-nums text-ink-4">
+              {fmt(stage.accumulated_qty)} / {fmt(stage.target_qty)}{" "}
+              {stage.target_unit}
+              <span
+                className="ml-1 font-semibold"
+                style={{
+                  color: over
+                    ? "var(--color-danger)"
+                    : pct >= 100
+                      ? "var(--color-teal)"
+                      : "var(--color-brand)",
+                }}
+              >
+                {pct}%
+              </span>
+            </p>
+            {over && ceiling !== null && (
+              <p className="text-[0.6875rem] font-medium text-danger-deep">
+                Past the {fmt(ceiling)} {stage.target_unit} this stage accepts.
+                Entries already filed stay; raise this target, or the
+                batch&rsquo;s tolerance, to make the plan agree with them.
+              </p>
+            )}
+          </div>
+        )}
+
+        {done && (
+          <p className="text-[0.6875rem] text-teal-deep">
+            Signed off
+            {stage.completed_by_name ? ` by ${stage.completed_by_name}` : ""}
+            {stage.yield_pct !== null ? ` · yield ${stage.yield_pct}%` : ""}
+            {stage.yield_acceptable === false ? " · yield not accepted" : ""}
+            {stage.yield_notes ? ` · ${stage.yield_notes}` : ""}
+          </p>
+        )}
+
+        {/* The target was changed after the fact. Shown because yield is
+            accumulated ÷ target, and a lowered target flatters it. */}
+        {stage.previous_target_qty !== null && (
+          <p className="text-[0.6875rem] text-warn-ink">
+            Target changed from {fmt(stage.previous_target_qty)}.
+          </p>
+        )}
+
+        {problems && problems.length > 0 && (
+          <p role="alert" className="text-[0.6875rem] text-danger-deep">
+            {problems.join(" · ")}
+          </p>
+        )}
+      </div>
+
+      {/* Only while nothing has been logged against it: past that the stage
+          is the heading over audit-protected rows, and the database refuses
+          the delete anyway. */}
+      {editable && !started ? (
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label={`Remove stage ${index + 1}`}
+          className="mt-5 grid size-8 shrink-0 place-items-center rounded-lg text-ink-6 transition hover:bg-danger-soft hover:text-danger-deep @3xl:mt-0.5"
+        >
+          <X className="size-4" />
+        </button>
+      ) : (
+        <span className="size-8 shrink-0" aria-hidden />
       )}
-    </section>
+    </li>
   );
 }
 
-/** The add-stage form at the foot of the plan. */
-function AddStageForm({
+/**
+ * A new stage, written as one more line of the table — the same columns —
+ * and appended to the end of the plan, where it becomes the stage that
+ * completes the order.
+ */
+function AddStageRow({
   processes,
   rooms,
   showWorkOrder,
+  first,
   onAdd,
+  onCancel,
 }: {
   processes: { id: string; name: string; category: string | null }[];
   rooms: { id: string; name: string }[];
   /** Only a company tracking work orders per stage is asked for one. */
   showWorkOrder: boolean;
+  /** The plan is empty — the row is the whole of it, so it is not dismissable. */
+  first: boolean;
   onAdd: (values: StageParsed) => Promise<void>;
+  onCancel?: () => void;
 }) {
   const {
     register,
@@ -761,6 +1050,7 @@ function AddStageForm({
       processId: "",
       unitId: "",
       plannedDate: "",
+      estFinishDate: "",
       canRunParallel: false,
       targetQty: undefined,
       targetUnit: "units",
@@ -769,8 +1059,10 @@ function AddStageForm({
       packSize: undefined,
     },
   });
+  const [dateError, setDateError] = useState<string | null>(null);
 
   const firstError =
+    dateError ??
     errors.processId?.message ??
     errors.plannedDate?.message ??
     errors.targetUnit?.message ??
@@ -780,175 +1072,206 @@ function AddStageForm({
   return (
     <form
       onSubmit={handleSubmit(async (values) => {
+        // Checked here, not by the database — see `stageEditSchema`.
+        if (
+          values.plannedDate &&
+          values.estFinishDate &&
+          values.estFinishDate < values.plannedDate
+        ) {
+          setDateError("The finish is before the start.");
+          return;
+        }
+        setDateError(null);
         await onAdd(values);
         reset();
       })}
-      className="rounded-xl border border-dashed border-line-strong bg-sunken p-3.5"
+      className={cn(
+        "bg-sunken/60 px-3 py-3",
+        !first && "border-t border-line-soft",
+      )}
     >
-      <p className="mb-2.5 text-[0.625rem] font-bold tracking-[0.05em] text-ink-4 uppercase">
-        Add the next stage
+      <p className="mb-2 flex items-center gap-1.5 text-[0.625rem] font-bold tracking-[0.05em] text-ink-4 uppercase">
+        <Plus className="size-3" aria-hidden />
+        {first ? "Add the first stage" : "Add the next stage"}
       </p>
 
-      <div className="grid gap-2 sm:grid-cols-2">
-        <div className="space-y-1">
-          <label htmlFor="st-process" className={LABEL}>
-            Activity
-          </label>
-          <Controller
-            name="processId"
-            control={control}
-            render={({ field }) => (
-              <SelectField
-                id="st-process"
-                value={field.value ?? ""}
-                onChange={field.onChange}
-                onBlur={field.onBlur}
-                ariaInvalid={Boolean(errors.processId)}
-                searchPlaceholder="Activity name…"
-                emptyMessage="No activity matches that."
-                options={processes.map((proc) => ({
-                  value: proc.id,
-                  label: proc.name,
-                  meta: proc.category ?? undefined,
-                }))}
-              />
+      <div className="flex gap-2.5">
+        <span className="hidden w-[68px] shrink-0 @3xl:block" aria-hidden />
+        <div className="min-w-0 flex-1 space-y-2">
+          <div
+            className={cn(
+              "grid grid-cols-2 gap-2",
+              showWorkOrder ? ROW_COLS_WO : ROW_COLS,
             )}
-          />
-        </div>
-        <div className="space-y-1">
-          <label htmlFor="st-room" className={LABEL}>
-            Assigned room
-          </label>
-          <Controller
-            name="unitId"
-            control={control}
-            render={({ field }) => (
-              <SelectField
-                id="st-room"
-                value={field.value ?? ""}
-                onChange={field.onChange}
-                onBlur={field.onBlur}
-                clearable
-                clearLabel="Not assigned yet"
-                placeholder="Not assigned yet"
-                options={rooms.map((r) => ({ value: r.id, label: r.name }))}
+          >
+            <Cell label="Activity" wide>
+              <Controller
+                name="processId"
+                control={control}
+                render={({ field }) => (
+                  <SelectField
+                    id="ps-add-process"
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    ariaInvalid={Boolean(errors.processId)}
+                    placeholder="Pick the activity…"
+                    searchPlaceholder="Activity name…"
+                    emptyMessage="No activity matches that."
+                    className={CONTROL}
+                    options={processes.map((proc) => ({
+                      value: proc.id,
+                      label: proc.name,
+                      meta: proc.category ?? undefined,
+                    }))}
+                  />
+                )}
               />
-            )}
-          />
-        </div>
-      </div>
-
-      <div className="mt-2 grid gap-2 sm:grid-cols-3">
-        {/* The day this stage is meant to run — left blank as readily as the
-            room: a route is written before the days are settled, and the date
-            is edited back onto the row later. Controlled, so a `Controller`
-            rather than `register` — the same wiring `SelectField` needs. */}
-        <div className="space-y-1">
-          <label htmlFor="st-date" className={LABEL}>
-            Planned date
-          </label>
-          <Controller
-            name="plannedDate"
-            control={control}
-            render={({ field }) => (
-              <DateField
-                id="st-date"
-                value={field.value ?? ""}
-                onChange={field.onChange}
-                ariaInvalid={Boolean(errors.plannedDate)}
-                placeholder="Not scheduled"
+            </Cell>
+            <Cell label="Room" wide>
+              <Controller
+                name="unitId"
+                control={control}
+                render={({ field }) => (
+                  <SelectField
+                    id="ps-add-room"
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    clearable
+                    clearLabel="Not assigned"
+                    placeholder="Not assigned"
+                    className={CONTROL}
+                    options={rooms.map((r) => ({ value: r.id, label: r.name }))}
+                  />
+                )}
               />
+            </Cell>
+            {showWorkOrder && (
+              <Cell label="Work order" wide>
+                <input
+                  id="ps-add-wo"
+                  placeholder="e.g. 46000D"
+                  autoComplete="off"
+                  className={cn(INPUT, MONO)}
+                  {...register("workOrder")}
+                />
+              </Cell>
             )}
-          />
-        </div>
-        <div className="space-y-1">
-          <label htmlFor="st-target" className={LABEL}>
-            Target
-          </label>
-          <input
-            id="st-target"
-            type="number"
-            step="any"
-            min={0}
-            placeholder="e.g. 210000"
-            className={cn(FIELD, MONO)}
-            {...register("targetQty", { valueAsNumber: true })}
-          />
-        </div>
-        <div className="space-y-1">
-          <label htmlFor="st-unit" className={LABEL}>
-            Unit
-          </label>
-          <Controller
-            name="targetUnit"
-            control={control}
-            render={({ field }) => (
-              <SelectField
-                id="st-unit"
-                value={field.value ?? ""}
-                onChange={field.onChange}
-                onBlur={field.onBlur}
-                options={STAGE_UNITS.map((u) => ({ value: u, label: u }))}
+            <Cell label="Start">
+              <Controller
+                name="plannedDate"
+                control={control}
+                render={({ field }) => (
+                  <DateField
+                    id="ps-add-start"
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    ariaInvalid={Boolean(errors.plannedDate)}
+                    placeholder="—"
+                    className={CONTROL}
+                  />
+                )}
               />
-            )}
-          />
-        </div>
-      </div>
-
-      {/* Only needed when the batch runs the same activity more than once —
-          three packing runs under one number. Left blank on the ordinary
-          stage, where the activity name already says everything. */}
-      <div
-        className={cn(
-          "mt-2 grid gap-2",
-          showWorkOrder
-            ? "sm:grid-cols-[1fr_1fr_1fr_auto]"
-            : "sm:grid-cols-[1fr_1fr_auto]",
-        )}
-      >
-        <div className="space-y-1">
-          <label htmlFor="st-label" className={LABEL}>
-            Label
-          </label>
-          <input
-            id="st-label"
-            placeholder="e.g. 30's"
-            className={FIELD}
-            {...register("label")}
-          />
-        </div>
-        {showWorkOrder && (
-          <div className="space-y-1">
-            <label htmlFor="st-wo" className={LABEL}>
-              Work order
-            </label>
-            <input
-              id="st-wo"
-              placeholder="e.g. 46000D"
-              className={cn(FIELD, MONO)}
-              {...register("workOrder")}
-            />
+            </Cell>
+            <Cell label="End">
+              <Controller
+                name="estFinishDate"
+                control={control}
+                render={({ field }) => (
+                  <DateField
+                    id="ps-add-end"
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    ariaInvalid={Boolean(dateError)}
+                    placeholder="—"
+                    className={CONTROL}
+                  />
+                )}
+              />
+            </Cell>
+            <Cell label="Target">
+              <input
+                id="ps-add-target"
+                type="number"
+                step="any"
+                min={0}
+                placeholder="—"
+                aria-invalid={Boolean(errors.targetQty) || undefined}
+                className={cn(INPUT, MONO)}
+                {...register("targetQty", { valueAsNumber: true })}
+              />
+            </Cell>
+            <Cell label="Unit">
+              <Controller
+                name="targetUnit"
+                control={control}
+                render={({ field }) => (
+                  <SelectField
+                    id="ps-add-unit"
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    searchable={false}
+                    className={CONTROL}
+                    options={STAGE_UNITS.map((u) => ({ value: u, label: u }))}
+                  />
+                )}
+              />
+            </Cell>
           </div>
-        )}
-        <div className="space-y-1">
-          <label htmlFor="st-pack" className={LABEL}>
-            Pack size
-          </label>
-          <input
-            id="st-pack"
-            type="number"
-            step="any"
-            min={0}
-            placeholder="e.g. 30"
-            className={cn(FIELD, MONO)}
-            {...register("packSize", { valueAsNumber: true })}
-          />
+
+          {/* Only needed when the batch runs the same activity more than once
+              — three packing runs under one number. Left blank on the
+              ordinary stage, where the activity name says everything. */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <span className="flex items-center gap-2">
+              <label htmlFor="ps-add-label" className={HEAD}>
+                Run label
+              </label>
+              <input
+                id="ps-add-label"
+                placeholder="e.g. 30's"
+                className={cn(INPUT, "h-8 w-36")}
+                {...register("label")}
+              />
+            </span>
+            <span className="flex items-center gap-2">
+              <label htmlFor="ps-add-pack" className={HEAD}>
+                Pack size
+              </label>
+              <input
+                id="ps-add-pack"
+                type="number"
+                step="any"
+                min={0}
+                placeholder="e.g. 30"
+                className={cn(INPUT, MONO, "h-8 w-28")}
+                {...register("packSize", { valueAsNumber: true })}
+              />
+            </span>
+            <label className="flex cursor-pointer items-center gap-2 text-[0.6875rem] text-ink-4">
+              <input
+                type="checkbox"
+                className="size-3.5 accent-[var(--color-brand)]"
+                {...register("canRunParallel")}
+              />
+              Can start before the previous stage finishes
+            </label>
+          </div>
+
+          {firstError && (
+            <p role="alert" className="text-[0.6875rem] text-danger-deep">
+              {firstError}
+            </p>
+          )}
         </div>
-        <div className="flex items-end">
+
+        <div className="flex shrink-0 flex-col gap-1.5 @3xl:w-auto">
           <button
             type="submit"
             disabled={isSubmitting}
-            className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-3.5 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-60 sm:w-auto"
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-3.5 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-60"
           >
             {isSubmitting ? (
               <Loader2 className="size-3.5 animate-spin" />
@@ -957,80 +1280,40 @@ function AddStageForm({
             )}
             Add
           </button>
+          {onCancel && (
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={isSubmitting}
+              className="inline-flex h-8 items-center justify-center rounded-lg px-3 text-xs font-semibold text-ink-4 transition hover:bg-sunken-2 hover:text-ink"
+            >
+              Cancel
+            </button>
+          )}
         </div>
       </div>
-
-      <label className="mt-2.5 flex cursor-pointer items-center gap-2 text-[0.6875rem] text-ink-3">
-        <input
-          type="checkbox"
-          className="size-3.5 cursor-pointer rounded border-ink-6 accent-brand"
-          {...register("canRunParallel")}
-        />
-        Can run in parallel with the stage before it
-      </label>
-
-      <p className="mt-2 text-[0.6562rem] text-ink-5">
-        Label or work order only where the batch runs this activity more than
-        once — Packing 30&rsquo;s, 60&rsquo;s, 120&rsquo;s. The stage added
-        last completes the order. The room and date are the plan&rsquo;s
-        intent — the shift log records where and when the work actually
-        happened, and does not have to agree.
-      </p>
-
-      {firstError && (
-        <p role="alert" className="mt-2 text-[0.6875rem] text-danger-deep">
-          {firstError}
-        </p>
-      )}
     </form>
-  );
-}
-
-function IconButton({
-  onClick,
-  label,
-  danger,
-  children,
-}: {
-  onClick?: () => void;
-  label: string;
-  danger?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={!onClick}
-      title={label}
-      aria-label={label}
-      className={cn(
-        "grid size-7 place-items-center rounded-lg text-ink-5 transition disabled:opacity-25",
-        danger
-          ? "hover:bg-danger-soft hover:text-danger-deep"
-          : "hover:bg-sunken-2 hover:text-ink",
-      )}
-    >
-      {children}
-    </button>
   );
 }
 
 function SmallButton({
   onClick,
   primary,
+  disabled,
   children,
 }: {
   onClick: () => void;
   primary?: boolean;
+  disabled?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       className={cn(
-        "inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold transition",
+        "inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold transition disabled:opacity-60",
         primary
           ? "bg-brand text-white hover:brightness-[1.06]"
           : "border border-line bg-surface text-ink-3 hover:border-ink-6 hover:text-ink",

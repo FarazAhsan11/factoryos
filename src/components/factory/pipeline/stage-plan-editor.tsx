@@ -9,7 +9,6 @@ import {
 } from "react-hook-form";
 import {
   ArrowDown,
-  ArrowRight,
   ArrowUp,
   ChevronRight,
   Flag,
@@ -27,36 +26,18 @@ import {
   type StageUnit,
 } from "@/app/factory/[slug]/pipeline/schemas";
 import { DateField } from "@/components/ui/date-picker";
+import {
+  CONTROL,
+  Cell,
+  ColumnHeads,
+  HEAD,
+  INPUT,
+  ROW_COLS,
+  ROW_COLS_WO,
+  RoutePills,
+} from "@/components/factory/pipeline/stage-table-parts";
 import { SelectField } from "@/components/ui/select-field";
 import { cn } from "@/lib/utils";
-
-const INPUT =
-  "h-9 w-full rounded-lg border border-line bg-surface px-2.5 text-[0.8125rem] text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)] outline-none transition placeholder:text-placeholder hover:border-line-strong focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12 aria-invalid:border-danger";
-const CONTROL = "h-9 rounded-lg px-2.5 text-[0.8125rem]";
-const HEAD = "text-[0.625rem] font-semibold tracking-[0.04em] text-ink-5 uppercase";
-
-/**
- * The one-line row's columns: activity, room, [work order], start, end, target,
- * unit. The header row and every stage share it, so they cannot drift. Written
- * out in full — Tailwind finds classes by scanning for whole strings.
- */
-const ROW_COLS =
-  "@3xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1.1fr)_7.5rem_7.5rem_5.5rem_6rem]";
-const ROW_COLS_WO =
-  "@3xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1.1fr)_6rem_7.5rem_7.5rem_5.5rem_6rem]";
-
-/**
- * What a route's pills take turns in, by position — so neighbours always read
- * as separate steps. Amber and red are left out: they mean "no activity yet"
- * and "this stage has an error", and a pill must never look like either by
- * accident. Written out in full, for the same reason as `ROW_COLS`.
- */
-const PILL_TONES = [
-  "border-brand-line bg-brand-soft text-brand-deep",
-  "border-teal-line bg-teal-soft text-teal-deep",
-  "border-violet-line bg-violet-soft text-violet-deep",
-  "border-line-strong bg-sunken-2 text-ink-3",
-];
 
 type PlanForm = UseFormReturn<StagePlanValues, unknown, StagePlanParsed>;
 
@@ -168,57 +149,22 @@ export function StagePlanEditor({
 
       {fields.length > 0 && (
         <>
-          {/* The route at a glance: one pill per stage, in order, wrapping onto
-              the next line when there are more than fit. The flag marks the
-              stage that completes the order. */}
-          <div className="mt-2.5 rounded-xl border border-line bg-sunken/60 px-3 py-3">
-            <ol className="flex flex-wrap items-center gap-y-2" aria-label="Stage route">
-              {fields.map((field, index) => {
-                const row = rows[index];
-                const proc = row?.processId
-                  ? processNames.get(row.processId)
-                  : undefined;
-                const isLast = index === fields.length - 1;
-                const runLabel = row?.label?.trim();
-                const unresolved = !proc;
-                const hasError = Boolean(errors.stages?.[index]);
-                const name =
-                  proc?.name ?? row?.templateName ?? "Pick the activity";
-
-                return (
-                  <li key={field.id} className="flex items-center">
-                    {index > 0 && (
-                      <ArrowRight
-                        className="mx-1.5 size-3.5 shrink-0 text-ink-6"
-                        aria-hidden
-                      />
-                    )}
-                    <span
-                      title={
-                        isLast
-                          ? `${name} — completes the order`
-                          : `Stage ${index + 1}: ${name}`
-                      }
-                      className={cn(
-                        "inline-flex max-w-full items-center gap-1.5 rounded-full border px-3 py-1 text-[0.75rem] font-semibold",
-                        hasError
-                          ? "border-danger-line bg-danger-soft text-danger-deep"
-                          : unresolved
-                            ? "border-dashed border-warn-line bg-warn-tint text-warn-ink"
-                            : PILL_TONES[index % PILL_TONES.length],
-                      )}
-                    >
-                      {isLast && <Flag className="size-3 shrink-0" aria-hidden />}
-                      <span className="truncate">{name}</span>
-                      {runLabel && (
-                        <span className="font-normal opacity-70">· {runLabel}</span>
-                      )}
-                    </span>
-                  </li>
-                );
-              })}
-            </ol>
-          </div>
+          <RoutePills
+            className="mt-2.5"
+            steps={fields.map((field, index) => {
+              const row = rows[index];
+              const proc = row?.processId
+                ? processNames.get(row.processId)
+                : undefined;
+              return {
+                key: field.id,
+                name: proc?.name ?? row?.templateName ?? "Pick the activity",
+                runLabel: row?.label?.trim() || undefined,
+                unresolved: !proc,
+                error: Boolean(errors.stages?.[index]),
+              };
+            })}
+          />
 
           <button
             type="button"
@@ -266,28 +212,7 @@ export function StagePlanEditor({
         <div className="min-h-0 overflow-hidden">
         <div className="pt-2.5">
         <div className="overflow-hidden rounded-xl border border-line bg-surface">
-          {/* Column headers, once — the cells' own labels are for the
-              narrow layout. The spacers are the order controls' and the
-              remove button's widths, so the columns sit under their names. */}
-          <div className="hidden gap-2.5 border-b border-line-soft bg-sunken/60 px-3 py-2 @3xl:flex">
-            <span className="w-[68px] shrink-0" aria-hidden />
-            <div
-              className={cn(
-                "grid min-w-0 flex-1 gap-2",
-                showWorkOrder ? ROW_COLS_WO : ROW_COLS,
-              )}
-              aria-hidden
-            >
-              <span className={HEAD}>Activity</span>
-              <span className={HEAD}>Room</span>
-              {showWorkOrder && <span className={HEAD}>Work order</span>}
-              <span className={HEAD}>Start</span>
-              <span className={HEAD}>End</span>
-              <span className={HEAD}>Target</span>
-              <span className={HEAD}>Unit</span>
-            </div>
-            <span className="w-8 shrink-0" aria-hidden />
-          </div>
+          <ColumnHeads showWorkOrder={showWorkOrder} />
           <ol className="divide-y divide-line-soft">
             {fields.map((field, index) => {
               const rowErrors = errors.stages?.[index];
@@ -613,31 +538,6 @@ export function StagePlanEditor({
         </span>
       </label>
     </section>
-  );
-}
-
-/** One labelled field of a stage row. */
-function Cell({
-  label,
-  wide,
-  children,
-}: {
-  label: string;
-  /** Takes the full width of the narrow layout — activity, room, work order. */
-  wide?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div
-      className={cn(
-        "min-w-0 space-y-1 @3xl:space-y-0",
-        wide && "col-span-2 @3xl:col-span-1",
-      )}
-    >
-      {/* The header row names the columns once the row is one line. */}
-      <span className={cn(HEAD, "block @3xl:sr-only")}>{label}</span>
-      {children}
-    </div>
   );
 }
 

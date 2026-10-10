@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { BatchTypeBadge } from "@/components/factory/pipeline/batch-type-badge";
+import { StageProgressList } from "@/components/factory/pipeline/stage-progress";
 import { StageStrip } from "@/components/factory/pipeline/stage-strip";
 import { SelectField } from "@/components/ui/select-field";
 import { BATCH_TYPES } from "@/app/factory/[slug]/pipeline/schemas";
@@ -282,6 +283,11 @@ function BatchRow({
   const isBulk = job.batch_type === "manufacturing";
   const allocation = allocationFor(job);
   const panelId = `batch-panel-${job.id}`;
+  // The detail is built the first time the row is opened and kept after, so
+  // closing it can animate away rather than vanish — and a board of forty
+  // closed rows still renders none of it.
+  const [hasOpened, setHasOpened] = useState(open);
+  if (open && !hasOpened) setHasOpened(true);
 
   return (
     <article
@@ -368,11 +374,21 @@ function BatchRow({
         </div>
       </div>
 
-      {open && (
-        <div
-          id={panelId}
-          className="animate-in space-y-3 border-t border-line-soft bg-sunken py-3 pr-3 pl-[3.25rem] fade-in-0"
-        >
+      {/* Opens by animating its row track from 0fr to 1fr — the one way to
+          transition to an auto height. The wrapper is always there, so the
+          first open has a closed state to leave; `inert` keeps the hidden
+          buttons out of the tab order and the accessibility tree. */}
+      <div
+        id={panelId}
+        inert={!open}
+        className={cn(
+          "grid transition-[grid-template-rows,opacity] duration-300 ease-out motion-reduce:transition-none",
+          open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+        )}
+      >
+        <div className="min-h-0 overflow-hidden">
+        {hasOpened && (
+        <div className="space-y-3 border-t border-line-soft bg-sunken py-3 pr-3 pl-[3.25rem]">
           {/* Where the batch is in its own route: which stage is running,
               which are done, and which one finishes the order. */}
           <div>
@@ -380,20 +396,37 @@ function BatchRow({
               Stages
             </p>
             {stages.length > 0 ? (
-              <StageStrip stages={stages} className="mt-1.5" />
+              <StageProgressList stages={stages} className="mt-1.5" />
             ) : (
               <p className="mt-1 text-xs text-ink-5">No stages planned yet.</p>
             )}
+            {/* The order as a whole — what the last stage has made against
+                what was asked for, which is the one number the row's own bar
+                carries too. */}
             {percent !== null && (
-              <p className="mt-1.5 font-mono text-[0.6875rem] tabular-nums text-ink-4">
-                {fmt(job.produced_qty)} / {fmt(job.required_qty)} made
-                <span
-                  className="ml-1 font-semibold"
-                  style={{ color: status.accent }}
-                >
-                  {percent}%
+              <div className="mt-2.5 flex items-center gap-3">
+                <span className="shrink-0 text-[0.625rem] font-bold tracking-[0.07em] text-ink-5 uppercase">
+                  Order
                 </span>
-              </p>
+                <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-sunken-2 ring-1 ring-line-soft ring-inset">
+                  <span
+                    className="block h-full rounded-full transition-[width] duration-500"
+                    style={{
+                      width: `${Math.min(100, percent)}%`,
+                      background: status.accent,
+                    }}
+                  />
+                </span>
+                <span className="shrink-0 font-mono text-[0.6875rem] tabular-nums text-ink-4">
+                  {fmt(job.produced_qty)} / {fmt(job.required_qty)} made
+                  <span
+                    className="ml-1.5 font-semibold"
+                    style={{ color: status.accent }}
+                  >
+                    {percent}%
+                  </span>
+                </span>
+              </div>
             )}
           </div>
 
@@ -452,7 +485,9 @@ function BatchRow({
             </div>
           )}
         </div>
-      )}
+        )}
+        </div>
+      </div>
     </article>
   );
 }

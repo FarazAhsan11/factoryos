@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+  type Ref,
+} from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,6 +17,7 @@ import {
   Package,
   Plus,
   RefreshCw,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -161,14 +169,22 @@ export function NewBatchDialog({
   const open = controlledOpen ?? uncontrolledOpen;
   const setOpenRaw = onOpenChange ?? setUncontrolledOpen;
   /**
-   * "Also add a finished lot from this bulk" — on Bulk Production, the lot is
-   * filled in beside the bulk, both are validated together, and one submit
-   * raises the pair with the lot already drawing on the bulk.
+   * "Also add a finished lot from this bulk" — on Bulk Production, each lot is
+   * filled in beside the bulk, all are validated together, and one submit
+   * raises the bulk with every lot already drawing on it. A bulk is usually
+   * packed into several lots (one per market or pack size), so there can be
+   * as many as the planner adds.
+   *
+   * Only what the dialog itself needs to see of a lot lives here — which batch
+   * it is and how big a pack — to keep one lot out of another's picker and to
+   * add the lots up against the bulk. The rest is the card's own forms.
    */
-  const [withLot, setWithLot] = useState(false);
+  const [lotSlots, setLots] = useState<LotSlot[]>([]);
+  /** Each card's handle, to validate and read it from the one submit. */
+  const lotHandles = useRef(new Map<string, LotEntryHandle>());
   const setOpen = (next: boolean) => {
     // Belongs to one run of the dialog; the next New batch starts without it.
-    if (!next) setWithLot(false);
+    if (!next) setLots([]);
     setOpenRaw(next);
   };
   const split = batchModel === "split";
@@ -211,33 +227,16 @@ export function NewBatchDialog({
     ],
   });
 
-  /** The paired finished lot — its own form, validated alongside the bulk. */
-  const lotForm = useForm<PairedLotValues, unknown, PairedLotParsed>({
-    resolver: zodResolver(pairedLotSchema),
-    defaultValues: emptyLot(),
-  });
-  const lotErrors = lotForm.formState.errors;
-  const [lotProductId, lotPackSize, lotPackUnit] = useWatch({
-    control: lotForm.control,
-    name: ["productId", "packSize", "packUnit"],
-  });
-  const resetLot = lotForm.reset;
-
   /**
-   * The stage plans: one for the batch this dialog raises, one for the paired
-   * lot. Their own forms, because a field array of stages is its own shape —
-   * validated beside the batch, saved after it.
+   * The stage plan of the batch this dialog raises — its own form, because a
+   * field array of stages is its own shape: validated beside the batch, saved
+   * after it. Each lot's card keeps one of its own.
    */
   const plan = useForm<StagePlanValues, unknown, StagePlanParsed>({
     resolver: zodResolver(stagePlanSchema),
     defaultValues: emptyPlan(),
   });
-  const lotPlan = useForm<StagePlanValues, unknown, StagePlanParsed>({
-    resolver: zodResolver(stagePlanSchema),
-    defaultValues: emptyPlan(),
-  });
   const resetPlan = plan.reset;
-  const resetLotPlan = lotPlan.reset;
 
   /**
    * Reset on open rather than on close, so a dialog dismissed by accident can
@@ -253,19 +252,8 @@ export function NewBatchDialog({
         ? { batchType: "packing" as const, parentJobId: presetParentId }
         : {}),
     });
-    resetLot(emptyLot());
     resetPlan(emptyPlan());
-    resetLotPlan(emptyPlan());
-  }, [
-    open,
-    factoryId,
-    presetParentId,
-    defaultType,
-    reset,
-    resetLot,
-    resetPlan,
-    resetLotPlan,
-  ]);
+  }, [open, factoryId, presetParentId, defaultType, reset, resetPlan]);
 
   // The same cache keys as the plan dialog and Admin, so these are usually
   // already warm by the time New batch opens.
@@ -315,11 +303,23 @@ export function NewBatchDialog({
     () => products.find((p) => p.id === productId) ?? null,
     [products, productId],
   );
-  /** The catalogue row behind the paired finished lot. */
-  const lotPicked = useMemo(
-    () => products.find((p) => p.id === lotProductId) ?? null,
-    [products, lotProductId],
+
+  /**
+   * "+ Lot" on a bulk: the bulk is already on the board, so there is no batch
+   * to ask about — its details are read back at the top and the dialog is just
+   * its lots, as many as are added. Falls back to the full form if the bulk is
+   * not on the board (yet).
+   */
+  const presetBulk = useMemo(
+    () =>
+      presetParentId
+        ? (bulkSources.find((job) => job.id === presetParentId) ?? null)
+        : null,
+    [bulkSources, presetParentId],
   );
+  const lotsOnly = presetBulk !== null;
+  /** The lots, with the one a "+ Lot" dialog opens on already in place. */
+  const lots = lotsOnly && lotSlots.length === 0 ? [SEED_LOT] : lotSlots;
 
   /**
    * A plan's stages, one insert at a time and in order: `batch_stages_validate`
@@ -334,13 +334,20 @@ export function NewBatchDialog({
 
   const create = useMutation({
     mutationFn: async ({
-      values,
-      stagePlan,
-      lot,
+      main,
+      parent: existingBulk,
+      lotEntries,
+      lotNotes,
     }: {
-      values: NewBatchParsed;
-      stagePlan: StagePlanParsed;
-      lot?: { values: PairedLotParsed; plan: StagePlanParsed };
+      /** The bulk (or batch) this submit raises — null when lots are added to
+       *  a bulk already on the board. */
+      main: { values: NewBatchParsed; stagePlan: StagePlanParsed } | null;
+      /** The bulk already on the board the lots draw on, when `main` is null. */
+      parent: PipelineJob | null;
+      lotEntries: { values: PairedLotParsed; plan: StagePlanParsed }[];
+      /** With no batch of its own to put them on, the dialog's notes go on
+       *  each lot. */
+      lotNotes: string;
     }) => {
       /**
        * Everything this submit put on the board, newest last — what a failure
@@ -354,26 +361,44 @@ export function NewBatchDialog({
         // the column the shift log's autofill and the batch record already
         // read — so it is written there, not onto the card as a second copy.
         // Blank falls back to the batch number, the same rule Products applies.
-        if (perBatchWo && picked) {
-          await updateProduct(picked.id, {
-            work_order: values.workOrder?.trim() || picked.batch_no,
-          });
+        let mainId: string;
+        // One order, one urgency, one tolerance — the bulk's, whether it is
+        // raised here or already on the board.
+        let priority: NewBatchParsed["priority"];
+        let tolerancePct: NewBatchParsed["tolerancePct"];
+        if (main) {
+          if (perBatchWo && picked) {
+            await updateProduct(picked.id, {
+              work_order: main.values.workOrder?.trim() || picked.batch_no,
+            });
+          }
+          mainId = await createBatchJob(main.values, userId);
+          created.push(mainId);
+          await addStages(mainId, main.stagePlan);
+          priority = main.values.priority;
+          tolerancePct = main.values.tolerancePct;
+        } else if (existingBulk) {
+          mainId = existingBulk.id;
+          priority = existingBulk.priority;
+          tolerancePct = existingBulk.tolerance_pct;
+        } else {
+          throw new Error("There is no bulk to add these lots to.");
         }
-        const mainId = await createBatchJob(values, userId);
-        created.push(mainId);
-        await addStages(mainId, stagePlan);
 
-        let lotId: string | null = null;
-        if (lot) {
+        // One lot after another, each with its plan. Every id goes into
+        // `created` as soon as it exists, so a failure on the third lot takes
+        // back the bulk and the first two as well.
+        const lotIds: string[] = [];
+        for (const lot of lotEntries) {
           const lotRow = products.find((p) => p.id === lot.values.productId);
           if (perBatchWo && lotRow) {
             await updateProduct(lotRow.id, {
               work_order: lot.values.workOrder?.trim() || lotRow.batch_no,
             });
           }
-          lotId = await createBatchJob(
+          const lotId = await createBatchJob(
             {
-              factoryId: values.factoryId,
+              factoryId,
               productId: lot.values.productId,
               batchType: "packing",
               parentJobId: mainId,
@@ -385,23 +410,26 @@ export function NewBatchDialog({
               // overage (`pipeline_jobs_overage_belongs`, 0032).
               bulkUnit: undefined,
               overagePct: undefined,
-              // One order, one urgency, one tolerance — the bulk's, not asked
-              // twice. The due date is the lot's own, from its row in Products.
-              priority: values.priority,
-              tolerancePct: values.tolerancePct,
+              // Not asked twice. The due date is the lot's own, from its row
+              // in Products.
+              priority,
+              tolerancePct,
               dueDate: lotRow?.due_date ?? "",
-              notes: "",
+              notes: main ? "" : lotNotes,
             },
             userId,
           );
           created.push(lotId);
+          lotIds.push(lotId);
           await addStages(lotId, lot.plan);
         }
 
         // Issued last, once every batch and stage exists, so a failure above
         // never leaves a batch on the floor that the rollback then pulls.
-        if (stagePlan.issue) await issueJob(mainId);
-        if (lotId && lot?.plan.issue) await issueJob(lotId);
+        if (main?.stagePlan.issue) await issueJob(mainId);
+        for (const [i, lotId] of lotIds.entries()) {
+          if (lotEntries[i].plan.issue) await issueJob(lotId);
+        }
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
         if (created.length === 0) throw new Error(message);
@@ -415,21 +443,30 @@ export function NewBatchDialog({
         throw new Error(`Nothing was added. ${message}`);
       }
     },
-    onSuccess: (_data, { stagePlan, lot }) => {
+    onSuccess: (_data, { main, lotEntries }) => {
       if (perBatchWo) {
         queryClient.invalidateQueries({ queryKey: productKeys.all(factoryId) });
       }
-      const numbers = [picked?.batch_no, lot ? lotPicked?.batch_no : null]
-        .filter(Boolean)
-        .join(" and ");
-      const issued = [stagePlan.issue, lot?.plan.issue].filter(Boolean).length;
+      const numbers = [
+        main ? picked?.batch_no : null,
+        ...lotEntries.map(
+          (l) => products.find((p) => p.id === l.values.productId)?.batch_no,
+        ),
+      ].filter(Boolean);
+      const total = (main ? 1 : 0) + lotEntries.length;
+      const issued = [main?.stagePlan.issue, ...lotEntries.map((l) => l.plan.issue)]
+        .filter(Boolean).length;
       toast.success(
-        `${lot ? "Batches" : "Batch"} ${numbers} added to the board${
+        `${total > 1 ? "Batches" : "Batch"} ${
+          numbers.length > 2
+            ? `${numbers.slice(0, -1).join(", ")} and ${numbers.at(-1)}`
+            : numbers.join(" and ")
+        } added to the board${
           issued === 0
             ? "."
-            : issued === (lot ? 2 : 1)
+            : issued === total
               ? " and issued for production."
-              : " — one issued for production."
+              : ` — ${issued} of ${total} issued for production.`
         }`,
       );
       setOpen(false);
@@ -480,18 +517,12 @@ export function NewBatchDialog({
             ]
           : packingRoute(parentBulk, v.packUnit, plannable),
     );
-    // The paired lot packs this bulk, so its route follows the bulk unit too.
-    if (withLot && "bulkUnit" in changed) {
-      loadRoute(
-        lotPlan,
-        packingRoute(v.bulkUnit, lotForm.getValues("packUnit"), plannable),
-      );
+    // The lots pack this bulk, so each one's route follows the bulk unit too.
+    if ("bulkUnit" in changed) {
+      for (const handle of lotHandles.current.values()) {
+        handle.reroute(v.bulkUnit);
+      }
     }
-  }
-
-  /** The paired lot's route: this bulk's unit, the lot's own pack unit. */
-  function rerouteLot(packUnit: string) {
-    loadRoute(lotPlan, packingRoute(getValues("bulkUnit"), packUnit, plannable));
   }
 
   const type = (batchType ?? defaultType) as BatchType;
@@ -509,35 +540,70 @@ export function NewBatchDialog({
     : null;
   const parent = bulkSources.find((j) => j.id === parentJobId);
 
-  /** The paired lot is only live on Bulk Production with a bulk picked. */
-  const pairing = isManufacturing && withLot && Boolean(picked);
-  const lotNeeded = pairing
-    ? bulkNeeded(
-        lotPicked?.required_qty || undefined,
-        typeof lotPackSize === "number" ? lotPackSize : undefined,
-      )
-    : null;
+  /**
+   * The lots are live on Bulk Production with a bulk picked — or, from "+ Lot",
+   * always: the bulk is the one it was opened on.
+   */
+  const pairing =
+    lotsOnly || (isManufacturing && lots.length > 0 && Boolean(picked));
+  /** The bulk the lots draw on, and what it is counted in. */
+  const lotBulk = lotsOnly ? presetBulk : picked;
+  const lotBulkUnit = lotsOnly ? (presetBulk.bulk_unit ?? undefined) : bulkUnit;
+  const lotProductIds = lots.map((l) => l.productId).filter(Boolean);
+  /** What each lot draws from the bulk — null until its batch and pack size. */
+  const lotNeeds = lots.map((l) =>
+    pairing
+      ? bulkNeeded(
+          products.find((p) => p.id === l.productId)?.required_qty || undefined,
+          l.packSize,
+        )
+      : null,
+  );
+  const lotsNeeded = lotNeeds.reduce<number>((sum, n) => sum + (n ?? 0), 0);
   // What the families bar measures against (0032). A batch raised here
   // declares no overage, so it is the bulk target itself.
-  const bulkAllowance = picked?.required_qty
-    ? Math.floor(picked.required_qty)
+  const bulkAllowance = lotBulk?.required_qty
+    ? Math.floor(lotBulk.required_qty)
     : null;
+  /** What the bulk's lots already on the board draw — "+ Lot" only. */
+  const alreadyAllocated = lotsOnly ? (presetBulk.allocated_qty ?? 0) : 0;
+
+  /** The slots as they stand, counting the one "+ Lot" opens on. */
+  const withSeed = (current: LotSlot[]) =>
+    lotsOnly && current.length === 0 ? [SEED_LOT] : current;
+  function addLot() {
+    setLots((current) => [
+      ...withSeed(current),
+      { key: crypto.randomUUID(), productId: "" },
+    ]);
+  }
+  function removeLot(key: string) {
+    setLots((current) => withSeed(current).filter((l) => l.key !== key));
+  }
+  function patchLot(key: string, patch: Partial<Omit<LotSlot, "key">>) {
+    setLots((current) =>
+      withSeed(current).map((l) => (l.key === key ? { ...l, ...patch } : l)),
+    );
+  }
 
   const busy = create.isPending;
 
   /**
    * Validates every part the dialog is about to save — the batch, its plan,
-   * and when paired the lot and the lot's plan — all at once, so every error
+   * and when paired the lots and each lot's plan — all at once, so every error
    * in every part shows on the same submit, and writes nothing until they all
    * pass.
    */
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     if (busy) return;
+    const handles = pairing
+      ? lots.flatMap((l) => lotHandles.current.get(l.key) ?? [])
+      : [];
     const checks = await Promise.all([
-      validateBatch(),
-      plan.trigger(),
-      ...(pairing ? [lotForm.trigger(), lotPlan.trigger()] : []),
+      // "+ Lot" has no batch of its own: the bulk is already on the board.
+      ...(lotsOnly ? [] : [validateBatch(), plan.trigger()]),
+      ...handles.map((h) => h.validate()),
     ]);
     if (!checks.every(Boolean)) {
       toast.error("Some fields need attention — they're marked in red.");
@@ -547,14 +613,15 @@ export function NewBatchDialog({
     // the checks above have already proved it parses.
     await create
       .mutateAsync({
-        values: newBatchSchema.parse(getValues()),
-        stagePlan: stagePlanSchema.parse(plan.getValues()),
-        lot: pairing
-          ? {
-              values: pairedLotSchema.parse(lotForm.getValues()),
-              plan: stagePlanSchema.parse(lotPlan.getValues()),
-            }
-          : undefined,
+        main: lotsOnly
+          ? null
+          : {
+              values: newBatchSchema.parse(getValues()),
+              stagePlan: stagePlanSchema.parse(plan.getValues()),
+            },
+        parent: presetBulk,
+        lotEntries: handles.map((h) => h.read()),
+        lotNotes: lotsOnly ? (getValues("notes") ?? "").trim() : "",
       })
       .catch(() => undefined);
   }
@@ -562,12 +629,8 @@ export function NewBatchDialog({
   /** What a new stage row counts in: the batch's own unit, where it has one. */
   const mainUnitWord = isPacking ? packUnitWatch : bulkUnit || packUnitWatch;
   const mainUnit = asStageUnit(mainUnitWord);
-  const lotUnit = asStageUnit(lotPackUnit);
   const mainOrder = picked?.required_qty
     ? `${fmt(picked.required_qty)}${mainUnitWord ? ` ${mainUnitWord}` : ""}`
-    : null;
-  const lotOrder = lotPicked?.required_qty
-    ? `${fmt(lotPicked.required_qty)}${lotPackUnit ? ` ${lotPackUnit}` : ""}`
     : null;
 
   return (
@@ -594,8 +657,8 @@ export function NewBatchDialog({
           <DialogHeader className="shrink-0 gap-1 border-b border-line bg-surface px-5 pt-4 pr-12 pb-3">
             <DialogTitle className="text-[0.9375rem] text-ink">New batch</DialogTitle>
             <DialogDescription className="text-xs">
-              It lands in Planned and moves itself as entries are logged
-              against it.
+              It lands in Planning. Issue it for production and it becomes Planned,
+              then moves itself as entries are logged against it.
             </DialogDescription>
           </DialogHeader>
 
@@ -604,11 +667,71 @@ export function NewBatchDialog({
             className="flex min-h-0 flex-1 flex-col"
           >
             <div className="scrollbar-slim @container min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-3.5">
+              {/* ── The bulk, read back ────────────────────────────────────
+                  "+ Lot": the production batch is already on the board, so it
+                  is shown here as the batch is in the full form — the same
+                  fields in the same places — but as facts, not questions.
+                  The lots below are what is asked. */}
+              {lotsOnly && presetBulk && (
+                <section className="space-y-3 rounded-xl border border-line bg-surface p-3.5">
+                  <div className="grid gap-3 @3xl:grid-cols-4">
+                    <Field label="Production batch" className="@3xl:col-span-2">
+                      <ReadOnlyValue>
+                        {presetBulk.batch_no} — {presetBulk.product_name}
+                      </ReadOnlyValue>
+                    </Field>
+                    <Field label="Priority">
+                      <ReadOnlyValue>
+                        {PRIORITY_LABELS[presetBulk.priority]}
+                      </ReadOnlyValue>
+                    </Field>
+                    <Field label="Bulk unit">
+                      <ReadOnlyValue>{presetBulk.bulk_unit ?? "—"}</ReadOnlyValue>
+                    </Field>
+                  </div>
+                  <Summary className="@3xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
+                    <Stat label="Product" value={presetBulk.product_name} />
+                    <Stat label="Code" value={presetBulk.product_code || "—"} mono />
+                    <Stat
+                      label="Bulk target"
+                      value={
+                        presetBulk.required_qty
+                          ? fmt(presetBulk.required_qty)
+                          : "Not set"
+                      }
+                      mono
+                    />
+                    <Stat
+                      label="Due date"
+                      value={
+                        presetBulk.due_date
+                          ? longDay(presetBulk.due_date)
+                          : "None in Products"
+                      }
+                      icon={CalendarDays}
+                      title="Set on the batch in Products"
+                    />
+                  </Summary>
+                  {presetBulk.child_count > 0 && (
+                    <p className="text-[0.6875rem] text-ink-5">
+                      {presetBulk.child_count === 1
+                        ? "1 lot already draws"
+                        : `${presetBulk.child_count} lots already draw`}{" "}
+                      <span className="font-mono">
+                        {fmt(alreadyAllocated)} {presetBulk.bulk_unit ?? "units"}
+                      </span>{" "}
+                      of this bulk.
+                    </p>
+                  )}
+                </section>
+              )}
+
               {/* ── The batch ──────────────────────────────────────────────
                   Everything that is *this batch's* and not the type's: which
                   one, how urgent, and — for a bulk batch, whose only own field
                   is the unit — what its bulk is counted in. Then what the
                   catalogue already knows about it, read back as a strip. */}
+              {!lotsOnly && (
               <section className="space-y-3 rounded-xl border border-line bg-surface p-3.5">
                 <div
                   className={cn(
@@ -656,8 +779,8 @@ export function NewBatchDialog({
                           searchPlaceholder="Batch number, code or product…"
                           emptyMessage="No batch matches that."
                           options={available
-                            // Not the batch already chosen as the paired lot.
-                            .filter((p) => !pairing || p.id !== lotProductId)
+                            // Not a batch already chosen as one of the lots.
+                            .filter((p) => !lotProductIds.includes(p.id))
                             .map((product) => ({
                             value: product.id,
                             label: `${product.batch_no} — ${product.name}`,
@@ -824,6 +947,7 @@ export function NewBatchDialog({
                   </p>
                 )}
               </section>
+              )}
 
               {/* ── Single batch ───────────────────────────────────────────
                   Both halves in one row — the bulk's unit and the lot's pack
@@ -951,7 +1075,7 @@ export function NewBatchDialog({
               )}
 
               {/* ── Packing ──────────────────────────────────────────────── */}
-              {isPacking && (
+              {isPacking && !lotsOnly && (
                 <TypeSection
                   icon={Package}
                   title="Finished lot details"
@@ -1121,24 +1245,28 @@ export function NewBatchDialog({
                   already known goes from nothing to planned — or issued — in
                   one sitting instead of a second trip through Plan stages.
                   Left empty, it is exactly the old New batch. */}
-              <StagePlanEditor
-                form={plan}
-                idPrefix="nb-plan"
-                processes={plannable}
-                rooms={rooms}
-                showWorkOrder={workOrderMode === "stage"}
-                defaultUnit={mainUnit}
-                orderLabel={mainOrder}
-                disabled={busy}
-              />
+              {!lotsOnly && (
+                <StagePlanEditor
+                  form={plan}
+                  idPrefix="nb-plan"
+                  processes={plannable}
+                  rooms={rooms}
+                  showWorkOrder={workOrderMode === "stage"}
+                  defaultUnit={mainUnit}
+                  orderLabel={mainOrder}
+                  disabled={busy}
+                />
+              )}
 
-              {/* ── Paired finished lot ─────────────────────────────────────
-                  The bulk and the lot packed from it are usually planned
-                  together. Ticked, the lot is filled in here, validated with
+              {/* ── Finished lots ────────────────────────────────────────────
+                  The bulk and the lots packed from it are usually planned
+                  together. Ticked, the lots are filled in here, validated with
                   the bulk, and raised in the same submit already drawing on
                   it — no second trip through the dialog to find the bulk in
-                  the parent picker. Needs a bulk picked first: there is
-                  nothing to pack from until there is one. */}
+                  the parent picker. A bulk is often packed into several lots
+                  (a market or a pack size each), so more can be added. Needs
+                  a bulk picked first: there is nothing to pack from until
+                  there is one. */}
               {isManufacturing && (
                 <label
                   title={picked ? undefined : "Pick the bulk batch first"}
@@ -1146,7 +1274,7 @@ export function NewBatchDialog({
                     "flex items-start gap-2.5 rounded-xl border px-3 py-2.5 transition select-none",
                     !picked
                       ? "cursor-not-allowed border-dashed border-line-strong text-ink-6"
-                      : withLot
+                      : lots.length > 0
                         ? "cursor-pointer border-brand-line bg-brand-tint text-brand-deep"
                         : "cursor-pointer border-line bg-surface text-ink-3 hover:border-line-strong hover:text-ink",
                   )}
@@ -1155,248 +1283,111 @@ export function NewBatchDialog({
                     type="checkbox"
                     checked={pairing}
                     disabled={!picked || busy}
-                    onChange={(e) => setWithLot(e.target.checked)}
+                    onChange={(e) => {
+                      if (e.target.checked) addLot();
+                      else setLots([]);
+                    }}
                     className="mt-0.5 size-4 shrink-0 accent-[var(--color-brand)]"
                   />
                   <span>
                     <span className="flex items-center gap-1.5 text-[0.7812rem] font-semibold">
                       <Package className="size-3.5" aria-hidden />
-                      Also add a finished lot from this bulk
+                      Also add finished lots from this bulk
                     </span>
                     <span className="mt-0.5 block text-[0.6875rem] font-normal opacity-80">
                       {picked
-                        ? "Both batches are checked together and added in one go, the lot already drawing on this bulk."
+                        ? "All batches are checked together and added in one go, each lot already drawing on this bulk."
                         : "Pick the bulk batch above first."}
                     </span>
                   </span>
                 </label>
               )}
 
+              {pairing &&
+                lots.map((lot, index) => (
+                  <LotEntry
+                    key={lot.key}
+                    ref={(handle) => {
+                      if (handle) lotHandles.current.set(lot.key, handle);
+                      else lotHandles.current.delete(lot.key);
+                    }}
+                    index={index}
+                    count={lots.length}
+                    bulk={lotBulk}
+                    bulkUnit={lotBulkUnit}
+                    bulkAllowance={bulkAllowance}
+                    products={products}
+                    available={available}
+                    // Not the bulk itself, and not a batch another lot has.
+                    takenIds={[
+                      productId,
+                      ...lots
+                        .filter((l) => l.key !== lot.key)
+                        .map((l) => l.productId),
+                    ]}
+                    plannable={plannable}
+                    rooms={rooms}
+                    showWorkOrder={workOrderMode === "stage"}
+                    perBatchWo={perBatchWo}
+                    disabled={busy}
+                    onReport={(patch) => patchLot(lot.key, patch)}
+                    // The last lot of a "+ Lot" dialog is what it is for.
+                    onRemove={
+                      lotsOnly && lots.length === 1
+                        ? undefined
+                        : () => removeLot(lot.key)
+                    }
+                  />
+                ))}
+
               {pairing && (
-                <TypeSection
-                  icon={Package}
-                  title={`Finished lot from ${picked?.batch_no ?? "this bulk"}`}
-                  tone="border-brand-line bg-brand-tint"
-                >
-                  <div className="grid gap-3 @3xl:grid-cols-4">
-                    <Field
-                      label="Lot batch"
-                      htmlFor="nb-lot-product"
-                      error={lotErrors.productId?.message}
-                      className="@3xl:col-span-2"
-                    >
-                      <Controller
-                        name="productId"
-                        control={lotForm.control}
-                        render={({ field }) => (
-                          <SelectField
-                            className={CONTROL}
-                            id="nb-lot-product"
-                            value={field.value ?? ""}
-                            onChange={field.onChange}
-                            onBlur={field.onBlur}
-                            ariaInvalid={Boolean(lotErrors.productId)}
-                            placeholder="Select the lot's batch…"
-                            searchPlaceholder="Batch number, code or product…"
-                            emptyMessage="No batch matches that."
-                            options={available
-                              .filter((p) => p.id !== productId)
-                              .map((product) => ({
-                                value: product.id,
-                                label: `${product.batch_no} — ${product.name}`,
-                                meta:
-                                  product.code || product.work_order || undefined,
-                              }))}
-                          />
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={addLot}
+                    disabled={busy}
+                    className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-brand-line bg-surface text-xs font-semibold text-brand transition hover:border-brand hover:bg-brand-tint disabled:opacity-50"
+                  >
+                    <Plus className="size-3.5" aria-hidden />
+                    Add another lot
+                  </button>
+                  {/* The lots drawn together against the one bulk — what no
+                      single card can say. Advisory, as in Batch families. */}
+                  {(lots.length > 1 || alreadyAllocated > 0) &&
+                    lotsNeeded > 0 && (
+                      <p
+                        className={cn(
+                          "rounded-xl px-3 py-2 text-xs",
+                          bulkAllowance !== null &&
+                            alreadyAllocated + lotsNeeded > bulkAllowance
+                            ? "bg-warn-tint text-warn-ink ring-1 ring-warn-line"
+                            : "bg-surface text-ink-3 ring-1 ring-line",
                         )}
-                      />
-                    </Field>
-                    <Field
-                      label="Pack size"
-                      note="units per container"
-                      htmlFor="nb-lot-pack-size"
-                      error={lotErrors.packSize?.message}
-                    >
-                      <input
-                        id="nb-lot-pack-size"
-                        type="number"
-                        step="any"
-                        min={0}
-                        placeholder="e.g. 60"
-                        aria-invalid={Boolean(lotErrors.packSize)}
-                        className={cn(FIELD, MONO)}
-                        {...lotForm.register("packSize", { valueAsNumber: true })}
-                      />
-                    </Field>
-                    <Field
-                      label="Pack unit"
-                      htmlFor="nb-lot-pack-unit"
-                      error={lotErrors.packUnit?.message}
-                    >
-                      <Controller
-                        name="packUnit"
-                        control={lotForm.control}
-                        render={({ field }) => (
-                          <SelectField
-                            className={CONTROL}
-                            id="nb-lot-pack-unit"
-                            value={field.value ?? ""}
-                            onChange={(v) => {
-                              field.onChange(v);
-                              rerouteLot(v);
-                            }}
-                            onBlur={field.onBlur}
-                            ariaInvalid={Boolean(lotErrors.packUnit)}
-                            clearable
-                            options={PACK_UNITS.map((unit) => ({
-                              value: unit,
-                              label: unit,
-                            }))}
-                          />
-                        )}
-                      />
-                    </Field>
-                  </div>
-
-                  {lotPicked && (
-                    <Summary className="mt-3 border-transparent bg-surface @3xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
-                      <Stat label="Product" value={lotPicked.name} />
-                      <Stat
-                        label="Containers to fill"
-                        value={
-                          lotPicked.required_qty
-                            ? fmt(lotPicked.required_qty)
-                            : "Not set"
-                        }
-                        mono
-                      />
-                      <Stat
-                        label="Due date"
-                        value={
-                          lotPicked.due_date
-                            ? longDay(lotPicked.due_date)
-                            : "None in Products"
-                        }
-                        icon={CalendarDays}
-                        title="Set on the batch in Products"
-                      />
-                    </Summary>
-                  )}
-                  {lotPicked && !lotPicked.required_qty && (
-                    <p className="mt-2 rounded-xl border border-warn-line bg-warn-tint px-3 py-2 text-[0.6875rem] text-warn-ink">
-                      Batch {lotPicked.batch_no} has no required quantity. Set
-                      it in Products, or this lot counts as nothing against its
-                      bulk.
-                    </p>
-                  )}
-
-                  <div className="mt-3 grid gap-3 @3xl:grid-cols-4">
-                    <Field
-                      label="Market"
-                      optional
-                      htmlFor="nb-lot-market"
-                      error={lotErrors.market?.message}
-                    >
-                      <input
-                        id="nb-lot-market"
-                        placeholder="AU, NZ, UK…"
-                        className={FIELD}
-                        {...lotForm.register("market")}
-                      />
-                    </Field>
-                    <Field
-                      label="Bulk qty received"
-                      note="if different"
-                      optional
-                      htmlFor="nb-lot-bulk-received"
-                      error={lotErrors.bulkQtyReceived?.message}
-                    >
-                      <input
-                        id="nb-lot-bulk-received"
-                        type="number"
-                        step="any"
-                        min={0}
-                        placeholder={lotNeeded ? String(lotNeeded) : "e.g. 60000"}
-                        className={cn(FIELD, MONO)}
-                        {...lotForm.register("bulkQtyReceived", {
-                          valueAsNumber: true,
-                        })}
-                      />
-                    </Field>
-                    {/* Only where the company tracks one work order per batch
-                        (Admin → Company) — the lot has a work order of its own,
-                        just as the bulk above does. */}
-                    {perBatchWo && (
-                      <Field
-                        label="Work order"
-                        note="saved on the lot's batch"
-                        optional
-                        htmlFor="nb-lot-wo"
-                        error={lotErrors.workOrder?.message}
                       >
-                        <input
-                          id="nb-lot-wo"
-                          placeholder={
-                            lotPicked
-                              ? `Same as ${lotPicked.batch_no}`
-                              : "e.g. 46001"
-                          }
-                          autoComplete="off"
-                          className={cn(FIELD, MONO)}
-                          {...lotForm.register("workOrder")}
-                        />
-                      </Field>
+                        {lots.length > 1 ? `All ${lots.length} lots together` : "This lot"}{" "}
+                        need{lots.length > 1 ? "" : "s"}{" "}
+                        <strong className="font-mono font-semibold text-brand">
+                          {fmt(lotsNeeded)}
+                        </strong>
+                        {alreadyAllocated > 0 && (
+                          <>
+                            {" "}
+                            on top of the {fmt(alreadyAllocated)} already
+                            allocated
+                          </>
+                        )}
+                        {bulkAllowance !== null && (
+                          <>
+                            {" "}
+                            of {lotBulk?.batch_no}&rsquo;s {fmt(bulkAllowance)}{" "}
+                            {lotBulkUnit || "units"}
+                            {alreadyAllocated + lotsNeeded > bulkAllowance &&
+                              ` — ${fmt(alreadyAllocated + lotsNeeded - bulkAllowance)} more than the bulk makes`}
+                          </>
+                        )}
+                      </p>
                     )}
-                  </div>
-
-                  {/* The arithmetic said out loud against the bulk beside it —
-                      advisory, as in Batch families: over is badged, never
-                      refused. */}
-                  {lotNeeded !== null && (
-                    <p
-                      className={cn(
-                        "mt-3 rounded-xl px-3 py-2 text-xs",
-                        bulkAllowance !== null && lotNeeded > bulkAllowance
-                          ? "bg-warn-tint text-warn-ink ring-1 ring-warn-line"
-                          : "bg-surface text-ink-3",
-                      )}
-                    >
-                      Bulk needed:{" "}
-                      <strong className="font-mono font-semibold text-brand">
-                        {fmt(lotNeeded)}
-                      </strong>
-                      {bulkAllowance !== null && (
-                        <>
-                          {" "}
-                          of {picked?.batch_no}&rsquo;s {fmt(bulkAllowance)}{" "}
-                          {bulkUnit || "units"}
-                          {lotNeeded > bulkAllowance &&
-                            ` — ${fmt(lotNeeded - bulkAllowance)} more than the bulk makes`}
-                        </>
-                      )}
-                    </p>
-                  )}
-
-                  <p className="mt-3 text-[0.6875rem] text-ink-5">
-                    Takes the bulk&rsquo;s priority; its due date is its own,
-                    from Products.
-                  </p>
-
-                  {/* The lot's own route — filling, labelling, packing — on
-                      a plan of its own, issued on its own tick. */}
-                  <div className="mt-4 border-t border-brand-line/60 pt-4">
-                    <StagePlanEditor
-                      form={lotPlan}
-                      idPrefix="nb-lot-plan"
-                      processes={plannable}
-                      rooms={rooms}
-                      showWorkOrder={workOrderMode === "stage"}
-                      defaultUnit={lotUnit}
-                      orderLabel={lotOrder}
-                      disabled={busy}
-                    />
-                  </div>
-                </TypeSection>
+                </div>
               )}
 
               {/* Last — the one field nobody has to fill in. */}
@@ -1430,13 +1421,369 @@ export function NewBatchDialog({
                 className="inline-flex h-10 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-4 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60"
               >
                 {busy && <Loader2 className="size-4 animate-spin" />}
-                {pairing ? "Add both to pipeline" : "Add to pipeline"}
+                {!pairing
+                  ? "Add to pipeline"
+                  : lotsOnly
+                    ? lots.length === 1
+                      ? "Add lot to pipeline"
+                      : `Add ${lots.length} lots to pipeline`
+                    : lots.length === 1
+                      ? "Add both to pipeline"
+                      : `Add all ${lots.length + 1} to pipeline`}
               </button>
             </div>
           </form>
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+/** What the dialog keeps of a lot: which batch it is, and how big a pack. */
+interface LotSlot {
+  key: string;
+  productId: string;
+  packSize?: number;
+}
+
+/** The first lot of a "+ Lot" dialog — there before anything is added. */
+const SEED_LOT: LotSlot = { key: "seed", productId: "" };
+
+/** What the one submit needs from a lot's card — which owns its own forms. */
+interface LotEntryHandle {
+  /** Runs the lot's checks and its plan's, so every error shows at once. */
+  validate: () => Promise<boolean>;
+  /** The parsed lot and plan — only after `validate` has passed. */
+  read: () => { values: PairedLotParsed; plan: StagePlanParsed };
+  /** The bulk's unit changed: re-read this lot's route, if untouched. */
+  reroute: (bulkUnit: string | undefined) => void;
+}
+
+/**
+ * One finished lot packed from the bulk being raised: its batch, pack, market
+ * and stage plan, on forms of its own so a dialog can hold as many as the bulk
+ * is packed into. The dialog sees only what it must — the batch and pack size,
+ * through `onReport`, to keep one lot out of another's picker and add the lots
+ * up against the bulk — and validates and reads the rest through `ref`.
+ */
+function LotEntry({
+  ref,
+  index,
+  count,
+  bulk,
+  bulkUnit,
+  bulkAllowance,
+  products,
+  available,
+  takenIds,
+  plannable,
+  rooms,
+  showWorkOrder,
+  perBatchWo,
+  disabled,
+  onReport,
+  onRemove,
+}: {
+  ref: Ref<LotEntryHandle>;
+  index: number;
+  /** How many lots the dialog holds — decides what the card says. */
+  count: number;
+  /** The bulk this lot is packed from — a batch in Products or a card. */
+  bulk: { batch_no: string } | null;
+  bulkUnit: string | undefined;
+  /** The bulk's target, what the lots are measured against. */
+  bulkAllowance: number | null;
+  products: Product[];
+  available: Product[];
+  /** Batches this lot's picker must not offer: the bulk and the other lots. */
+  takenIds: string[];
+  plannable: { id: string; name: string; category: string | null }[];
+  rooms: { id: string; name: string }[];
+  showWorkOrder: boolean;
+  perBatchWo: boolean;
+  disabled: boolean;
+  onReport: (patch: Partial<Omit<LotSlot, "key">>) => void;
+  /** Absent when this is the only lot a "+ Lot" dialog can be saved with. */
+  onRemove?: () => void;
+}) {
+  const lotForm = useForm<PairedLotValues, unknown, PairedLotParsed>({
+    resolver: zodResolver(pairedLotSchema),
+    defaultValues: emptyLot(),
+  });
+  const lotPlan = useForm<StagePlanValues, unknown, StagePlanParsed>({
+    resolver: zodResolver(stagePlanSchema),
+    defaultValues: emptyPlan(),
+  });
+  const errors = lotForm.formState.errors;
+  const [productId, packSize, packUnit] = useWatch({
+    control: lotForm.control,
+    name: ["productId", "packSize", "packUnit"],
+  });
+  const picked = useMemo(
+    () => products.find((p) => p.id === productId) ?? null,
+    [products, productId],
+  );
+  const needed = bulkNeeded(
+    picked?.required_qty || undefined,
+    typeof packSize === "number" ? packSize : undefined,
+  );
+
+  /** Loads the route only while the plan holds nothing typed. */
+  function loadLotRoute(unit: string | undefined, pack: string | undefined) {
+    if (!isUntouchedPlan(lotPlan.getValues("stages"))) return;
+    lotPlan.setValue("stages", packingRoute(unit, pack, plannable), {
+      shouldDirty: true,
+    });
+  }
+
+  useImperativeHandle(ref, () => ({
+    validate: async () =>
+      (await Promise.all([lotForm.trigger(), lotPlan.trigger()])).every(Boolean),
+    read: () => ({
+      values: pairedLotSchema.parse(lotForm.getValues()),
+      plan: stagePlanSchema.parse(lotPlan.getValues()),
+    }),
+    reroute: (unit) => loadLotRoute(unit, lotForm.getValues("packUnit")),
+  }));
+
+  const id = `nb-lot-${index}`;
+  const lotOrder = picked?.required_qty
+    ? `${fmt(picked.required_qty)}${packUnit ? ` ${packUnit}` : ""}`
+    : null;
+
+  return (
+    <TypeSection
+      icon={Package}
+      title={`Finished lot${count > 1 ? ` ${index + 1}` : ""} from ${bulk?.batch_no ?? "this bulk"}`}
+      tone="border-brand-line bg-brand-tint"
+      action={
+        onRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            disabled={disabled}
+            aria-label={`Remove finished lot ${index + 1}`}
+            className="grid size-6 place-items-center rounded-md text-ink-5 transition hover:bg-danger-soft hover:text-danger-deep disabled:opacity-50"
+          >
+            <X className="size-3.5" />
+          </button>
+        )
+      }
+    >
+      <div className="grid gap-3 @3xl:grid-cols-4">
+        <Field
+          label="Lot batch"
+          htmlFor={`${id}-product`}
+          error={errors.productId?.message}
+          className="@3xl:col-span-2"
+        >
+          <Controller
+            name="productId"
+            control={lotForm.control}
+            render={({ field }) => (
+              <SelectField
+                className={CONTROL}
+                id={`${id}-product`}
+                value={field.value ?? ""}
+                onChange={(v) => {
+                  field.onChange(v);
+                  onReport({ productId: v });
+                }}
+                onBlur={field.onBlur}
+                ariaInvalid={Boolean(errors.productId)}
+                placeholder="Select the lot's batch…"
+                searchPlaceholder="Batch number, code or product…"
+                emptyMessage="No batch matches that."
+                options={available
+                  .filter((p) => !takenIds.includes(p.id))
+                  .map((product) => ({
+                    value: product.id,
+                    label: `${product.batch_no} — ${product.name}`,
+                    meta: product.code || product.work_order || undefined,
+                  }))}
+              />
+            )}
+          />
+        </Field>
+        <Field
+          label="Pack size"
+          note="units per container"
+          htmlFor={`${id}-pack-size`}
+          error={errors.packSize?.message}
+        >
+          <input
+            id={`${id}-pack-size`}
+            type="number"
+            step="any"
+            min={0}
+            placeholder="e.g. 60"
+            aria-invalid={Boolean(errors.packSize)}
+            className={cn(FIELD, MONO)}
+            {...lotForm.register("packSize", {
+              valueAsNumber: true,
+              onChange: (e) => {
+                const n = e.target.valueAsNumber;
+                onReport({ packSize: Number.isNaN(n) ? undefined : n });
+              },
+            })}
+          />
+        </Field>
+        <Field
+          label="Pack unit"
+          htmlFor={`${id}-pack-unit`}
+          error={errors.packUnit?.message}
+        >
+          <Controller
+            name="packUnit"
+            control={lotForm.control}
+            render={({ field }) => (
+              <SelectField
+                className={CONTROL}
+                id={`${id}-pack-unit`}
+                value={field.value ?? ""}
+                onChange={(v) => {
+                  field.onChange(v);
+                  loadLotRoute(bulkUnit, v);
+                }}
+                onBlur={field.onBlur}
+                ariaInvalid={Boolean(errors.packUnit)}
+                clearable
+                options={PACK_UNITS.map((unit) => ({
+                  value: unit,
+                  label: unit,
+                }))}
+              />
+            )}
+          />
+        </Field>
+      </div>
+
+      {picked && (
+        <Summary className="mt-3 border-transparent bg-surface @3xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
+          <Stat label="Product" value={picked.name} />
+          <Stat
+            label="Containers to fill"
+            value={picked.required_qty ? fmt(picked.required_qty) : "Not set"}
+            mono
+          />
+          <Stat
+            label="Due date"
+            value={picked.due_date ? longDay(picked.due_date) : "None in Products"}
+            icon={CalendarDays}
+            title="Set on the batch in Products"
+          />
+        </Summary>
+      )}
+      {picked && !picked.required_qty && (
+        <p className="mt-2 rounded-xl border border-warn-line bg-warn-tint px-3 py-2 text-[0.6875rem] text-warn-ink">
+          Batch {picked.batch_no} has no required quantity. Set it in Products,
+          or this lot counts as nothing against its bulk.
+        </p>
+      )}
+
+      <div className="mt-3 grid gap-3 @3xl:grid-cols-4">
+        <Field
+          label="Market"
+          optional
+          htmlFor={`${id}-market`}
+          error={errors.market?.message}
+        >
+          <input
+            id={`${id}-market`}
+            placeholder="AU, NZ, UK…"
+            className={FIELD}
+            {...lotForm.register("market")}
+          />
+        </Field>
+        <Field
+          label="Bulk qty received"
+          note="if different"
+          optional
+          htmlFor={`${id}-bulk-received`}
+          error={errors.bulkQtyReceived?.message}
+        >
+          <input
+            id={`${id}-bulk-received`}
+            type="number"
+            step="any"
+            min={0}
+            placeholder={needed ? String(needed) : "e.g. 60000"}
+            className={cn(FIELD, MONO)}
+            {...lotForm.register("bulkQtyReceived", { valueAsNumber: true })}
+          />
+        </Field>
+        {/* Only where the company tracks one work order per batch
+            (Admin → Company) — the lot has a work order of its own, just as
+            the bulk above does. */}
+        {perBatchWo && (
+          <Field
+            label="Work order"
+            note="saved on the lot's batch"
+            optional
+            htmlFor={`${id}-wo`}
+            error={errors.workOrder?.message}
+          >
+            <input
+              id={`${id}-wo`}
+              placeholder={
+                picked ? `Same as ${picked.batch_no}` : "e.g. 46001"
+              }
+              autoComplete="off"
+              className={cn(FIELD, MONO)}
+              {...lotForm.register("workOrder")}
+            />
+          </Field>
+        )}
+      </div>
+
+      {/* The arithmetic said out loud against the bulk — advisory, as in
+          Batch families: over is badged, never refused. With several lots the
+          allowance is shared, so the total is said once below the cards and a
+          card only says what it needs. */}
+      {needed !== null && (
+        <p
+          className={cn(
+            "mt-3 rounded-xl px-3 py-2 text-xs",
+            count === 1 && bulkAllowance !== null && needed > bulkAllowance
+              ? "bg-warn-tint text-warn-ink ring-1 ring-warn-line"
+              : "bg-surface text-ink-3",
+          )}
+        >
+          Bulk needed:{" "}
+          <strong className="font-mono font-semibold text-brand">
+            {fmt(needed)}
+          </strong>
+          {count === 1 && bulkAllowance !== null && (
+            <>
+              {" "}
+              of {bulk?.batch_no}&rsquo;s {fmt(bulkAllowance)}{" "}
+              {bulkUnit || "units"}
+              {needed > bulkAllowance &&
+                ` — ${fmt(needed - bulkAllowance)} more than the bulk makes`}
+            </>
+          )}
+        </p>
+      )}
+
+      <p className="mt-3 text-[0.6875rem] text-ink-5">
+        Takes the bulk&rsquo;s priority; its due date is its own, from Products.
+      </p>
+
+      {/* The lot's own route — filling, labelling, packing — on a plan of its
+          own, issued on its own tick. */}
+      <div className="mt-4 border-t border-brand-line/60 pt-4">
+        <StagePlanEditor
+          form={lotPlan}
+          idPrefix={`${id}-plan`}
+          processes={plannable}
+          rooms={rooms}
+          showWorkOrder={showWorkOrder}
+          defaultUnit={asStageUnit(packUnit)}
+          orderLabel={lotOrder}
+          disabled={disabled}
+        />
+      </div>
+    </TypeSection>
   );
 }
 
@@ -1474,12 +1821,22 @@ function emptyLot(): PairedLotValues {
   };
 }
 
+/** A fact in the shape of a field — same height and frame, nothing to edit. */
+function ReadOnlyValue({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex h-9 items-center rounded-lg border border-line bg-sunken px-2.5 text-[0.8125rem] text-ink-2">
+      <span className="truncate">{children}</span>
+    </div>
+  );
+}
+
 /** The tinted block a batch type's own fields live in. */
 function TypeSection({
   icon: Icon,
   title,
   tone,
   info,
+  action,
   children,
 }: {
   icon: typeof Package;
@@ -1487,6 +1844,8 @@ function TypeSection({
   tone: string;
   /** What the section is for — folded behind an (i) rather than printed. */
   info?: React.ReactNode;
+  /** Pushed to the end of the heading — a card's remove button. */
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -1495,6 +1854,7 @@ function TypeSection({
         <Icon className="size-3.5" aria-hidden />
         {title}
         {info && <InfoTip label={`About ${title.toLowerCase()}`}>{info}</InfoTip>}
+        {action && <span className="ml-auto">{action}</span>}
       </p>
       {children}
     </section>

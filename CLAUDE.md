@@ -45,7 +45,7 @@ Next.js 16 (App Router), React 19, TypeScript strict · Tailwind v4 (no `tailwin
 - **Shift-log entries are audit-protected:** no delete policy (never add one), insert requires `logged_by = auth.uid()`, updates go through `shift_log_amend_guard` (needs an `amend_note`, restores provenance columns). **Triggers on `shift_log_entries` are load-bearing** — they move pipeline cards and raise actions, and fire on update too. Adding one means adding its React Query key to the invalidation list in `log-entry-form.tsx` (IMPLEMENTATION_GUIDE_2 §9).
 - **Derived, never stored:** product status, overdue / escalated, maintenance response and downtime. A stored copy is a second record of one fact.
 - **Null, not zero,** for a measurement that does not apply (speed on a manual stage, quantity on a stage that produces nothing) — OEE must tell "not applicable" from "produced nothing".
-- Migrations (`supabase/migrations/NNNN_name.sql`, currently `0001`–`0047`) are applied **by hand** in the Supabase SQL Editor; the CLI is not installed. Say so when you add one. See the migrations rule.
+- Migrations (`supabase/migrations/NNNN_name.sql`, currently `0001`–`0048`) are applied **by hand** in the Supabase SQL Editor; the CLI is not installed. Say so when you add one. See the migrations rule.
 
 ## Performance
 

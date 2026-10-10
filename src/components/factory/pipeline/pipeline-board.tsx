@@ -23,8 +23,10 @@ import {
   allocationFor,
   formatPackSize,
   jobProgress,
+  jobStage,
   packUnitSingular,
   type PipelineJob,
+  type PipelineStage,
 } from "@/lib/factory/pipeline-queries";
 import { useRenderClock } from "@/lib/use-render-clock";
 import { cn } from "@/lib/utils";
@@ -33,8 +35,8 @@ function fmt(n: number) {
   return Number(n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
-/** The status's own colours — the same four the rest of the module uses. */
-function statusStyle(status: PipelineJob["status"]) {
+/** The stage's own colours — the same ones the rest of the module uses. */
+function statusStyle(status: PipelineStage) {
   const column = PIPELINE_COLUMNS.find((c) => c.status === status);
   return {
     label: column?.label ?? status,
@@ -145,7 +147,7 @@ export function PipelineBoard({
       PIPELINE_COLUMNS.map((column) => ({
         value: column.status,
         label: column.label,
-        meta: String(jobs.filter((j) => j.status === column.status).length),
+        meta: String(jobs.filter((j) => jobStage(j) === column.status).length),
       })),
     [jobs],
   );
@@ -161,7 +163,7 @@ export function PipelineBoard({
 
   const filtering = status !== "" || type !== "";
   const matches = (job: PipelineJob) =>
-    (status === "" || job.status === status) &&
+    (status === "" || jobStage(job) === status) &&
     (type === "" || job.batch_type === type);
   // A family is kept whole: a bulk batch stays when one of its lots is what
   // matched, and is opened so the match is not hidden behind an arrow.
@@ -274,7 +276,7 @@ function BatchRow({
   onDelete: (job: PipelineJob) => void;
   onAddPacking: (parentId: string) => void;
 }) {
-  const status = statusStyle(job.status);
+  const status = statusStyle(jobStage(job));
   const stages = stagesByJob.get(job.id) ?? [];
   const percent = jobProgress(job);
   const isBulk = job.batch_type === "manufacturing";
@@ -475,7 +477,7 @@ function LotRow({
   onPlan: (job: PipelineJob) => void;
   onDelete: (job: PipelineJob) => void;
 }) {
-  const status = statusStyle(job.status);
+  const status = statusStyle(jobStage(job));
 
   return (
     <div className="relative flex flex-wrap items-center gap-x-3 gap-y-2 overflow-hidden rounded-lg border border-line bg-surface py-2.5 pr-2.5 pl-3.5 sm:flex-nowrap">
@@ -626,7 +628,7 @@ function RowAlerts({ job }: { job: PipelineJob }) {
 }
 
 function StatusChip({ job }: { job: PipelineJob }) {
-  const status = statusStyle(job.status);
+  const status = statusStyle(jobStage(job));
   return (
     <span
       className="rounded-full px-2.5 py-1 text-[0.625rem] font-bold tracking-[0.05em] whitespace-nowrap uppercase"

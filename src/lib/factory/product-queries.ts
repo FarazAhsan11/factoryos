@@ -1,7 +1,7 @@
 import type { ProductValues } from "@/app/factory/[slug]/admin/schemas";
 import {
   PIPELINE_COLUMNS,
-  type PipelineStatus,
+  type PipelineStage,
 } from "@/lib/factory/pipeline-queries";
 import { createClient } from "@/lib/supabase/client";
 
@@ -71,8 +71,8 @@ export const productKeys = {
     ["factory_products", factoryId, "batch-nos"] as const,
 };
 
-/** Received, then one of the board's four columns. */
-export type ProductStatus = "received" | PipelineStatus;
+/** Received, then one of the board's stages (Planning → Finished). */
+export type ProductStatus = "received" | PipelineStage;
 
 /**
  * Every status in the order a batch moves through them, with the board's own
@@ -97,7 +97,7 @@ export const PRODUCT_STATUSES: {
 /**
  * A product's status: **Received** from the moment it is added, until the
  * batch has a card on the pipeline board — then whatever the board says:
- * Planned, In production, On hold, Finished.
+ * Planning, Planned, In production, On hold, Finished.
  *
  * Derived, never stored. The card's status is already moved by the shift log
  * (`pipeline_sync_from_log`) and by stage sign-offs; a copy on the product
@@ -105,9 +105,9 @@ export const PRODUCT_STATUSES: {
  * step would be the one a customer rang up about.
  */
 export function productStatus(
-  jobStatus: PipelineStatus | undefined,
+  jobStage: PipelineStage | undefined,
 ): ProductStatus {
-  return jobStatus ?? "received";
+  return jobStage ?? "received";
 }
 
 export function statusMeta(status: ProductStatus) {

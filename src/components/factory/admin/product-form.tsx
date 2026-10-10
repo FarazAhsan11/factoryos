@@ -347,7 +347,7 @@ export function ProductForm({
                 </label>
                 <p className="mt-0.5 text-[0.7188rem] leading-snug text-ink-5">
                   {plannedLocked ??
-                    "Joins the pipeline board as Planned on this day. Unlike Exp. start it moves the batch — leave it blank to add it from New batch instead."}
+                    "Joins the pipeline board as Planning on this day. Unlike Exp. start it moves the batch — leave it blank to add it from New batch instead."}
                 </p>
                 {errors.plannedFor?.message && (
                   <p role="alert" className="mt-1 text-[0.7188rem] text-danger-deep">

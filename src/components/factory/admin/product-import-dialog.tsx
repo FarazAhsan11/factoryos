@@ -223,7 +223,7 @@ export function ProductImportDialog({
                   Planned for
                 </strong>{" "}
                 is the one date that acts: it puts the batch on the pipeline as
-                Planned that day. Leave it blank to add the batch by hand later.
+                Planning that day. Leave it blank to add the batch by hand later.
               </p>
             </div>
           )}
@@ -328,7 +328,7 @@ export function ProductImportDialog({
                       </span>
                       {r.plannedFor && (
                         <span
-                          title={`Joins the pipeline as Planned on ${r.plannedFor}`}
+                          title={`Joins the pipeline as Planning on ${r.plannedFor}`}
                           className="shrink-0 rounded-full bg-violet-soft px-1.5 py-0.5 text-[0.625rem] font-semibold text-violet"
                         >
                           {formatDay(r.plannedFor)}

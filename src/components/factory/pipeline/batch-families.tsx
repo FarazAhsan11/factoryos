@@ -9,8 +9,10 @@ import {
   allocationFor,
   familiesFrom,
   formatPackSize,
+  jobStage,
   packUnitSingular,
   type PipelineJob,
+  type PipelineStage,
 } from "@/lib/factory/pipeline-queries";
 import { cn } from "@/lib/utils";
 
@@ -21,13 +23,14 @@ function fmt(n: number) {
 const FILTERS = [
   { value: "all", label: "All" },
   { value: "active", label: "Active" },
+  { value: "planning", label: "Planning" },
   { value: "planned", label: "Planned" },
 ] as const;
 
 type Filter = (typeof FILTERS)[number]["value"];
 
 /** The board's own colours, so a status reads the same in both views. */
-function statusStyle(status: PipelineJob["status"]) {
+function statusStyle(status: PipelineStage) {
   const column = PIPELINE_COLUMNS.find((c) => c.status === status);
   return {
     label: column?.label ?? status,
@@ -69,14 +72,13 @@ export function BatchFamilies({
 }) {
   const [filter, setFilter] = useState<Filter>("all");
 
-  const matches = useMemo(() => {
+  const matches = (job: PipelineJob) => {
     if (filter === "active")
-      return (job: PipelineJob) =>
-        job.status === "production" || job.status === "hold";
-    if (filter === "planned")
-      return (job: PipelineJob) => job.status === "planned";
-    return () => true;
-  }, [filter]);
+      return job.status === "production" || job.status === "hold";
+    if (filter === "planning" || filter === "planned")
+      return jobStage(job) === filter;
+    return true;
+  };
 
   const { families, standalone } = useMemo(() => familiesFrom(jobs), [jobs]);
 
@@ -172,7 +174,7 @@ function FamilyGroup({
 }) {
   const [open, setOpen] = useState(true);
   const allocation = allocationFor(parent);
-  const status = statusStyle(parent.status);
+  const status = statusStyle(jobStage(parent));
 
   return (
     <section className="overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
@@ -316,7 +318,7 @@ function PackingChildRow({
   job: PipelineJob;
   onOpen: (job: PipelineJob) => void;
 }) {
-  const status = statusStyle(job.status);
+  const status = statusStyle(jobStage(job));
   const needed =
     job.pack_size && job.required_qty
       ? Number(job.required_qty) * Number(job.pack_size)
@@ -370,7 +372,7 @@ function StandaloneRow({
   job: PipelineJob;
   onOpen: (job: PipelineJob) => void;
 }) {
-  const status = statusStyle(job.status);
+  const status = statusStyle(jobStage(job));
 
   return (
     <button

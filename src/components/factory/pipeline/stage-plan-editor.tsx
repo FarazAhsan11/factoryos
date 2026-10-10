@@ -1,12 +1,23 @@
 "use client";
 
+import { useState } from "react";
 import {
   Controller,
   useFieldArray,
   useWatch,
   type UseFormReturn,
 } from "react-hook-form";
-import { ArrowDown, ArrowUp, Flag, ListChecks, Plus, Rocket, X } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowRight,
+  ArrowUp,
+  ChevronRight,
+  Flag,
+  ListChecks,
+  Plus,
+  Rocket,
+  X,
+} from "lucide-react";
 
 import {
   STAGE_UNITS,
@@ -33,6 +44,19 @@ const ROW_COLS =
   "@3xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1.1fr)_7.5rem_7.5rem_5.5rem_6rem]";
 const ROW_COLS_WO =
   "@3xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1.1fr)_6rem_7.5rem_7.5rem_5.5rem_6rem]";
+
+/**
+ * What a route's pills take turns in, by position — so neighbours always read
+ * as separate steps. Amber and red are left out: they mean "no activity yet"
+ * and "this stage has an error", and a pill must never look like either by
+ * accident. Written out in full, for the same reason as `ROW_COLS`.
+ */
+const PILL_TONES = [
+  "border-brand-line bg-brand-soft text-brand-deep",
+  "border-teal-line bg-teal-soft text-teal-deep",
+  "border-violet-line bg-violet-soft text-violet-deep",
+  "border-line-strong bg-sunken-2 text-ink-3",
+];
 
 type PlanForm = UseFormReturn<StagePlanValues, unknown, StagePlanParsed>;
 
@@ -88,6 +112,14 @@ export function StagePlanEditor({
   const rows = useWatch({ control, name: "stages" }) ?? [];
   const issue = useWatch({ control, name: "issue" });
 
+  // The route reads as pills; the rows behind them are the detail. Closed until
+  // asked for — except when a row has something to say (a failed submit), which
+  // must not stay hidden, and when a stage has just been added.
+  const [expanded, setExpanded] = useState(false);
+  const open = expanded || Boolean(errors.stages);
+  const rowsId = `${idPrefix}-rows`;
+  const processNames = new Map(processes.map((p) => [p.id, p]));
+
   // An activity that appears twice needs a label on each run; the field only
   // appears once it is needed.
   const repeated = new Set(
@@ -109,12 +141,15 @@ export function StagePlanEditor({
       canRunParallel: false,
     };
     append(row);
+    setExpanded(true);
   }
 
   return (
     // A container, so the rows lay out by the width they are given — the
     // dialog's — rather than by the screen's.
-    <section className="@container space-y-2.5">
+    // Spaced child by child, not with `space-y`: the rows are animated to zero
+    // height, and a collapsed child would still be given its gap.
+    <section className="@container">
       <div>
         <p className="flex items-center gap-1.5 text-[0.6875rem] font-bold tracking-[0.04em] text-ink-2 uppercase">
           <ListChecks className="size-3.5" aria-hidden />
@@ -131,8 +166,78 @@ export function StagePlanEditor({
         </p>
       </div>
 
+      {fields.length > 0 && (
+        <>
+          {/* The route at a glance: one pill per stage, in order, wrapping onto
+              the next line when there are more than fit. The flag marks the
+              stage that completes the order. */}
+          <div className="mt-2.5 rounded-xl border border-line bg-sunken/60 px-3 py-3">
+            <ol className="flex flex-wrap items-center gap-y-2" aria-label="Stage route">
+              {fields.map((field, index) => {
+                const row = rows[index];
+                const proc = row?.processId
+                  ? processNames.get(row.processId)
+                  : undefined;
+                const isLast = index === fields.length - 1;
+                const runLabel = row?.label?.trim();
+                const unresolved = !proc;
+                const hasError = Boolean(errors.stages?.[index]);
+                const name =
+                  proc?.name ?? row?.templateName ?? "Pick the activity";
+
+                return (
+                  <li key={field.id} className="flex items-center">
+                    {index > 0 && (
+                      <ArrowRight
+                        className="mx-1.5 size-3.5 shrink-0 text-ink-6"
+                        aria-hidden
+                      />
+                    )}
+                    <span
+                      title={
+                        isLast
+                          ? `${name} — completes the order`
+                          : `Stage ${index + 1}: ${name}`
+                      }
+                      className={cn(
+                        "inline-flex max-w-full items-center gap-1.5 rounded-full border px-3 py-1 text-[0.75rem] font-semibold",
+                        hasError
+                          ? "border-danger-line bg-danger-soft text-danger-deep"
+                          : unresolved
+                            ? "border-dashed border-warn-line bg-warn-tint text-warn-ink"
+                            : PILL_TONES[index % PILL_TONES.length],
+                      )}
+                    >
+                      {isLast && <Flag className="size-3 shrink-0" aria-hidden />}
+                      <span className="truncate">{name}</span>
+                      {runLabel && (
+                        <span className="font-normal opacity-70">· {runLabel}</span>
+                      )}
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            aria-expanded={open}
+            aria-controls={rowsId}
+            className="mt-1 inline-flex h-8 items-center gap-1.5 rounded-lg px-1 text-xs font-semibold text-brand transition hover:text-brand-deep"
+          >
+            <ChevronRight
+              className={cn("size-3.5 transition-transform", open && "rotate-90")}
+              aria-hidden
+            />
+            Customise stages
+          </button>
+        </>
+      )}
+
       {fields.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-line-strong bg-surface px-4 py-4 text-center">
+        <div className="mt-2.5 rounded-xl border border-dashed border-line-strong bg-surface px-4 py-4 text-center">
           <p className="text-xs text-ink-5">
             No stages yet. Add them now, or plan them later from the board.
           </p>
@@ -147,6 +252,19 @@ export function StagePlanEditor({
           </button>
         </div>
       ) : (
+        // Opens by animating its row track from 0fr to 1fr — the one way to
+        // transition to an auto height. `inert` keeps the hidden fields out of
+        // the tab order and the accessibility tree while it is closed.
+        <div
+          id={rowsId}
+          inert={!open}
+          className={cn(
+            "grid transition-[grid-template-rows,opacity] duration-300 ease-out motion-reduce:transition-none",
+            open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+          )}
+        >
+        <div className="min-h-0 overflow-hidden">
+        <div className="pt-2.5">
         <div className="overflow-hidden rounded-xl border border-line bg-surface">
           {/* Column headers, once — the cells' own labels are for the
               narrow layout. The spacers are the order controls' and the
@@ -454,6 +572,9 @@ export function StagePlanEditor({
             </button>
           </div>
         </div>
+        </div>
+        </div>
+        </div>
       )}
 
       {/* Issuing is what lets the floor log against the batch. Offered here so
@@ -462,7 +583,7 @@ export function StagePlanEditor({
           above are checked for before anything is saved. */}
       <label
         className={cn(
-          "flex cursor-pointer items-start gap-2.5 rounded-xl border px-3 py-2 transition select-none",
+          "mt-2.5 flex cursor-pointer items-start gap-2.5 rounded-xl border px-3 py-2 transition select-none",
           issue
             ? "border-teal-line bg-teal-soft text-teal-deep"
             : "border-line bg-surface text-ink-3 hover:border-line-strong",

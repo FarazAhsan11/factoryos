@@ -94,7 +94,7 @@ export function NewJobDialog({
         userId,
       ),
     onSuccess: (count) => {
-      toast.success(`${count} job${count === 1 ? "" : "s"} added to Planned.`);
+      toast.success(`${count} job${count === 1 ? "" : "s"} added to Planning.`);
       reset();
       setOpen(false);
       onCreated();
@@ -130,15 +130,15 @@ export function NewJobDialog({
         {/* `p-0` and a flex column so the batch list is the only thing that
             scrolls — the dialog used to scroll as a whole *and* cap the list
             at 18rem, which put two scrollbars inside one box and could take
-            "Add to Planned" off the bottom of the screen. */}
+            "Add to Planning" off the bottom of the screen. */}
         <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col gap-0 overflow-hidden p-0">
           <DialogHeader className="shrink-0 gap-1.5 border-b border-line bg-surface px-5 pt-5 pr-12 pb-4">
             <DialogTitle className="text-ink">
               Add jobs to the pipeline
             </DialogTitle>
             <DialogDescription>
-              Pick the batches to start tracking. They land in Planned and move
-              themselves as entries are logged against them.
+              Pick the batches to start tracking. They land in Planning — issue one for production and it becomes Planned,
+              then moves itself as entries are logged against it.
             </DialogDescription>
           </DialogHeader>
 
@@ -220,7 +220,7 @@ export function NewJobDialog({
                               know it was going to arrive on its own. */}
                           {product.planned_for && (
                             <span
-                              title={`Scheduled to join Planned on ${product.planned_for}`}
+                              title={`Scheduled to join Planning on ${product.planned_for}`}
                               className="shrink-0 rounded-full bg-violet-soft px-1.5 py-0.5 text-[0.625rem] font-semibold text-violet-deep ring-1 ring-violet-line"
                             >
                               {formatDay(product.planned_for)}
@@ -254,7 +254,7 @@ export function NewJobDialog({
                   {create.isPending && (
                     <Loader2 className="size-4 animate-spin" />
                   )}
-                  Add {picked.size || ""} to Planned
+                  Add {picked.size || ""} to Planning
                 </button>
               </div>
             </div>

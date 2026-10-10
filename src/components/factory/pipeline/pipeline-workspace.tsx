@@ -81,7 +81,7 @@ export function PipelineWorkspace({
   } = useQuery({
     queryKey: pipelineKeys.all(factoryId),
     // Scheduled batches are promoted immediately before the board is read, so
-    // a batch dated for today is already in Planned by the time it renders.
+    // a batch dated for today is already in Planning by the time it renders.
     // The promotion is idempotent, which is what makes running it on every
     // load — rather than on a timer nobody can see — the simple option.
     queryFn: async () => {
@@ -91,7 +91,7 @@ export function PipelineWorkspace({
       const promoted = await promoteScheduledJobs(factoryId).catch(() => 0);
       if (promoted > 0) {
         toast.success(
-          `${promoted} scheduled batch${promoted === 1 ? "" : "es"} added to Planned.`,
+          `${promoted} scheduled batch${promoted === 1 ? "" : "es"} added to Planning.`,
         );
       }
       return fetchPipelineJobs(factoryId);

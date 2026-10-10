@@ -790,7 +790,7 @@ export function ProductsPanel({
                             setEditingDateId(product.id);
                             setEditDate(product.planned_for ?? "");
                           }}
-                          title="The day this batch joins the pipeline as Planned"
+                          title="The day this batch joins the pipeline as Planning"
                           className={cn(
                             "inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 transition hover:bg-sunken-2",
                             product.planned_for

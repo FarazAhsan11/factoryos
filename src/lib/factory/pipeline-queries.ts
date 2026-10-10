@@ -120,13 +120,40 @@ export const pipelineKeys = {
   all: (factoryId: string) => ["pipeline_jobs", factoryId] as const,
 };
 
-/** The four columns, in board order. */
+/**
+ * What the board calls a batch: its stored status, with **Planning** in front.
+ *
+ * A card is `planned` from the moment it is added, but it can't be logged
+ * against until it is issued for production — and until then it is still being
+ * worked out (stages, targets), not planned. So the word follows the issue:
+ * Planning until `issued_at`, Planned once the floor can log against it, then
+ * In production / On hold / Finished as the shift log moves it.
+ *
+ * Derived, never stored — `issued_at` is already the fact, and a second column
+ * saying the same thing is the one that would fall out of step. The database
+ * view behind Customer orders derives the same word (0048).
+ */
+export type PipelineStage = "planning" | PipelineStatus;
+
+export function jobStage(
+  job: Pick<PipelineJob, "status" | "issued_at">,
+): PipelineStage {
+  return job.status === "planned" && !job.issued_at ? "planning" : job.status;
+}
+
+/** The stages, in the order a batch moves through them. */
 export const PIPELINE_COLUMNS: {
-  status: PipelineStatus;
+  status: PipelineStage;
   label: string;
   accent: string;
   tint: string;
 }[] = [
+  {
+    status: "planning",
+    label: "Planning",
+    accent: "var(--color-ink-5)",
+    tint: "var(--color-sunken-2)",
+  },
   {
     status: "planned",
     label: "Planned",

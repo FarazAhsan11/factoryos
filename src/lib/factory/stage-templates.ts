@@ -92,6 +92,18 @@ const PACKING: Record<string, RouteStage[]> = {
     UNIT_CARTONS,
     SHIPPER_BOX,
   ],
+  // "Powder Sachet" and "Liquid Sachet" name the dose in the pack unit itself;
+  // the bare "sachets" is what batches raised before that still carry.
+  "powder|powder sachets": [
+    filling("Powder Sachet Filling", "Powder Sachet Fill"),
+    UNIT_CARTONS,
+    SHIPPER_BOX,
+  ],
+  "liquid|liquid sachets": [
+    filling("Liquid Sachet Filling", "Liquid Sachet Fill"),
+    UNIT_CARTONS,
+    SHIPPER_BOX,
+  ],
   "powder|sachets": [
     filling("Powder Sachet Filling", "Powder Sachet Fill"),
     UNIT_CARTONS,

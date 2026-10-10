@@ -68,40 +68,99 @@ export const BATCH_TYPE_VALUES = BATCH_TYPES.map((t) => t.value) as unknown as [
  * whatever the room handles it as (3 drums). They answer different questions
  * and are deliberately not the same list.
  */
-export const BULK_UNITS = [
-  "tablets",
-  "capsules",
-  "softgels",
-  "sachets",
-  "kg",
-  "litres",
-  "units",
-] as const;
-
-export type BulkUnit = (typeof BULK_UNITS)[number];
+export const BULK_UNITS = ["kg", "capsules", "litres", "tablets"] as const;
 
 /**
- * The bulk unit picker's options. Powder is weighed and liquid measured, so
- * their *values* stay `kg` and `litres` — what a quantity is counted in — and
- * only the label names the dose form the plant's stage sheets use, which is
- * also what picks the stage route (`stage-templates.ts`).
+ * Values the picker no longer offers but rows may still hold — a batch raised
+ * before the list was cut down. Accepted by the schema so such a batch can be
+ * edited and saved untouched, and offered by the Edit dialog as that one extra
+ * option (`bulkUnitOptions`), so its unit is still visible.
+ */
+export const LEGACY_BULK_UNITS = ["softgels", "sachets", "units"] as const;
+
+export type BulkUnit =
+  | (typeof BULK_UNITS)[number]
+  | (typeof LEGACY_BULK_UNITS)[number];
+
+/**
+ * The bulk unit picker's options: the four dose forms the plant's stage sheets
+ * use. Powder is weighed and liquid measured, so their *values* stay `kg` and
+ * `litres` — what a quantity is counted in — and only the label names the dose
+ * form, which is also what picks the stage route (`stage-templates.ts`).
  */
 export const BULK_UNIT_OPTIONS = BULK_UNITS.map((unit) => ({
-  value: unit,
+  value: unit as string,
   label:
-    unit === "kg" ? "Powder (kg)" : unit === "litres" ? "Liquid (litres)" : unit,
+    unit === "kg"
+      ? "Powder (kg)"
+      : unit === "litres"
+        ? "Liquid (litres)"
+        : unit === "capsules"
+          ? "Capsule"
+          : "Tablet",
 }));
 
-/** What finished goods are counted in on a packing batch. */
+/**
+ * The picker's options, plus this batch's own unit when it is one the list no
+ * longer offers — so an old batch reads as what it is rather than as empty.
+ */
+export function bulkUnitOptions(current?: string | null) {
+  if (
+    current &&
+    (LEGACY_BULK_UNITS as readonly string[]).includes(current)
+  ) {
+    return [
+      ...BULK_UNIT_OPTIONS,
+      { value: current, label: `${current} (legacy)` },
+    ];
+  }
+  return BULK_UNIT_OPTIONS;
+}
+
+/**
+ * What finished goods are counted in on a packing batch. Stored plural, as it
+ * reads everywhere ("1,000 bottles"); the labels are the singular names the
+ * plant uses.
+ */
 export const PACK_UNITS = [
   "bottles",
-  "sachets",
+  "blisters",
   "pouches",
-  "boxes",
-  "units",
+  "powder sachets",
+  "liquid sachets",
 ] as const;
 
-export type PackUnit = (typeof PACK_UNITS)[number];
+/** As `LEGACY_BULK_UNITS`: still held by older batches, no longer offered. */
+export const LEGACY_PACK_UNITS = ["sachets", "boxes", "units"] as const;
+
+export type PackUnit =
+  | (typeof PACK_UNITS)[number]
+  | (typeof LEGACY_PACK_UNITS)[number];
+
+const PACK_UNIT_LABELS: Record<(typeof PACK_UNITS)[number], string> = {
+  bottles: "Bottle",
+  blisters: "Blister",
+  pouches: "Pouch",
+  "powder sachets": "Powder Sachet",
+  "liquid sachets": "Liquid Sachet",
+};
+
+export const PACK_UNIT_OPTIONS = PACK_UNITS.map((unit) => ({
+  value: unit as string,
+  label: PACK_UNIT_LABELS[unit],
+}));
+
+/** The picker's options, plus this batch's own unit if it is a legacy one. */
+export function packUnitOptions(current?: string | null) {
+  if (current && (LEGACY_PACK_UNITS as readonly string[]).includes(current)) {
+    return [...PACK_UNIT_OPTIONS, { value: current, label: `${current} (legacy)` }];
+  }
+  return PACK_UNIT_OPTIONS;
+}
+
+/** What any schema accepts: the offered units and the ones old rows hold. */
+const ANY_BULK_UNIT = [...BULK_UNITS, ...LEGACY_BULK_UNITS] as const;
+const ANY_PACK_UNIT = [...PACK_UNITS, ...LEGACY_PACK_UNITS] as const;
 
 export const PRIORITIES = ["high", "medium", "low"] as const;
 export type Priority = (typeof PRIORITIES)[number];
@@ -159,7 +218,7 @@ const batchFields = {
 
     /* ── Manufacturing ─────────────────────────────────────────────────── */
     bulkUnit: z
-      .union([z.enum(BULK_UNITS), z.literal("")])
+      .union([z.enum(ANY_BULK_UNIT), z.literal("")])
       .optional()
       .transform((v) => (v ? v : undefined)),
     /**
@@ -202,7 +261,7 @@ const batchFields = {
       .transform((v) => (v ? v : undefined)),
     packSize: optionalQty,
     packUnit: z
-      .union([z.enum(PACK_UNITS), z.literal("")])
+      .union([z.enum(ANY_PACK_UNIT), z.literal("")])
       .optional()
       .transform((v) => (v ? v : undefined)),
     /** Bulk physically handed over, when it differs from what pack size implies. */
@@ -337,7 +396,7 @@ export const pairedLotSchema = z.object({
     "Enter the pack size — it's what converts containers to bulk.",
   ),
   packUnit: z
-    .union([z.enum(PACK_UNITS), z.literal("")])
+    .union([z.enum(ANY_PACK_UNIT), z.literal("")])
     .optional()
     .transform((v) => (v ? v : undefined))
     .refine((v) => v !== undefined, "Pick what's being filled."),
@@ -394,7 +453,10 @@ export const STAGE_UNITS = [
   "capsules",
   "softgels",
   "bottles",
+  "blisters",
   "sachets",
+  "powder sachets",
+  "liquid sachets",
   "pouches",
   "boxes",
   "units",

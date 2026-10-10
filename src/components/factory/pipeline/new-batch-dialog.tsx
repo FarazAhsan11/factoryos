@@ -23,7 +23,7 @@ import { toast } from "sonner";
 
 import {
   BULK_UNIT_OPTIONS,
-  PACK_UNITS,
+  PACK_UNIT_OPTIONS,
   PRIORITIES,
   PRIORITY_LABELS,
   bulkNeeded,
@@ -653,7 +653,7 @@ export function NewBatchDialog({
           setOpen(next);
         }}
       >
-        <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-full max-w-[min(62rem,calc(100vw-2rem))] flex-col gap-0 overflow-hidden p-0">
+        <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-full max-w-[min(68rem,calc(100vw-2rem))] flex-col gap-0 overflow-hidden p-0">
           <DialogHeader className="shrink-0 gap-1 border-b border-line bg-surface px-5 pt-4 pr-12 pb-3">
             <DialogTitle className="text-[0.9375rem] text-ink">New batch</DialogTitle>
             <DialogDescription className="text-xs">
@@ -674,8 +674,8 @@ export function NewBatchDialog({
                   The lots below are what is asked. */}
               {lotsOnly && presetBulk && (
                 <section className="space-y-3 rounded-xl border border-line bg-surface p-3.5">
-                  <div className="grid gap-3 @3xl:grid-cols-4">
-                    <Field label="Production batch" className="@3xl:col-span-2">
+                  <div className="grid gap-3 @3xl:grid-cols-[minmax(0,3fr)_minmax(0,1fr)_minmax(0,1fr)]">
+                    <Field label="Production batch">
                       <ReadOnlyValue>
                         {presetBulk.batch_no} — {presetBulk.product_name}
                       </ReadOnlyValue>
@@ -736,14 +736,15 @@ export function NewBatchDialog({
                 <div
                   className={cn(
                     "grid gap-3",
-                    isManufacturing ? "@3xl:grid-cols-4" : "@3xl:grid-cols-3",
+                    isManufacturing
+                      ? "@3xl:grid-cols-[minmax(0,3fr)_minmax(0,1fr)_minmax(0,1fr)]"
+                      : "@3xl:grid-cols-[minmax(0,3fr)_minmax(0,1fr)]",
                   )}
                 >
                   <Field
                     label="Batch"
                     htmlFor="nb-product"
                     error={errors.productId?.message}
-                    className="@3xl:col-span-2"
                   >
                     <Controller
                       name="productId"
@@ -1049,10 +1050,7 @@ export function NewBatchDialog({
                             }}
                             onBlur={field.onBlur}
                             clearable
-                            options={PACK_UNITS.map((unit) => ({
-                              value: unit,
-                              label: unit,
-                            }))}
+                            options={PACK_UNIT_OPTIONS}
                           />
                         )}
                       />
@@ -1094,12 +1092,11 @@ export function NewBatchDialog({
                       point at when it is created. The other way in is
                       "Add packing batch" on a family, which opens this dialog
                       with the parent already chosen. */}
-                  <div className="grid gap-3 @3xl:grid-cols-4">
+                  <div className="grid gap-3 @3xl:grid-cols-[minmax(0,3fr)_minmax(0,1fr)_minmax(0,1fr)]">
                     <Field
                       label="Bulk from"
                       htmlFor="nb-parent"
                       error={errors.parentJobId?.message}
-                      className="@3xl:col-span-2"
                     >
                     <Controller
                       name="parentJobId"
@@ -1166,10 +1163,7 @@ export function NewBatchDialog({
                             }}
                             onBlur={field.onBlur}
                             clearable
-                            options={PACK_UNITS.map((unit) => ({
-                              value: unit,
-                              label: unit,
-                            }))}
+                            options={PACK_UNIT_OPTIONS}
                           />
                         )}
                       />
@@ -1570,12 +1564,11 @@ function LotEntry({
         )
       }
     >
-      <div className="grid gap-3 @3xl:grid-cols-4">
+      <div className="grid gap-3 @3xl:grid-cols-[minmax(0,3fr)_minmax(0,1fr)_minmax(0,1fr)]">
         <Field
           label="Lot batch"
           htmlFor={`${id}-product`}
           error={errors.productId?.message}
-          className="@3xl:col-span-2"
         >
           <Controller
             name="productId"
@@ -1648,10 +1641,7 @@ function LotEntry({
                 onBlur={field.onBlur}
                 ariaInvalid={Boolean(errors.packUnit)}
                 clearable
-                options={PACK_UNITS.map((unit) => ({
-                  value: unit,
-                  label: unit,
-                }))}
+                options={PACK_UNIT_OPTIONS}
               />
             )}
           />

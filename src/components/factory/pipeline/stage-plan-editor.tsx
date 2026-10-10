@@ -300,6 +300,7 @@ export function StagePlanEditor({
                               placeholder={
                                 missing ? `${missing} — pick…` : "Pick the activity…"
                               }
+                              showMeta={false}
                               searchPlaceholder="Activity name…"
                               emptyMessage="No activity matches that."
                               className={CONTROL}
@@ -324,8 +325,8 @@ export function StagePlanEditor({
                               onBlur={f.onBlur}
                               disabled={disabled}
                               clearable
-                              clearLabel="Not assigned"
-                              placeholder="Not assigned"
+                              clearLabel="No room"
+                              placeholder="No room"
                               className={CONTROL}
                               options={rooms.map((r) => ({
                                 value: r.id,
@@ -353,6 +354,7 @@ export function StagePlanEditor({
                           control={control}
                           render={({ field: f }) => (
                             <DateField
+                              compact
                               id={`${idPrefix}-start-${index}`}
                               value={f.value ?? ""}
                               onChange={f.onChange}
@@ -369,6 +371,7 @@ export function StagePlanEditor({
                           control={control}
                           render={({ field: f }) => (
                             <DateField
+                              compact
                               id={`${idPrefix}-end-${index}`}
                               value={f.value ?? ""}
                               onChange={f.onChange}

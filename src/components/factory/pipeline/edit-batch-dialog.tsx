@@ -9,8 +9,8 @@ import { toast } from "sonner";
 
 import {
   BATCH_TYPES,
-  BULK_UNIT_OPTIONS,
-  PACK_UNITS,
+  bulkUnitOptions,
+  packUnitOptions,
   PRIORITIES,
   PRIORITY_LABELS,
   bulkNeeded,
@@ -217,7 +217,7 @@ export function EditBatchDialog({
                           onChange={field.onChange}
                           onBlur={field.onBlur}
                           clearable
-                          options={BULK_UNIT_OPTIONS}
+                          options={bulkUnitOptions(job?.bulk_unit)}
                         />
                       )}
                     />
@@ -272,7 +272,7 @@ export function EditBatchDialog({
                           onChange={field.onChange}
                           onBlur={field.onBlur}
                           clearable
-                          options={BULK_UNIT_OPTIONS}
+                          options={bulkUnitOptions(job?.bulk_unit)}
                         />
                       )}
                     />
@@ -334,10 +334,7 @@ export function EditBatchDialog({
                           onChange={field.onChange}
                           onBlur={field.onBlur}
                           clearable
-                          options={PACK_UNITS.map((unit) => ({
-                            value: unit,
-                            label: unit,
-                          }))}
+                          options={packUnitOptions(job?.pack_unit)}
                         />
                       )}
                     />
@@ -435,10 +432,7 @@ export function EditBatchDialog({
                           onChange={field.onChange}
                           onBlur={field.onBlur}
                           clearable
-                          options={PACK_UNITS.map((unit) => ({
-                            value: unit,
-                            label: unit,
-                          }))}
+                          options={packUnitOptions(job?.pack_unit)}
                         />
                       )}
                     />

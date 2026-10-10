@@ -405,7 +405,7 @@ export function PlanStagesDialog({
           if (!open) close();
         }}
       >
-        <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-full max-w-[min(62rem,calc(100vw-2rem))] flex-col gap-0 overflow-hidden p-0">
+        <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-full max-w-[min(68rem,calc(100vw-2rem))] flex-col gap-0 overflow-hidden p-0">
           <DialogHeader className="shrink-0 gap-1.5 border-b border-line bg-surface px-5 pt-5 pr-12 pb-4">
             <DialogTitle className="text-ink">
               Plan stages — {job?.batch_no}
@@ -784,8 +784,8 @@ function StageRow({
               onChange={(v) => onEdit("unitId", v)}
               disabled={!editable}
               clearable
-              clearLabel="Not assigned"
-              placeholder="Not assigned"
+              clearLabel="No room"
+              placeholder="No room"
               className={CONTROL}
               options={rooms.map((r) => ({ value: r.id, label: r.name }))}
             />
@@ -805,6 +805,7 @@ function StageRow({
           )}
           <Cell label="Start">
             <DateField
+              compact
               id={`${id}-start`}
               ariaLabel="Planned start"
               value={value.plannedDate}
@@ -816,6 +817,7 @@ function StageRow({
           </Cell>
           <Cell label="End">
             <DateField
+              compact
               id={`${id}-end`}
               ariaLabel="Estimated finish"
               value={value.estFinishDate}
@@ -1116,6 +1118,7 @@ function AddStageRow({
                     onBlur={field.onBlur}
                     ariaInvalid={Boolean(errors.processId)}
                     placeholder="Pick the activity…"
+                    showMeta={false}
                     searchPlaceholder="Activity name…"
                     emptyMessage="No activity matches that."
                     className={CONTROL}
@@ -1139,8 +1142,8 @@ function AddStageRow({
                     onChange={field.onChange}
                     onBlur={field.onBlur}
                     clearable
-                    clearLabel="Not assigned"
-                    placeholder="Not assigned"
+                    clearLabel="No room"
+                    placeholder="No room"
                     className={CONTROL}
                     options={rooms.map((r) => ({ value: r.id, label: r.name }))}
                   />
@@ -1164,6 +1167,7 @@ function AddStageRow({
                 control={control}
                 render={({ field }) => (
                   <DateField
+                    compact
                     id="ps-add-start"
                     value={field.value ?? ""}
                     onChange={field.onChange}
@@ -1180,6 +1184,7 @@ function AddStageRow({
                 control={control}
                 render={({ field }) => (
                   <DateField
+                    compact
                     id="ps-add-end"
                     value={field.value ?? ""}
                     onChange={field.onChange}

@@ -275,6 +275,7 @@ export function DateField({
   className,
   ariaLabel,
   ariaInvalid,
+  compact = false,
 }: {
   id?: string;
   value: string;
@@ -288,6 +289,12 @@ export function DateField({
   className?: string;
   ariaLabel?: string;
   ariaInvalid?: boolean;
+  /**
+   * For a table cell. The clear button stops taking a slot beside the date —
+   * it appears over the end of the field on hover or focus — so a narrow
+   * column holds the whole date instead of "11 Oct …".
+   */
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const selected = fromKey(value);
@@ -297,10 +304,10 @@ export function DateField({
       <Popover.Trigger
         id={id}
         disabled={disabled}
-        title={title}
+        title={title ?? (selected ? longDate(selected) : undefined)}
         aria-label={ariaLabel}
         aria-invalid={ariaInvalid}
-        className={cn(TRIGGER, className)}
+        className={cn(TRIGGER, compact && "group relative", className)}
       >
         <CalendarDays className="size-4 shrink-0 text-ink-5" />
         <span
@@ -323,7 +330,11 @@ export function DateField({
               event.stopPropagation();
               onChange("");
             }}
-            className="grid size-5 shrink-0 place-items-center rounded text-ink-5 transition hover:bg-sunken hover:text-danger-deep"
+            className={cn(
+              "grid size-5 shrink-0 place-items-center rounded text-ink-5 transition hover:bg-sunken hover:text-danger-deep",
+              compact &&
+                "absolute top-1/2 right-1.5 -translate-y-1/2 bg-surface opacity-0 shadow-[0_0_0_1px_var(--color-line)] group-hover:opacity-100 group-focus-visible:opacity-100",
+            )}
           >
             <X className="size-3.5" />
           </span>

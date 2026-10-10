@@ -22,9 +22,9 @@ export const HEAD =
  * out in full — Tailwind finds classes by scanning for whole strings.
  */
 export const ROW_COLS =
-  "@3xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1.1fr)_7.5rem_7.5rem_5.5rem_6rem]";
+  "@3xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_8.5rem_8.5rem_5.5rem_6.5rem]";
 export const ROW_COLS_WO =
-  "@3xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1.1fr)_6rem_7.5rem_7.5rem_5.5rem_6rem]";
+  "@3xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_6rem_8.5rem_8.5rem_5.5rem_6.5rem]";
 
 /**
  * What a route's pills take turns in, by position — so neighbours always read

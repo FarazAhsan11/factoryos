@@ -80,6 +80,7 @@ export function SelectField({
   className,
   ariaLabel,
   ariaInvalid,
+  showMeta = true,
 }: {
   id?: string;
   /** The chosen option's value, or `""`. */
@@ -106,6 +107,12 @@ export function SelectField({
   className?: string;
   ariaLabel?: string;
   ariaInvalid?: boolean;
+  /**
+   * Whether the chosen option's `meta` is repeated on the trigger. Off in a
+   * tight cell (a table column), where the category after the name only
+   * crowds the name out — the list still shows it beside every option.
+   */
+  showMeta?: boolean;
 }) {
   /* An explicit "back to empty" row rather than an X on the trigger: it is
      what the native control did, it needs no new affordance, and half of these
@@ -186,7 +193,7 @@ export function SelectField({
               current ? (
                 <>
                   {current.label}
-                  {current.meta && (
+                  {showMeta && current.meta && (
                     <span className="ml-1.5 text-ink-5">{current.meta}</span>
                   )}
                 </>

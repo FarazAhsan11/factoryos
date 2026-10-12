@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   CalendarDays,
   Check,
+  CheckCircle2,
   Cog,
   Flag,
   MapPin,
@@ -9,6 +10,7 @@ import {
 
 import { formatDay } from "@/lib/factory/dates";
 import {
+  signerName,
   stageCeiling,
   stageName,
   stageProgress,
@@ -29,15 +31,19 @@ function fmt(n: number | null | undefined) {
  * which is what a planner or a supervisor opening it is asking: this stage is
  * done, this one is at 62% of its target and a day behind, these are waiting.
  *
- * Read-only and derived — everything comes from the stage rows, whose
- * accumulated quantity is the shift log's. Nothing on screen is a second
- * record of anything.
+ * Derived — everything comes from the stage rows, whose accumulated quantity
+ * is the shift log's. Nothing on screen is a second record of anything. The
+ * one thing it can do is hand a running stage to `onSignOff`; left out, the
+ * list is read-only and draws no button column.
  */
 export function StageProgressList({
   stages,
+  onSignOff,
   className,
 }: {
   stages: BatchStage[];
+  /** Offered on an in-progress stage; the caller owns the sign-off dialog. */
+  onSignOff?: (stage: BatchStage) => void;
   className?: string;
 }) {
   if (stages.length === 0) return null;
@@ -68,6 +74,7 @@ export function StageProgressList({
             stage={stage}
             index={index}
             isLast={index === stages.length - 1}
+            onSignOff={onSignOff}
           />
         ))}
       </ol>
@@ -92,10 +99,12 @@ function StageProgressRow({
   stage,
   index,
   isLast,
+  onSignOff,
 }: {
   stage: BatchStage;
   index: number;
   isLast: boolean;
+  onSignOff?: (stage: BatchStage) => void;
 }) {
   const over = stage.is_over_tolerance;
   const pct = stageProgress(stage);
@@ -124,7 +133,12 @@ function StageProgressRow({
   return (
     <li
       className={cn(
-        "grid items-center gap-x-5 gap-y-2 px-3.5 py-3 sm:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]",
+        "grid items-center gap-x-5 gap-y-2 px-3.5 py-3",
+        // A fixed third column on every row, not just the running one, so the
+        // bars of all the stages stay the same width and line up.
+        onSignOff
+          ? "sm:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)_7.5rem]"
+          : "sm:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]",
         stage.status === "in_progress" && "bg-brand-tint/60",
       )}
     >
@@ -249,12 +263,34 @@ function StageProgressRow({
         {stage.status === "complete" && (
           <p className="mt-0.5 text-[0.6875rem] text-teal-deep">
             Signed off
-            {stage.completed_by_name ? ` by ${stage.completed_by_name}` : ""}
+            {signerName(stage) ? ` by ${signerName(stage)}` : ""}
             {stage.yield_pct !== null ? ` · yield ${stage.yield_pct}%` : ""}
             {stage.yield_acceptable === false ? " · not accepted" : ""}
           </p>
         )}
       </div>
+
+      {/* What can be done: only a running stage can be signed off. */}
+      {onSignOff && (
+        <div className="flex sm:justify-end">
+          {stage.status === "in_progress" && (
+            <button
+              type="button"
+              onClick={() => onSignOff(stage)}
+              title={
+                isLast
+                  ? "Sign off — this is the last stage, so it completes the order"
+                  : `Sign off ${stageName(stage)}`
+              }
+              aria-label={`Sign off ${stageName(stage)}`}
+              className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-3.5 text-[0.8125rem] font-semibold text-white shadow-brand transition hover:brightness-[1.06] focus-visible:ring-4 focus-visible:ring-brand/20 focus-visible:outline-none active:scale-[0.97]"
+            >
+              <CheckCircle2 className="size-4" aria-hidden />
+              Sign off
+            </button>
+          )}
+        </div>
+      )}
     </li>
   );
 }

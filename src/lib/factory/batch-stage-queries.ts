@@ -96,7 +96,10 @@ export interface BatchStage {
   /** Resolved in the view, so the plan names its stages without a second cache. */
   process_name: string | null;
   process_category: string | null;
+  /** The signed-in account that pressed the button — stamped by the server. */
   completed_by_name: string | null;
+  /** The name the signer gave at sign-off (0049); null on earlier sign-offs. */
+  signed_off_by_name: string | null;
 }
 
 /**
@@ -111,7 +114,8 @@ const COLUMNS = `
   yield_notes, previous_target_qty, created_at,
   tolerance_pct, effective_tolerance_pct, allowed_qty, is_over_tolerance,
   planned_date, is_behind_plan, est_finish_date, planning_note, is_overrunning,
-  process_name, process_category, unit_name, completed_by_name
+  process_name, process_category, unit_name, completed_by_name,
+  signed_off_by_name
 `;
 
 export const batchStageKeys = {
@@ -306,6 +310,7 @@ export async function signOffStage(
       status: "complete",
       yield_acceptable: values.yieldAcceptable,
       yield_notes: values.notes?.trim() || null,
+      signed_off_by_name: values.signedOffBy.trim(),
     })
     .eq("id", id);
   if (error) throw new Error(error.message);
@@ -375,6 +380,15 @@ export function stageName(stage: BatchStage): string {
   const base = stage.process_name ?? "Stage";
   const suffix = stage.label?.trim() || stage.work_order?.trim();
   return suffix ? `${base} — ${suffix}` : base;
+}
+
+/**
+ * Who a signed-off stage says signed it off: the name given at sign-off,
+ * falling back to the account that was signed in for stages signed off before
+ * 0049 asked for one.
+ */
+export function signerName(stage: BatchStage): string | null {
+  return stage.signed_off_by_name?.trim() || stage.completed_by_name || null;
 }
 
 /**

@@ -17,10 +17,12 @@ import { NewBatchDialog } from "@/components/factory/pipeline/new-batch-dialog";
 import { NewJobDialog } from "@/components/factory/pipeline/new-job-dialog";
 import { PipelineBoard } from "@/components/factory/pipeline/pipeline-board";
 import { ScheduleView } from "@/components/factory/pipeline/schedule/schedule-view";
+import { StageSignOffDialog } from "@/components/factory/pipeline/stage-signoff-dialog";
 import { UnissuedNotice } from "@/components/factory/pipeline/unissued-notice";
 import {
   batchStageKeys,
   fetchFactoryStages,
+  type BatchStage,
 } from "@/lib/factory/batch-stage-queries";
 import { resolvePipelineTab } from "@/lib/factory/pipeline-tabs";
 import {
@@ -72,6 +74,8 @@ export function PipelineWorkspace({
   const [newBatchOpen, setNewBatchOpen] = useState(false);
   const [planJob, setPlanJob] = useState<PipelineJob | null>(null);
   const [editJob, setEditJob] = useState<PipelineJob | null>(null);
+  /** The running stage being signed off from an expanded board row. */
+  const [signOffStage, setSignOffStage] = useState<BatchStage | null>(null);
 
   const {
     data: jobs = [],
@@ -233,10 +237,11 @@ export function PipelineWorkspace({
         <PipelineBoard
           jobs={jobs}
           stages={stages}
-          unitWord={units.singular}
           canManage={canManage}
-          onOpen={setDetailJob}
+          // `onOpen={setDetailJob}` is deliberately off — batch details are
+          // not wanted for now. Passing it again re-enables the name link.
           onPlan={setPlanJob}
+          onSignOff={setSignOffStage}
           onDelete={(job) => remove.mutate(job)}
           onAddPacking={(parentId) => {
             setPackingParent(parentId);
@@ -270,6 +275,15 @@ export function PipelineWorkspace({
           await refresh();
         }}
         onClose={() => setEditJob(null)}
+      />
+
+      <StageSignOffDialog
+        stage={signOffStage}
+        onDone={async () => {
+          setSignOffStage(null);
+          await refresh();
+        }}
+        onClose={() => setSignOffStage(null)}
       />
 
       <PlanStagesDialog

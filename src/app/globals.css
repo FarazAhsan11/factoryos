@@ -237,6 +237,20 @@
   --color-violet-line: #ded8fd;
   --color-violet-soft: #f3f1fe;
 
+  /* ── Sky, azure, navy — the blue ramp ─────────────────────────────────
+     Three steps of one hue, light to dark, for places that want colour
+     without a meaning attached (the batch board's status and facts). Each
+     solid colour holds white text at 4:1 or better. */
+  --color-sky: #0284c7;
+  --color-sky-deep: #0369a1;
+  --color-sky-line: #bae6fd;
+  --color-sky-soft: #e0f2fe;
+  --color-azure: #2563eb;
+  --color-azure-deep: #1d4ed8;
+  --color-azure-line: #bfdbfe;
+  --color-azure-soft: #dbeafe;
+  --color-navy: #1e40af;
+
   /* ── Elevation ────────────────────────────────────────────────────────
      Named so a shadow can be re-tuned once. `shadow-card` is the resting
      state of a panel, `shadow-lift` is what hovering one adds, and

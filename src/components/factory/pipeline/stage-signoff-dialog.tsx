@@ -39,10 +39,10 @@ function fmt(n: number | null | undefined) {
  * typed yield would be a third number free to disagree with the two it comes
  * from, and it is the one that ends up on a handover sheet.
  *
- * There is no "signed off by" box either. The person is signed in; a text box
- * for their name can be left blank, misspelt, or filled in with somebody
- * else's, which turns the only piece of accountability a sign-off carries into
- * something the client asserts.
+ * "Signed off by" is a typed name, asked on Yes and No alike, and it sits
+ * beside — not instead of — the signed-in account the trigger stamps
+ * (`completed_by`). The name is a statement; the account is the audit trail,
+ * and the client never gets to choose it.
  *
  * On the **last** stage of the plan this also completes the order — said out
  * loud here, because it is the one press with a consequence beyond the stage.
@@ -64,11 +64,11 @@ export function StageSignOffDialog({
     formState: { errors, isSubmitting },
   } = useForm<StageSignOffValues, unknown, StageSignOffParsed>({
     resolver: zodResolver(stageSignOffSchema),
-    defaultValues: { yieldAcceptable: true, notes: "" },
+    defaultValues: { yieldAcceptable: true, signedOffBy: "", notes: "" },
   });
 
   useEffect(() => {
-    if (stage) reset({ yieldAcceptable: true, notes: "" });
+    if (stage) reset({ yieldAcceptable: true, signedOffBy: "", notes: "" });
   }, [stage, reset]);
 
   const sign = useMutation({
@@ -190,6 +190,31 @@ export function StageSignOffDialog({
             {errors.notes?.message && (
               <p role="alert" className="text-[0.6875rem] text-danger-deep">
                 {errors.notes.message}
+              </p>
+            )}
+          </div>
+
+          {/* Asked on Yes and No alike — the name is the signature on the
+              statement above, whichever way it went. */}
+          <div className="space-y-1.5">
+            <label
+              htmlFor="signoff-by"
+              className="block text-xs font-medium text-ink-3"
+            >
+              Signed off by
+            </label>
+            <input
+              id="signoff-by"
+              type="text"
+              autoComplete="off"
+              aria-invalid={Boolean(errors.signedOffBy)}
+              placeholder="Full name of the person signing off"
+              className="h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)] outline-none transition placeholder:text-placeholder hover:border-line-strong focus:border-brand focus:shadow-none focus:ring-4 focus:ring-brand/12 aria-invalid:border-danger-line"
+              {...register("signedOffBy")}
+            />
+            {errors.signedOffBy?.message && (
+              <p role="alert" className="text-[0.6875rem] text-danger-deep">
+                {errors.signedOffBy.message}
               </p>
             )}
           </div>

@@ -53,6 +53,7 @@ import {
   fetchBatchStages,
   issueJob,
   stageIsNext,
+  signerName,
   stageName,
   stageCeiling,
   stageProgress,
@@ -977,7 +978,7 @@ function StageRow({
         {done && (
           <p className="text-[0.6875rem] text-teal-deep">
             Signed off
-            {stage.completed_by_name ? ` by ${stage.completed_by_name}` : ""}
+            {signerName(stage) ? ` by ${signerName(stage)}` : ""}
             {stage.yield_pct !== null ? ` · yield ${stage.yield_pct}%` : ""}
             {stage.yield_acceptable === false ? " · yield not accepted" : ""}
             {stage.yield_notes ? ` · ${stage.yield_notes}` : ""}

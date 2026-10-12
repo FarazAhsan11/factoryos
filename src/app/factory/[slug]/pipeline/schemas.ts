@@ -677,12 +677,11 @@ export type StageEditParsed = z.output<typeof stageEditSchema>;
 /**
  * A supervisor's sign-off on a finished stage.
  *
- * No "signed off by" field, and its absence is the design — the same argument
- * as `kaizenIdeaSchema` in the log's schemas. The person is signed in, so the
- * name is already known; a text box for it can be left blank, misspelt, or
- * filled in with somebody else's name, which turns the one piece of
- * accountability that makes a sign-off mean anything into something the client
- * asserts. The trigger stamps it from the session.
+ * `signedOffBy` is what the person says, kept beside — not instead of — the
+ * account the trigger stamps from the session (`completed_by`, 0033). A shared
+ * tablet means the signed-in account is not always the person who checked the
+ * yield. Because it is client-asserted it is never read as an identity; the
+ * stamped account stays the audit trail. Asked for on Yes and No alike.
  *
  * A yield that isn't acceptable costs an explanation. "No" with no reason is
  * an alarm nobody can act on, and it is the answer that matters most.
@@ -690,6 +689,11 @@ export type StageEditParsed = z.output<typeof stageEditSchema>;
 export const stageSignOffSchema = z
   .object({
     yieldAcceptable: z.boolean({ error: "Say whether the yield is acceptable." }),
+    signedOffBy: z
+      .string()
+      .trim()
+      .min(2, "Say who is signing this stage off.")
+      .max(120, "Keep the name under 120 characters."),
     notes: z.string().trim().max(500, "Keep the note under 500 characters."),
   })
   .refine((v) => v.yieldAcceptable || v.notes.length >= 10, {

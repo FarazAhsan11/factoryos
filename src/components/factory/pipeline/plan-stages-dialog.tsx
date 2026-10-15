@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -30,6 +30,7 @@ import {
 import {
   CONTROL,
   Cell,
+  ClashNotice,
   ColumnHeads,
   HEAD,
   INPUT,
@@ -68,6 +69,14 @@ import { DateField } from "@/components/ui/date-picker";
 import { formatReportDate } from "@/lib/factory/shift-report-queries";
 import { pipelineKeys, type PipelineJob } from "@/lib/factory/pipeline-queries";
 import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
+import { todayKey } from "@/lib/factory/dates";
+import {
+  draftSlot,
+  slotClashes,
+  type RoomSlot,
+} from "@/lib/factory/schedule";
+import { useRoomSlots } from "@/lib/factory/use-room-slots";
+import { useRenderClock } from "@/lib/use-render-clock";
 import { cn } from "@/lib/utils";
 
 const MONO = "font-mono tracking-tight";
@@ -174,6 +183,34 @@ export function PlanStagesDialog({
     queryFn: () => fetchSetupItems("factory_units", factoryId),
   });
   const rooms = useMemo(() => unitList.filter((u) => u.active), [unitList]);
+  const today = useRenderClock(todayKey);
+  const roomSlotsAll = useRoomSlots(factoryId);
+
+  /**
+   * What a row would clash with: every other batch's bookings, plus this
+   * batch's own *other* stages as they are on screen — an unsaved edit counts,
+   * so two rows of one plan can clash before either is saved.
+   */
+  function bookingsFor(excludeId?: string): RoomSlot[] {
+    const others = roomSlotsAll.filter((s) => s.jobId !== job?.id);
+    const siblings: RoomSlot[] = [];
+    stages.forEach((s, i) => {
+      if (s.id === excludeId || s.status === "complete") return;
+      const v = drafts[s.id] ?? draftOf(s);
+      const slot = draftSlot(
+        { ...v, running: s.status === "in_progress" },
+        today,
+      );
+      if (!slot) return;
+      siblings.push({
+        ...slot,
+        key: s.id,
+        jobId: job?.id ?? null,
+        label: `${job?.batch_no ?? "This batch"} · ${s.process_name ?? `Stage ${i + 1}`}`,
+      });
+    });
+    return [...others, ...siblings];
+  }
 
   /**
    * Only stages that produce something. Downtime is logged when it happens,
@@ -518,6 +555,16 @@ export function PlanStagesDialog({
                           Boolean(valueOf(stage).label.trim())
                         }
                         rooms={rooms}
+                        clashes={slotClashes(
+                          draftSlot(
+                            {
+                              ...valueOf(stage),
+                              running: stage.status === "in_progress",
+                            },
+                            today,
+                          ),
+                          bookingsFor(stage.id),
+                        )}
                         busy={saving}
                         onEdit={(key, value) => edit(stage, key, value)}
                         onSave={() => save(stage)}
@@ -544,6 +591,7 @@ export function PlanStagesDialog({
                       <AddStageRow
                         processes={plannable}
                         rooms={rooms}
+                        bookings={bookingsFor()}
                         showWorkOrder={showWorkOrder}
                         first={stages.length === 0}
                         onAdd={async (values) => {
@@ -664,6 +712,7 @@ function StageRow({
   showWorkOrder,
   needsLabel,
   rooms,
+  clashes,
   busy,
   onEdit,
   onSave,
@@ -685,6 +734,8 @@ function StageRow({
   showWorkOrder: boolean;
   needsLabel: boolean;
   rooms: { id: string; name: string }[];
+  /** Other stages already holding this row's room on these days. */
+  clashes: RoomSlot[];
   busy: boolean;
   onEdit: <K extends keyof RowDraft>(key: K, value: RowDraft[K]) => void;
   onSave: () => void;
@@ -862,6 +913,13 @@ function StageRow({
           </Cell>
         </div>
 
+        {editable && (
+          <ClashNotice
+            roomName={rooms.find((r) => r.id === value.unitId)?.name ?? "This room"}
+            clashes={clashes}
+          />
+        )}
+
         {/* The occasional answers, and what can be done to a saved stage. */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           {needsLabel && (
@@ -1027,6 +1085,7 @@ function StageRow({
 function AddStageRow({
   processes,
   rooms,
+  bookings,
   showWorkOrder,
   first,
   onAdd,
@@ -1034,6 +1093,8 @@ function AddStageRow({
 }: {
   processes: { id: string; name: string; category: string | null }[];
   rooms: { id: string; name: string }[];
+  /** What the rooms already hold — a clash is said before the stage is added. */
+  bookings: RoomSlot[];
   /** Only a company tracking work orders per stage is asked for one. */
   showWorkOrder: boolean;
   /** The plan is empty — the row is the whole of it, so it is not dismissable. */
@@ -1063,6 +1124,17 @@ function AddStageRow({
     },
   });
   const [dateError, setDateError] = useState<string | null>(null);
+
+  // `useWatch`, not `watch()` — see CLAUDE.md on the React Compiler.
+  const [unitId, plannedDate, estFinishDate] = useWatch({
+    control,
+    name: ["unitId", "plannedDate", "estFinishDate"],
+  });
+  const today = useRenderClock(todayKey);
+  const clashes = slotClashes(
+    draftSlot({ unitId, plannedDate, estFinishDate }, today),
+    bookings,
+  );
 
   const firstError =
     dateError ??
@@ -1265,6 +1337,11 @@ function AddStageRow({
               Can start before the previous stage finishes
             </label>
           </div>
+
+          <ClashNotice
+            roomName={rooms.find((r) => r.id === unitId)?.name ?? "This room"}
+            clashes={clashes}
+          />
 
           {firstError && (
             <p role="alert" className="text-[0.6875rem] text-danger-deep">

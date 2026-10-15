@@ -372,6 +372,19 @@ with **no room** cannot be drawn in a room — but it is counted and named
 rather than silently dropped, because a board that quietly omits them
 under-reports the plant's load.
 
+**Clashes are said while planning, not only on the Board.** Typing a room and
+dates in New batch (including each finished lot), Plan stages (a saved row or
+the Add row) and the Schedule's stage dialog shows an amber notice under the row
+when another stage already holds that room. What counts is `clashRange` in
+`schedule.ts`, the one rule the Board banner, the calendar's red days and this
+notice all read: **two or more shared days** clash (one shared day is a
+handoff — the plan holds days, not hours), and two **running** stages (started,
+not signed off) clash on any shared day. Only from today on. Shared as
+`draftSlot` / `roomSlots` / `slotClashes` in `schedule.ts` and read through
+`useRoomSlots`. It is a **notice, never a block** — room and dates are advisory.
+Rows of the same plan count against each other; a bulk's plan and its lots'
+plans are not cross-checked until saved.
+
 **Migration 0040** adds the two fields a queue asks for that a plan does not.
 `est_finish_date` is when the planner expects the stage *off* the room — not
 `planned_date` (when it goes on), not `completed_at` (a fact, and only after

@@ -10,9 +10,14 @@ import {
   Cog,
 } from "lucide-react";
 
+import { Tooltip } from "@base-ui/react/tooltip";
+
+import { StageTip } from "@/components/factory/pipeline/schedule/stage-tip";
+import { DateField } from "@/components/ui/date-picker";
 import { stageName, stageProgress } from "@/lib/factory/batch-stage-queries";
 import { addDays, formatDay, todayKey } from "@/lib/factory/dates";
 import {
+  clashPairs,
   compareRoomNames,
   dayDiff,
   findRoomConflicts,
@@ -28,12 +33,18 @@ import {
 import { useRenderClock } from "@/lib/use-render-clock";
 import { cn } from "@/lib/utils";
 
-/** Two weeks across — enough to see what comes after this week. */
-const DAYS = 14;
+/**
+ * How many weeks the calendar spans. Two is the glance — this week and what
+ * comes after; four and eight let a planner see a month or a quarter of the
+ * plan without paging, at the cost of narrower days.
+ */
+const SPANS = [2, 4, 8] as const;
+type Weeks = (typeof SPANS)[number];
+/** Narrower days as the window grows, so 8 weeks is a scroll, not a wall. */
+const DAY_COL: Record<Weeks, number> = { 2: 112, 4: 84, 8: 64 };
 /** How many stages a room shows on one day before it says "+N more". */
 const MAX_TRACKS = 3;
 const ROOM_COL = 184;
-const DAY_COL = 112;
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 /**
@@ -52,8 +63,8 @@ function batchHue(key: string): number {
 }
 
 /**
- * Schedule → Board. The plan as a calendar: rooms down the side, a fortnight
- * across the top, each stage drawn over the days it holds its room.
+ * Schedule → Board. The plan as a calendar: rooms down the side, two, four or
+ * eight weeks across the top, each stage drawn over the days it holds its room.
  *
  * The rooms are every room from `buildRoomLanes`, the same set the Queue
  * lists — a room with nothing planned is drawn as an empty row marked Idle. A stage
@@ -79,9 +90,22 @@ export function ScheduleCalendar({
    * alone rolls over at midnight, and "Today" is just forgetting the choice.
    */
   const [picked, setPicked] = useState<string | null>(null);
+  /**
+   * The day chosen in the date picker, kept as typed so the field reads back
+   * what was picked rather than the Monday the window snapped to. Any other
+   * way of moving the window clears it — it would otherwise name a day the
+   * window is no longer on.
+   */
+  const [goTo, setGoTo] = useState<string | null>(null);
   const start = picked ?? mondayOf(today);
-  const end = addDays(start, DAYS - 1);
-  const days = Array.from({ length: DAYS }, (_, i) => addDays(start, i));
+  const [weeks, setWeeks] = useState<Weeks>(2);
+  const dayCount = weeks * 7;
+  const dayCol = DAY_COL[weeks];
+  const end = addDays(start, dayCount - 1);
+  const days = Array.from({ length: dayCount }, (_, i) => addDays(start, i));
+  /** "12 Oct" once the columns are too narrow to hold "12 Oct 2026". */
+  const dayLabel = (day: string) =>
+    weeks === 2 ? formatDay(day) : formatDay(day).replace(/ \d{4}$/, "");
 
   /** The room a conflict link jumped to — scrolled into view and ringed. */
   const [focusRoom, setFocusRoom] = useState<string | null>(null);
@@ -101,10 +125,11 @@ export function ScheduleCalendar({
 
   const jumpTo = (day: string, unitId?: string) => {
     setPicked(mondayOf(day));
+    setGoTo(null);
     setFocusRoom(unitId ?? null);
   };
 
-  const columns = `${ROOM_COL}px repeat(${DAYS}, minmax(${DAY_COL}px, 1fr))`;
+  const columns = `${ROOM_COL}px repeat(${dayCount}, minmax(${dayCol}px, 1fr))`;
 
   return (
     <div className="flex flex-col gap-3 lg:min-h-0 lg:flex-1">
@@ -113,7 +138,10 @@ export function ScheduleCalendar({
           <div className="flex items-center rounded-xl border border-line bg-surface p-0.5 shadow-soft">
             <button
               type="button"
-              onClick={() => setPicked(addDays(start, -7))}
+              onClick={() => {
+                setPicked(addDays(start, -7));
+                setGoTo(null);
+              }}
               aria-label="Previous week"
               className="grid size-8 place-items-center rounded-lg text-ink-4 transition hover:bg-sunken hover:text-ink"
             >
@@ -123,6 +151,7 @@ export function ScheduleCalendar({
               type="button"
               onClick={() => {
                 setPicked(null);
+                setGoTo(null);
                 setFocusRoom(null);
               }}
               className="rounded-lg px-3 py-1.5 text-xs font-semibold text-ink-3 transition hover:bg-sunken hover:text-ink"
@@ -131,16 +160,55 @@ export function ScheduleCalendar({
             </button>
             <button
               type="button"
-              onClick={() => setPicked(addDays(start, 7))}
+              onClick={() => {
+                setPicked(addDays(start, 7));
+                setGoTo(null);
+              }}
               aria-label="Next week"
               className="grid size-8 place-items-center rounded-lg text-ink-4 transition hover:bg-sunken hover:text-ink"
             >
               <ChevronRight className="size-4" />
             </button>
           </div>
+          {/* Jump to any date: the window moves to the week holding it.
+              Clearing returns to following today. */}
+          <DateField
+            ariaLabel="Go to date"
+            title="Go to a date"
+            value={goTo ?? ""}
+            placeholder="Go to date"
+            onChange={(next) => {
+              setGoTo(next || null);
+              setPicked(next ? mondayOf(next) : null);
+              setFocusRoom(null);
+            }}
+            className="h-9 w-[10.5rem] text-xs"
+          />
           <p className="text-sm font-semibold text-ink tabular-nums">
             {formatDay(start)} – {formatDay(end)}
           </p>
+          <div
+            role="group"
+            aria-label="Weeks shown"
+            className="flex items-center rounded-xl border border-line bg-surface p-0.5 shadow-soft"
+          >
+            {SPANS.map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setWeeks(n)}
+                aria-pressed={weeks === n}
+                className={cn(
+                  "rounded-lg px-2.5 py-1.5 text-xs font-semibold tabular-nums transition",
+                  weeks === n
+                    ? "bg-brand text-white"
+                    : "text-ink-3 hover:bg-sunken hover:text-ink",
+                )}
+              >
+                {n}w
+              </button>
+            ))}
+          </div>
         </div>
         <Legend />
       </div>
@@ -152,7 +220,7 @@ export function ScheduleCalendar({
       />
 
       <div className="scrollbar-slim min-h-0 flex-1 overflow-auto rounded-2xl border border-line bg-surface shadow-card max-lg:max-h-[75svh]">
-        <div style={{ minWidth: ROOM_COL + DAYS * DAY_COL }}>
+        <div style={{ minWidth: ROOM_COL + dayCount * dayCol }}>
           <div
             className="sticky top-0 z-30 grid border-b border-line bg-sunken-2"
             style={{ gridTemplateColumns: columns }}
@@ -167,13 +235,14 @@ export function ScheduleCalendar({
                   key={day}
                   className={cn(
                     "border-l border-line-soft px-2 py-2 text-center",
-                    isToday && "bg-brand-soft",
+                    isToday &&
+                      "bg-warn-soft shadow-[inset_0_-2px_0_var(--color-warn)]",
                   )}
                 >
                   <p
                     className={cn(
                       "text-[0.625rem] font-bold tracking-[0.06em] uppercase",
-                      isToday ? "text-brand-deep" : "text-ink-5",
+                      isToday ? "text-warn-ink" : "text-ink-5",
                     )}
                   >
                     {WEEKDAYS[i % 7]}
@@ -182,10 +251,10 @@ export function ScheduleCalendar({
                   <p
                     className={cn(
                       "mt-0.5 text-[0.7188rem] font-semibold tabular-nums",
-                      isToday ? "text-brand-deep" : "text-ink-3",
+                      isToday ? "text-warn-ink" : "text-ink-3",
                     )}
                   >
-                    {formatDay(day)}
+                    {dayLabel(day)}
                   </p>
                 </div>
               );
@@ -282,8 +351,25 @@ function RoomRow({
     return { ...s, track };
   });
 
-  const perDay = days.map(
-    (_, i) => placed.filter((p) => p.from <= i && p.to >= i).length,
+  // Which days are a clash is `clashRange`'s call, not "two bars share a
+  // day": one shared day is a handoff, and only two running stages clash on
+  // one. Pairs are taken over the room's whole plan, not just the window.
+  const pairs = clashPairs(
+    spans.flatMap((s) =>
+      s.span
+        ? [
+            {
+              id: s.entry.stage.id,
+              start: s.span.start,
+              end: s.span.end,
+              running: s.entry.stage.status === "in_progress",
+            },
+          ]
+        : [],
+    ),
+  );
+  const clashingIds = new Set(
+    pairs.filter((p) => p.to >= today).flatMap((p) => [p.a, p.b]),
   );
   const hiddenPerDay = days.map(
     (_, i) =>
@@ -291,7 +377,9 @@ function RoomRow({
         .length,
   );
   // A clash is only worth marking where it can still be planned away.
-  const clash = days.map((day, i) => perDay[i] > 1 && day >= today);
+  const clash = days.map(
+    (day) => day >= today && pairs.some((p) => p.from <= day && p.to >= day),
+  );
   const clashDays = clash.filter(Boolean).length;
   const hasHidden = hiddenPerDay.some((n) => n > 0);
   const tracks = Math.max(1, Math.min(MAX_TRACKS, trackEnds.length));
@@ -385,7 +473,7 @@ function RoomRow({
             className={cn(
               "border-l border-line-soft",
               weekend && "bg-sunken/70",
-              day === today && "bg-brand-tint",
+              day === today && "bg-warn-tint",
               clash[i] &&
                 "bg-danger-tint shadow-[inset_0_2px_0_var(--color-danger)]",
             )}
@@ -402,7 +490,7 @@ function RoomRow({
             placed={p}
             clipLeft={p.span.start < start}
             clipRight={p.span.end > end}
-            clashing={clash.some((c, i) => c && p.from <= i && p.to >= i)}
+            clashing={clashingIds.has(p.entry.stage.id)}
             onOpen={() => onOpen(p.entry)}
           />
         ))}
@@ -449,50 +537,54 @@ function StageBar({
   const hue = batchHue(stage.job_id);
   const name = stageName(stage);
 
-  const title = [
+  // The bar's accessible name — the hover card is a mouse convenience, so
+  // everything it says is also said here.
+  const summary = [
     `${job?.batch_no ?? "—"} · ${name}`,
     job?.product_name,
-    `${formatShortDate(span.start)}${span.end !== span.start ? ` → ${formatShortDate(span.end)}` : ""}${running ? " · running" : ""}`,
-    stage.is_behind_plan ? "Behind plan — the day has passed unstarted" : null,
-    stage.is_overrunning ? "Overrunning its estimated finish" : null,
+    `${formatShortDate(span.start)}${span.end !== span.start ? ` to ${formatShortDate(span.end)}` : ""}${running ? ", running" : ""}`,
+    stage.is_behind_plan ? "Behind plan" : null,
+    stage.is_overrunning ? "Past its estimated finish" : null,
     job?.due_date ? `Due ${formatShortDate(job.due_date)}` : null,
     clashing ? "Shares this room with another stage" : null,
   ]
     .filter(Boolean)
-    .join("\n");
+    .join(", ");
 
   return (
-    <button
-      type="button"
-      onClick={onOpen}
-      title={title}
-      aria-label={title.replaceAll("\n", ", ")}
-      className={cn(
-        "relative z-10 my-1 flex min-w-0 flex-col justify-center gap-0.5 overflow-hidden rounded-lg border px-2 py-1.5 text-left transition",
-        "hover:-translate-y-px hover:shadow-[0_3px_10px_rgb(20_22_43/0.14)] focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none",
-        clipLeft ? "ml-0 rounded-l-none border-l-0" : "ml-1",
-        clipRight ? "mr-0 rounded-r-none border-r-0" : "mr-1",
-        clashing && "ring-2 ring-danger/70",
-      )}
-      style={{
-        gridColumn: `${from + 2} / ${to + 3}`,
-        gridRow: track + 1,
-        ...(running
-          ? {
-              background: `hsl(${hue} 58% 40%)`,
-              borderColor: `hsl(${hue} 58% 34%)`,
-              color: "white",
-            }
-          : {
-              background: `hsl(${hue} 85% 96%)`,
-              borderColor: `hsl(${hue} 55% 80%)`,
-              color: `hsl(${hue} 55% 24%)`,
-              boxShadow: clipLeft
-                ? undefined
-                : `inset 3px 0 0 hsl(${hue} 58% 45%)`,
-            }),
-      }}
-    >
+    <Tooltip.Root>
+      <Tooltip.Trigger
+        delay={150}
+        closeDelay={80}
+        type="button"
+        onClick={onOpen}
+        aria-label={summary}
+        className={cn(
+          "relative z-10 my-1 flex min-w-0 flex-col justify-center gap-0.5 overflow-hidden rounded-lg border px-2 py-1.5 text-left transition",
+          "hover:-translate-y-px hover:shadow-[0_3px_10px_rgb(20_22_43/0.14)] focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none",
+          clipLeft ? "ml-0 rounded-l-none border-l-0" : "ml-1",
+          clipRight ? "mr-0 rounded-r-none border-r-0" : "mr-1",
+          clashing && "ring-2 ring-danger/70",
+        )}
+        style={{
+          gridColumn: `${from + 2} / ${to + 3}`,
+          gridRow: track + 1,
+          ...(running
+            ? {
+                background: `hsl(${hue} 58% 40%)`,
+                borderColor: `hsl(${hue} 58% 34%)`,
+                color: "white",
+              }
+            : {
+                background: `hsl(${hue} 85% 96%)`,
+                borderColor: `hsl(${hue} 55% 80%)`,
+                color: `hsl(${hue} 55% 24%)`,
+                boxShadow: clipLeft
+                  ? undefined
+                  : `inset 3px 0 0 hsl(${hue} 58% 45%)`,
+              }),
+        }}
+      >
       {/* Three lines — batch, stage, product — so a one-day bar never trades
           the stage name for the batch number beside it. */}
       <span className="flex min-w-0 items-center gap-1 text-[0.7188rem] leading-tight">
@@ -536,7 +628,20 @@ function StageBar({
           />
         </span>
       )}
-    </button>
+      </Tooltip.Trigger>
+      <Tooltip.Portal>
+        <Tooltip.Positioner side="top" align="start" sideOffset={8} className="z-50">
+          <Tooltip.Popup className="rounded-xl border border-line bg-surface shadow-lift outline-none">
+            <StageTip
+              entry={entry}
+              span={span}
+              hue={hue}
+              clashing={clashing}
+            />
+          </Tooltip.Popup>
+        </Tooltip.Positioner>
+      </Tooltip.Portal>
+    </Tooltip.Root>
   );
 }
 
@@ -572,7 +677,8 @@ function ConflictBanner({
             {conflicts.length} {word} conflict
             {conflicts.length === 1 ? "" : "s"}
           </strong>{" "}
-          — more than one stage planned into the same {word} on the same day.
+          — stages planned into the same {word} over two or more of the same
+          days, or two running at once.
         </span>
         <span className="ml-auto inline-flex shrink-0 items-center gap-1 font-semibold">
           {open ? "Hide" : "Review"}

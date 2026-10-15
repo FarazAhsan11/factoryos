@@ -14,6 +14,7 @@ import {
   type StageEditValues,
 } from "@/app/factory/[slug]/pipeline/schemas";
 import { BatchTypeBadge } from "@/components/factory/pipeline/batch-type-badge";
+import { ClashNotice } from "@/components/factory/pipeline/stage-table-parts";
 import {
   Dialog,
   DialogContent,
@@ -30,7 +31,11 @@ import {
   type BatchStage,
 } from "@/lib/factory/batch-stage-queries";
 import type { PipelineJob } from "@/lib/factory/pipeline-queries";
+import { todayKey } from "@/lib/factory/dates";
+import { draftSlot, slotClashes } from "@/lib/factory/schedule";
 import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
+import { useRoomSlots } from "@/lib/factory/use-room-slots";
+import { useRenderClock } from "@/lib/use-render-clock";
 import { cn } from "@/lib/utils";
 
 const FIELD =
@@ -149,6 +154,25 @@ export function StageEditDialog({
   // render, which the React Compiler cannot memoize past. Same choice as
   // `kaizen-form` and `action-stage-form`.
   const plannedDate = useWatch({ control, name: "plannedDate" });
+  const unitId = useWatch({ control, name: "unitId" });
+  const estFinishDate = useWatch({ control, name: "estFinishDate" });
+
+  // Said while the dates are being typed, not after the save. Every other
+  // stage's booking counts; this stage's own current one does not.
+  const today = useRenderClock(todayKey);
+  const bookings = useRoomSlots(factoryId);
+  const clashes = slotClashes(
+    draftSlot(
+      {
+        unitId,
+        plannedDate,
+        estFinishDate,
+        running: stage?.status === "in_progress",
+      },
+      today,
+    ),
+    bookings.filter((b) => b.key !== stage?.id),
+  );
 
   const firstError =
     errors.targetUnit?.message ??
@@ -303,6 +327,13 @@ export function StageEditDialog({
                 />
               </div>
             </div>
+
+            {!done && (
+              <ClashNotice
+                roomName={rooms.find((r) => r.id === unitId)?.name ?? "This room"}
+                clashes={clashes}
+              />
+            )}
 
             <div
               className={cn(

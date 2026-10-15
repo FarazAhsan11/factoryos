@@ -22,7 +22,7 @@ const VIEWS = [
     value: "board",
     label: "Board",
     icon: CalendarDays,
-    hint: "Board view — every room across a fortnight, clashes marked",
+    hint: "Board view — every room across 2, 4 or 8 weeks, clashes marked",
   },
   {
     value: "queue",

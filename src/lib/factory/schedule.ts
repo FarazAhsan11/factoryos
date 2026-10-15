@@ -231,10 +231,12 @@ export interface StageSpan {
  *
  * From the planned date to the estimated finish — a single day when there is
  * no estimate, or when the estimate is earlier than the start (0040 leaves
- * that to the form, so a stale row can still hold one). A **running** stage is
- * on the machine now whatever the plan says: undated, it is drawn today, and
- * past its estimate it stretches to today, because the room is not free until
- * somebody signs the stage off.
+ * that to the form, so a stale row can still hold one). Only the planned
+ * window: a stage that has overrun its estimate is *not* stretched to today,
+ * so a stage nobody has signed off yet does not hold a room on days the plan
+ * never gave it. It is still marked behind plan / past its estimate. The one
+ * allowance is a **running** stage with no planned date, which is drawn today —
+ * it is on the machine now and has no other day to be drawn on.
  */
 export function stageSpan(stage: BatchStage, today: string): StageSpan | null {
   const running = stage.status === "in_progress";
@@ -242,8 +244,7 @@ export function stageSpan(stage: BatchStage, today: string): StageSpan | null {
   if (!start) return null;
 
   const estimate = stage.est_finish_date?.slice(0, 10);
-  let end = estimate && estimate >= start ? estimate : start;
-  if (running && end < today) end = today;
+  const end = estimate && estimate >= start ? estimate : start;
   return { start, end };
 }
 
@@ -263,12 +264,65 @@ export interface RoomConflict {
 const CONFLICT_HORIZON_DAYS = 366;
 
 /**
- * Every room double-booked from today on, a clash per run of days.
+ * Shared days it takes before two planned stages in one room are a clash.
  *
- * A room runs one stage a day — the rule `seed-stage-dates.mjs` schedules by —
- * so two stages covering the same day in the same room is a clash. Days with
- * the same stages clashing are merged into one, so a four-day overlap of two
- * batches reads as one conflict and not four.
+ * The plan holds days, not hours, so a stage ending on the 18th and the next
+ * starting on the 18th is a handoff — one after the other the same day — and
+ * not a double booking. Two days or more cannot be a handoff.
+ */
+export const CLASH_MIN_DAYS = 2;
+
+/** One stage, reduced to what the clash rule reads. */
+export interface ClashItem {
+  id: string;
+  start: string;
+  end: string;
+  /** Started and not signed off — physically in the room right now. */
+  running: boolean;
+}
+
+/**
+ * The days two stages in one room clash over, or null when they do not.
+ *
+ * The one rule for the whole app — the Board's banner and chips, the
+ * calendar's red days and the notice while a plan is typed all read it:
+ *
+ *   · two **running** stages clash on any shared day. Both are on the machine,
+ *     and a room runs one stage at a time — that is not a handoff.
+ *   · otherwise they clash only over `CLASH_MIN_DAYS` or more shared days.
+ */
+export function clashRange(
+  a: Omit<ClashItem, "id">,
+  b: Omit<ClashItem, "id">,
+): { from: string; to: string } | null {
+  const from = a.start > b.start ? a.start : b.start;
+  const to = a.end < b.end ? a.end : b.end;
+  if (from > to) return null;
+  const shared = dayDiff(from, to) + 1;
+  const needed = a.running && b.running ? 1 : CLASH_MIN_DAYS;
+  return shared >= needed ? { from, to } : null;
+}
+
+/** Every pair of stages in one room that clash, with the days they clash on. */
+export function clashPairs(
+  items: ClashItem[],
+): { a: string; b: string; from: string; to: string }[] {
+  const pairs: { a: string; b: string; from: string; to: string }[] = [];
+  for (let i = 0; i < items.length; i++) {
+    for (let j = i + 1; j < items.length; j++) {
+      const range = clashRange(items[i], items[j]);
+      if (range) pairs.push({ a: items[i].id, b: items[j].id, ...range });
+    }
+  }
+  return pairs;
+}
+
+/**
+ * Every double-booked room from today on, a clash per run of days.
+ *
+ * What counts as a clash is `clashRange`. Days with the same stages clashing
+ * are merged into one, so a four-day overlap of two batches reads as one
+ * conflict and not four.
  *
  * Only from today: a clash on a day already gone cannot be planned away, and
  * the shift log, not the plan, says what that room actually did.
@@ -289,25 +343,37 @@ export function findRoomConflicts(
       );
     if (spans.length < 2) continue;
 
-    let first = spans[0].span.start < today ? today : spans[0].span.start;
-    let last = spans[0].span.end;
-    for (const { span } of spans) {
-      if (span.start < first) first = span.start < today ? today : span.start;
-      if (span.end > last) last = span.end;
+    const byId = new Map(spans.map((s) => [s.entry.stage.id, s.entry]));
+    const pairs = clashPairs(
+      spans.map(({ entry, span }) => ({
+        id: entry.stage.id,
+        start: span.start,
+        end: span.end,
+        running: entry.stage.status === "in_progress",
+      })),
+    ).filter((p) => p.to >= today);
+    if (pairs.length === 0) continue;
+
+    let first = pairs[0].from < today ? today : pairs[0].from;
+    let last = pairs[0].to;
+    for (const p of pairs) {
+      const from = p.from < today ? today : p.from;
+      if (from < first) first = from;
+      if (p.to > last) last = p.to;
     }
     if (last > horizon) last = horizon;
 
     let open: RoomConflict | null = null;
     let openKey = "";
     for (let day = first; day <= last; day = addDays(day, 1)) {
-      const here = spans.filter((s) => s.span.start <= day && s.span.end >= day);
-      const key =
-        here.length > 1
-          ? here
-              .map((s) => s.entry.stage.id)
-              .sort()
-              .join("|")
-          : "";
+      const involved = new Set<string>();
+      for (const p of pairs) {
+        if (p.from <= day && p.to >= day) {
+          involved.add(p.a);
+          involved.add(p.b);
+        }
+      }
+      const key = involved.size > 0 ? [...involved].sort().join("|") : "";
 
       if (open && key === openKey) {
         open.to = day;
@@ -320,7 +386,9 @@ export function findRoomConflicts(
             unitName: lane.unitName,
             from: day,
             to: day,
-            entries: here.map((s) => s.entry),
+            entries: [...involved]
+              .map((id) => byId.get(id))
+              .filter((e): e is ScheduledStage => Boolean(e)),
           }
         : null;
       openKey = key;
@@ -331,6 +399,93 @@ export function findRoomConflicts(
   return conflicts.sort(
     (a, b) =>
       compareDate(a.from, b.from) || byName.compare(a.unitName, b.unitName),
+  );
+}
+
+/* ── Clash check while planning ──────────────────────────────────────────── */
+
+/**
+ * A room held over a run of days — an existing stage, or a stage still being
+ * typed. The same unit `findRoomConflicts` compares, in a shape a form can
+ * build before anything is saved.
+ */
+export interface RoomSlot {
+  /** A stage id for a saved stage; anything unique for a draft row. */
+  key: string;
+  /** The batch this belongs to — lets a dialog leave its own batch out. */
+  jobId: string | null;
+  unitId: string;
+  start: string;
+  end: string;
+  /** Started and not signed off — see `clashRange`. */
+  running: boolean;
+  /** "46686 · Mixing" — what the notice names. */
+  label: string;
+}
+
+/**
+ * The room a stage being planned would hold, or null when it cannot clash yet
+ * (no room, no start) or when it is wholly in the past — a day already gone
+ * cannot be planned away, the same rule `findRoomConflicts` keeps.
+ */
+export function draftSlot(
+  draft: {
+    unitId?: string | null;
+    plannedDate?: string | null;
+    estFinishDate?: string | null;
+    /** The stage is already running — only a saved stage can be. */
+    running?: boolean;
+  },
+  today: string,
+): { unitId: string; start: string; end: string; running: boolean } | null {
+  const start = draft.plannedDate?.slice(0, 10);
+  if (!draft.unitId || !start) return null;
+  const finish = draft.estFinishDate?.slice(0, 10);
+  const end = finish && finish >= start ? finish : start;
+  if (end < today) return null;
+  return { unitId: draft.unitId, start, end, running: draft.running ?? false };
+}
+
+/** The saved stages that still hold a room from today on, as slots. */
+export function roomSlots(
+  stages: BatchStage[],
+  jobs: PipelineJob[],
+  today: string,
+): RoomSlot[] {
+  const jobById = new Map(jobs.map((j) => [j.id, j]));
+  const slots: RoomSlot[] = [];
+  for (const stage of stages) {
+    if (stage.status === "complete" || !stage.unit_id) continue;
+    const span = stageSpan(stage, today);
+    if (!span || span.end < today) continue;
+    const batchNo = jobById.get(stage.job_id)?.batch_no;
+    const name = stage.process_name ?? "Stage";
+    slots.push({
+      key: stage.id,
+      jobId: stage.job_id,
+      unitId: stage.unit_id,
+      start: span.start,
+      end: span.end,
+      running: stage.status === "in_progress",
+      label: batchNo ? `${batchNo} · ${name}` : name,
+    });
+  }
+  return slots;
+}
+
+/** The slots a plan being typed clashes with — by `clashRange`, same room. */
+export function slotClashes(
+  candidate: {
+    unitId: string;
+    start: string;
+    end: string;
+    running: boolean;
+  } | null,
+  others: RoomSlot[],
+): RoomSlot[] {
+  if (!candidate) return [];
+  return others.filter(
+    (o) => o.unitId === candidate.unitId && clashRange(candidate, o) !== null,
   );
 }
 

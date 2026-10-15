@@ -29,6 +29,7 @@ import { DateField } from "@/components/ui/date-picker";
 import {
   CONTROL,
   Cell,
+  ClashNotice,
   ColumnHeads,
   HEAD,
   INPUT,
@@ -37,6 +38,13 @@ import {
   RoutePills,
 } from "@/components/factory/pipeline/stage-table-parts";
 import { SelectField } from "@/components/ui/select-field";
+import { todayKey } from "@/lib/factory/dates";
+import {
+  draftSlot,
+  slotClashes,
+  type RoomSlot,
+} from "@/lib/factory/schedule";
+import { useRenderClock } from "@/lib/use-render-clock";
 import { cn } from "@/lib/utils";
 
 type PlanForm = UseFormReturn<StagePlanValues, unknown, StagePlanParsed>;
@@ -69,6 +77,7 @@ export function StagePlanEditor({
   defaultUnit,
   orderLabel,
   disabled,
+  bookings = [],
 }: {
   form: PlanForm;
   /** Keeps ids unique when two plans share the dialog. */
@@ -83,7 +92,14 @@ export function StagePlanEditor({
   /** "40,000 boxes" — what the last stage is measured against. */
   orderLabel?: string | null;
   disabled?: boolean;
+  /**
+   * What the factory's rooms already hold (`useRoomSlots`). Each row is
+   * checked against these and against the plan's other rows, and a clash is
+   * said under the row — a notice, never a block.
+   */
+  bookings?: RoomSlot[];
 }) {
+  const today = useRenderClock(todayKey);
   const { control, register, formState } = form;
   const errors = formState.errors;
   const { fields, append, remove, move } = useFieldArray({
@@ -100,6 +116,24 @@ export function StagePlanEditor({
   const open = expanded || Boolean(errors.stages);
   const rowsId = `${idPrefix}-rows`;
   const processNames = new Map(processes.map((p) => [p.id, p]));
+  const roomNames = new Map(rooms.map((r) => [r.id, r.name]));
+
+  /** Rows of this plan as bookings of their own, so two rows can clash too. */
+  const planSlots: RoomSlot[] = rows.flatMap((r, i) => {
+    const slot = draftSlot(r, today);
+    return slot
+      ? [
+          {
+            ...slot,
+            key: `plan-${i}`,
+            jobId: null,
+            label: `Stage ${i + 1} of this plan · ${
+              processNames.get(r.processId ?? "")?.name ?? "Stage"
+            }`,
+          },
+        ]
+      : [];
+  });
 
   // An activity that appears twice needs a label on each run; the field only
   // appears once it is needed.
@@ -225,6 +259,10 @@ export function StagePlanEditor({
               const needsLabel =
                 repeated.has(rows[index]?.processId ?? "") ||
                 Boolean(rowErrors?.label);
+              const clashes = slotClashes(draftSlot(rows[index] ?? {}, today), [
+                ...bookings,
+                ...planSlots.filter((s) => s.key !== `plan-${index}`),
+              ]);
               const messages = [
                 rowErrors?.processId?.message,
                 rowErrors?.targetQty?.message,
@@ -458,6 +496,11 @@ export function StagePlanEditor({
                         )}
                       </div>
                     )}
+
+                    <ClashNotice
+                      roomName={roomNames.get(rows[index]?.unitId ?? "") ?? "This room"}
+                      clashes={clashes}
+                    />
 
                     {missing && (
                       <p className="text-[0.6875rem] text-warn-ink">

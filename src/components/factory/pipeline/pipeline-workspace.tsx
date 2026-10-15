@@ -33,6 +33,7 @@ import {
   type PipelineJob,
 } from "@/lib/factory/pipeline-queries";
 import { fetchProducts, productKeys } from "@/lib/factory/product-queries";
+import { cn } from "@/lib/utils";
 
 /**
  * Pipeline → Kanban. The board of batches currently being worked.
@@ -150,13 +151,24 @@ export function PipelineWorkspace({
     <div className="flex flex-col lg:min-h-0 lg:flex-1">
       {/* One line: the title, then the buttons. The eyebrow and the sentence
           under the title cost three rows of a screen whose job is the list. */}
-      <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-3">
+      {/* The Schedule has no visible title: the rail already names the screen,
+          and the row it cost is height the room table needs. Kept for screen
+          readers, which still need a page heading. */}
+      {tab === "schedule" && (
+        <h1 className="sr-only">{units.singular} schedule</h1>
+      )}
+      <div
+        className={cn(
+          "mb-4 flex shrink-0 flex-wrap items-center justify-between gap-3",
+          tab === "schedule" && "hidden",
+        )}
+      >
         <div className="flex items-center gap-2.5">
-          <h1 className="text-2xl font-semibold tracking-tight text-ink">
-            {tab === "schedule"
-              ? `${units.singular} schedule`
-              : "Batch pipeline"}
-          </h1>
+          {tab !== "schedule" && (
+            <h1 className="text-2xl font-semibold tracking-tight text-ink">
+              Batch pipeline
+            </h1>
+          )}
           {/* Not on the Schedule: "use Plan stages on the batch" is an
               instruction about the board, and the Schedule is a room view
               with no batch rows to act on. */}

@@ -50,6 +50,8 @@ import {
   issueJob,
 } from "@/lib/factory/batch-stage-queries";
 import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
+import type { RoomSlot } from "@/lib/factory/schedule";
+import { useRoomSlots } from "@/lib/factory/use-room-slots";
 import {
   isUntouchedPlan,
   manufacturingRoute,
@@ -273,6 +275,9 @@ export function NewBatchDialog({
     [processList],
   );
   const rooms = useMemo(() => unitList.filter((u) => u.active), [unitList]);
+  // What the rooms already hold — each plan row is checked against it, and a
+  // clash is said under the row while the dates are typed.
+  const bookings = useRoomSlots(factoryId);
 
   /** Manufacturing batches on the board are the only possible bulk sources. */
   const bulkSources = useMemo(
@@ -1249,6 +1254,7 @@ export function NewBatchDialog({
                   defaultUnit={mainUnit}
                   orderLabel={mainOrder}
                   disabled={busy}
+                  bookings={bookings}
                 />
               )}
 
@@ -1321,6 +1327,7 @@ export function NewBatchDialog({
                     ]}
                     plannable={plannable}
                     rooms={rooms}
+                    bookings={bookings}
                     showWorkOrder={workOrderMode === "stage"}
                     perBatchWo={perBatchWo}
                     disabled={busy}
@@ -1472,6 +1479,7 @@ function LotEntry({
   takenIds,
   plannable,
   rooms,
+  bookings,
   showWorkOrder,
   perBatchWo,
   disabled,
@@ -1493,6 +1501,8 @@ function LotEntry({
   takenIds: string[];
   plannable: { id: string; name: string; category: string | null }[];
   rooms: { id: string; name: string }[];
+  /** What the rooms already hold — the lot's plan is checked against it. */
+  bookings: RoomSlot[];
   showWorkOrder: boolean;
   perBatchWo: boolean;
   disabled: boolean;
@@ -1771,6 +1781,7 @@ function LotEntry({
           defaultUnit={asStageUnit(packUnit)}
           orderLabel={lotOrder}
           disabled={disabled}
+          bookings={bookings}
         />
       </div>
     </TypeSection>

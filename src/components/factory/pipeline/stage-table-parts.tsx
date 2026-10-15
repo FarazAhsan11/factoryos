@@ -1,5 +1,6 @@
-import { ArrowRight, Flag } from "lucide-react";
+import { AlertTriangle, ArrowRight, Flag } from "lucide-react";
 
+import { formatDay } from "@/lib/factory/dates";
 import { cn } from "@/lib/utils";
 
 /**
@@ -165,5 +166,57 @@ export function ColumnHeads({
       </div>
       <span className={cn(trailing, "shrink-0")} aria-hidden />
     </div>
+  );
+}
+
+/**
+ * A heads-up that a stage being planned lands on days another stage already
+ * holds the same room. Said while the dates are being typed, not after the
+ * save — and never a refusal: a plant does double-book a room on purpose
+ * (a short clean-down between two runs, a stage that is really two lines), and
+ * room and dates are advisory everywhere. The Schedule marks the same overlap
+ * once it is saved, through the same rule.
+ */
+export function ClashNotice({
+  roomName,
+  clashes,
+  className,
+}: {
+  roomName: string;
+  clashes: { key: string; label: string; start: string; end: string }[];
+  className?: string;
+}) {
+  if (clashes.length === 0) return null;
+
+  const shown = clashes.slice(0, 3);
+  const more = clashes.length - shown.length;
+  const range = (start: string, end: string) =>
+    start === end ? formatDay(start) : `${formatDay(start)} – ${formatDay(end)}`;
+
+  return (
+    <p
+      role="status"
+      className={cn(
+        "flex items-start gap-1.5 rounded-lg border border-warn-line bg-warn-tint px-2.5 py-1.5 text-[0.6875rem] text-warn-ink",
+        className,
+      )}
+    >
+      <AlertTriangle className="mt-px size-3.5 shrink-0" aria-hidden />
+      <span>
+        <strong className="font-semibold">
+          {roomName} is already booked on these days
+        </strong>{" "}
+        by{" "}
+        {shown.map((c, i) => (
+          <span key={c.key}>
+            {i > 0 && "; "}
+            <span className="font-medium">{c.label}</span> (
+            {range(c.start, c.end)})
+          </span>
+        ))}
+        {more > 0 && ` and ${more} more`}. You can still plan it — it will show
+        as a clash on the Schedule.
+      </span>
+    </p>
   );
 }

@@ -14,6 +14,7 @@ import {
 } from "@/lib/factory/batch-stage-queries";
 import {
   formatShortDate,
+  isIdle,
   type RoomLane,
   type ScheduledStage,
 } from "@/lib/factory/schedule";
@@ -84,12 +85,25 @@ export function ScheduleQueue({
         >
           <header className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-sunken px-4 py-2.5">
             <h3 className="text-sm font-semibold text-ink">{lane.unitName}</h3>
-            <p className="text-[0.6875rem] text-ink-5">
-              {lane.pending} planned · {lane.stages.length} total
-              {lane.nextDate ? ` · from ${formatShortDate(lane.nextDate)}` : ""}
-            </p>
+            {isIdle(lane) ? (
+              <span className="inline-flex items-center rounded-full bg-surface px-2 py-0.5 text-[0.625rem] font-bold text-ink-4 ring-1 ring-line">
+                Idle
+              </span>
+            ) : (
+              <p className="text-[0.6875rem] text-ink-5">
+                {lane.pending} planned · {lane.stages.length} total
+                {lane.nextDate
+                  ? ` · from ${formatShortDate(lane.nextDate)}`
+                  : ""}
+              </p>
+            )}
           </header>
 
+          {isIdle(lane) ? (
+            <p className="px-4 py-3 text-xs text-ink-5">
+              Nothing planned in this room.
+            </p>
+          ) : (
           <div className="scrollbar-slim overflow-x-auto">
             <table className="w-full min-w-[900px] border-collapse text-sm">
               <thead>
@@ -119,6 +133,7 @@ export function ScheduleQueue({
               </tbody>
             </table>
           </div>
+          )}
         </section>
       ))}
     </div>

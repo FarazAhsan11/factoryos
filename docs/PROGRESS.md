@@ -364,9 +364,11 @@ room to the Queue, scrolled to it and ringed. The board does not grow a fourth
 and fifth column: past three, a row is no longer something anybody reads
 across, and the view that lists everything already exists.
 
-A room with nothing left to run is in neither: a lane of dashes tells a planner
-nothing, and twenty-five of them buries the four rooms that matter. A stage
-with **no room** cannot be drawn in a room either — but it is counted and named
+A room with nothing left to run is **still listed, marked Idle**, after the
+busy ones: a planner hunting for a free room has to see which are free, and a
+board of busy rooms only made an idle one look like it did not exist
+(`buildRoomLanes` is given the factory's active rooms). A stage
+with **no room** cannot be drawn in a room — but it is counted and named
 rather than silently dropped, because a board that quietly omits them
 under-reports the plant's load.
 

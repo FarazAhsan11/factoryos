@@ -207,7 +207,9 @@ export function PipelineWorkspace({
         <p className="rounded-2xl border border-danger-line bg-danger-soft px-4 py-6 text-center text-sm font-medium text-danger-deep">
           Could not load the pipeline: {(error as Error).message}
         </p>
-      ) : jobs.length === 0 ? (
+      ) : jobs.length === 0 && tab !== "schedule" ? (
+        // Not the Schedule: it lists every room whether or not a batch exists,
+        // so an empty plant shows its rooms as idle rather than this notice.
         <div className="rounded-2xl border border-dashed border-line-strong bg-surface px-4 py-16 text-center">
           <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-sunken text-ink-6">
             <LayoutGrid className="size-6" />
@@ -217,9 +219,7 @@ export function PipelineWorkspace({
           </p>
           <p className="mt-1 text-xs text-ink-5">
             {canManage
-              ? tab === "schedule"
-                ? "Raise a batch from Batch pipeline and it appears here."
-                : "Use New batch to raise one, or From catalogue to pick several."
+              ? "Use New batch to raise one, or From catalogue to pick several."
               : "A manager adds batches from the product catalogue."}
           </p>
         </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { CalendarClock, CalendarDays, LayoutList } from "lucide-react";
 
 import { ScheduleCalendar } from "@/components/factory/pipeline/schedule/schedule-calendar";
@@ -8,6 +9,7 @@ import { ScheduleQueue } from "@/components/factory/pipeline/schedule/schedule-q
 import { StageEditDialog } from "@/components/factory/pipeline/schedule/stage-edit-dialog";
 import type { BatchStage } from "@/lib/factory/batch-stage-queries";
 import type { PipelineJob } from "@/lib/factory/pipeline-queries";
+import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
 import {
   buildRoomLanes,
   stagesWithoutRoom,
@@ -40,8 +42,9 @@ type ViewKey = (typeof VIEWS)[number]["value"];
  * surface, where a planner sets the estimated finish and leaves the note that
  * says why a line sits where it does.
  *
- * Both read `buildRoomLanes`, so they cannot disagree about which rooms are
- * busy or what order a room's stages are in. Both open the same
+ * Both read `buildRoomLanes` — every room the factory has, idle ones
+ * included — so they cannot disagree about which rooms are busy or what order
+ * a room's stages are in. Both open the same
  * `StageEditDialog`, so a stage edited from the glance is edited exactly as it
  * is from the list.
  *
@@ -76,7 +79,17 @@ export function ScheduleView({
    */
   const [focusRoom, setFocusRoom] = useState<string | null>(null);
 
-  const lanes = useMemo(() => buildRoomLanes(stages, jobs), [stages, jobs]);
+  // Same key as the stage dialog and the rest of the app, so the list is
+  // normally already cached. Every room is a lane, busy or idle.
+  const { data: rooms = [] } = useQuery({
+    queryKey: setupKeys.all("factory_units", factoryId),
+    queryFn: () => fetchSetupItems("factory_units", factoryId),
+  });
+
+  const lanes = useMemo(
+    () => buildRoomLanes(stages, jobs, rooms),
+    [stages, jobs, rooms],
+  );
   const roomless = useMemo(() => stagesWithoutRoom(stages), [stages]);
   const hint = VIEWS.find((v) => v.value === view)?.hint;
 
@@ -154,11 +167,12 @@ export function ScheduleView({
             <CalendarClock className="size-6" />
           </span>
           <p className="mt-3 text-sm font-medium text-ink-3">
-            Nothing scheduled in any {unitWord.toLowerCase()}.
+            No {unitWord.toLowerCase()} set up yet.
           </p>
           <p className="mt-1 text-xs text-ink-5">
-            A {unitWord.toLowerCase()} appears here once a batch has a stage
-            planned in it that has not been signed off.
+            Every {unitWord.toLowerCase()} the factory has appears here —
+            add them in Admin, and they show as idle until a batch is planned
+            into them.
           </p>
         </div>
       ) : view === "board" ? (

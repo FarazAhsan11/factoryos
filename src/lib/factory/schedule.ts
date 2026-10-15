@@ -91,11 +91,30 @@ function compareStages(a: BatchStage, b: BatchStage): number {
   return a.created_at < b.created_at ? -1 : 1;
 }
 
+/** A room as the factory's setup lists it — all the schedule needs of one. */
+export interface ScheduleRoom {
+  id: string;
+  name: string;
+  active: boolean;
+}
+
+/** A room with nothing left to run — shown as Idle, not hidden. */
+export function isIdle(lane: RoomLane): boolean {
+  return lane.stages.length === 0;
+}
+
 /**
- * The rooms with work still on them, each with that work in order.
+ * Every room the factory has, each with the work still on it in order.
  *
- * Three things are filtered out, and each is a deliberate answer rather than
- * tidying:
+ * **Every active room gets a lane**, busy or not. A planner looking for a free
+ * room needs to see which ones are free, and a board that lists only the busy
+ * rooms cannot say so — an idle room just looked like a room that did not
+ * exist. Idle lanes sort after the busy ones (`isIdle`) and views label them.
+ * An *inactive* room is left out unless it still has work on it, because
+ * work already planned into a room is never hidden.
+ *
+ * Two things are still filtered out, and each is a deliberate answer rather
+ * than tidying:
  *
  *   · **Signed-off stages.** The schedule answers "what is coming", and a
  *     finished stage is history — it belongs to the batch record, which keeps
@@ -104,15 +123,26 @@ function compareStages(a: BatchStage, b: BatchStage): number {
  *   · **Roomless stages.** A stage nobody has assigned a room to cannot be
  *     drawn in a room. It is not lost: `stagesWithoutRoom` counts them so the
  *     view can say so rather than quietly shrinking.
- *   · **Rooms with nothing left.** A lane of dashes tells a planner nothing,
- *     and twenty-five of them buries the four rooms that matter.
  */
 export function buildRoomLanes(
   stages: BatchStage[],
   jobs: PipelineJob[],
+  rooms: ScheduleRoom[],
 ): RoomLane[] {
   const jobById = new Map(jobs.map((j) => [j.id, j]));
   const lanes = new Map<string, RoomLane>();
+
+  const roomName = new Map(rooms.map((r) => [r.id, r.name]));
+  for (const room of rooms) {
+    if (!room.active) continue;
+    lanes.set(room.id, {
+      unitId: room.id,
+      unitName: room.name,
+      stages: [],
+      pending: 0,
+      nextDate: null,
+    });
+  }
 
   for (const stage of stages) {
     if (stage.status === "complete") continue;
@@ -122,7 +152,8 @@ export function buildRoomLanes(
     if (!lane) {
       lane = {
         unitId: stage.unit_id,
-        unitName: stage.unit_name ?? "Unnamed room",
+        unitName:
+          roomName.get(stage.unit_id) ?? stage.unit_name ?? "Unnamed room",
         stages: [],
         pending: 0,
         nextDate: null,
@@ -148,9 +179,11 @@ export function buildRoomLanes(
 
   // Rooms with the nearest work first — that is the whole point of the board,
   // and it is what "the nearest coming day" means once every room is a lane.
-  // Undated rooms sit at the end, ordered by name so the tail is still
-  // scannable.
+  // Busy-but-undated rooms follow, and idle rooms close the list; both tails
+  // are ordered by name so they are still scannable.
   return [...lanes.values()].sort((a, b) => {
+    const idle = Number(isIdle(a)) - Number(isIdle(b));
+    if (idle) return idle;
     const date = compareDate(a.nextDate, b.nextDate);
     if (date) return date;
     return byName.compare(a.unitName, b.unitName);

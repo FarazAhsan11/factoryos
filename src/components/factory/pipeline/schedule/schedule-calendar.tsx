@@ -17,6 +17,7 @@ import {
   dayDiff,
   findRoomConflicts,
   formatShortDate,
+  isIdle,
   mondayOf,
   stageSpan,
   type RoomConflict,
@@ -54,8 +55,8 @@ function batchHue(key: string): number {
  * Schedule → Board. The plan as a calendar: rooms down the side, a fortnight
  * across the top, each stage drawn over the days it holds its room.
  *
- * The rooms are the busy rooms from `buildRoomLanes`, the same set the Queue
- * lists, so the two views cannot disagree about which rooms are busy. A stage
+ * The rooms are every room from `buildRoomLanes`, the same set the Queue
+ * lists — a room with nothing planned is drawn as an empty row marked Idle. A stage
  * spans `stageSpan` — planned date to estimated finish, and a running stage
  * to today at least. Stages that overlap in one room are stacked, never drawn
  * over each other, and the days they share are marked as a clash.
@@ -330,10 +331,16 @@ function RoomRow({
         style={{ gridColumn: 1, gridRow: "1 / -1" }}
       >
         <p className="text-sm font-semibold text-ink">{lane.unitName}</p>
-        <p className="text-[0.6562rem] text-ink-5">
-          {lane.stages.length} stage{lane.stages.length === 1 ? "" : "s"} to
-          run
-        </p>
+        {isIdle(lane) ? (
+          <span className="inline-flex w-fit items-center rounded-full bg-sunken px-1.5 py-0.5 text-[0.625rem] font-bold text-ink-4 ring-1 ring-line">
+            Idle
+          </span>
+        ) : (
+          <p className="text-[0.6562rem] text-ink-5">
+            {lane.stages.length} stage{lane.stages.length === 1 ? "" : "s"} to
+            run
+          </p>
+        )}
         <div className="flex flex-wrap gap-1">
           {clashDays > 0 && (
             <span className="inline-flex items-center gap-1 rounded-full bg-danger-soft px-1.5 py-0.5 text-[0.625rem] font-bold text-danger-deep ring-1 ring-danger-line">
@@ -359,7 +366,10 @@ function RoomRow({
               onClick={() => onJump(elsewhere)}
               className="inline-flex items-center gap-0.5 rounded-full border border-line bg-surface px-1.5 py-0.5 text-[0.625rem] font-semibold text-ink-4 transition hover:border-brand-line hover:text-brand-deep"
             >
-              {elsewhere > end ? "Next" : "Last"} {formatDay(elsewhere)}
+              {/* A stage that ended before the window and is still open was
+                  never started (a running one is stretched to today), so
+                  "Last" read as if the room had worked then. */}
+              {elsewhere > end ? "Next" : "Was due"} {formatDay(elsewhere)}
               <ChevronRight className="size-3" aria-hidden />
             </button>
           )}

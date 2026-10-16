@@ -72,14 +72,18 @@ import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
 import { todayKey } from "@/lib/factory/dates";
 import {
   draftSlot,
-  slotClashes,
+  slotCheck,
   type RoomSlot,
+  type SlotCheck,
 } from "@/lib/factory/schedule";
 import { useRoomSlots } from "@/lib/factory/use-room-slots";
 import { useRenderClock } from "@/lib/use-render-clock";
 import { cn } from "@/lib/utils";
 
 const MONO = "font-mono tracking-tight";
+
+/** A row with nothing to check — no unsaved edit, so nothing to warn about. */
+const NO_CLASH: SlotCheck = { clashes: [], free: null };
 
 function fmt(n: number | null | undefined) {
   return Number(n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -555,16 +559,24 @@ export function PlanStagesDialog({
                           Boolean(valueOf(stage).label.trim())
                         }
                         rooms={rooms}
-                        clashes={slotClashes(
-                          draftSlot(
-                            {
-                              ...valueOf(stage),
-                              running: stage.status === "in_progress",
-                            },
-                            today,
-                          ),
-                          bookingsFor(stage.id),
-                        )}
+                        // Only the row being changed is checked. A saved row that
+                        // an unsaved edit elsewhere now overlaps is not the one
+                        // doing the double-booking, and it already shows on the
+                        // Schedule — a warning on both reads as two problems.
+                        check={
+                          dirty.some((d) => d.id === stage.id)
+                            ? slotCheck(
+                                draftSlot(
+                                  {
+                                    ...valueOf(stage),
+                                    running: stage.status === "in_progress",
+                                  },
+                                  today,
+                                ),
+                                bookingsFor(stage.id),
+                              )
+                            : NO_CLASH
+                        }
                         busy={saving}
                         onEdit={(key, value) => edit(stage, key, value)}
                         onSave={() => save(stage)}
@@ -712,7 +724,7 @@ function StageRow({
   showWorkOrder,
   needsLabel,
   rooms,
-  clashes,
+  check,
   busy,
   onEdit,
   onSave,
@@ -734,8 +746,8 @@ function StageRow({
   showWorkOrder: boolean;
   needsLabel: boolean;
   rooms: { id: string; name: string }[];
-  /** Other stages already holding this row's room on these days. */
-  clashes: RoomSlot[];
+  /** Other stages already holding this row's room, and where it is free. */
+  check: SlotCheck;
   busy: boolean;
   onEdit: <K extends keyof RowDraft>(key: K, value: RowDraft[K]) => void;
   onSave: () => void;
@@ -916,7 +928,7 @@ function StageRow({
         {editable && (
           <ClashNotice
             roomName={rooms.find((r) => r.id === value.unitId)?.name ?? "This room"}
-            clashes={clashes}
+            check={check}
           />
         )}
 
@@ -1131,7 +1143,7 @@ function AddStageRow({
     name: ["unitId", "plannedDate", "estFinishDate"],
   });
   const today = useRenderClock(todayKey);
-  const clashes = slotClashes(
+  const check = slotCheck(
     draftSlot({ unitId, plannedDate, estFinishDate }, today),
     bookings,
   );
@@ -1340,7 +1352,7 @@ function AddStageRow({
 
           <ClashNotice
             roomName={rooms.find((r) => r.id === unitId)?.name ?? "This room"}
-            clashes={clashes}
+            check={check}
           />
 
           {firstError && (

@@ -32,7 +32,7 @@ import {
 } from "@/lib/factory/batch-stage-queries";
 import type { PipelineJob } from "@/lib/factory/pipeline-queries";
 import { todayKey } from "@/lib/factory/dates";
-import { draftSlot, slotClashes } from "@/lib/factory/schedule";
+import { draftSlot, slotCheck } from "@/lib/factory/schedule";
 import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
 import { useRoomSlots } from "@/lib/factory/use-room-slots";
 import { useRenderClock } from "@/lib/use-render-clock";
@@ -161,7 +161,7 @@ export function StageEditDialog({
   // stage's booking counts; this stage's own current one does not.
   const today = useRenderClock(todayKey);
   const bookings = useRoomSlots(factoryId);
-  const clashes = slotClashes(
+  const check = slotCheck(
     draftSlot(
       {
         unitId,
@@ -331,7 +331,7 @@ export function StageEditDialog({
             {!done && (
               <ClashNotice
                 roomName={rooms.find((r) => r.id === unitId)?.name ?? "This room"}
-                clashes={clashes}
+                check={check}
               />
             )}
 

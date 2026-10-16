@@ -41,7 +41,7 @@ import { SelectField } from "@/components/ui/select-field";
 import { todayKey } from "@/lib/factory/dates";
 import {
   draftSlot,
-  slotClashes,
+  slotCheck,
   type RoomSlot,
 } from "@/lib/factory/schedule";
 import { useRenderClock } from "@/lib/use-render-clock";
@@ -259,7 +259,7 @@ export function StagePlanEditor({
               const needsLabel =
                 repeated.has(rows[index]?.processId ?? "") ||
                 Boolean(rowErrors?.label);
-              const clashes = slotClashes(draftSlot(rows[index] ?? {}, today), [
+              const check = slotCheck(draftSlot(rows[index] ?? {}, today), [
                 ...bookings,
                 ...planSlots.filter((s) => s.key !== `plan-${index}`),
               ]);
@@ -499,7 +499,7 @@ export function StagePlanEditor({
 
                     <ClashNotice
                       roomName={roomNames.get(rows[index]?.unitId ?? "") ?? "This room"}
-                      clashes={clashes}
+                      check={check}
                     />
 
                     {missing && (

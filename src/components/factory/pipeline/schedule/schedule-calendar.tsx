@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import {
   AlertTriangle,
+  CalendarCheck,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -24,6 +25,8 @@ import {
   formatShortDate,
   isIdle,
   mondayOf,
+  roomFreeFrom,
+  weekdayOf,
   stageSpan,
   type RoomConflict,
   type RoomLane,
@@ -74,11 +77,26 @@ function batchHue(key: string): number {
  */
 export function ScheduleCalendar({
   lanes,
+  canManage,
+  onMove,
+  holidays,
+  weeklyOff,
   unitWord,
   onOpen,
   onShowAll,
 }: {
   lanes: RoomLane[];
+  /** Bars can be dragged to another day or room — managers only. */
+  canManage: boolean;
+  /** A bar dropped: the room and start day it landed on. */
+  onMove: (
+    entry: ScheduledStage,
+    to: { unitId: string; start: string; fromStart: string },
+  ) => void;
+  /** Closed days, `YYYY-MM-DD` → name (null when none was given). */
+  holidays: Map<string, string | null>;
+  /** Weekdays always closed, 0 = Monday … 6 = Sunday. */
+  weeklyOff: Set<number>;
   unitWord: string;
   onOpen: (entry: ScheduledStage) => void;
   /** Hands the room to the Queue, which lists everything in it. */
@@ -103,6 +121,21 @@ export function ScheduleCalendar({
   const dayCol = DAY_COL[weeks];
   const end = addDays(start, dayCount - 1);
   const days = Array.from({ length: dayCount }, (_, i) => addDays(start, i));
+  /**
+   * What closes each day, aligned with `days`: a named holiday, else a weekly
+   * day off ("Day off"), else null. The window always starts on a Monday, so a
+   * column's position is its weekday.
+   */
+  const closures = days.map((day, i) =>
+    holidays.has(day)
+      ? holidays.get(day) || "Holiday"
+      : weeklyOff.has(i % 7)
+        ? "Day off"
+        : null,
+  );
+  /** A day the factory does not work — a holiday or a weekly day off. */
+  const isClosed = (day: string) =>
+    holidays.has(day) || weeklyOff.has(weekdayOf(day));
   /** "12 Oct" once the columns are too narrow to hold "12 Oct 2026". */
   const dayLabel = (day: string) =>
     weeks === 2 ? formatDay(day) : formatDay(day).replace(/ \d{4}$/, "");
@@ -130,6 +163,47 @@ export function ScheduleCalendar({
   };
 
   const columns = `${ROOM_COL}px repeat(${dayCount}, minmax(${dayCol}px, 1fr))`;
+
+  /**
+   * The bar being dragged: the stage, the start it had, how many days into
+   * the bar it was grabbed (so a bar picked up by its third day lands with
+   * its third day under the pointer), and its length in days after the first.
+   */
+  const [drag, setDrag] = useState<{
+    entry: ScheduledStage;
+    fromStart: string;
+    offset: number;
+    length: number;
+  } | null>(null);
+  /** Where the dragged bar would land — drawn as a dashed outline. */
+  const [target, setTarget] = useState<{ unitId: string; start: string } | null>(
+    null,
+  );
+
+  const overDay = (unitId: string, day: string) => {
+    if (!drag) return;
+    const at = addDays(day, -drag.offset);
+    if (target?.unitId === unitId && target.start === at) return;
+    setTarget({ unitId, start: at });
+  };
+  const dropDay = (unitId: string, day: string) => {
+    if (!drag) return;
+    const at = addDays(day, -drag.offset);
+    const moved = drag;
+    setDrag(null);
+    setTarget(null);
+    // Dropped back where it was — nothing to write, nothing to undo.
+    if (unitId === moved.entry.stage.unit_id && at === moved.fromStart) return;
+    onMove(moved.entry, { unitId, start: at, fromStart: moved.fromStart });
+  };
+  /** The landing outline for one room, clipped to the window. */
+  const previewFor = (unitId: string) => {
+    if (!drag || target?.unitId !== unitId) return null;
+    const from = dayDiff(start, target.start);
+    const to = from + drag.length;
+    if (to < 0 || from > dayCount - 1) return null;
+    return { from: Math.max(0, from), to: Math.min(dayCount - 1, to) };
+  };
 
   return (
     <div className="flex flex-col gap-3 lg:min-h-0 lg:flex-1">
@@ -230,11 +304,14 @@ export function ScheduleCalendar({
             </div>
             {days.map((day, i) => {
               const isToday = day === today;
+              const closed = closures[i];
               return (
                 <div
                   key={day}
+                  title={closed ?? undefined}
                   className={cn(
                     "border-l border-line-soft px-2 py-2 text-center",
+                    closed && "bg-violet-line/70",
                     isToday &&
                       "bg-warn-soft shadow-[inset_0_-2px_0_var(--color-warn)]",
                   )}
@@ -256,6 +333,11 @@ export function ScheduleCalendar({
                   >
                     {dayLabel(day)}
                   </p>
+                  {closed && (
+                    <p className="mt-0.5 truncate text-[0.5625rem] font-bold tracking-[0.06em] text-violet-deep uppercase">
+                      {closed}
+                    </p>
+                  )}
                 </div>
               );
             })}
@@ -266,6 +348,29 @@ export function ScheduleCalendar({
               key={lane.unitId}
               ref={lane.unitId === focusRoom ? focusRef : undefined}
               lane={lane}
+              freeFrom={isIdle(lane) ? null : roomFreeFrom(lane, today, isClosed)}
+              closures={closures}
+              canDrag={canManage}
+              draggingId={drag?.entry.stage.id ?? null}
+              preview={previewFor(lane.unitId)}
+              onDragStartBar={(entry, span, grabbed) =>
+                // After the browser has taken its drag image: re-rendering
+                // the source inside dragstart can cancel the drag.
+                requestAnimationFrame(() =>
+                  setDrag({
+                    entry,
+                    fromStart: span.start,
+                    offset: Math.max(0, dayDiff(span.start, grabbed)),
+                    length: dayDiff(span.start, span.end),
+                  }),
+                )
+              }
+              onDragEndBar={() => {
+                setDrag(null);
+                setTarget(null);
+              }}
+              onOverDay={(day) => overDay(lane.unitId, day)}
+              onDropDay={(day) => dropDay(lane.unitId, day)}
               days={days}
               start={start}
               end={end}
@@ -281,6 +386,19 @@ export function ScheduleCalendar({
       </div>
     </div>
   );
+}
+
+/**
+ * The calendar day cell under a point, and the room it belongs to — read
+ * through whatever is stacked on top of it (bars, the landing outline).
+ */
+function dayAt(x: number, y: number): { unit: string; day: string } | null {
+  for (const el of document.elementsFromPoint(x, y)) {
+    if (el instanceof HTMLElement && el.dataset.day && el.dataset.unit) {
+      return { unit: el.dataset.unit, day: el.dataset.day };
+    }
+  }
+  return null;
 }
 
 interface Placed {
@@ -302,6 +420,15 @@ interface Placed {
 function RoomRow({
   ref,
   lane,
+  freeFrom,
+  closures,
+  canDrag,
+  draggingId,
+  preview,
+  onDragStartBar,
+  onDragEndBar,
+  onOverDay,
+  onDropDay,
   days,
   start,
   end,
@@ -314,6 +441,23 @@ function RoomRow({
 }: {
   ref?: (node: HTMLElement | null) => void;
   lane: RoomLane;
+  /** When this busy room is next free (`roomFreeFrom`); null when idle. */
+  freeFrom: { from: string; until: string | null } | null;
+  /** Per day, why the factory is closed — or null on a working day. */
+  closures: (string | null)[];
+  canDrag: boolean;
+  /** The stage being dragged anywhere on the Board, or null. */
+  draggingId: string | null;
+  /** Where a dragged bar would land in this room, as window columns. */
+  preview: { from: number; to: number } | null;
+  onDragStartBar: (
+    entry: ScheduledStage,
+    span: StageSpan,
+    grabbedDay: string,
+  ) => void;
+  onDragEndBar: () => void;
+  onOverDay: (day: string) => void;
+  onDropDay: (day: string) => void;
   days: string[];
   start: string;
   end: string;
@@ -368,17 +512,16 @@ function RoomRow({
         : [],
     ),
   );
-  const clashingIds = new Set(
-    pairs.filter((p) => p.to >= today).flatMap((p) => [p.a, p.b]),
-  );
+  const clashingIds = new Set(pairs.flatMap((p) => [p.a, p.b]));
   const hiddenPerDay = days.map(
     (_, i) =>
       placed.filter((p) => p.track >= MAX_TRACKS && p.from <= i && p.to >= i)
         .length,
   );
-  // A clash is only worth marking where it can still be planned away.
-  const clash = days.map(
-    (day) => day >= today && pairs.some((p) => p.from <= day && p.to >= day),
+  // Marked on past days too: both stages are still open, so the overlap is
+  // unsettled — see `findRoomConflicts`.
+  const clash = days.map((day) =>
+    pairs.some((p) => p.from <= day && p.to >= day),
   );
   const clashDays = clash.filter(Boolean).length;
   const hasHidden = hiddenPerDay.some((n) => n > 0);
@@ -402,6 +545,29 @@ function RoomRow({
   return (
     <div
       ref={ref}
+      // A drop target only while something is being dragged. The day is read
+      // from the cell under the pointer, through the bars stacked on it.
+      onDragOver={
+        draggingId
+          ? (e) => {
+              const hit = dayAt(e.clientX, e.clientY);
+              if (!hit || hit.unit !== lane.unitId) return;
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "move";
+              onOverDay(hit.day);
+            }
+          : undefined
+      }
+      onDrop={
+        draggingId
+          ? (e) => {
+              const hit = dayAt(e.clientX, e.clientY);
+              if (!hit || hit.unit !== lane.unitId) return;
+              e.preventDefault();
+              onDropDay(hit.day);
+            }
+          : undefined
+      }
       className="grid scroll-mt-16 border-b border-line-soft last:border-0"
       style={{
         gridTemplateColumns: columns,
@@ -430,6 +596,23 @@ function RoomRow({
           </p>
         )}
         <div className="flex flex-wrap gap-1">
+          {/* When the room opens up — the one answer a planner looking for
+              space needs, without reading every bar to the right. */}
+          {freeFrom && (
+            <span
+              title={
+                freeFrom.until
+                  ? `Free ${formatDay(freeFrom.from)} – ${formatDay(freeFrom.until)}, then booked`
+                  : `Nothing booked from ${formatDay(freeFrom.from)}`
+              }
+              className="inline-flex items-center gap-1 rounded-full bg-teal-soft px-1.5 py-0.5 text-[0.625rem] font-bold text-teal-deep ring-1 ring-teal-line"
+            >
+              <CalendarCheck className="size-3" aria-hidden />
+              {freeFrom.from === today
+                ? "Free now"
+                : `Free from ${formatDay(freeFrom.from)}`}
+            </span>
+          )}
           {clashDays > 0 && (
             <span className="inline-flex items-center gap-1 rounded-full bg-danger-soft px-1.5 py-0.5 text-[0.625rem] font-bold text-danger-deep ring-1 ring-danger-line">
               <AlertTriangle className="size-3" aria-hidden />
@@ -470,10 +653,18 @@ function RoomRow({
           <div
             key={day}
             aria-hidden
+            data-day={day}
+            data-unit={lane.unitId}
             className={cn(
               "border-l border-line-soft",
               weekend && "bg-sunken/70",
-              day === today && "bg-warn-tint",
+              // Closed days are hatched as well as tinted, so they read as
+              // "off" at a glance and not as a slightly different white.
+              closures[i] &&
+                "bg-violet-soft bg-[repeating-linear-gradient(135deg,transparent_0_7px,color-mix(in_srgb,var(--color-violet)_14%,transparent)_7px_9px)]",
+              // Today: a clearly yellow column with an amber edge each side.
+              day === today &&
+                "bg-warn-soft shadow-[inset_1px_0_0_var(--color-warn-line),inset_-1px_0_0_var(--color-warn-line)]",
               clash[i] &&
                 "bg-danger-tint shadow-[inset_0_2px_0_var(--color-danger)]",
             )}
@@ -481,6 +672,19 @@ function RoomRow({
           />
         );
       })}
+
+      {/* Where the dragged bar would land. Above the bars, but never in the
+          way of the pointer — the drop is read from the cells beneath. */}
+      {preview && (
+        <div
+          aria-hidden
+          className="pointer-events-none relative z-[15] m-1 rounded-lg border-2 border-dashed border-brand bg-brand/10"
+          style={{
+            gridColumn: `${preview.from + 2} / ${preview.to + 3}`,
+            gridRow: "1 / -1",
+          }}
+        />
+      )}
 
       {placed
         .filter((p) => p.track < MAX_TRACKS)
@@ -491,6 +695,12 @@ function RoomRow({
             clipLeft={p.span.start < start}
             clipRight={p.span.end > end}
             clashing={clashingIds.has(p.entry.stage.id)}
+            draggable={canDrag}
+            dragging={draggingId === p.entry.stage.id}
+            onDragStart={(grabbed) =>
+              onDragStartBar(p.entry, p.span, grabbed)
+            }
+            onDragEnd={onDragEndBar}
             onOpen={() => onOpen(p.entry)}
           />
         ))}
@@ -522,12 +732,22 @@ function StageBar({
   clipLeft,
   clipRight,
   clashing,
+  draggable,
+  dragging,
+  onDragStart,
+  onDragEnd,
   onOpen,
 }: {
   placed: Placed;
   clipLeft: boolean;
   clipRight: boolean;
   clashing: boolean;
+  draggable: boolean;
+  /** This bar is the one being dragged — drawn faded in place. */
+  dragging: boolean;
+  /** The day under the pointer when the bar was picked up. */
+  onDragStart: (grabbedDay: string) => void;
+  onDragEnd: () => void;
   onOpen: () => void;
 }) {
   const { entry, span, from, to, track } = placed;
@@ -559,12 +779,26 @@ function StageBar({
         type="button"
         onClick={onOpen}
         aria-label={summary}
+        draggable={draggable}
+        onDragStart={
+          draggable
+            ? (e) => {
+                e.dataTransfer.effectAllowed = "move";
+                // Firefox starts no drag without data.
+                e.dataTransfer.setData("text/plain", stage.id);
+                onDragStart(dayAt(e.clientX, e.clientY)?.day ?? span.start);
+              }
+            : undefined
+        }
+        onDragEnd={draggable ? onDragEnd : undefined}
         className={cn(
           "relative z-10 my-1 flex min-w-0 flex-col justify-center gap-0.5 overflow-hidden rounded-lg border px-2 py-1.5 text-left transition",
           "hover:-translate-y-px hover:shadow-[0_3px_10px_rgb(20_22_43/0.14)] focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none",
           clipLeft ? "ml-0 rounded-l-none border-l-0" : "ml-1",
           clipRight ? "mr-0 rounded-r-none border-r-0" : "mr-1",
           clashing && "ring-2 ring-danger/70",
+          draggable && "cursor-grab active:cursor-grabbing",
+          dragging && "opacity-40",
         )}
         style={{
           gridColumn: `${from + 2} / ${to + 3}`,
@@ -752,6 +986,13 @@ function Legend() {
           aria-hidden
         />
         Clash
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <span
+          className="h-2.5 w-4 rounded-sm border border-violet-line bg-violet-soft"
+          aria-hidden
+        />
+        Holiday / day off
       </span>
       <span className="text-ink-5">· colour follows the batch</span>
     </div>

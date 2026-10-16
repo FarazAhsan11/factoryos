@@ -379,7 +379,8 @@ when another stage already holds that room. What counts is `clashRange` in
 `schedule.ts`, the one rule the Board banner, the calendar's red days and this
 notice all read: **two or more shared days** clash (one shared day is a
 handoff — the plan holds days, not hours), and two **running** stages (started,
-not signed off) clash on any shared day. Only from today on. Shared as
+not signed off) clash on any shared day. Past days count — a stage still
+open is unsettled, and signed-off ones never reach the check. Shared as
 `draftSlot` / `roomSlots` / `slotClashes` in `schedule.ts` and read through
 `useRoomSlots`. It is a **notice, never a block** — room and dates are advisory.
 Rows of the same plan count against each other; a bulk's plan and its lots'

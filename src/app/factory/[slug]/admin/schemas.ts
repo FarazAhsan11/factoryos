@@ -435,6 +435,51 @@ export const shiftTimesSchema = z.object({
 export type ShiftClockValues = z.infer<typeof shiftClockSchema>;
 export type ShiftTimesValues = z.infer<typeof shiftTimesSchema>;
 
+/** The longest run of closed days one entry may add — a month and a half. */
+export const MAX_HOLIDAY_RUN = 45;
+
+/**
+ * Admin → Shift times → Holidays. One day, or a run of them: `until` turns it
+ * into every day from `date` to `until`, written as one row each. The label is
+ * optional ("Diwali"). The end-before-start rule lives here rather than in a
+ * `check` so its message can name the field (see the migrations rule).
+ */
+export const holidaySchema = z
+  .object({
+    date: z.string().min(1, "Pick the day."),
+    until: z.string().optional(),
+    label: z
+      .string()
+      .trim()
+      .max(60, "Keep the name under 60 characters.")
+      .optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (!v.until) return;
+    if (v.until < v.date) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["until"],
+        message: "The last day is before the first.",
+      });
+      return;
+    }
+    const days =
+      Math.round(
+        (Date.parse(`${v.until}T00:00:00Z`) - Date.parse(`${v.date}T00:00:00Z`)) /
+          86_400_000,
+      ) + 1;
+    if (days > MAX_HOLIDAY_RUN) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["until"],
+        message: `Add at most ${MAX_HOLIDAY_RUN} days at a time.`,
+      });
+    }
+  });
+
+export type HolidayValues = z.infer<typeof holidaySchema>;
+
 /** Row-level edits on the roster. Send only the field being changed. */
 export const updateEmployeeSchema = z
   .object({

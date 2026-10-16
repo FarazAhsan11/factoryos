@@ -7,6 +7,7 @@ import { Building2, Clock3, Cog, LayoutGrid, Wrench } from "lucide-react";
 import { PROCESS_CATEGORIES } from "@/app/factory/[slug]/log/schemas";
 import { CompanySettingsForm } from "@/components/factory/admin/company-settings-form";
 import { SetupListManager } from "@/components/factory/admin/setup-list-manager";
+import { HolidaysCard } from "@/components/factory/admin/holidays-card";
 import { ShiftTimesForm } from "@/components/factory/admin/shift-times-form";
 import { PanelHeader } from "@/components/factory/admin/settings-ui";
 import { resolveAdminTab } from "@/lib/factory/admin-tabs";
@@ -131,7 +132,10 @@ export function AdminWorkspace({
             title="Shift times"
             description="When each shift starts and ends, and who supervises it. The workspace clock, the log form and the printed handover all read these."
           />
-          <ShiftTimesForm factoryId={factory.id} canManage={canManage} />
+          <div className="space-y-5">
+            <ShiftTimesForm factoryId={factory.id} canManage={canManage} />
+            <HolidaysCard factoryId={factory.id} canManage={canManage} />
+          </div>
         </Panel>
       </div>
     </div>

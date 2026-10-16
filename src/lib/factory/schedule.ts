@@ -258,8 +258,8 @@ export interface RoomConflict {
 }
 
 /**
- * How far ahead clashes are looked for. A typo'd estimate in 2062 would
- * otherwise have the scan walk thirteen thousand days.
+ * How far either side of today clashes are looked for. A typo'd estimate in
+ * 2062 would otherwise have the scan walk thirteen thousand days.
  */
 const CONFLICT_HORIZON_DAYS = 366;
 
@@ -318,20 +318,24 @@ export function clashPairs(
 }
 
 /**
- * Every double-booked room from today on, a clash per run of days.
+ * Every double-booked room, a clash per run of days.
  *
  * What counts as a clash is `clashRange`. Days with the same stages clashing
  * are merged into one, so a four-day overlap of two batches reads as one
  * conflict and not four.
  *
- * Only from today: a clash on a day already gone cannot be planned away, and
- * the shift log, not the plan, says what that room actually did.
+ * Days already gone are included. The lanes hold only stages that are not
+ * signed off, so an overlap in the past is two stages still open in one room —
+ * not history, and exactly what a planner has to settle by re-dating one or
+ * signing it off. (The shift log, not the plan, is the record of what a room
+ * did; a signed-off stage never reaches this function.)
  */
 export function findRoomConflicts(
   lanes: RoomLane[],
   today: string,
 ): RoomConflict[] {
   const horizon = addDays(today, CONFLICT_HORIZON_DAYS);
+  const floor = addDays(today, -CONFLICT_HORIZON_DAYS);
   const conflicts: RoomConflict[] = [];
 
   for (const lane of lanes) {
@@ -339,7 +343,7 @@ export function findRoomConflicts(
       .map((entry) => ({ entry, span: stageSpan(entry.stage, today) }))
       .filter(
         (s): s is { entry: ScheduledStage; span: StageSpan } =>
-          s.span !== null && s.span.end >= today && s.span.start <= horizon,
+          s.span !== null && s.span.end >= floor && s.span.start <= horizon,
       );
     if (spans.length < 2) continue;
 
@@ -351,13 +355,13 @@ export function findRoomConflicts(
         end: span.end,
         running: entry.stage.status === "in_progress",
       })),
-    ).filter((p) => p.to >= today);
+    );
     if (pairs.length === 0) continue;
 
-    let first = pairs[0].from < today ? today : pairs[0].from;
+    let first = pairs[0].from < floor ? floor : pairs[0].from;
     let last = pairs[0].to;
     for (const p of pairs) {
-      const from = p.from < today ? today : p.from;
+      const from = p.from < floor ? floor : p.from;
       if (from < first) first = from;
       if (p.to > last) last = p.to;
     }
@@ -487,6 +491,111 @@ export function slotClashes(
   return others.filter(
     (o) => o.unitId === candidate.unitId && clashRange(candidate, o) !== null,
   );
+}
+
+/** What a stage being planned clashes with, and the next dates that are free. */
+export interface SlotCheck {
+  clashes: RoomSlot[];
+  /**
+   * The first later day the room is free for a stage of this length, and how
+   * long it stays free: `end` is the last free day, or null when nothing is
+   * booked in the room after that (free "onwards").
+   */
+  free: { start: string; end: string | null } | null;
+}
+
+/**
+ * The clashes of a plan being typed, and — when there are any — where the room
+ * is next free and for how long.
+ *
+ * The start is the first day, after the one the planner typed, that a stage
+ * of this length fits without clashing ("later" because an earlier day would
+ * say the plan they just made was wrong, not where it can go). The end is how
+ * far that gap runs — to the next booking in the room, or none ("onwards"),
+ * so the planner sees the whole opening and not just a window their stage
+ * happens to fill. Free is by `clashRange` itself, so a start on the last day
+ * of a booking counts when that is only a handoff. Looks a year ahead and no
+ * further.
+ */
+export function slotCheck(
+  candidate: {
+    unitId: string;
+    start: string;
+    end: string;
+    running: boolean;
+  } | null,
+  others: RoomSlot[],
+): SlotCheck {
+  const clashes = slotClashes(candidate, others);
+  if (!candidate || clashes.length === 0) return { clashes, free: null };
+
+  const length = dayDiff(candidate.start, candidate.end);
+  const limit = addDays(candidate.start, CONFLICT_HORIZON_DAYS);
+  for (let start = addDays(candidate.start, 1); start <= limit; start = addDays(start, 1)) {
+    const probe = { ...candidate, start, end: addDays(start, length) };
+    if (slotClashes(probe, others).length === 0) {
+      // Stretch the window until the next booking gets in the way.
+      let end = probe.end;
+      while (end < limit) {
+        const next = addDays(end, 1);
+        if (slotClashes({ ...probe, end: next }, others).length > 0) break;
+        end = next;
+      }
+      return {
+        clashes,
+        free: { start: probe.start, end: end >= limit ? null : end },
+      };
+    }
+  }
+  return { clashes, free: null };
+}
+
+/** 0 = Monday … 6 = Sunday — the order the calendar is drawn in. */
+export function weekdayOf(day: string): number {
+  const [y, m, d] = day.slice(0, 10).split("-").map(Number);
+  return (new Date(y, m - 1, d).getDay() + 6) % 7;
+}
+
+/**
+ * When a busy room is next free: the first working day from today that none
+ * of its open stages covers, and how long that opening lasts — `until` is the
+ * last free day before the next booking, or null when nothing is booked after.
+ *
+ * "Covers" is the stage's planned span (`stageSpan`), so this answers what a
+ * planner reads off the row: Capsule Pack holds 18–23 Oct, the room is free
+ * from the 24th. Closed days (`isClosed` — holidays and weekly days off) are
+ * skipped for the start, since a free Sunday the plant does not work is not
+ * when anything can run. Null when nothing is free within a year.
+ */
+export function roomFreeFrom(
+  lane: RoomLane,
+  today: string,
+  isClosed: (day: string) => boolean = () => false,
+): { from: string; until: string | null } | null {
+  const spans = lane.stages
+    .map((s) => stageSpan(s.stage, today))
+    .filter((s): s is StageSpan => s !== null);
+  const covered = (day: string) =>
+    spans.some((s) => s.start <= day && s.end >= day);
+
+  const limit = addDays(today, CONFLICT_HORIZON_DAYS);
+  // A `while` over a variable declared outside it, not `for (let day …)`:
+  // Turbopack's dev build mis-compiled the `for` form — with a closure in
+  // the body capturing the loop variable it left `addDays` in the update
+  // step un-rewritten ("addDays is not defined" at runtime).
+  let day = today;
+  while (day <= limit) {
+    if (!covered(day) && !isClosed(day)) {
+      const from = day;
+      const next = spans
+        .map((s) => s.start)
+        .filter((start) => start > from)
+        .sort()[0];
+      return { from, until: next ? addDays(next, -1) : null };
+    }
+    day = addDays(day, 1);
+  }
+  return null;
 }
 
 /** Room names in reading order — "Room 4" before "Room 10". */

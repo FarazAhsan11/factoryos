@@ -1,17 +1,31 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarClock, CalendarDays, LayoutList } from "lucide-react";
+import { toast } from "sonner";
 
 import { ScheduleCalendar } from "@/components/factory/pipeline/schedule/schedule-calendar";
 import { ScheduleQueue } from "@/components/factory/pipeline/schedule/schedule-queue";
 import { StageEditDialog } from "@/components/factory/pipeline/schedule/stage-edit-dialog";
-import type { BatchStage } from "@/lib/factory/batch-stage-queries";
+import {
+  batchStageKeys,
+  stageName,
+  updateBatchStage,
+  type BatchStage,
+} from "@/lib/factory/batch-stage-queries";
+import { addDays, formatDay } from "@/lib/factory/dates";
 import type { PipelineJob } from "@/lib/factory/pipeline-queries";
+import {
+  fetchHolidays,
+  fetchWeeklyOff,
+  holidayKeys,
+  weeklyOffKeys,
+} from "@/lib/factory/holiday-queries";
 import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
 import {
   buildRoomLanes,
+  dayDiff,
   stagesWithoutRoom,
   type ScheduledStage,
 } from "@/lib/factory/schedule";
@@ -90,8 +104,108 @@ export function ScheduleView({
     () => buildRoomLanes(stages, jobs, rooms),
     [stages, jobs, rooms],
   );
+
+  // The days the factory is closed (Admin → Shift times), drawn as tinted
+  // columns on the Board. Day → name, since a day is what the calendar asks.
+  const { data: holidayList = [] } = useQuery({
+    queryKey: holidayKeys.all(factoryId),
+    queryFn: () => fetchHolidays(factoryId),
+  });
+  const holidays = useMemo(
+    () => new Map(holidayList.map((h) => [h.date, h.label])),
+    [holidayList],
+  );
+  // Weekdays always closed (0 = Monday … 6 = Sunday) — tinted the same way.
+  const { data: weeklyOffList = [] } = useQuery({
+    queryKey: weeklyOffKeys.all(factoryId),
+    queryFn: () => fetchWeeklyOff(factoryId),
+  });
+  const weeklyOff = useMemo(() => new Set(weeklyOffList), [weeklyOffList]);
   const roomless = useMemo(() => stagesWithoutRoom(stages), [stages]);
-  const hint = VIEWS.find((v) => v.value === view)?.hint;
+  const hint =
+    (VIEWS.find((v) => v.value === view)?.hint ?? "") +
+    // Only managers can move a stage, so only they are told they can.
+    (view === "board" && canManage ? " · drag a stage to move it" : "");
+
+  const queryClient = useQueryClient();
+  type Placement = Pick<BatchStage, "unit_id" | "planned_date" | "est_finish_date">;
+
+  /**
+   * Writes a stage's room and dates, drawing the move at once.
+   *
+   * The cache is patched before the request so the bar lands where it was
+   * dropped instead of snapping back for the length of a round trip; the
+   * refresh afterwards replaces the patch with what the server derived
+   * (behind plan, overrunning). A failed write puts the stage back.
+   */
+  async function place(stage: BatchStage, to: Placement, from: Placement) {
+    const key = batchStageKeys.all(factoryId);
+    const patch = (values: Placement) =>
+      queryClient.setQueryData<BatchStage[]>(key, (old) =>
+        old?.map((s) =>
+          s.id === stage.id
+            ? {
+                ...s,
+                ...values,
+                unit_name:
+                  rooms.find((r) => r.id === values.unit_id)?.name ??
+                  s.unit_name,
+              }
+            : s,
+        ),
+      );
+    patch(to);
+    try {
+      await updateBatchStage(stage.id, to);
+      return true;
+    } catch (e) {
+      patch(from);
+      toast.error((e as Error).message);
+      return false;
+    } finally {
+      await onRefresh();
+    }
+  }
+
+  /**
+   * A bar dropped on the Board: the stage takes the room and the start day it
+   * was dropped on, and its estimated finish moves by the same number of days
+   * so the stage keeps its length. Offered back with Undo, since a drag is
+   * the one edit here that is easy to make by accident.
+   */
+  async function moveStage(
+    entry: ScheduledStage,
+    to: { unitId: string; start: string; fromStart: string },
+  ) {
+    const { stage, job } = entry;
+    const delta = dayDiff(to.fromStart, to.start);
+    const from: Placement = {
+      unit_id: stage.unit_id,
+      planned_date: stage.planned_date,
+      est_finish_date: stage.est_finish_date,
+    };
+    const next: Placement = {
+      unit_id: to.unitId,
+      planned_date: to.start,
+      est_finish_date: stage.est_finish_date
+        ? addDays(stage.est_finish_date, delta)
+        : null,
+    };
+    if (!(await place(stage, next, from))) return;
+
+    const room = rooms.find((r) => r.id === to.unitId)?.name ?? unitWord;
+    toast.success(
+      `${job?.batch_no ?? "Stage"} · ${stageName(stage)} moved to ${room}, ${formatDay(to.start)}.`,
+      {
+        action: {
+          label: "Undo",
+          onClick: async () => {
+            if (await place(stage, from, next)) toast.success("Move undone.");
+          },
+        },
+      },
+    );
+  }
 
   /**
    * The open dialog re-read from the current stage list.
@@ -180,6 +294,10 @@ export function ScheduleView({
            banner stay put while the rooms scroll under a sticky day header. */
         <ScheduleCalendar
           lanes={lanes}
+          canManage={canManage}
+          onMove={moveStage}
+          holidays={holidays}
+          weeklyOff={weeklyOff}
           unitWord={unitWord}
           onOpen={setEditing}
           onShowAll={(unitId) => {

@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowRight, Flag } from "lucide-react";
+import { AlertTriangle, ArrowRight, CalendarCheck, Flag } from "lucide-react";
 
 import { formatDay } from "@/lib/factory/dates";
 import { cn } from "@/lib/utils";
@@ -171,21 +171,26 @@ export function ColumnHeads({
 
 /**
  * A heads-up that a stage being planned lands on days another stage already
- * holds the same room. Said while the dates are being typed, not after the
- * save — and never a refusal: a plant does double-book a room on purpose
- * (a short clean-down between two runs, a stage that is really two lines), and
- * room and dates are advisory everywhere. The Schedule marks the same overlap
- * once it is saved, through the same rule.
+ * holds the same room — said while the dates are being typed, not after the
+ * save, and never a refusal: a plant does double-book a room on purpose, and
+ * room and dates are advisory everywhere. Alongside the problem it offers the
+ * answer: the nearest later dates the room is free for a stage of the same
+ * length. The Schedule marks the same overlap once it is saved, through the
+ * same rule.
  */
 export function ClashNotice({
   roomName,
-  clashes,
+  check,
   className,
 }: {
   roomName: string;
-  clashes: { key: string; label: string; start: string; end: string }[];
+  check: {
+    clashes: { key: string; label: string; start: string; end: string }[];
+    free: { start: string; end: string | null } | null;
+  };
   className?: string;
 }) {
+  const { clashes, free } = check;
   if (clashes.length === 0) return null;
 
   const shown = clashes.slice(0, 3);
@@ -194,7 +199,7 @@ export function ClashNotice({
     start === end ? formatDay(start) : `${formatDay(start)} – ${formatDay(end)}`;
 
   return (
-    <p
+    <div
       role="status"
       className={cn(
         "flex items-start gap-1.5 rounded-lg border border-warn-line bg-warn-tint px-2.5 py-1.5 text-[0.6875rem] text-warn-ink",
@@ -202,21 +207,33 @@ export function ClashNotice({
       )}
     >
       <AlertTriangle className="mt-px size-3.5 shrink-0" aria-hidden />
-      <span>
-        <strong className="font-semibold">
-          {roomName} is already booked on these days
-        </strong>{" "}
-        by{" "}
-        {shown.map((c, i) => (
-          <span key={c.key}>
-            {i > 0 && "; "}
-            <span className="font-medium">{c.label}</span> (
-            {range(c.start, c.end)})
-          </span>
-        ))}
-        {more > 0 && ` and ${more} more`}. You can still plan it — it will show
-        as a clash on the Schedule.
-      </span>
-    </p>
+      <div className="min-w-0 space-y-0.5">
+        <p>
+          <strong className="font-semibold">
+            {roomName} is already booked on these days
+          </strong>{" "}
+          by{" "}
+          {shown.map((c, i) => (
+            <span key={c.key}>
+              {i > 0 && "; "}
+              <span className="font-medium">{c.label}</span> (
+              {range(c.start, c.end)})
+            </span>
+          ))}
+          {more > 0 && ` and ${more} more`}.
+        </p>
+        {free && (
+          <p className="flex items-center gap-1 font-semibold text-teal-deep">
+            <CalendarCheck className="size-3.5 shrink-0" aria-hidden />
+            {roomName} is free{" "}
+            {free.end === null || free.end === free.start
+              ? free.end === null
+                ? `from ${formatDay(free.start)} onwards`
+                : `on ${formatDay(free.start)}`
+              : `from ${formatDay(free.start)} to ${formatDay(free.end)}`}
+          </p>
+        )}
+      </div>
+    </div>
   );
 }

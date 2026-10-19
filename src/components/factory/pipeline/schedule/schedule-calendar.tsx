@@ -9,13 +9,18 @@ import {
   ChevronRight,
   Clock,
   Cog,
+  Sparkles,
 } from "lucide-react";
 
 import { Tooltip } from "@base-ui/react/tooltip";
 
 import { StageTip } from "@/components/factory/pipeline/schedule/stage-tip";
 import { DateField } from "@/components/ui/date-picker";
-import { stageName, stageProgress } from "@/lib/factory/batch-stage-queries";
+import {
+  cleanShort,
+  stageName,
+  stageProgress,
+} from "@/lib/factory/batch-stage-queries";
 import { addDays, formatDay, todayKey } from "@/lib/factory/dates";
 import {
   clashPairs,
@@ -207,8 +212,11 @@ export function ScheduleCalendar({
 
   return (
     <div className="flex flex-col gap-3 lg:min-h-0 lg:flex-1">
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
+      {/* One row from `lg` up, whatever the span: the controls keep their
+          width and the legend takes what is left, wrapping inside its own
+          column rather than dropping the whole legend under the controls. */}
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 lg:flex-nowrap">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           <div className="flex items-center rounded-xl border border-line bg-surface p-0.5 shadow-soft">
             <button
               type="button"
@@ -258,7 +266,10 @@ export function ScheduleCalendar({
             }}
             className="h-9 w-[10.5rem] text-xs"
           />
-          <p className="text-sm font-semibold text-ink tabular-nums">
+          {/* A fixed width, sized for the longest range ("28 Sep 2026 –
+              22 Nov 2026"): the label must not grow when 2w becomes 4w and
+              shove the legend about. */}
+          <p className="w-[13.5rem] text-sm font-semibold whitespace-nowrap text-ink tabular-nums">
             {formatDay(start)} – {formatDay(end)}
           </p>
           <div
@@ -757,6 +768,21 @@ function StageBar({
   const hue = batchHue(stage.job_id);
   const name = stageName(stage);
 
+  /*
+   * The clean after the stage (0052), drawn as the last stretch of the bar:
+   * its share of the bar is its hours against the bar's visible days, so a
+   * 12 h clean on a one-day bar fills half of it. Floored so "FC" stays
+   * readable on a short clean and capped at half so the stage itself always
+   * shows. Not drawn when the bar runs off the right edge — the clean is
+   * after the end, and the end is not on screen.
+   */
+  const clean = cleanShort(stage.clean_type);
+  const cleanHours = stage.clean_hours ?? 0;
+  const showClean = clean !== null && cleanHours > 0 && !clipRight;
+  const cleanShare = (cleanHours / (24 * (to - from + 1))) * 100;
+  const cleanWidth = `min(50%, max(2.5rem, ${cleanShare}%))`;
+  const fullClean = stage.clean_type === "full";
+
   // The bar's accessible name — the hover card is a mouse convenience, so
   // everything it says is also said here.
   const summary = [
@@ -766,6 +792,7 @@ function StageBar({
     stage.is_behind_plan ? "Behind plan" : null,
     stage.is_overrunning ? "Past its estimated finish" : null,
     job?.due_date ? `Due ${formatShortDate(job.due_date)}` : null,
+    clean ? `${clean} clean, ${fmtHours(cleanHours)} h after` : null,
     clashing ? "Shares this room with another stage" : null,
   ]
     .filter(Boolean)
@@ -803,6 +830,8 @@ function StageBar({
         style={{
           gridColumn: `${from + 2} / ${to + 3}`,
           gridRow: track + 1,
+          // The text stops where the clean begins rather than running under it.
+          ...(showClean ? { paddingRight: `calc(${cleanWidth} + 0.5rem)` } : {}),
           ...(running
             ? {
                 background: `hsl(${hue} 58% 40%)`,
@@ -849,6 +878,26 @@ function StageBar({
       <span className="truncate text-[0.6562rem] leading-tight opacity-80">
         {job?.product_name ?? "Unnamed batch"}
       </span>
+      {showClean && (
+        <span
+          aria-hidden
+          className={cn(
+            "absolute inset-y-0 right-0 flex flex-col items-center justify-center gap-0.5 border-l-2 border-dashed leading-none",
+            fullClean
+              ? "border-teal bg-teal-soft bg-[repeating-linear-gradient(135deg,transparent_0_5px,color-mix(in_srgb,var(--color-teal)_16%,transparent)_5px_7px)] text-teal-deep"
+              : "border-warn bg-warn-tint bg-[repeating-linear-gradient(135deg,transparent_0_5px,color-mix(in_srgb,var(--color-warn)_18%,transparent)_5px_7px)] text-warn-ink",
+          )}
+          style={{ width: cleanWidth }}
+        >
+          <span className="inline-flex items-center gap-0.5 font-mono text-[0.6875rem] font-bold tracking-tight">
+            <Sparkles className="size-2.5 shrink-0" />
+            {clean}
+          </span>
+          <span className="font-mono text-[0.625rem] font-semibold tabular-nums opacity-80">
+            {fmtHours(cleanHours)}h
+          </span>
+        </span>
+      )}
       {pct !== null && (
         <span className="absolute inset-x-0 bottom-0 h-[3px] bg-black/15">
           <span
@@ -958,9 +1007,14 @@ function ConflictBanner({
   );
 }
 
+/** "4", "2.5" — hours as a planner typed them. */
+function fmtHours(n: number): string {
+  return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
 function Legend() {
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.6562rem] text-ink-4">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.6562rem] whitespace-nowrap text-ink-4 lg:min-w-0 lg:flex-1 lg:justify-end">
       <span className="inline-flex items-center gap-1.5">
         <span className="h-2.5 w-4 rounded-sm bg-brand" aria-hidden />
         Running
@@ -993,6 +1047,13 @@ function Legend() {
           aria-hidden
         />
         Holiday / day off
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <span
+          className="h-2.5 w-4 rounded-sm border border-dashed border-teal bg-teal-soft"
+          aria-hidden
+        />
+        FC / PC clean
       </span>
       <span className="text-ink-5">· colour follows the batch</span>
     </div>

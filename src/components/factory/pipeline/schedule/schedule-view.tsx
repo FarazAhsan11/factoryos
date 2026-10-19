@@ -1,10 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarClock, CalendarDays, LayoutList } from "lucide-react";
+import { CalendarClock, LayoutList, Rows3 } from "lucide-react";
 import { toast } from "sonner";
 
+import { ScheduleBoard } from "@/components/factory/pipeline/schedule/schedule-board";
 import { ScheduleCalendar } from "@/components/factory/pipeline/schedule/schedule-calendar";
 import { ScheduleQueue } from "@/components/factory/pipeline/schedule/schedule-queue";
 import { StageEditDialog } from "@/components/factory/pipeline/schedule/stage-edit-dialog";
@@ -35,8 +37,8 @@ const VIEWS = [
   {
     value: "board",
     label: "Board",
-    icon: CalendarDays,
-    hint: "Board view — every room across 2, 4 or 8 weeks, clashes marked",
+    icon: Rows3,
+    hint: "Board view — three stages ahead per room at a glance",
   },
   {
     value: "queue",
@@ -49,23 +51,26 @@ const VIEWS = [
 type ViewKey = (typeof VIEWS)[number]["value"];
 
 /**
- * Pipeline → Schedule. The plan read by room instead of by batch.
+ * Pipeline → Room schedule and Pipeline → Gantt timeline. The plan read by
+ * room instead of by batch.
  *
- * Two views over one derivation. The **Board** is the glance — which rooms are
- * busy, what is on them now, what comes next — and the **Queue** is the work
- * surface, where a planner sets the estimated finish and leaves the note that
- * says why a line sits where it does.
+ * Three views over one derivation. On the Room schedule, the **Board** is the
+ * glance — what each room is on now and the two stages after it — and the
+ * **Queue** is the work surface, where a planner sets the estimated finish and
+ * leaves the note that says why a line sits where it does. The **Gantt
+ * timeline** is its own screen: every room across 2, 4 or 8 weeks, with
+ * clashes marked and stages moved by dragging.
  *
- * Both read `buildRoomLanes` — every room the factory has, idle ones
+ * All three read `buildRoomLanes` — every room the factory has, idle ones
  * included — so they cannot disagree about which rooms are busy or what order
- * a room's stages are in. Both open the same
- * `StageEditDialog`, so a stage edited from the glance is edited exactly as it
- * is from the list.
+ * a room's stages are in. All open the same `StageEditDialog`, so a stage
+ * edited from the glance is edited exactly as it is from the list.
  *
  * No extra request: the stages and jobs are the ones the workspace already
  * holds for the Kanban board.
  */
 export function ScheduleView({
+  screen,
   stages,
   jobs,
   factoryId,
@@ -74,6 +79,8 @@ export function ScheduleView({
   showWorkOrder = false,
   onRefresh,
 }: {
+  /** Which rail screen this is — the Room schedule or the Gantt timeline. */
+  screen: "schedule" | "gantt";
   stages: BatchStage[];
   jobs: PipelineJob[];
   factoryId: string;
@@ -83,15 +90,35 @@ export function ScheduleView({
   showWorkOrder?: boolean;
   onRefresh: () => void | Promise<void>;
 }) {
-  const [view, setView] = useState<ViewKey>("board");
+  /**
+   * A room handed over from the Gantt timeline (`?room=`): a "+N more" on a
+   * day stacked past three, or a room's undated stages, which have no day to
+   * be drawn on. Read once, on mount — the workspace keys this view by
+   * screen, so arriving from the Gantt is always a fresh mount.
+   */
+  const handedRoom = useSearchParams().get("room");
+  const [view, setView] = useState<ViewKey>(handedRoom ? "queue" : "board");
   const [editing, setEditing] = useState<ScheduledStage | null>(null);
   /**
-   * The room the Queue should open on, set from the Board's calendar — a
-   * "+N more" on a day stacked past three, or a room's undated stages, which
-   * have no day to be drawn on. Either way the room goes to the view that
-   * lists all of it, at the row it was asked about.
+   * The room the Queue should open on — from the Gantt, or from a "+N more"
+   * on the Board, which draws three stages of a room that can hold ten. Either
+   * way the room goes to the view that lists all of it, at the row it was
+   * asked about.
    */
-  const [focusRoom, setFocusRoom] = useState<string | null>(null);
+  const [focusRoom, setFocusRoom] = useState<string | null>(handedRoom);
+
+  /**
+   * The Gantt's way into a whole room: the Room schedule's Queue, focused on
+   * it. A URL rewrite, as the rail does — the page reads its screen from
+   * `?tab=`, so nothing is torn down or refetched.
+   */
+  function showInQueue(unitId: string) {
+    window.history.pushState(
+      null,
+      "",
+      `?tab=schedule&room=${encodeURIComponent(unitId)}`,
+    );
+  }
 
   // Same key as the stage dialog and the rest of the app, so the list is
   // normally already cached. Every room is a lane, busy or idle.
@@ -122,10 +149,7 @@ export function ScheduleView({
   });
   const weeklyOff = useMemo(() => new Set(weeklyOffList), [weeklyOffList]);
   const roomless = useMemo(() => stagesWithoutRoom(stages), [stages]);
-  const hint =
-    (VIEWS.find((v) => v.value === view)?.hint ?? "") +
-    // Only managers can move a stage, so only they are told they can.
-    (view === "board" && canManage ? " · drag a stage to move it" : "");
+  const hint = VIEWS.find((v) => v.value === view)?.hint ?? "";
 
   const queryClient = useQueryClient();
   type Placement = Pick<BatchStage, "unit_id" | "planned_date" | "est_finish_date">;
@@ -168,7 +192,7 @@ export function ScheduleView({
   }
 
   /**
-   * A bar dropped on the Board: the stage takes the room and the start day it
+   * A bar dropped on the Gantt: the stage takes the room and the start day it
    * was dropped on, and its estimated finish moves by the same number of days
    * so the stage keeps its length. Offered back with Undo, since a drag is
    * the one edit here that is easy to make by accident.
@@ -227,41 +251,45 @@ export function ScheduleView({
        scrolls off the top, which is exactly the thing a planner needs to stay
        put while they work down a room. */
     <div className="flex flex-col gap-4 lg:min-h-0 lg:flex-1">
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
-        <div className="flex shrink-0 gap-1.5">
-          {VIEWS.map((option) => {
-            const on = view === option.value;
-            const Icon = option.icon;
-            return (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => {
-                  setView(option.value);
-                  // The highlight belongs to the jump that caused it. Left
-                  // set, the ring would still be on that room the next time
-                  // anyone opened the Queue by hand.
-                  setFocusRoom(null);
-                }}
-                aria-pressed={on}
-                className={cn(
-                  "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition",
-                  on
-                    ? "border-brand bg-brand text-white shadow-brand-sm"
-                    : "border-line bg-surface text-ink-3 hover:border-ink-6 hover:text-ink",
-                )}
-              >
-                <Icon className="size-3.5" aria-hidden />
-                {option.label}
-              </button>
-            );
-          })}
+      {/* The Room schedule's toggle and hint. Not on the Gantt: it has one
+          view, and its legend already says what the bars mean. */}
+      {screen === "schedule" && (
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
+          <div className="flex shrink-0 gap-1.5">
+            {VIEWS.map((option) => {
+              const on = view === option.value;
+              const Icon = option.icon;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => {
+                    setView(option.value);
+                    // The highlight belongs to the jump that caused it. Left
+                    // set, the ring would still be on that room the next time
+                    // anyone opened the Queue by hand.
+                    setFocusRoom(null);
+                  }}
+                  aria-pressed={on}
+                  className={cn(
+                    "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition",
+                    on
+                      ? "border-brand bg-brand text-white shadow-brand-sm"
+                      : "border-line bg-surface text-ink-3 hover:border-ink-6 hover:text-ink",
+                  )}
+                >
+                  <Icon className="size-3.5" aria-hidden />
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[0.6875rem] text-ink-5">{hint}</p>
         </div>
-        <p className="text-[0.6875rem] text-ink-5">{hint}</p>
-      </div>
+      )}
 
       {/* Stages nobody has roomed cannot be drawn in a room, so they are
-          absent from both views. Said out loud: a board that silently omits
+          absent from every view. Said out loud: a board that silently omits
           them under-reports the plant's load, and these are exactly the rows
           a planner has to fix. */}
       {roomless.length > 0 && (
@@ -289,7 +317,7 @@ export function ScheduleView({
             into them.
           </p>
         </div>
-      ) : view === "board" ? (
+      ) : screen === "gantt" ? (
         /* The calendar owns its scroller: its week controls and the conflict
            banner stay put while the rooms scroll under a sticky day header. */
         <ScheduleCalendar
@@ -300,10 +328,7 @@ export function ScheduleView({
           weeklyOff={weeklyOff}
           unitWord={unitWord}
           onOpen={setEditing}
-          onShowAll={(unitId) => {
-            setFocusRoom(unitId);
-            setView("queue");
-          }}
+          onShowAll={showInQueue}
         />
       ) : (
         /* The rooms scroll, the toggle above them does not. A plant with
@@ -311,13 +336,24 @@ export function ScheduleView({
            Room 4 with Room 22 should not lose the view switch on the way
            down. `min-h-0` is what lets a flex child scroll at all. */
         <div className="scrollbar-slim min-h-0 flex-1 overflow-auto pr-0.5 pb-1">
-          <ScheduleQueue
-            lanes={lanes}
-            canManage={canManage}
-            focusRoom={focusRoom}
-            onOpen={setEditing}
-            onSaved={onRefresh}
-          />
+          {view === "board" ? (
+            <ScheduleBoard
+              lanes={lanes}
+              onOpen={setEditing}
+              onShowAll={(unitId) => {
+                setFocusRoom(unitId);
+                setView("queue");
+              }}
+            />
+          ) : (
+            <ScheduleQueue
+              lanes={lanes}
+              canManage={canManage}
+              focusRoom={focusRoom}
+              onOpen={setEditing}
+              onSaved={onRefresh}
+            />
+          )}
         </div>
       )}
 

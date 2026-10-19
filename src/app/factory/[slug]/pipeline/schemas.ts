@@ -653,6 +653,38 @@ export const stageEditSchema = z
       .trim()
       .max(500, "Keep the note under 500 characters.")
       .optional(),
+    /** Does the room need cleaning after this stage (0052)? */
+    cleanRequired: z.boolean().optional(),
+    cleanType: z.union([z.enum(["full", "provisional"]), z.literal("")]).optional(),
+    cleanHours: optionalQty,
+  })
+  /**
+   * A clean asked for is a clean described: which kind, and for how long.
+   * Mirrors `batch_stages_clean_both_or_neither` and the 0–168 h range (0052),
+   * so the planner hears it on the field instead of from the database.
+   */
+  .superRefine((v, ctx) => {
+    if (!v.cleanRequired) return;
+    if (!v.cleanType) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["cleanType"],
+        message: "Pick Full Clean or Provisional Clean.",
+      });
+    }
+    if (!(v.cleanHours && v.cleanHours > 0)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["cleanHours"],
+        message: "Enter the cleaning time in hours.",
+      });
+    } else if (v.cleanHours > 168) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["cleanHours"],
+        message: "A clean longer than a week (168 h) — check the hours.",
+      });
+    }
   })
   /**
    * A stage cannot come off the room before it goes on.

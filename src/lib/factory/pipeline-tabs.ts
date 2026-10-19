@@ -13,7 +13,7 @@ import type { AdminTab } from "@/lib/factory/admin-tabs";
 export const PIPELINE_TABS: AdminTab[] = [
   { value: "board", label: "Batch pipeline", ready: true },
   { value: "schedule", label: "Schedule", ready: true },
-  { value: "gantt", label: "Gantt", ready: false },
+  { value: "gantt", label: "Gantt", ready: true },
   { value: "archive", label: "Archive", ready: false },
 ];
 

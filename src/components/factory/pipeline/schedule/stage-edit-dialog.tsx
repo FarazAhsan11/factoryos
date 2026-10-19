@@ -4,7 +4,7 @@ import { useEffect, useMemo } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CheckCircle2, Loader2 } from "lucide-react";
+import { CheckCircle2, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -25,6 +25,7 @@ import {
 import { DateField } from "@/components/ui/date-picker";
 import { SelectField } from "@/components/ui/select-field";
 import {
+  CLEAN_TYPES,
   stageCeiling,
   stageName,
   updateBatchStage,
@@ -118,6 +119,9 @@ export function StageEditDialog({
       workOrder: stage.work_order ?? "",
       packSize: stage.pack_size ?? undefined,
       planningNote: stage.planning_note ?? "",
+      cleanRequired: stage.clean_type !== null,
+      cleanType: stage.clean_type ?? "",
+      cleanHours: stage.clean_hours ?? undefined,
     });
   }, [stage, reset]);
 
@@ -134,6 +138,9 @@ export function StageEditDialog({
         work_order: values.workOrder?.trim() || null,
         pack_size: values.packSize ?? null,
         planning_note: values.planningNote?.trim() || null,
+        // Both or neither (0052): "No" clears a clean that was planned.
+        clean_type: values.cleanRequired ? values.cleanType || null : null,
+        clean_hours: values.cleanRequired ? (values.cleanHours ?? null) : null,
         // `tolerance_pct` is not written here for the same reason the plan
         // dialog does not write it: the tolerance is decided once, on the
         // batch, and inherited. A queue that can pin one stage's ceiling is a
@@ -156,6 +163,7 @@ export function StageEditDialog({
   const plannedDate = useWatch({ control, name: "plannedDate" });
   const unitId = useWatch({ control, name: "unitId" });
   const estFinishDate = useWatch({ control, name: "estFinishDate" });
+  const cleanRequired = useWatch({ control, name: "cleanRequired" });
 
   // Said while the dates are being typed, not after the save. Every other
   // stage's booking counts; this stage's own current one does not.
@@ -179,7 +187,9 @@ export function StageEditDialog({
     errors.estFinishDate?.message ??
     errors.targetQty?.message ??
     errors.label?.message ??
-    errors.planningNote?.message;
+    errors.planningNote?.message ??
+    errors.cleanType?.message ??
+    errors.cleanHours?.message;
 
   return (
     <Dialog open={stage !== null} onOpenChange={(open) => !open && onClose()}>
@@ -393,6 +403,126 @@ export function StageEditDialog({
                 {...register("planningNote")}
               />
             </div>
+
+            {/* The clean after the stage (0052): drawn as an FC / PC block at
+                the end of the stage's bar on the Gantt timeline, so the room
+                does not look free while it is still being cleaned. */}
+            <section className="space-y-3 rounded-xl border border-line bg-sunken/60 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="flex items-center gap-2 text-xs font-semibold text-ink-2">
+                  <span className="grid size-6 place-items-center rounded-lg bg-surface text-teal-deep ring-1 ring-line">
+                    <Sparkles className="size-3.5" aria-hidden />
+                  </span>
+                  Cleaning required after this batch?
+                </p>
+                <Controller
+                  name="cleanRequired"
+                  control={control}
+                  render={({ field }) => (
+                    <div
+                      role="radiogroup"
+                      aria-label="Cleaning required after this batch"
+                      className="flex rounded-lg border border-line bg-surface p-0.5"
+                    >
+                      {[
+                        { value: false, label: "No" },
+                        { value: true, label: "Yes" },
+                      ].map((option) => {
+                        const on = (field.value ?? false) === option.value;
+                        return (
+                          <button
+                            key={option.label}
+                            type="button"
+                            role="radio"
+                            aria-checked={on}
+                            onClick={() => field.onChange(option.value)}
+                            className={cn(
+                              "rounded-md px-3 py-1 text-xs font-semibold transition",
+                              on
+                                ? "bg-brand text-white shadow-brand-sm"
+                                : "text-ink-4 hover:text-ink",
+                            )}
+                          >
+                            {option.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                />
+              </div>
+
+              {cleanRequired && (
+                /* Stacked, not side by side: both questions are long, and in
+                   two columns the hours label wrapped and dropped its input
+                   below the type buttons. */
+                <div className="animate-in space-y-3 fade-in-0">
+                  <div className="space-y-1">
+                    <p className={LABEL}>
+                      Which type of cleaning required after this batch?
+                    </p>
+                    <Controller
+                      name="cleanType"
+                      control={control}
+                      render={({ field }) => (
+                        <div
+                          role="radiogroup"
+                          aria-label="Type of cleaning"
+                          className="grid grid-cols-2 gap-2"
+                        >
+                          {CLEAN_TYPES.map((option) => {
+                            const on = field.value === option.value;
+                            const full = option.value === "full";
+                            return (
+                              <button
+                                key={option.value}
+                                type="button"
+                                role="radio"
+                                aria-checked={on}
+                                onClick={() => field.onChange(option.value)}
+                                className={cn(
+                                  "flex h-9 items-center gap-2 rounded-lg border bg-surface px-2.5 text-left text-xs font-semibold transition",
+                                  on
+                                    ? full
+                                      ? "border-teal-line bg-teal-soft text-teal-deep ring-2 ring-teal/25"
+                                      : "border-warn-line bg-warn-tint text-warn-ink ring-2 ring-warn/25"
+                                    : "border-line text-ink-3 hover:border-line-strong hover:text-ink",
+                                )}
+                              >
+                                <span
+                                  className={cn(
+                                    "rounded px-1 py-px font-mono text-[0.625rem] font-bold text-white",
+                                    full ? "bg-teal-deep" : "bg-warn-deep",
+                                  )}
+                                >
+                                  {option.short}
+                                </span>
+                                {option.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-3 border-t border-line-soft pt-3">
+                    <label htmlFor="se-clean-hours" className={LABEL}>
+                      Cleaning time after this stage (hrs)
+                    </label>
+                    <input
+                      id="se-clean-hours"
+                      type="number"
+                      step="0.5"
+                      min={0}
+                      max={168}
+                      placeholder="e.g. 4"
+                      className={cn(FIELD, MONO, "w-32 shrink-0")}
+                      {...register("cleanHours", { valueAsNumber: true })}
+                    />
+                  </div>
+                </div>
+              )}
+            </section>
 
             <label className="flex cursor-pointer items-center gap-2 text-[0.6875rem] text-ink-3">
               <input

@@ -65,6 +65,8 @@ export function PipelineWorkspace({
   // Which screen of the pipeline is open is chosen in the rail and carried
   // in the URL, so it survives a reload and a shared link.
   const tab = resolvePipelineTab(useSearchParams().get("tab") ?? undefined);
+  /** Room schedule and Gantt timeline — room views, not batch lists. */
+  const roomScreen = tab === "schedule" || tab === "gantt";
   /**
    * The board's + Lot opens New batch itself, pre-set to Packing with the
    * parent filled — the prototype's `quickAddPackingFor`. Held here rather
@@ -151,20 +153,21 @@ export function PipelineWorkspace({
     <div className="flex flex-col lg:min-h-0 lg:flex-1">
       {/* One line: the title, then the buttons. The eyebrow and the sentence
           under the title cost three rows of a screen whose job is the list. */}
-      {/* The Schedule has no visible title: the rail already names the screen,
-          and the row it cost is height the room table needs. Kept for screen
-          readers, which still need a page heading. */}
+      {/* The room screens have no visible title: the rail already names the
+          screen, and the row it cost is height the room table needs. Kept for
+          screen readers, which still need a page heading. */}
       {tab === "schedule" && (
         <h1 className="sr-only">{units.singular} schedule</h1>
       )}
+      {tab === "gantt" && <h1 className="sr-only">Gantt timeline</h1>}
       <div
         className={cn(
           "mb-4 flex shrink-0 flex-wrap items-center justify-between gap-3",
-          tab === "schedule" && "hidden",
+          roomScreen && "hidden",
         )}
       >
         <div className="flex items-center gap-2.5">
-          {tab !== "schedule" && (
+          {!roomScreen && (
             <h1 className="text-2xl font-semibold tracking-tight text-ink">
               Batch pipeline
             </h1>
@@ -172,7 +175,7 @@ export function PipelineWorkspace({
           {/* Not on the Schedule: "use Plan stages on the batch" is an
               instruction about the board, and the Schedule is a room view
               with no batch rows to act on. */}
-          {!isPending && tab !== "schedule" && unissued.length > 0 && (
+          {!isPending && !roomScreen && unissued.length > 0 && (
             <UnissuedNotice count={unissued.length} />
           )}
         </div>
@@ -180,7 +183,7 @@ export function PipelineWorkspace({
         {/* Not on the Schedule: it is a room view, and raising a batch is the
             board's job — the schedule only plans the stages of batches that
             already exist. */}
-        {canManage && tab !== "schedule" && (
+        {canManage && !roomScreen && (
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             {/* Secondary, and kept: picking twenty already-catalogued batches
                 off a list is still the fastest way to fill the board, and the
@@ -219,9 +222,9 @@ export function PipelineWorkspace({
         <p className="rounded-2xl border border-danger-line bg-danger-soft px-4 py-6 text-center text-sm font-medium text-danger-deep">
           Could not load the pipeline: {(error as Error).message}
         </p>
-      ) : jobs.length === 0 && tab !== "schedule" ? (
-        // Not the Schedule: it lists every room whether or not a batch exists,
-        // so an empty plant shows its rooms as idle rather than this notice.
+      ) : jobs.length === 0 && !roomScreen ? (
+        // Not the room screens: they list every room whether or not a batch
+        // exists, so an empty plant shows its rooms as idle, not this notice.
         <div className="rounded-2xl border border-dashed border-line-strong bg-surface px-4 py-16 text-center">
           <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-sunken text-ink-6">
             <LayoutGrid className="size-6" />
@@ -235,8 +238,13 @@ export function PipelineWorkspace({
               : "A manager adds batches from the product catalogue."}
           </p>
         </div>
-      ) : tab === "schedule" ? (
+      ) : tab === "schedule" || tab === "gantt" ? (
         <ScheduleView
+          // Keyed by screen: the two share a position in the tree, and without
+          // the key a Gantt → Room schedule jump would keep the Gantt's state
+          // instead of opening on the room it handed over.
+          key={tab}
+          screen={tab}
           stages={stages}
           jobs={jobs}
           factoryId={factoryId}

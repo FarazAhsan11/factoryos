@@ -1,6 +1,10 @@
 import { AlertTriangle, Clock, Cog, Users } from "lucide-react";
 
-import { stageName, stageProgress } from "@/lib/factory/batch-stage-queries";
+import {
+  CLEAN_TYPES,
+  stageName,
+  stageProgress,
+} from "@/lib/factory/batch-stage-queries";
 import {
   dayDiff,
   formatShortDate,
@@ -39,6 +43,7 @@ export function StageTip({
   const running = stage.status === "in_progress";
   const pct = running ? stageProgress(stage) : null;
   const days = dayDiff(span.start, span.end) + 1;
+  const clean = CLEAN_TYPES.find((c) => c.value === stage.clean_type);
 
   const warnings = [
     stage.is_behind_plan
@@ -98,6 +103,22 @@ export function StageTip({
             · {days} day{days === 1 ? "" : "s"}
           </span>
         </Row>
+        {clean && (
+          <Row label="Then clean">
+            <span
+              className={cn(
+                "mr-1.5 rounded px-1 py-px font-mono text-[0.625rem] font-bold text-white",
+                clean.value === "full" ? "bg-teal-deep" : "bg-warn-deep",
+              )}
+            >
+              {clean.short}
+            </span>
+            {clean.label}
+            <span className="ml-1.5 text-[0.6875rem] text-ink-5">
+              · {fmt(stage.clean_hours)} h
+            </span>
+          </Row>
+        )}
         {job?.due_date && <Row label="Batch due">{formatShortDate(job.due_date)}</Row>}
         {stage.target_qty ? (
           <Row label="Target">

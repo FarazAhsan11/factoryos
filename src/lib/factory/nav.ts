@@ -126,7 +126,7 @@ export const FACTORY_NAV: NavSection[] = [
             href: "/pipeline?tab=gantt",
             label: "Gantt timeline",
             roles: ALL,
-            ready: false,
+            ready: true,
           },
           {
             href: "/pipeline?tab=archive",

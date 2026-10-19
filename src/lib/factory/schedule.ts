@@ -621,11 +621,11 @@ export function formatShortDate(iso: string | null): string {
  *
  * Days rather than a date wherever the gap is what matters — a planner
  * scanning a room does not care that it is the 15th, they care that it is
- * Tuesday and it is late.
+ * Tuesday and it is late. `today` is passed in (`useRenderClock`), never read
+ * here, so a component can call this in render.
  */
-export function relativeDay(iso: string | null): string | null {
+export function relativeDay(iso: string | null, today: string): string | null {
   if (!iso) return null;
-  const today = todayKey();
   if (iso === today) return "Today";
 
   const [ay, am, ad] = iso.slice(0, 10).split("-").map(Number);

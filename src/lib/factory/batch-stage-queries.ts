@@ -100,6 +100,31 @@ export interface BatchStage {
   completed_by_name: string | null;
   /** The name the signer gave at sign-off (0049); null on earlier sign-offs. */
   signed_off_by_name: string | null;
+  /**
+   * The clean the room needs after this stage (0052) — full (FC) or
+   * provisional (PC) — or null when none is planned. Advisory.
+   */
+  clean_type: CleanType | null;
+  /** How long that clean takes, in hours. Set exactly when `clean_type` is. */
+  clean_hours: number | null;
+}
+
+/** The two cleans a room can need after a stage (0052). */
+export type CleanType = "full" | "provisional";
+
+export const CLEAN_TYPES: {
+  value: CleanType;
+  label: string;
+  /** What the Gantt bar and the board card print — "FC", "PC". */
+  short: string;
+}[] = [
+  { value: "full", label: "Full Clean", short: "FC" },
+  { value: "provisional", label: "Provisional Clean", short: "PC" },
+];
+
+/** "FC" / "PC" for a stage's clean, or null when none is planned. */
+export function cleanShort(type: CleanType | null): string | null {
+  return CLEAN_TYPES.find((c) => c.value === type)?.short ?? null;
 }
 
 /**
@@ -115,7 +140,7 @@ const COLUMNS = `
   tolerance_pct, effective_tolerance_pct, allowed_qty, is_over_tolerance,
   planned_date, is_behind_plan, est_finish_date, planning_note, is_overrunning,
   process_name, process_category, unit_name, completed_by_name,
-  signed_off_by_name
+  signed_off_by_name, clean_type, clean_hours
 `;
 
 export const batchStageKeys = {
@@ -233,6 +258,8 @@ export async function updateBatchStage(
       | "planned_date"
       | "est_finish_date"
       | "planning_note"
+      | "clean_type"
+      | "clean_hours"
     >
   >,
 ): Promise<void> {

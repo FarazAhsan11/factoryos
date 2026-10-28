@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Mail, Trash2, Users } from "lucide-react";
+import { KeyRound, Loader2, Mail, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -41,14 +41,19 @@ const STATUS: Record<EmployeeStatus, { label: string; className: string }> = {
 };
 
 /**
- * Admin → Employees. A factory's people are its users, so this list is
- * `profiles`: read straight from Supabase under RLS, but every write goes
- * through a Server Action because auth users need the service-role key.
+ * Configuration → Users: who can sign in to this factory, and with what
+ * access. This list is `profiles` — read straight from Supabase under RLS, but
+ * every write goes through a Server Action because auth users need the
+ * service-role key. An invite emails a link where the person sets their own
+ * password; nobody else ever types it.
  *
- * `canManage` (manager and up) can see the roster; only a factory admin gets
+ * Not the workforce. The people named on shift records and assigned work are
+ * `factory_workers` (Resources → Workforce), and most of them never log in.
+ *
+ * `canManage` (manager and up) can see the list; only a factory admin gets
  * the add / invite / remove controls, matching the action-side authorization.
  */
-export function EmployeesPanel({
+export function UsersPanel({
   factoryId,
   isAdmin,
 }: {
@@ -146,12 +151,12 @@ export function EmployeesPanel({
   return (
     <div className="space-y-5">
       <PanelHeader
-        icon={Users}
-        title="Employees"
+        icon={KeyRound}
+        title="Users"
         description={
           notInvited > 0
-            ? `Who works here. The shift log picks operators from this list. ${notInvited} ${notInvited === 1 ? "person has" : "people have"} not been invited yet.`
-            : "Who works here. The shift log picks operators from this list, and an invite gives them a login."
+            ? `Who can sign in to this factory, with their email and access. ${notInvited} ${notInvited === 1 ? "person has" : "people have"} not been invited yet.`
+            : "Who can sign in to this factory, with their email and access. An invite emails them a link to set their password."
         }
         count={employees.length}
         action={
@@ -167,16 +172,16 @@ export function EmployeesPanel({
         <TableSkeleton />
       ) : isError ? (
         <p className="rounded-xl bg-danger-soft px-4 py-3 text-sm text-danger-deep">
-          Could not load the team: {(error as Error).message}
+          Could not load the users: {(error as Error).message}
         </p>
       ) : employees.length === 0 ? (
         <EmptyState
-          icon={Users}
-          title="Nobody here yet."
+          icon={KeyRound}
+          title="No users yet."
           hint={
             isAdmin
-              ? "Add your first teammate above, or import a roster from CSV."
-              : "An admin adds people to the roster."
+              ? "Add your first user above, or import a list from CSV."
+              : "An admin adds users."
           }
         />
       ) : (

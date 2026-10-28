@@ -262,8 +262,11 @@ export const FACTORY_NAV: NavSection[] = [
             roles: MANAGER_UP,
             ready: true,
           },
+          // The people who perform and are assigned work — the shift log's
+          // operators and every other "who" picker. Not the logins: those are
+          // Configuration → Users.
           {
-            href: "/resources?tab=employees",
+            href: "/resources?tab=workforce",
             label: "Workforce",
             roles: MANAGER_UP,
             ready: true,
@@ -301,6 +304,14 @@ export const FACTORY_NAV: NavSection[] = [
           {
             href: "/admin?tab=shift-times",
             label: "Shift pattern",
+            roles: MANAGER_UP,
+            ready: true,
+          },
+          // Who can sign in, with their email and access. Manager and up may
+          // see the list; only an admin may add, invite or remove.
+          {
+            href: "/admin?tab=users",
+            label: "Users",
             roles: MANAGER_UP,
             ready: true,
           },

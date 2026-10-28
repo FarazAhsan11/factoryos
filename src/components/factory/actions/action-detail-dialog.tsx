@@ -238,7 +238,12 @@ function Body({
             {/* Position first, and only here: on the working tab it is the
                 context for the form under it. */}
             <ActionStageStepper action={action} />
-            <ActionStageForm action={action} role={role} onDone={refresh} />
+            <ActionStageForm
+              action={action}
+              factoryId={factoryId}
+              role={role}
+              onDone={refresh}
+            />
           </div>
         )}
 

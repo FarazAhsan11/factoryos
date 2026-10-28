@@ -32,6 +32,8 @@ import {
 } from "@/lib/factory/maintenance-queries";
 import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
 import { SelectField } from "@/components/ui/select-field";
+import { WorkerSelect } from "@/components/factory/worker-select";
+import { useWorkers } from "@/lib/factory/worker-queries";
 import { cn } from "@/lib/utils";
 
 const CONTROL =
@@ -123,9 +125,9 @@ function AssignForm({
     queryKey: setupKeys.all("factory_departments", factoryId),
     queryFn: () => fetchSetupItems("factory_departments", factoryId),
   });
+  const { data: workers = [] } = useWorkers(factoryId);
 
   const {
-    register,
     control,
     handleSubmit,
     formState: { errors, isSubmitting },
@@ -162,12 +164,24 @@ function AssignForm({
         body="Put a name on the work and confirm which department is doing it. Until someone owns it, this is a report rather than a job."
       />
 
+      {/* From the workforce; a contractor who isn't on it is typed through
+          "Not on the list…". */}
       <Field label="Work assigned to" error={errors.assignedTo?.message}>
-        <input
-          {...register("assignedTo")}
-          placeholder="Fitter, engineer or contractor"
-          className={CONTROL}
-          aria-invalid={!!errors.assignedTo}
+        <Controller
+          name="assignedTo"
+          control={control}
+          render={({ field }) => (
+            <WorkerSelect
+              value={field.value ?? ""}
+              onChange={field.onChange}
+              onBlur={field.onBlur}
+              workers={workers}
+              placeholder="Fitter, engineer or contractor"
+              ariaLabel="Work assigned to"
+              ariaInvalid={Boolean(errors.assignedTo)}
+              inputClassName={CONTROL}
+            />
+          )}
         />
       </Field>
 

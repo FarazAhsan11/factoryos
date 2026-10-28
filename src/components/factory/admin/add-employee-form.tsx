@@ -73,11 +73,11 @@ export function AddEmployeeForm({
       className="rounded-2xl border border-line bg-sunken p-4 shadow-[inset_0_1px_2px_rgb(20_22_43/0.04)]"
     >
       <p className="mb-3 text-[0.6875rem] font-bold tracking-[0.07em] text-ink-4 uppercase">
-        Add someone to this factory
+        Add a user
       </p>
 
       <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_130px_140px_auto] lg:items-end">
-        <div className="space-y-1.5">
+        <div className="flex flex-col gap-1.5">
           <label htmlFor="emp-name" className={LABEL}>
             Full name
           </label>
@@ -90,7 +90,7 @@ export function AddEmployeeForm({
           />
         </div>
 
-        <div className="space-y-1.5">
+        <div className="flex flex-col gap-1.5">
           <label htmlFor="emp-email" className={LABEL}>
             Email
           </label>
@@ -105,7 +105,7 @@ export function AddEmployeeForm({
           />
         </div>
 
-        <div className="space-y-1.5">
+        <div className="flex flex-col gap-1.5">
           <label htmlFor="emp-role" className={LABEL}>
             Role
           </label>
@@ -127,7 +127,7 @@ export function AddEmployeeForm({
           />
         </div>
 
-        <div className="space-y-1.5">
+        <div className="flex flex-col gap-1.5">
           <label htmlFor="emp-shift" className={LABEL}>
             Default shift
           </label>

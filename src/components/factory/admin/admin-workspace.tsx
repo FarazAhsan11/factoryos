@@ -9,6 +9,7 @@ import { CompanySettingsForm } from "@/components/factory/admin/company-settings
 import { SetupListManager } from "@/components/factory/admin/setup-list-manager";
 import { HolidaysCard } from "@/components/factory/admin/holidays-card";
 import { ShiftTimesForm } from "@/components/factory/admin/shift-times-form";
+import { UsersPanel } from "@/components/factory/admin/users-panel";
 import { PanelHeader } from "@/components/factory/admin/settings-ui";
 import { resolveAdminTab } from "@/lib/factory/admin-tabs";
 import type { FactoryContext } from "@/lib/factory/context";
@@ -22,10 +23,13 @@ import type { FactoryContext } from "@/lib/factory/context";
 export function AdminWorkspace({
   factory,
   canManage,
+  isAdmin,
   units,
 }: {
   factory: FactoryContext["factory"];
   canManage: boolean;
+  /** Narrower than canManage: only an admin may add or remove users. */
+  isAdmin: boolean;
   units: { singular: string; plural: string };
 }) {
   const tab = resolveAdminTab(useSearchParams().get("tab") ?? undefined);
@@ -136,6 +140,12 @@ export function AdminWorkspace({
             <ShiftTimesForm factoryId={factory.id} canManage={canManage} />
             <HolidaysCard factoryId={factory.id} canManage={canManage} />
           </div>
+        </Panel>
+
+        {/* The logins. The panel draws its own header — its description
+            counts the people still waiting on an invite. */}
+        <Panel active={tab === "users"} lazy>
+          <UsersPanel factoryId={factory.id} isAdmin={isAdmin} />
         </Panel>
       </div>
     </div>

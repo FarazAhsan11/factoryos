@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/client";
 
 /**
- * Client-side reads for Admin → Employees. Reads go straight to Supabase (the
+ * Client-side reads for Configuration → Users — the logins, not the
+ * workforce (that is `worker-queries.ts`). Reads go straight to Supabase (the
  * `profiles_factory_read` policy scopes them to the viewer's tenant); every
  * write is a Server Action, because creating and deleting auth users needs the
  * service-role key.

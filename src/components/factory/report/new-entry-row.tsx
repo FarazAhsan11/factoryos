@@ -17,6 +17,7 @@ import {
   SPEED_TYPES,
   logEntrySchema,
   operatorsRequired,
+  planRequired,
   speedTypeTakesRate,
   targetQtyFromSpeed,
   type LogEntryParsed,
@@ -34,7 +35,7 @@ import {
   stageIsOverTolerance,
   stageName,
 } from "@/lib/factory/batch-stage-queries";
-import { employeeKeys, fetchEmployees } from "@/lib/factory/employee-queries";
+import { useWorkers } from "@/lib/factory/worker-queries";
 import {
   equipmentKeys,
   fetchEquipment,
@@ -204,10 +205,7 @@ export function NewEntryRow({
     queryKey: equipmentKeys.all(factoryId),
     queryFn: () => fetchEquipment(factoryId),
   });
-  const { data: employees = [] } = useQuery({
-    queryKey: employeeKeys.all(factoryId),
-    queryFn: () => fetchEmployees(factoryId),
-  });
+  const { data: workers = [] } = useWorkers(factoryId);
   const { data: pipelineJobs = [], isPending: jobsPending } = useQuery({
     queryKey: pipelineKeys.all(factoryId),
     queryFn: () => fetchPipelineJobs(factoryId),
@@ -267,6 +265,9 @@ export function NewEntryRow({
 
   const stageChoices = useMemo(() => {
     if (!job || !processId || isDowntime) return [];
+    // Before issue no entry takes a stage: production is refused outright,
+    // and preparatory work is filed against the batch alone (0054).
+    if (!job.issued_at) return [];
     return allStages.filter(
       (s) => s.job_id === job.id && s.process_id === processId,
     );
@@ -305,6 +306,8 @@ export function NewEntryRow({
     if (!typed) return "This entry needs a batch number.";
     if (!product) return `No batch ${typed} in the product register.`;
     if (!job) return `Batch ${typed} isn't on the production board.`;
+    // Rules 3 and 4 are production's alone (0054).
+    if (!planRequired(category as ProcessCategory)) return null;
     if (!job.issued_at)
       return `Batch ${typed} isn't issued for production yet.`;
     if (processId && !stagesPending && stageChoices.length === 0) {
@@ -313,6 +316,7 @@ export function NewEntryRow({
     return null;
   }, [
     isDowntime,
+    category,
     productsPending,
     jobsPending,
     stagesPending,
@@ -760,7 +764,7 @@ export function NewEntryRow({
                           control={control}
                           name={`operators.${i}.name`}
                           label={`Operator ${i + 1}`}
-                          employees={employees}
+                          workers={workers}
                           shift={shift}
                           exclude={chosen.filter(
                             (n) => n !== operators?.[i]?.name,

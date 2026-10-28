@@ -32,6 +32,7 @@ import {
   editEntrySchema,
   logEntryFieldsSchema,
   operatorsRequired,
+  planRequired,
   speedTypeTakesRate,
   targetQtyFromSpeed,
   type ActionFlag,
@@ -64,7 +65,7 @@ import {
   fetchFactoryStages,
   stageName,
 } from "@/lib/factory/batch-stage-queries";
-import { employeeKeys, fetchEmployees } from "@/lib/factory/employee-queries";
+import { useWorkers } from "@/lib/factory/worker-queries";
 import {
   equipmentKeys,
   fetchEquipment,
@@ -252,10 +253,7 @@ function EditEntryForm({
     queryKey: equipmentKeys.all(factoryId),
     queryFn: () => fetchEquipment(factoryId),
   });
-  const { data: employees = [] } = useQuery({
-    queryKey: employeeKeys.all(factoryId),
-    queryFn: () => fetchEmployees(factoryId),
-  });
+  const { data: workers = [] } = useWorkers(factoryId);
   const { data: pipelineJobs = [] } = useQuery({
     queryKey: pipelineKeys.all(factoryId),
     queryFn: () => fetchPipelineJobs(factoryId),
@@ -371,6 +369,9 @@ function EditEntryForm({
 
   const stageChoices = useMemo(() => {
     if (!job || !processId) return [];
+    // Before issue no entry takes a stage: production is refused outright,
+    // and preparatory work is filed against the batch alone (0054).
+    if (!job.issued_at) return [];
     return allStages.filter(
       (s) => s.job_id === job.id && s.process_id === processId,
     );
@@ -400,7 +401,10 @@ function EditEntryForm({
     }
   }, [stageChoices, batchStageId, setValue]);
 
-  const blockedByIssue = Boolean(job && !job.issued_at && !isDowntime);
+  // Production only since 0054 — preparatory work may be logged before issue.
+  const blockedByIssue = Boolean(
+    job && !job.issued_at && planRequired(category as ProcessCategory),
+  );
 
   /**
    * The shift follows the corrected times, exactly as it does on the entry
@@ -736,8 +740,9 @@ function EditEntryForm({
                 <strong className="font-semibold">
                   Batch {batchNo} isn&rsquo;t issued for production yet.
                 </strong>{" "}
-                The database refuses a producing entry against it — issue it on
-                the Pipeline first, or leave this entry on a downtime activity.
+                The database refuses a production entry against it — issue it
+                on the Pipeline first, or leave this entry on a downtime or
+                preparatory activity.
               </span>
             </p>
           )}
@@ -1027,7 +1032,7 @@ function EditEntryForm({
                   name={`operators.${i}.name` as const}
                   label={`Operator ${i + 1}`}
                   optional={!needsOperators}
-                  employees={employees}
+                  workers={workers}
                   shift={(values.shift ?? shift) as RunningShift}
                   exclude={(values.operators ?? [])
                     .filter((_, j) => j !== i)

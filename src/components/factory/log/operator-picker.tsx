@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import {
   useController,
   type Control,
@@ -9,26 +8,20 @@ import {
 } from "react-hook-form";
 
 import { CONTROL, Field } from "@/components/factory/log/log-fields";
-import { SelectField } from "@/components/ui/select-field";
-import type { Employee } from "@/lib/factory/employee-queries";
+import { WorkerSelect } from "@/components/factory/worker-select";
 import type { RunningShift } from "@/lib/factory/shift-time-queries";
-import { cn } from "@/lib/utils";
-
-/** Sentinel option: someone who isn't on the roster (contractor, cover staff). */
-const OTHER = "__other__";
-
-export function employeeName(employee: Employee): string {
-  return employee.full_name?.trim() || employee.email;
-}
+import type { Worker } from "@/lib/factory/worker-queries";
 
 /**
- * Picks an operator from the factory's roster. People rostered on the shift
- * being logged come first, because that's who it almost always is.
+ * Picks an operator from the factory's workforce (Resources → Workforce).
+ * People on the shift being logged come first, because that's who it almost
+ * always is.
  *
  * The stored value is the person's *name*, not their id: a shift record has
- * to keep saying who ran the machine even if that account is later renamed or
+ * to keep saying who ran the machine even if that person is later renamed or
  * removed. That's also why "Not on the list" stays available — cover staff and
- * contractors work real shifts without ever having a login.
+ * contractors work real shifts without ever being on the register. Both rules
+ * live in `WorkerSelect`; this is that control bound to one row of a log form.
  */
 export function OperatorPicker<
   TValues extends FieldValues,
@@ -41,7 +34,7 @@ export function OperatorPicker<
   note,
   optional,
   action,
-  employees,
+  workers,
   shift,
   exclude,
 }: {
@@ -49,9 +42,8 @@ export function OperatorPicker<
    * Generic over the form it belongs to rather than tied to `LogEntryValues`:
    * the shift report's edit dialog is the same fields plus an amendment note,
    * and pinning the picker to one of the two schemas would mean a second copy
-   * of the roster, the on-shift grouping and the "Not on the list…" escape
-   * hatch — three behaviours that must not drift between filing an entry and
-   * correcting one.
+   * of the on-shift grouping and the "Not on the list…" escape hatch —
+   * behaviours that must not drift between filing an entry and correcting one.
    */
   control: Control<TValues, unknown, TParsed>;
   name: TName;
@@ -61,7 +53,7 @@ export function OperatorPicker<
   optional?: boolean;
   /** Rendered opposite the label — the "Remove" button on an added operator. */
   action?: React.ReactNode;
-  employees: Employee[];
+  workers: Worker[];
   shift: RunningShift;
   /** Names already chosen in the other rows, so nobody is picked twice. */
   exclude?: string[];
@@ -70,28 +62,6 @@ export function OperatorPicker<
     control,
     name,
   });
-  const value = (field.value as string | undefined) ?? "";
-
-  const taken = new Set(exclude ?? []);
-  const roster = employees
-    .map(employeeName)
-    .filter((n) => n && !taken.has(n))
-    .sort((a, b) => a.localeCompare(b));
-
-  const onShift = employees
-    .filter((e) => e.default_shift === shift || e.default_shift === "both")
-    .map(employeeName)
-    .filter((n) => n && !taken.has(n));
-  const onShiftSet = new Set(onShift);
-  const others = roster.filter((n) => !onShiftSet.has(n));
-
-  // A value that isn't on the roster means it was typed — keep the free-text
-  // box open so it stays editable instead of silently resetting.
-  const [freeText, setFreeText] = useState(
-    () => Boolean(value) && !roster.includes(value),
-  );
-
-  const selectValue = freeText ? OTHER : roster.includes(value) ? value : "";
 
   return (
     <Field
@@ -104,68 +74,18 @@ export function OperatorPicker<
       {/* On a producing or machine activity every row that exists is
           required — an unwanted one is removed, not left blank. On waiting
           time it may simply be left here, and the entry files without it. */}
-      <SelectField
-        ariaLabel={label}
-        value={selectValue}
-        onChange={(next) => {
-          if (next === OTHER) {
-            setFreeText(true);
-            field.onChange("");
-            return;
-          }
-          setFreeText(false);
-          field.onChange(next);
-        }}
+      <WorkerSelect
+        value={(field.value as string | undefined) ?? ""}
+        onChange={field.onChange}
         onBlur={field.onBlur}
-        clearable
+        workers={workers}
+        shift={shift}
+        exclude={exclude}
+        placeholder="Select…"
+        ariaLabel={label}
         ariaInvalid={Boolean(fieldState.error)}
-        // A roster of forty is exactly the list the search box is for, and
-        // "Not on the list" is the last row rather than a group of its own —
-        // it is an escape hatch, not a third category of person.
-        searchPlaceholder="Name…"
-        emptyMessage="Nobody on the roster matches that."
-        groups={[
-          ...(onShift.length > 0
-            ? [
-                {
-                  label: `On ${shift} shift`,
-                  options: [...onShift]
-                    .sort((a, b) => a.localeCompare(b))
-                    .map((n) => ({ value: n, label: n })),
-                },
-              ]
-            : []),
-          ...(others.length > 0
-            ? [
-                {
-                  label: "Other staff",
-                  options: others.map((n) => ({ value: n, label: n })),
-                },
-              ]
-            : []),
-          // Headless, so it reads as a footer to the roster rather than a
-          // third category of person — and pinned, because typing a name the
-          // roster doesn't have is exactly when it is needed.
-          {
-            label: "",
-            options: [
-              { value: OTHER, label: "Not on the list…", pinned: true },
-            ],
-          },
-        ]}
+        inputClassName={CONTROL}
       />
-
-      {freeText && (
-        <input
-          autoFocus
-          className={cn(CONTROL, "mt-1.5")}
-          placeholder="Type the name"
-          value={value}
-          onChange={(e) => field.onChange(e.target.value)}
-          onBlur={field.onBlur}
-          aria-label={`${label} — name`}
-        />
-      )}
     </Field>
   );
 }

@@ -19,6 +19,7 @@ import {
   decomposeSpeedUnit,
   logEntrySchema,
   operatorsRequired,
+  planRequired,
   targetQtyFromSpeed,
   type LogEntryParsed,
   type LogEntryValues,
@@ -124,7 +125,7 @@ export function LogGridRow({
     products,
     productsPending,
     equipment: equipmentList,
-    employees,
+    workers,
     jobs,
     jobsPending,
     stages,
@@ -255,6 +256,9 @@ export function LogGridRow({
 
   const stageChoices = useMemo(() => {
     if (!job || !processId) return [];
+    // Before issue no entry takes a stage: production is refused outright,
+    // and preparatory work is filed against the batch alone (0054).
+    if (!job.issued_at) return [];
     return stages.filter(
       (s) => s.job_id === job.id && s.process_id === processId,
     );
@@ -311,10 +315,13 @@ export function LogGridRow({
         body: "Check the number, or have it added under Products.",
       };
     }
+    const needsPlan = planRequired(category as ProcessCategory);
     if (!job) {
       return {
         head: `Batch ${typed} isn't on the production board.`,
-        body: "A manager adds it on the Pipeline, plans its stages and issues it before work can be logged against it.",
+        body: needsPlan
+          ? "A manager adds it on the Pipeline, plans its stages and issues it before work can be logged against it."
+          : "A manager adds it on the Pipeline before work can be logged against it.",
       };
     }
     // Checked by `shift_log_quarantine_guard` (0044), ahead of the stage rules.
@@ -324,10 +331,13 @@ export function LogGridRow({
         body: "Preparatory and production work can't be logged against it until QA closes the NCR. You can still log downtime against it.",
       };
     }
+    // Rules 3 and 4 are production's alone (0054): preparatory work starts
+    // while the plan is still being drawn up.
+    if (!needsPlan) return null;
     if (!job.issued_at) {
       return {
         head: `Batch ${typed} isn't issued for production yet.`,
-        body: "A manager plans its stages on the Pipeline and issues it. You can still log downtime against it.",
+        body: "A manager plans its stages on the Pipeline and issues it. You can still log downtime and preparatory work against it.",
       };
     }
     if (processId && !stagesPending && stageChoices.length === 0) {
@@ -868,9 +878,9 @@ export function LogGridRow({
                 >
                   <Popover.Popup className="w-76 rounded-xl border border-line bg-surface p-3 shadow-lift">
                     <div className="space-y-2.5">
-                      {employees.length === 0 && (
+                      {workers.length === 0 && (
                         <p className="rounded-lg bg-sunken px-2.5 py-2 text-[0.6875rem] text-ink-4">
-                          No one on the roster yet — use &ldquo;Not on the
+                          No one on the workforce yet — use &ldquo;Not on the
                           list…&rdquo; to type a name.
                         </p>
                       )}
@@ -880,7 +890,7 @@ export function LogGridRow({
                           control={control}
                           name={`operators.${i}.name`}
                           label={`Operator ${i + 1}`}
-                          employees={employees}
+                          workers={workers}
                           shift={(shift as RunningShift) ?? "morning"}
                           exclude={(operators ?? [])
                             .filter((_, j) => j !== i)

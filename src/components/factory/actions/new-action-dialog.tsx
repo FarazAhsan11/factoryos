@@ -24,6 +24,8 @@ import { DateTimeField } from "@/components/ui/date-picker";
 import { fetchProducts, productKeys } from "@/lib/factory/product-queries";
 import type { SetupItem } from "@/lib/factory/setup-queries";
 import { SelectField } from "@/components/ui/select-field";
+import { WorkerSelect } from "@/components/factory/worker-select";
+import { useWorkers } from "@/lib/factory/worker-queries";
 import { cn } from "@/lib/utils";
 
 const CONTROL =
@@ -77,6 +79,7 @@ export function NewActionDialog({
     queryKey: productKeys.all(factoryId),
     queryFn: () => fetchProducts(factoryId),
   });
+  const { data: workers = [] } = useWorkers(factoryId);
 
   const matched = useMemo(() => {
     const term = values.batchNo.trim().toLowerCase();
@@ -191,12 +194,13 @@ export function NewActionDialog({
               </Field>
 
               <Field label="Assign to" htmlFor="na-assignee" note="(optional)">
-                <input
+                <WorkerSelect
                   id="na-assignee"
                   value={values.assignedTo}
-                  onChange={(e) => set("assignedTo", e.target.value)}
-                  placeholder="Name"
-                  className={CONTROL}
+                  onChange={(name) => set("assignedTo", name)}
+                  workers={workers}
+                  ariaLabel="Assign to"
+                  inputClassName={CONTROL}
                 />
               </Field>
             </div>

@@ -31,6 +31,7 @@ import {
   Field,
   Group,
   Muted,
+  PersonControl,
   SaveBar,
   SelectControl,
   YesNo,
@@ -54,6 +55,7 @@ import {
   type Deviation,
 } from "@/lib/factory/deviation-queries";
 import { pipelineKeys } from "@/lib/factory/pipeline-queries";
+import { useWorkers } from "@/lib/factory/worker-queries";
 import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/factory/dates";
 
@@ -605,6 +607,7 @@ export function ActionPlanTab({
         description: deviation.pa_description,
       };
 
+  const { data: workers = [] } = useWorkers(factoryId);
   const form = useForm<ActionPlanValues>({
     resolver: zodResolver(actionPlanSchema),
     defaultValues: {
@@ -654,11 +657,13 @@ export function ActionPlanTab({
 
       <Cols>
         <Field label={`${corrective ? "CA" : "PA"} owner`} htmlFor={`dev-${kind}-owner`}>
-          <input
+          <PersonControl
+            control={form.control}
+            name="owner"
             id={`dev-${kind}-owner`}
+            workers={workers}
+            label={`${corrective ? "CA" : "PA"} owner`}
             placeholder="Who owns it"
-            className={CONTROL}
-            {...form.register("owner")}
           />
         </Field>
         <Field label="Target date" htmlFor={`dev-${kind}-target`}>
@@ -725,6 +730,7 @@ export function CloseOutTab({
   const isNcr = deviation.type === "ncr";
   const gaps = outstanding(deviation);
 
+  const { data: workers = [] } = useWorkers(factoryId);
   const form = useForm<CloseOutValues>({
     resolver: zodResolver(closeOutSchema),
     defaultValues: {
@@ -874,11 +880,13 @@ export function CloseOutTab({
 
       <Cols>
         <Field label="CO owner" htmlFor="dev-co-owner">
-          <input
+          <PersonControl
+            control={form.control}
+            name="owner"
             id="dev-co-owner"
+            workers={workers}
+            label="CO owner"
             placeholder="Who owns the close-out"
-            className={CONTROL}
-            {...form.register("owner")}
           />
         </Field>
         <Field label="CO target date" htmlFor="dev-co-target">

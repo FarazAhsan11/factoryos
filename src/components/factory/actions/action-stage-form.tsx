@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, useWatch } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import {
   Check,
   CheckCheck,
@@ -40,6 +40,8 @@ import {
   saveRootCause,
   type FactoryAction,
 } from "@/lib/factory/action-queries";
+import { WorkerSelect } from "@/components/factory/worker-select";
+import { useWorkers } from "@/lib/factory/worker-queries";
 import { secondNow, useRenderClock } from "@/lib/use-render-clock";
 import { cn } from "@/lib/utils";
 
@@ -75,10 +77,13 @@ const GHOST =
  */
 export function ActionStageForm({
   action,
+  factoryId,
   role,
   onDone,
 }: {
   action: FactoryAction;
+  /** For the workforce list the investigator is picked from. */
+  factoryId: string;
   role: FactoryRole;
   onDone: () => Promise<void> | void;
 }) {
@@ -87,7 +92,12 @@ export function ActionStageForm({
   return (
     <div className="space-y-3">
       {action.status === "open" && (
-        <OpenPanel action={action} role={role} onDone={onDone} />
+        <OpenPanel
+          action={action}
+          factoryId={factoryId}
+          role={role}
+          onDone={onDone}
+        />
       )}
       {action.status === "investigating" && (
         <RootCauseForm action={action} onDone={onDone} />
@@ -130,16 +140,18 @@ export function ActionStageForm({
  */
 function OpenPanel({
   action,
+  factoryId,
   role,
   onDone,
 }: {
   action: FactoryAction;
+  factoryId: string;
   role: FactoryRole;
   onDone: () => Promise<void> | void;
 }) {
   return (
     <div className="space-y-4 rounded-2xl border border-line bg-surface p-4">
-      <StartForm action={action} onDone={onDone} />
+      <StartForm action={action} factoryId={factoryId} onDone={onDone} />
       {canReview(role) && (
         <>
           <div className="flex items-center gap-3">
@@ -160,13 +172,16 @@ function OpenPanel({
 
 function StartForm({
   action,
+  factoryId,
   onDone,
 }: {
   action: FactoryAction;
+  factoryId: string;
   onDone: () => Promise<void> | void;
 }) {
+  const { data: workers = [] } = useWorkers(factoryId);
   const {
-    register,
+    control,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<InvestigateValues>({
@@ -196,11 +211,22 @@ function StartForm({
         label="Who is looking into this?"
         error={errors.assignedTo?.message}
       >
-        <input
-          {...register("assignedTo")}
-          placeholder="Name — the person, not the department"
-          className={FIELD}
-          aria-invalid={!!errors.assignedTo}
+        {/* The person, not the department — picked from the workforce, or
+            typed through "Not on the list…" for someone who isn't on it. */}
+        <Controller
+          name="assignedTo"
+          control={control}
+          render={({ field }) => (
+            <WorkerSelect
+              value={field.value ?? ""}
+              onChange={field.onChange}
+              onBlur={field.onBlur}
+              workers={workers}
+              ariaLabel="Who is looking into this?"
+              ariaInvalid={Boolean(errors.assignedTo)}
+              inputClassName={FIELD}
+            />
+          )}
         />
       </Field>
       <button

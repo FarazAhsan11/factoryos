@@ -377,6 +377,35 @@ export const equipmentSchema = z.object({
 
 export type EquipmentValues = z.infer<typeof equipmentSchema>;
 
+/* ── Resources → Workforce ───────────────────────────────── */
+
+/**
+ * One person on the workforce register (`factory_workers`, migration 0053) —
+ * who performs and is assigned work, whether or not they ever sign in. Shared
+ * by the add form, the row edit and the bulk add, so all three refuse the same
+ * things. Department is optional, and `""` means none; role defaults to
+ * Operator the way the prototype's did.
+ */
+export const workerSchema = z.object({
+  fullName: fullName,
+  departmentId: z.union([z.literal(""), z.uuid()]),
+  shift: defaultShift,
+  role: z
+    .string()
+    .trim()
+    .min(2, "Enter the person's role, e.g. Operator.")
+    .max(60, "Keep the role under 60 characters."),
+});
+
+export type WorkerValues = z.infer<typeof workerSchema>;
+
+export const EMPTY_WORKER: WorkerValues = {
+  fullName: "",
+  departmentId: "",
+  shift: "morning",
+  role: "Operator",
+};
+
 /* ── Admin → Shift times ───────────────────────────────────────────────── */
 
 /** `<input type="time">` gives "HH:MM"; Postgres `time` gives "HH:MM:SS". */

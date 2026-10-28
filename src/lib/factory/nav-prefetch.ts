@@ -47,6 +47,7 @@ import {
   shiftTimeKeys,
   todayKey,
 } from "@/lib/factory/shift-time-queries";
+import { fetchWorkers, workerKeys } from "@/lib/factory/worker-queries";
 
 /**
  * Sidebar → warm a module's lists before its page is opened.
@@ -82,6 +83,14 @@ function products(client: QueryClient, factoryId: string) {
   });
 }
 
+/** The workforce — every "who" picker in the workspace reads it. */
+function workers(client: QueryClient, factoryId: string) {
+  void client.prefetchQuery({
+    queryKey: workerKeys.all(factoryId),
+    queryFn: () => fetchWorkers(factoryId),
+  });
+}
+
 function stages(client: QueryClient, factoryId: string) {
   void client.prefetchQuery({
     queryKey: batchStageKeys.all(factoryId),
@@ -99,10 +108,7 @@ const WARMERS: Record<string, Warm> = {
       queryKey: equipmentKeys.all(factoryId),
       queryFn: () => fetchEquipment(factoryId),
     });
-    void client.prefetchQuery({
-      queryKey: employeeKeys.all(factoryId),
-      queryFn: () => fetchEmployees(factoryId),
-    });
+    workers(client, factoryId);
     void client.prefetchQuery({
       queryKey: shiftTimeKeys.all(factoryId),
       queryFn: () => fetchShiftTimes(factoryId),
@@ -152,11 +158,9 @@ const WARMERS: Record<string, Warm> = {
   },
   // A screen that lives on a tab has its own entry, keyed by its full rail
   // href, where its data differs from the page's first tab.
-  "/resources?tab=employees": (client, factoryId) => {
-    void client.prefetchQuery({
-      queryKey: employeeKeys.all(factoryId),
-      queryFn: () => fetchEmployees(factoryId),
-    });
+  "/resources?tab=workforce": (client, factoryId) => {
+    workers(client, factoryId);
+    setupList(client, factoryId, "factory_departments");
   },
   "/admin?tab=units": (client, factoryId) => {
     setupList(client, factoryId, "factory_units");
@@ -173,20 +177,29 @@ const WARMERS: Record<string, Warm> = {
       queryFn: () => fetchShiftTimes(factoryId),
     });
   },
+  "/admin?tab=users": (client, factoryId) => {
+    void client.prefetchQuery({
+      queryKey: employeeKeys.all(factoryId),
+      queryFn: () => fetchEmployees(factoryId),
+    });
+  },
   "/actions": (client, factoryId) => {
     setupList(client, factoryId, "factory_units");
+    workers(client, factoryId);
     void client.prefetchQuery({
       queryKey: actionKeys.all(factoryId),
       queryFn: () => fetchActions(factoryId),
     });
   },
   "/maintenance": (client, factoryId) => {
+    workers(client, factoryId);
     void client.prefetchQuery({
       queryKey: maintenanceKeys.all(factoryId),
       queryFn: () => fetchMaintenanceRequests(factoryId),
     });
   },
   "/deviations": (client, factoryId) => {
+    workers(client, factoryId);
     void client.prefetchQuery({
       queryKey: deviationKeys.all(factoryId),
       queryFn: () => fetchDeviations(factoryId),

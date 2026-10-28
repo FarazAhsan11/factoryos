@@ -14,7 +14,7 @@ export default async function FactoryAdminPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const { factory, canManage } = await getFactoryContext(slug);
+  const { role, factory, canManage } = await getFactoryContext(slug);
 
   // Admin & Settings is manager-and-up; anyone else goes back to their board.
   if (!canManage) redirect(`/factory/${slug}`);
@@ -28,6 +28,7 @@ export default async function FactoryAdminPage({
       <AdminWorkspace
         factory={factory}
         canManage={canManage}
+        isAdmin={role === "admin" || role === "super_admin"}
         units={unitWords(factory)}
       />
     </div>

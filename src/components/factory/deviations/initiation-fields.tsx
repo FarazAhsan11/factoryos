@@ -18,6 +18,7 @@ import {
   DateControl,
   Field,
   Group,
+  PersonControl,
   SelectControl,
 } from "@/components/factory/deviations/deviation-fields";
 import { useCapaOptions } from "@/components/factory/deviations/use-capa-options";
@@ -32,6 +33,7 @@ import {
   PRIORITIES,
 } from "@/lib/factory/deviation-queries";
 import { fetchProducts, productKeys } from "@/lib/factory/product-queries";
+import { useWorkers } from "@/lib/factory/worker-queries";
 import { cn } from "@/lib/utils";
 
 /**
@@ -76,6 +78,7 @@ export function InitiationFields({
     queryFn: () => fetchEquipment(factoryId),
   });
   const capaGroups = useCapaOptions(factoryId);
+  const { data: workers = [] } = useWorkers(factoryId);
 
   const type = useWatch({ control, name: "type" });
   const disposition = useWatch({ control, name: "disposition" });
@@ -274,11 +277,13 @@ export function InitiationFields({
       <Group title="People">
         <Cols>
           <Field label="Case owner" htmlFor="dev-owner" note="(optional)">
-            <input
+            <PersonControl
+              control={control}
+              name="ownerName"
               id="dev-owner"
+              workers={workers}
+              label="Case owner"
               placeholder="Who is carrying this case"
-              className={CONTROL}
-              {...register("ownerName")}
             />
           </Field>
           <Field label="Raised by" htmlFor="dev-raised" note="(optional)">

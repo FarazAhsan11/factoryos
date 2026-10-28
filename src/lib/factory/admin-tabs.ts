@@ -17,6 +17,10 @@ export const ADMIN_TABS: AdminTab[] = [
   { value: "processes", label: "Processes", ready: true },
   { value: "departments", label: "Departments", ready: true },
   { value: "shift-times", label: "Shift times", ready: true },
+  // Who can sign in. It was Resources → Employees, when the one list of people
+  // was both the logins and the shift log's operators; the operators are the
+  // workforce register now, and a login is configuration.
+  { value: "users", label: "Users", ready: true },
 ];
 
 /** Falls back to Company for an unknown, unbuilt, or missing ?tab=. */

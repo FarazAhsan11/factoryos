@@ -3,25 +3,22 @@
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-import { EmployeesPanel } from "@/components/factory/admin/employees-panel";
 import { EquipmentPanel } from "@/components/factory/admin/equipment-panel";
+import { WorkforcePanel } from "@/components/factory/resources/workforce-panel";
 import { resolveResourceTab } from "@/lib/factory/resource-tabs";
 
 /**
  * Client half of Resources — the registers the floor names things from, the
- * machines and the people. Which one is open is chosen in the rail (Plant
+ * machines and the people who work them. Which one is open is chosen in the rail (Plant
  * setup → Resources) and carried in `?tab=`; the rail warms each register's
  * list on hover, as the tab strip it replaced used to.
  */
 export function ResourcesWorkspace({
   factoryId,
   canManage,
-  isAdmin,
 }: {
   factoryId: string;
   canManage: boolean;
-  /** Narrower than canManage: only an admin may add or remove people. */
-  isAdmin: boolean;
 }) {
   const tab = resolveResourceTab(useSearchParams().get("tab") ?? undefined);
 
@@ -36,8 +33,8 @@ export function ResourcesWorkspace({
           <EquipmentPanel factoryId={factoryId} canManage={canManage} />
         </Panel>
 
-        <Panel active={tab === "employees"} lazy>
-          <EmployeesPanel factoryId={factoryId} isAdmin={isAdmin} />
+        <Panel active={tab === "workforce"} lazy>
+          <WorkforcePanel factoryId={factoryId} canManage={canManage} />
         </Panel>
       </div>
     </div>

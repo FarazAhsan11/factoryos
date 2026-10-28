@@ -9,6 +9,8 @@ import {
 import { Loader2 } from "lucide-react";
 
 import { SelectField, type SelectOptionGroup } from "@/components/ui/select-field";
+import { WorkerSelect } from "@/components/factory/worker-select";
+import type { Worker } from "@/lib/factory/worker-queries";
 import { DateField } from "@/components/ui/date-picker";
 import { cn } from "@/lib/utils";
 import { formatDay } from "@/lib/factory/dates";
@@ -143,6 +145,48 @@ export function SelectControl<T extends FieldValues>({
           searchPlaceholder={searchPlaceholder}
           emptyMessage={emptyMessage}
           ariaInvalid={invalid}
+        />
+      )}
+    />
+  );
+}
+
+/**
+ * Someone from Resources → Workforce — the case owner and the CA / PA / CO
+ * owners, the people a deviation's work is assigned to. `WorkerSelect` bound
+ * to the tab's form, typing a name in this file's own input look.
+ */
+export function PersonControl<T extends FieldValues>({
+  control,
+  name,
+  id,
+  workers,
+  label,
+  placeholder,
+}: {
+  control: Control<T>;
+  name: FieldPath<T>;
+  id?: string;
+  workers: Worker[];
+  /** Read out for the control; the visible label is the `Field` around it. */
+  label: string;
+  placeholder?: string;
+}) {
+  return (
+    <Controller
+      name={name}
+      control={control}
+      render={({ field, fieldState }) => (
+        <WorkerSelect
+          id={id}
+          value={(field.value as string) ?? ""}
+          onChange={field.onChange}
+          onBlur={field.onBlur}
+          workers={workers}
+          placeholder={placeholder}
+          ariaLabel={label}
+          ariaInvalid={Boolean(fieldState.error)}
+          inputClassName={CONTROL}
         />
       )}
     />

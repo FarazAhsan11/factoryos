@@ -277,6 +277,19 @@ export function operatorsRequired(category: ProcessCategory): boolean {
   return category !== "downtime";
 }
 
+/**
+ * Whether an entry needs its batch issued and its activity in the batch's
+ * plan — rules 3 and 4 of `shift_log_stage_guard`. Production only, since
+ * migration 0054: preparatory work (dispensing, mixing) starts while the plan
+ * is still being drawn up, and downtime never answered to the plan.
+ *
+ * The forms read the same predicate the database applies, so an entry they
+ * let through is never refused for a rule they didn't mention.
+ */
+export function planRequired(category: ProcessCategory | undefined): boolean {
+  return category === "production";
+}
+
 /** An optional number field: "" means "not recorded", not 0. */
 const optionalQty = z
   // `null` is in the union for one reason: the draft in localStorage. An empty

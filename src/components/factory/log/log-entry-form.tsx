@@ -30,6 +30,7 @@ import {
   SPEED_TYPES,
   logEntrySchema,
   operatorsRequired,
+  planRequired,
   speedTypeTakesRate,
   targetQtyFromSpeed,
   type LogEntryParsed,
@@ -50,7 +51,7 @@ import { OperatorPicker } from "@/components/factory/log/operator-picker";
 import { StageProgress } from "@/components/factory/log/stage-progress";
 import { TimeField } from "@/components/ui/date-picker";
 import { SelectField } from "@/components/ui/select-field";
-import { employeeKeys, fetchEmployees } from "@/lib/factory/employee-queries";
+import { useWorkers } from "@/lib/factory/worker-queries";
 import {
   equipmentKeys,
   fetchEquipment,
@@ -171,10 +172,7 @@ export function LogEntryForm({
     queryKey: shiftTimeKeys.all(factoryId),
     queryFn: () => fetchShiftTimes(factoryId),
   });
-  const { data: employees = [] } = useQuery({
-    queryKey: employeeKeys.all(factoryId),
-    queryFn: () => fetchEmployees(factoryId),
-  });
+  const { data: workers = [] } = useWorkers(factoryId);
   // The board, for the batch panel's family context — what kind of batch this
   // is, whose bulk it draws on, and how much of it is left. Same cache key the
   // Pipeline page uses, so arriving from there costs nothing.
@@ -438,6 +436,9 @@ export function LogEntryForm({
    */
   const stageChoices = useMemo(() => {
     if (!job || !processId) return [];
+    // Before issue no entry takes a stage: production is refused outright,
+    // and preparatory work is filed against the batch alone (0054).
+    if (!job.issued_at) return [];
     return allStages.filter(
       (s) => s.job_id === job.id && s.process_id === processId,
     );
@@ -456,8 +457,9 @@ export function LogEntryForm({
    * The four rules of `shift_log_stage_guard` (0033, tightened in 0038), in
    * the order it applies them: the batch number must name a product, that
    * product must be on the board, the card must be issued, and the activity
-   * must be in the plan. Said here so the operator learns it while filling the
-   * form in rather than from a submit that fails after everything is typed.
+   * must be in the plan — the last two for production only since 0054. Said
+   * here so the operator learns it while filling the form in rather than from
+   * a submit that fails after everything is typed.
    *
    * The button stays enabled regardless. This is a courtesy reading of a
    * cached board, and a batch issued a moment ago on somebody else's screen
@@ -505,10 +507,13 @@ export function LogEntryForm({
         body: "Check the number, or have it added under Products.",
       };
     }
+    const needsPlan = planRequired(category as ProcessCategory);
     if (!job) {
       return {
         head: `Batch ${typed} isn't on the production board.`,
-        body: "A manager adds it on the Pipeline, plans its stages and issues it before work can be logged against it.",
+        body: needsPlan
+          ? "A manager adds it on the Pipeline, plans its stages and issues it before work can be logged against it."
+          : "A manager adds it on the Pipeline before work can be logged against it.",
       };
     }
     // Checked by `shift_log_quarantine_guard` (0044), ahead of the stage rules.
@@ -518,10 +523,13 @@ export function LogEntryForm({
         body: "Preparatory and production work can't be logged against it until QA closes the NCR. You can still log downtime against it.",
       };
     }
+    // Rules 3 and 4 are production's alone (0054): preparatory work starts
+    // while the plan is still being drawn up.
+    if (!needsPlan) return null;
     if (!job.issued_at) {
       return {
         head: `Batch ${typed} isn't issued for production yet.`,
-        body: "A manager plans its stages on the Pipeline and issues it. You can still log downtime against it.",
+        body: "A manager plans its stages on the Pipeline and issues it. You can still log downtime and preparatory work against it.",
       };
     }
     if (processId && !stagesPending && stageChoices.length === 0) {
@@ -1427,13 +1435,13 @@ export function LogEntryForm({
         {!isDowntime && (
           <section className={SECTION}>
             <SectionTitle icon={Users}>Operators</SectionTitle>
-            {/* The pickers render even with an empty roster: "Not on the list…"
+            {/* The pickers render even with an empty workforce: "Not on the list…"
               opens a free-text name, so a factory mid-setup can still file a
               shift instead of hitting a required field it has no way to fill. */}
-            {employees.length === 0 && needsOperators && (
+            {workers.length === 0 && needsOperators && (
               <p className="mb-2.5 rounded-xl border border-dashed border-ink-6 bg-surface px-3.5 py-3 text-xs text-ink-4">
-                No one on the roster yet — add people in Admin &amp; Settings →
-                Employees and they&rsquo;ll appear here. Until then, use
+                No one on the workforce yet — add people in Plant setup →
+                Resources → Workforce and they&rsquo;ll appear here. Until then, use
                 &ldquo;Not on the list…&rdquo; to type a name.
               </p>
             )}
@@ -1448,7 +1456,7 @@ export function LogEntryForm({
                   name={`operators.${i}.name`}
                   label={`Operator ${i + 1}`}
                   optional={!needsOperators}
-                  employees={employees}
+                  workers={workers}
                   shift={shift as RunningShift}
                   // Everyone picked in the *other* rows, so nobody is named twice.
                   exclude={(operators ?? [])

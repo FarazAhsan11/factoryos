@@ -139,7 +139,7 @@ export function EmployeeImportDialog({
     );
     const a = document.createElement("a");
     a.href = url;
-    a.download = "factoryos-employees-template.csv";
+    a.download = "factoryos-users-template.csv";
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -176,7 +176,7 @@ export function EmployeeImportDialog({
       >
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-ink">Import employees</DialogTitle>
+            <DialogTitle className="text-ink">Import users</DialogTitle>
             <DialogDescription>
               Upload a CSV of names, emails and roles. Each person gets an
               account, and an invite if you want one sent.

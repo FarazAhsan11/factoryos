@@ -13,11 +13,6 @@ import {
   type BatchStage,
 } from "@/lib/factory/batch-stage-queries";
 import {
-  employeeKeys,
-  fetchEmployees,
-  type Employee,
-} from "@/lib/factory/employee-queries";
-import {
   equipmentKeys,
   fetchEquipment,
   type Equipment,
@@ -44,6 +39,7 @@ import {
   type RunningShift,
   type ShiftClock,
 } from "@/lib/factory/shift-time-queries";
+import { useWorkers, type Worker } from "@/lib/factory/worker-queries";
 
 /**
  * Everything a grid row resolves what is typed into it against.
@@ -61,7 +57,7 @@ export interface LogRegisters {
   products: Product[];
   productsPending: boolean;
   equipment: Equipment[];
-  employees: Employee[];
+  workers: Worker[];
   jobs: PipelineJob[];
   jobsPending: boolean;
   stages: BatchStage[];
@@ -88,10 +84,7 @@ export function useLogRegisters(factoryId: string): LogRegisters {
     queryKey: equipmentKeys.all(factoryId),
     queryFn: () => fetchEquipment(factoryId),
   });
-  const { data: employees = [] } = useQuery({
-    queryKey: employeeKeys.all(factoryId),
-    queryFn: () => fetchEmployees(factoryId),
-  });
+  const { data: workers = [] } = useWorkers(factoryId);
   const { data: jobs = [], isPending: jobsPending } = useQuery({
     queryKey: pipelineKeys.all(factoryId),
     queryFn: () => fetchPipelineJobs(factoryId),
@@ -136,7 +129,7 @@ export function useLogRegisters(factoryId: string): LogRegisters {
     products,
     productsPending,
     equipment,
-    employees,
+    workers,
     jobs,
     jobsPending,
     stages,

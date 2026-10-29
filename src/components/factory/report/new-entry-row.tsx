@@ -25,6 +25,7 @@ import {
   type ProcessCategory,
 } from "@/app/factory/[slug]/log/schemas";
 import { OperatorPicker } from "@/components/factory/log/operator-picker";
+import { REPORT_SPAN } from "@/components/factory/report/report-columns";
 import { StageProgress } from "@/components/factory/log/stage-progress";
 import { TimeField } from "@/components/ui/date-picker";
 import { SelectField } from "@/components/ui/select-field";
@@ -73,11 +74,12 @@ import { cn } from "@/lib/utils";
  * batch gate (0038), automatic stage resolution (0033), the stage tolerance
  * (0037), the pipeline card move and the action a flag raises.
  *
- * **Two fields have no column**, and pretending otherwise would have meant
- * dropping them: the activity's start and end times, which the sheet shows only
- * as a derived run time. They live in the strip under the row, along with the
- * stage picker where a batch runs one activity twice, every warning the entry
- * has earned, and the buttons. That strip is the formula bar to the row's
+ * **Two fields are typed in the strip, not the row**: the activity's start and
+ * end times. Their column, Start → End, is sized to read "06:45 → 08:00", not
+ * to hold two clock pickers, so the row shows them read back there (and the
+ * run time beside it) while the pickers live in the strip under the row, along
+ * with the stage picker where a batch runs one activity twice, every warning
+ * the entry has earned, and the buttons. That strip is the formula bar to the row's
  * spreadsheet — the row holds the values, the strip holds what is being said
  * about them.
  *
@@ -568,6 +570,31 @@ export function NewEntryRow({
           </span>
         </Cell>
 
+        {/* When — read back from the two clocks in the strip below, the way
+            the run time beside it is: the column is too narrow for two
+            pickers, and the strip is where they are labelled. */}
+        <Cell>
+          {startTime ? (
+            <Static className="font-mono">
+              {startTime}
+              {endTime && <span className="text-ink-5"> → {endTime}</span>}
+            </Static>
+          ) : (
+            <Blank />
+          )}
+        </Cell>
+
+        {/* Run time is derived from the two clocks in the strip below. */}
+        <Cell>
+          {duration > 0 ? (
+            <Static className="justify-end font-mono">
+              {formatMinutes(duration)}
+            </Static>
+          ) : (
+            <Blank />
+          )}
+        </Cell>
+
         {/* Room. Fixed — the row was added to this one. */}
         <Cell>
           <Static className="truncate font-semibold text-ink-2">
@@ -600,36 +627,19 @@ export function NewEntryRow({
           />
         </Cell>
 
-        {/* Equipment — machine activities only, exactly as in the log form. */}
+        {/* Batch. The cell everything above and below is resolved from. */}
         <Cell>
-          {hasMachine ? (
-            <input
-              {...register("equipmentNo")}
-              placeholder="EQ383"
-              autoComplete="off"
-              title={equipment ? equipment.name : undefined}
-              className={cn(
-                INPUT,
-                "font-mono",
-                (equipmentNo ?? "").trim() &&
-                  !equipment &&
-                  INVALID,
-              )}
-            />
-          ) : (
-            <Blank />
-          )}
-        </Cell>
-
-        {/* Run time is derived from the two clocks in the strip below. */}
-        <Cell>
-          {duration > 0 ? (
-            <Static className="justify-end font-mono">
-              {formatMinutes(duration)}
-            </Static>
-          ) : (
-            <Blank />
-          )}
+          <input
+            {...register("batchNo")}
+            placeholder="46004"
+            autoComplete="off"
+            className={cn(
+              INPUT,
+              "font-mono",
+              batchBlock && WARN,
+              product && !batchBlock && RESOLVED,
+            )}
+          />
         </Cell>
 
         {/* Product and code are the batch's, read back from the register
@@ -652,21 +662,6 @@ export function NewEntryRow({
           )}
         </Cell>
 
-        {/* Batch. The cell everything above and below is resolved from. */}
-        <Cell>
-          <input
-            {...register("batchNo")}
-            placeholder="46004"
-            autoComplete="off"
-            className={cn(
-              INPUT,
-              "font-mono",
-              batchBlock && WARN,
-              product && !batchBlock && RESOLVED,
-            )}
-          />
-        </Cell>
-
         <Cell>
           {isDowntime ? (
             <Blank />
@@ -687,18 +682,32 @@ export function NewEntryRow({
         </Cell>
 
         <Cell>
-          {product ? (
+          {derivedTarget !== null ? (
             <Static className="justify-end font-mono">
-              {runningTotal.toLocaleString()}
+              {derivedTarget.toLocaleString()}
             </Static>
           ) : (
             <Blank />
           )}
         </Cell>
         <Cell>
-          {derivedTarget !== null ? (
+          {isProduction ? (
+            <input
+              type="number"
+              step="any"
+              min={0}
+              {...register("qtyRejected", { valueAsNumber: true })}
+              placeholder="0"
+              className={cn(INPUT, "text-right font-mono")}
+            />
+          ) : (
+            <Blank />
+          )}
+        </Cell>
+        <Cell>
+          {product ? (
             <Static className="justify-end font-mono">
-              {derivedTarget.toLocaleString()}
+              {runningTotal.toLocaleString()}
             </Static>
           ) : (
             <Blank />
@@ -713,14 +722,49 @@ export function NewEntryRow({
         </Cell>
 
         <Cell>
-          {isProduction ? (
+          {hasMachine ? (
             <input
               type="number"
               step="any"
               min={0}
-              {...register("qtyRejected", { valueAsNumber: true })}
-              placeholder="0"
+              {...register("targetSpeed", { valueAsNumber: true })}
+              placeholder="1200"
               className={cn(INPUT, "text-right font-mono")}
+            />
+          ) : (
+            <Blank />
+          )}
+        </Cell>
+        <Cell>
+          {hasMachine ? (
+            <input
+              type="number"
+              step="any"
+              min={0}
+              {...register("actualSpeed", { valueAsNumber: true })}
+              placeholder="980"
+              className={cn(INPUT, "text-right font-mono")}
+            />
+          ) : (
+            <Blank />
+          )}
+        </Cell>
+
+        {/* Equipment — machine activities only, exactly as in the log form. */}
+        <Cell>
+          {hasMachine ? (
+            <input
+              {...register("equipmentNo")}
+              placeholder="EQ383"
+              autoComplete="off"
+              title={equipment ? equipment.name : undefined}
+              className={cn(
+                INPUT,
+                "font-mono",
+                (equipmentNo ?? "").trim() &&
+                  !equipment &&
+                  INVALID,
+              )}
             />
           ) : (
             <Blank />
@@ -808,35 +852,6 @@ export function NewEntryRow({
             className={INPUT}
           />
         </Cell>
-
-        <Cell>
-          {hasMachine ? (
-            <input
-              type="number"
-              step="any"
-              min={0}
-              {...register("actualSpeed", { valueAsNumber: true })}
-              placeholder="980"
-              className={cn(INPUT, "text-right font-mono")}
-            />
-          ) : (
-            <Blank />
-          )}
-        </Cell>
-        <Cell>
-          {hasMachine ? (
-            <input
-              type="number"
-              step="any"
-              min={0}
-              {...register("targetSpeed", { valueAsNumber: true })}
-              placeholder="1200"
-              className={cn(INPUT, "text-right font-mono")}
-            />
-          ) : (
-            <Blank />
-          )}
-        </Cell>
       </tr>
 
       {/* ── The strip ───────────────────────────────────────────────────
@@ -846,7 +861,7 @@ export function NewEntryRow({
           them to say what they are. */}
       <tr className="border-b-2 border-brand bg-sunken">
         <td className="bg-sunken-2 shadow-[inset_4px_0_0_0_var(--color-brand)] print:hidden" />
-        <td colSpan={16} className="border-t border-line px-3 py-2.5">
+        <td colSpan={REPORT_SPAN - 1} className="border-t border-line px-3 py-2.5">
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2">
             <StripField label="Start">
               <Controller

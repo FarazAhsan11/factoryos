@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { Flag, PenLine, Plus } from "lucide-react";
+import { Flag, PenLine } from "lucide-react";
 
 import {
   formatQty,
@@ -10,14 +9,28 @@ import {
   type ShiftReportRoom,
   type ShiftReportRow,
 } from "@/lib/factory/shift-report-queries";
-import { NewEntryRow } from "@/components/factory/report/new-entry-row";
-import type { RunningShift } from "@/lib/factory/shift-time-queries";
+import {
+  REPORT_COLUMNS,
+  REPORT_SPAN,
+} from "@/components/factory/report/report-columns";
+import { ColumnResizeHandle } from "@/components/ui/column-resize-handle";
+import { useColumnResize } from "@/lib/use-column-resize";
 import { cn } from "@/lib/utils";
+
+const COLUMNS = REPORT_COLUMNS;
+const COLUMN_WIDTHS = COLUMNS.map((column) => column.width);
+const TABLE_WIDTH = COLUMN_WIDTHS.reduce((sum, w) => sum + w, 0);
+const SPAN = REPORT_SPAN;
+
+/** "06:45:00" → "06:45". */
+function clock(value: string | null): string {
+  return value ? value.slice(0, 5) : "";
+}
 
 /**
  * The report proper: every room, in room order, with what it ran this shift.
  *
- * Fifteen columns, not the prototype's eighteen. Three of its columns showed
+ * Not the prototype's columns as they were. Three of its columns showed
  * the same numbers twice — *Shift Total* and *Achieved* were both `qty`,
  * *Required* and *Target* were both `target_qty` — and a wide sheet that
  * prints one figure in two places invites the reader to hunt for a difference
@@ -29,22 +42,9 @@ export function ShiftReportTable({
   unitWord,
   onEdit,
   canEdit,
-  canManage,
-  factoryId,
-  userId,
-  date,
-  shift,
 }: {
   rooms: ShiftReportRoom[];
   unitWord: string;
-  factoryId: string;
-  /** Manager and up — decides how wide a new row's clocks open. */
-  canManage: boolean;
-  /** The viewer, who is also the author of any row added here. */
-  userId: string;
-  /** The sheet's date and shift — what a row added here is filed against. */
-  date: string;
-  shift: RunningShift;
   /**
    * Opens the correction dialog on one entry. Reading the sheet is when a
    * supervisor notices a wrong figure, so the fix starts on the row they are
@@ -54,18 +54,22 @@ export function ShiftReportTable({
   /** Their own entry, or a manager's — the same rule RLS enforces on the write. */
   canEdit: (entry: ShiftReportRow) => boolean;
 }) {
-  /**
-   * The room a new row is open on, if any. One at a time: two half-typed rows
-   * on one sheet is two ways to lose the other.
-   */
-  const [adding, setAdding] = useState<string | null>(null);
+  /** Widths the viewer has dragged a column to — see `useColumnResize`. */
+  const { widths, resizing, startResize } = useColumnResize(COLUMN_WIDTHS);
+  const resize = (index: number) => (event: React.PointerEvent<HTMLElement>) =>
+    startResize(index, event);
 
   return (
     /* Its own scroll box on screen so the sticky header holds and the summary
        strip stays put; on paper the box is undone entirely — a printed sheet
        has no scrollbar, and clipping the report to one viewport would lose
        every room past the first dozen. */
-    <div className="scrollbar-slim overflow-auto lg:min-h-0 lg:flex-1 print:block print:overflow-visible">
+    <div
+      className={cn(
+        "scrollbar-slim overflow-auto lg:min-h-0 lg:flex-1 print:block print:overflow-visible",
+        resizing && "cursor-col-resize select-none [&_*]:cursor-col-resize",
+      )}
+    >
       {/* `table-fixed`, with every column given a width in pixels.
 
           Three approaches were tried here and two were wrong. Auto layout
@@ -77,172 +81,71 @@ export function ShiftReportTable({
           allowed, split down the middle into "REQUIRE / D".
 
           Pixels sized to the longest word each column has to hold is the
-          answer. Seventeen columns of real words do not fit a laptop, and
+          answer. Eighteen columns of real words do not fit a laptop, and
           pretending otherwise is what broke the headings; the sheet is wider
           than the window and scrolls, which is what a wide sheet does. Headings
           still wrap at spaces — "TARGET / SPEED" — but never inside a word. */}
-      <table className="w-full min-w-[1614px] table-fixed border-collapse text-[0.75rem]">
+      <table
+        className={cn(
+          "table-fixed border-collapse text-[0.75rem]",
+          widths === null && "w-full",
+        )}
+        style={
+          widths === null
+            ? { minWidth: TABLE_WIDTH }
+            : { width: widths.reduce((sum, w) => sum + w, 0) }
+        }
+      >
         <colgroup>
-          {/* The edit column. Not hidden here for print — `display:none` on a
-              `<col>` is not honoured the way it is on a cell, and the `th`/`td`
-              already carry `print:hidden`. */}
-          <col className="w-[34px]" />
-          <col className="w-[84px]" />
-          <col className="w-[110px]" />
-          <col className="w-[76px]" />
-          <col className="w-[88px]" />
-          <col className="w-[140px]" />
-          <col className="w-[74px]" />
-          <col className="w-[80px]" />
-          <col className="w-[92px]" />
-          {/* "ACCUMULATIVE" is the longest unbreakable word on the sheet, and
-              this column is sized to it rather than the other way round. */}
-          <col className="w-[118px]" />
-          <col className="w-[90px]" />
-          <col className="w-[96px]" />
-          <col className="w-[90px]" />
-          <col className="w-[110px]" />
-          <col className="w-[140px]" />
-          <col className="w-[96px]" />
-          <col className="w-[96px]" />
+          {COLUMN_WIDTHS.map((width, i) => (
+            <col key={i} style={{ width: widths?.[i] ?? width }} />
+          ))}
         </colgroup>
 
         <thead>
           {/* The colour is on the row, but the stickiness has to be on the
               cells: `position: sticky` on a `<tr>` is ignored outside Firefox. */}
           <tr className="text-white print:bg-surface print:text-black">
-            {/* The edit column is leftmost so it is reachable without
-                scrolling a sixteen-column sheet sideways, and it carries no
-                heading: an icon column labelled "Edit" spends a header on
-                something the icon already says. */}
-            <Th className="print:hidden">
-              <span className="sr-only">Correct entry</span>
-            </Th>
-            <Th>{unitWord}</Th>
-            <Th>Status / stage</Th>
-            <Th>EQ no.</Th>
-            <Th align="right">Run time</Th>
-            <Th>Product</Th>
-            <Th>Code</Th>
-            <Th>Batch</Th>
-            <Th align="right">Shift qty</Th>
-            <Th align="right">Accumulative</Th>
-            {/* Not "Required": this column holds the entry own target_qty —
-                speed times how long it ran, what this shift was expected to
-                make — and "Required qty" everywhere else in FactoryOS means
-                the batch order quantity. One word made a handover sheet read
-                as "this batch needs 10,000" where it said "this shift was
-                expected to make 10,000". Named as the log form names it. */}
-            <Th align="right">Shift target</Th>
-            <Th>Progress</Th>
-            <Th align="right">Rejected</Th>
-            <Th>Operators</Th>
-            <Th>Comments</Th>
-            <Th align="right">Speed</Th>
-            <Th align="right">Target speed</Th>
+            {COLUMNS.map((column, i) =>
+              column.key === "edit" ? (
+                /* The edit column is leftmost so it is reachable without
+                   scrolling the sheet sideways, and it carries no heading: an
+                   icon column labelled "Edit" spends a header on something
+                   the icon already says. */
+                <Th key={column.key} className="print:hidden">
+                  <span className="sr-only">Correct entry</span>
+                </Th>
+              ) : (
+                <Th
+                  key={column.key}
+                  align={column.align}
+                  onResize={resize(i)}
+                >
+                  {column.key === "room" ? unitWord : column.label}
+                </Th>
+              ),
+            )}
           </tr>
         </thead>
 
         <tbody>
-          {rooms.map((room) => (
-            <RoomRows
-              key={room.unitId}
-              room={room}
-              onEdit={onEdit}
-              canEdit={canEdit}
-              canManage={canManage}
-              adding={adding === room.unitId}
-              onAdd={() => setAdding(room.unitId)}
-              onDoneAdding={() => setAdding(null)}
-              factoryId={factoryId}
-              userId={userId}
-              date={date}
-              shift={shift}
-            />
-          ))}
+          {/* A room with entries gets a heading and its rows; a room without
+              keeps a line of its own rather than dropping off the sheet. */}
+          {rooms.map((room) =>
+            room.entries.length === 0 ? (
+              <IdleRow key={room.unitId} room={room} />
+            ) : (
+              <RoomBlock
+                key={room.unitId}
+                room={room}
+                onEdit={onEdit}
+                canEdit={canEdit}
+              />
+            ),
+          )}
         </tbody>
       </table>
     </div>
-  );
-}
-
-/**
- * One room's place on the sheet: its heading or its idle line, its entries,
- * and — while it is open — the row being typed into it.
- *
- * A room with entries and a room without were two different rows before this,
- * and the `+` has to sit on both: an entry missed in a room that logged
- * nothing is exactly the one worth catching.
- */
-function RoomRows({
-  room,
-  onEdit,
-  canEdit,
-  canManage,
-  adding,
-  onAdd,
-  onDoneAdding,
-  factoryId,
-  userId,
-  date,
-  shift,
-}: {
-  room: ShiftReportRoom;
-  onEdit: (entry: ShiftReportRow) => void;
-  canEdit: (entry: ShiftReportRow) => boolean;
-  canManage: boolean;
-  adding: boolean;
-  onAdd: () => void;
-  onDoneAdding: () => void;
-  factoryId: string;
-  userId: string;
-  date: string;
-  shift: RunningShift;
-}) {
-  return (
-    <>
-      {room.entries.length === 0 ? (
-        <IdleRow room={room} onAdd={onAdd} />
-      ) : (
-        <RoomBlock
-          room={room}
-          onEdit={onEdit}
-          canEdit={canEdit}
-          onAdd={onAdd}
-        />
-      )}
-      {adding && (
-        <NewEntryRow
-          factoryId={factoryId}
-          userId={userId}
-          date={date}
-          shift={shift}
-          unit={{ id: room.unitId, name: room.name }}
-          canManage={canManage}
-          onDone={onDoneAdding}
-        />
-      )}
-    </>
-  );
-}
-
-/**
- * Adds a row to this room. Quiet until the room is hovered, like the pencil
- * on an entry — a sheet of twenty rooms must not be twenty invitations to
- * type — but never hidden, because a control that only exists on hover cannot
- * be found on a tablet.
- */
-function AddButton({ room, onAdd }: { room: string; onAdd: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onAdd}
-      title={`Add an entry for ${room}`}
-      className="inline-flex h-6 items-center gap-1 rounded-md border border-line bg-surface px-1.5 text-[0.625rem] font-semibold text-ink-5 opacity-70 transition group-hover/room:opacity-100 hover:border-brand hover:bg-brand-tint hover:text-brand focus-visible:opacity-100 print:hidden"
-    >
-      <Plus className="size-3" aria-hidden />
-      Add entry
-    </button>
   );
 }
 
@@ -253,35 +156,28 @@ function AddButton({ room, onAdd }: { room: string; onAdd: () => void }) {
  * 7?", and the blank row is the answer. Its status comes from the pipeline
  * board: a room holding a batch is not the same as a room standing ready.
  */
-function IdleRow({
-  room,
-  onAdd,
-}: {
-  room: ShiftReportRoom;
-  onAdd: () => void;
-}) {
+function IdleRow({ room }: { room: ShiftReportRoom }) {
   const held = room.idleStatus === "HOLD";
   return (
-    /* Three cells, not one spanning cell.
+    /* One line across the sheet, starting where a busy room's band title
+       starts. Room is no longer the first column — the sheet opens on when —
+       so a name parked in the Room column sat behind an empty time band, in
+       the middle of the sheet, out of line with every other room's name.
 
-       It was a single `colSpan={17}` and that is what put the room name at the
-       left edge of the table while the ROOM heading sat 46px further in, over
-       the column it names — the complaint that read as "the columns do not line
-       up" was this row ignoring the columns entirely. The name now sits in the
-       Room column and the status in Status / stage, where their headings are;
-       only the message spans, because there is nothing to put under the other
-       fourteen headings.
-
-       Still not fourteen em-dashes: the dashes were fourteen separate
+       Still not a row of em-dashes: the dashes were so many separate
        invitations to look for a number, and there is none to find — the answer
        is the status, and it fits in a sentence. */
-    <tr className="group/room border-t border-line-soft bg-sunken-2/70 print:bg-surface">
+    <tr className="border-t border-line-soft bg-sunken-2/70 print:bg-surface">
       <td className="print:hidden" />
-      <Td className="text-[0.75rem] font-medium text-ink-4" title={room.name}>
-        {room.name}
-      </Td>
-      <td colSpan={15} className="px-3 py-2">
+      <td colSpan={SPAN - 1} className="px-3 py-2">
         <div className="flex flex-wrap items-center gap-2.5">
+          {/* A fixed width, so the statuses down the sheet line up. */}
+          <span
+            title={room.name}
+            className="w-[6.5rem] shrink-0 truncate text-[0.75rem] font-medium text-ink-4"
+          >
+            {room.name}
+          </span>
           <span
             className={cn(
               "rounded-full px-2 py-0.5 text-[0.625rem] font-bold tracking-[0.07em] uppercase ring-1",
@@ -295,7 +191,6 @@ function IdleRow({
           <span className="text-[0.6875rem] text-ink-5">
             Nothing logged this shift.
           </span>
-          <AddButton room={room.name} onAdd={onAdd} />
         </div>
       </td>
     </tr>
@@ -306,26 +201,23 @@ function RoomBlock({
   room,
   onEdit,
   canEdit,
-  onAdd,
 }: {
   room: ShiftReportRoom;
   onEdit: (entry: ShiftReportRow) => void;
   canEdit: (entry: ShiftReportRow) => boolean;
-  onAdd: () => void;
 }) {
   return (
     <>
-      {/* A titled band opening each room: its name and the way to add to it,
-          nothing else. The entry count and produced total used to sit beside
-          the name, and both are already on the sheet — the rows are right
-          underneath to be counted, and the summary strip above the table
-          carries the shift's produced total. Said twice, they were noise
-          between the reader and the rows. */}
-      <tr className="group/room border-t border-line bg-sunken-2 print:bg-sunken">
+      {/* A titled band opening each room: its name, nothing else. The entry
+          count and produced total used to sit beside the name, and both are
+          already on the sheet — the rows are right underneath to be counted,
+          and the summary strip above the table carries the shift's produced
+          total. Said twice, they were noise between the reader and the rows. */}
+      <tr className="border-t border-line bg-sunken-2 print:bg-sunken">
         {/* An empty cell for the edit column, so the band's title starts where
-            the Room column starts rather than at the table's edge. */}
+            the sheet's first column starts rather than at the table's edge. */}
         <td className="print:hidden" />
-        <td colSpan={16} className="px-3 py-2">
+        <td colSpan={SPAN - 1} className="px-3 py-2">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="flex items-center gap-2 text-[0.75rem] font-bold uppercase tracking-[0.07em] text-ink">
               <span
@@ -334,7 +226,6 @@ function RoomBlock({
               />
               {room.name}
             </span>
-            <AddButton room={room.name} onAdd={onAdd} />
           </div>
         </td>
       </tr>
@@ -427,6 +318,19 @@ function EntryRow({
         )}
       </Td>
 
+      {/* When, as the Log history shows it: the start, and the end after an
+          arrow, a shade lighter — the run time beside it is the figure; this
+          is when it happened. */}
+      <Td className="font-mono text-[0.6875rem] text-ink-3">
+        {entry.start_time ? clock(entry.start_time) : "—"}
+        {entry.end_time && (
+          <span className="text-ink-5"> → {clock(entry.end_time)}</span>
+        )}
+      </Td>
+      <Td align="right" className="font-mono">
+        {formatRunTime(entry.duration_minutes)}
+      </Td>
+
       {/* Named once per room — the band above carries it, and repeating it
           down every row of a nine-entry block is noise. Kept as a column all
           the same: it is what the CSV export and the printed sheet are read
@@ -450,16 +354,20 @@ function EntryRow({
         )}
       </Td>
 
-      <Td className="font-mono text-[0.6875rem]">{entry.equipment_no || "—"}</Td>
-      <Td align="right" className="font-mono">
-        {formatRunTime(entry.duration_minutes)}
+      <Td className="font-mono text-[0.6875rem]">
+        {entry.batch_no || "—"}
+      </Td>
+      <Td title={entry.product_name ?? ""}>
+        {entry.product_name ?? "—"}
+      </Td>
+      <Td className="font-mono text-[0.6875rem]">
+        {entry.product_code || "—"}
       </Td>
 
-      <Td title={entry.product_name ?? ""}>{entry.product_name ?? "—"}</Td>
-      <Td className="font-mono text-[0.6875rem]">{entry.product_code || "—"}</Td>
-      <Td className="font-mono text-[0.6875rem]">{entry.batch_no || "—"}</Td>
-
-      <Td align="right" className="font-mono font-semibold text-brand-deep">
+      <Td
+        align="right"
+        className="font-mono font-semibold text-brand-deep"
+      >
         {formatQty(entry.qty)}
         {/* A preparatory room hands over "3 drums", not "3". On a printed
             handover the bare number is the one thing nobody can go back and
@@ -471,10 +379,19 @@ function EntryRow({
         )}
       </Td>
       <Td align="right" className="font-mono">
-        {formatQty(entry.accumulative)}
+        {formatQty(entry.target_qty)}
+      </Td>
+      <Td
+        align="right"
+        className={cn(
+          "font-mono",
+          (entry.qty_rejected ?? 0) > 0 && "font-semibold text-danger-deep",
+        )}
+      >
+        {formatQty(entry.qty_rejected)}
       </Td>
       <Td align="right" className="font-mono">
-        {formatQty(entry.target_qty)}
+        {formatQty(entry.accumulative)}
       </Td>
 
       <Td>
@@ -503,26 +420,24 @@ function EntryRow({
         )}
       </Td>
 
-      <Td
-        align="right"
-        className={cn(
-          "font-mono",
-          (entry.qty_rejected ?? 0) > 0 && "font-semibold text-danger-deep",
-        )}
-      >
-        {formatQty(entry.qty_rejected)}
+      <Td align="right" className="font-mono">
+        {entry.target_speed || "—"}
       </Td>
-
-      <Td title={operators}>{operators || "—"}</Td>
-      <Td title={remark ?? ""}>{remark || "—"}</Td>
-
       <Td align="right" className="font-mono">
         {entry.actual_speed
           ? `${entry.actual_speed}${entry.speed_unit ? ` ${entry.speed_unit}` : ""}`
           : "—"}
       </Td>
-      <Td align="right" className="font-mono">
-        {entry.target_speed || "—"}
+
+      <Td className="font-mono text-[0.6875rem]">
+        {entry.equipment_no || "—"}
+      </Td>
+      <Td title={operators}>
+        {operators || "—"}
+      </Td>
+
+      <Td title={remark ?? ""}>
+        {remark || "—"}
       </Td>
     </tr>
   );
@@ -532,10 +447,13 @@ function Th({
   children,
   align = "left",
   className,
+  onResize,
 }: {
   children: React.ReactNode;
   align?: "left" | "right";
   className?: string;
+  /** Starts dragging this column's right edge; no handle without it. */
+  onResize?: (event: React.PointerEvent<HTMLElement>) => void;
 }) {
   return (
     <th
@@ -556,6 +474,12 @@ function Th({
       )}
     >
       {children}
+      {onResize && (
+        <ColumnResizeHandle
+          onPointerDown={onResize}
+          className="before:bg-white/15 hover:before:bg-white/80"
+        />
+      )}
     </th>
   );
 }

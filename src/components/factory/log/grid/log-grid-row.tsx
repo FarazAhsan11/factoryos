@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Popover } from "@base-ui/react/popover";
-import { Loader2, Plus, RotateCcw, Users, X } from "lucide-react";
-import { toast } from "sonner";
+import { Plus, RotateCcw, Users, X } from "lucide-react";
 
 import {
   ACTION_FLAGS,
@@ -43,29 +42,51 @@ import { OperatorPicker } from "@/components/factory/log/operator-picker";
 import { StageProgress } from "@/components/factory/log/stage-progress";
 import { TimeField } from "@/components/ui/date-picker";
 import { SelectField } from "@/components/ui/select-field";
-import { actionKeys } from "@/lib/factory/action-queries";
 import {
-  batchStageKeys,
   stageIsOverTolerance,
   stageName,
 } from "@/lib/factory/batch-stage-queries";
 import { findEquipment } from "@/lib/factory/equipment-queries";
-import { pipelineKeys } from "@/lib/factory/pipeline-queries";
 import {
-  createLogEntry,
   durationMinutes,
   fetchBatchEntries,
   formatMinutes,
-  logKeys,
-  type LogEntry,
 } from "@/lib/factory/shift-log-queries";
 import {
   resolveCurrentShift,
   resolveShiftForEntry,
-  todayKey,
   type RunningShift,
 } from "@/lib/factory/shift-time-queries";
 import { cn } from "@/lib/utils";
+
+/**
+ * What a line hands the grid so one Log all can file every line on the sheet.
+ *
+ * The grid holds the button and the line holds the form, so the grid asks
+ * each line rather than reaching into it: is there anything here, is it
+ * valid, has it been written.
+ */
+export interface GridRowHandle {
+  unitName: string;
+  /** The line's values while it holds unlogged work; null when it doesn't. */
+  draft: () => Partial<LogEntryValues> | null;
+  /**
+   * Runs the schema. Resolves to the parsed entry, or to null with the line's
+   * own errors now showing in its strip.
+   */
+  validate: () => Promise<LogEntryParsed | null>;
+  /** The product the typed batch resolved to — what the insert links. */
+  productId: () => string | null;
+  /**
+   * The entry is filed. The grid removes the line — the entry now shows above
+   * it, locked — and this stops the line being saved as a draft meanwhile.
+   */
+  logged: () => void;
+  /** The database refused it: say why on the line itself. */
+  failed: (message: string) => void;
+  /** The end clock as typed — where a line added under this one starts. */
+  endTime: () => string;
+}
 
 /**
  * Shift log → Grid → one room's line.
@@ -77,48 +98,59 @@ import { cn } from "@/lib/utils";
  * batch gate (0038), automatic stage resolution (0033), the stage tolerance
  * (0037), the pipeline card move and the action a flag raises.
  *
- * The prefill is the form's as well: the start clock opens on the running
- * shift, the shift is derived from the entry's own times, the product and the
- * target are worked out rather than typed, and after a save the row carries
- * the run forward — same activity, batch, machine and crew, starting where the
- * last entry ended — with the quantities cleared.
+ * A line exists because someone pressed + under its room, and it opens empty
+ * but for its start clock, which the grid sets to where the room's last entry
+ * ended (or leaves blank when the room has logged nothing today). The rest is
+ * the form's: the shift is derived from the entry's own times, and the product
+ * and the target are worked out rather than typed.
  *
  * A handful of fields only matter sometimes — which stage, when a batch runs
  * an activity twice; why a machine ran slow — and they have no column. They
  * appear in a strip under the row exactly when they are needed, together with
  * whatever the entry has earned being told.
+ *
+ * The line does not file itself. The grid's one Log all button does, asking
+ * every line through the `GridRowHandle` it registers here.
  */
 export function LogGridRow({
   factoryId,
-  userId,
+  rowId,
   canManage,
   unit,
   registers,
   primary,
-  first,
+  startAt,
+  restored,
   onRemove,
-  onLogged,
+  onRegister,
+  onPendingChange,
 }: {
   factoryId: string;
-  userId: string;
+  /** Unique on the sheet. */
+  rowId: string;
   /** Manager and up — only decides how wide the clocks open, as on the form. */
   canManage: boolean;
   /** The room this line belongs to. Fixed: the row was drawn for it. */
   unit: { id: string; name: string };
   registers: LogRegisters;
   /**
-   * The room's own line, as opposed to one added with "Add row". Names the
-   * room in full; an added line is marked as a second line and can be removed.
+   * The room's first open line. Names the room in full; a further line is
+   * marked as a second one, so two lines for one room read as such.
    */
   primary: boolean;
-  /** Opens its room's block on the sheet, so it carries the room divider. */
-  first: boolean;
-  onRemove?: () => void;
-  /** Hands the filed entry to the grid, which shows it above this line. */
-  onLogged: (entry: LogEntry) => void;
+  /** Where the start clock opens, "HH:MM" — or "" for blank. */
+  startAt: string;
+  /** What this line held before the page reloaded, if it held anything. */
+  restored?: Partial<LogEntryValues>;
+  onRemove: () => void;
+  /** Hands the grid this line's handle on mount, and null on unmount. */
+  onRegister: (rowId: string, handle: GridRowHandle | null) => void;
+  /** Whether the line holds typed work that Log all would file. */
+  onPendingChange: (rowId: string, pending: boolean) => void;
 }) {
-  const queryClient = useQueryClient();
   const [operatorsOpen, setOperatorsOpen] = useState(false);
+  /** The database's refusal from the last Log all, until the next one. */
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const {
     processes,
     processGroups,
@@ -140,7 +172,7 @@ export function LogGridRow({
     setValue,
     getValues,
     reset,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<LogEntryValues, unknown, LogEntryParsed>({
     resolver: zodResolver(logEntrySchema),
     defaultValues: {
@@ -148,7 +180,7 @@ export function LogGridRow({
       unitId: unit.id,
       processId: "",
       shift: "morning",
-      startTime: "",
+      startTime: startAt,
       endTime: "",
       speedType: "RPM",
       speedRate: "hr",
@@ -165,6 +197,22 @@ export function LogGridRow({
     append: addOperator,
     remove: removeOperator,
   } = useFieldArray({ control, name: "operators" });
+
+  /**
+   * Put back what this line held before a reload, once, before paint — the
+   * form's draft restore, line by line. `keepDefaultValues` so Clear still
+   * returns it to a blank line rather than to the restore.
+   */
+  const restoreDone = useRef(false);
+  useLayoutEffect(() => {
+    if (restoreDone.current) return;
+    restoreDone.current = true;
+    if (!restored) return;
+    reset(
+      { ...getValues(), ...restored, factoryId, unitId: unit.id },
+      { keepDefaultValues: true },
+    );
+  }, [restored, reset, getValues, factoryId, unit.id]);
 
   const [
     processId,
@@ -224,17 +272,6 @@ export function LogGridRow({
   const isPreparatory = category === "preparatory";
   const isProduction = category === "production";
 
-  // Open the start clock on the running shift, once — the same courtesy the
-  // form pays. Strictly once, so a refetch can't overwrite what was typed.
-  const startPrefilled = useRef(false);
-  useEffect(() => {
-    if (!shiftTimes || startPrefilled.current) return;
-    startPrefilled.current = true;
-    if (!getValues("startTime")) {
-      setValue("startTime", shiftTimes[resolveCurrentShift(shiftTimes)].startTime);
-    }
-  }, [shiftTimes, setValue, getValues]);
-
   /* ── What the batch decides ─────────────────────────────────────────── */
 
   const product = useMemo(() => {
@@ -270,12 +307,22 @@ export function LogGridRow({
     return stageChoices.find((s) => s.id === batchStageId) ?? null;
   }, [stageChoices, batchStageId]);
 
-  // Clear a stage picked under a different activity — the guard would refuse it.
+  // Clear a stage picked under a different activity — the guard would refuse
+  // it. Not while the registers are still arriving: a stage restored after a
+  // reload has no choices to match until they do, and would be wiped unseen.
   useEffect(() => {
+    if (productsPending || jobsPending || stagesPending) return;
     if (batchStageId && !stageChoices.some((s) => s.id === batchStageId)) {
       setValue("batchStageId", "");
     }
-  }, [stageChoices, batchStageId, setValue]);
+  }, [
+    stageChoices,
+    batchStageId,
+    setValue,
+    productsPending,
+    jobsPending,
+    stagesPending,
+  ]);
 
   /**
    * Why the database will refuse this entry, when it will — the four rules of
@@ -452,83 +499,59 @@ export function LogGridRow({
    */
   const touched = Boolean(processId) || Boolean((batchNo ?? "").trim());
 
-  /* ── The write ──────────────────────────────────────────────────────── */
+  /**
+   * What Log all files and the draft keeps: a line with an activity or a batch
+   * in it. A filed line is removed rather than kept, and a line only ever
+   * opens blank (but for its start clock), so anything in those two cells was
+   * put there by someone — or restored from what they put there.
+   */
+  const pending = touched;
+  /** `pending`, for the handle — which the grid calls outside render. */
+  const pendingRef = useRef(false);
+  useEffect(() => {
+    pendingRef.current = pending;
+    onPendingChange(rowId, pending);
+    return () => onPendingChange(rowId, false);
+  }, [rowId, pending, onPendingChange]);
 
-  const submit = useMutation({
-    // The working day is read at submit time, not when the grid opened — a
-    // grid left open across midnight must not file under yesterday.
-    mutationFn: (values: LogEntryParsed) =>
-      createLogEntry(values, userId, todayKey(), product?.id ?? null),
-    onSuccess: async (entry) => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: logKeys.factory(factoryId) }),
-        queryClient.invalidateQueries({
-          queryKey: ["shift_log_batch", factoryId],
-        }),
-        // The same triggers the form invalidates for: an entry can move a
-        // pipeline card, raise an action, and change a stage's total.
-        queryClient.invalidateQueries({
-          queryKey: pipelineKeys.all(factoryId),
-        }),
-        queryClient.invalidateQueries({ queryKey: actionKeys.all(factoryId) }),
-        queryClient.invalidateQueries({
-          queryKey: batchStageKeys.all(factoryId),
-        }),
-        // And the shift report, one tab away, is a sheet of exactly these rows.
-        queryClient.invalidateQueries({
-          queryKey: ["shift_report", factoryId],
-        }),
-      ]);
-      toast.success(
-        `Logged — ${entry.unit?.name ?? unit.name} · ${entry.process?.name ?? ""}` +
-          (entry.duration_minutes
-            ? ` · ${formatMinutes(entry.duration_minutes)}`
-            : ""),
-      );
-      onLogged(entry);
+  /* ── The write — made by the grid ───────────────────────────────────── */
 
-      /* ── The row stays, carrying the run forward ─────────────────────
-         Identical to the form's rule, because it is the same run of entries:
-         what is still true of the next hour carries over, what described the
-         hour just filed is cleared.
+  const productId = product?.id ?? null;
+  const unitName = unit.name;
+  useEffect(() => {
+    onRegister(rowId, {
+      unitName,
+      // Read from the ref, not `pending`: the grid saves the draft straight
+      // after a Log all, before this line has re-rendered to say it is clean.
+      draft: () => (pendingRef.current ? getValues() : null),
+      validate: () =>
+        new Promise((resolve) => {
+          setSubmitError(null);
+          void handleSubmit(
+            (values) => resolve(values),
+            () => resolve(null),
+          )();
+        }),
+      productId: () => productId,
+      logged: () => {
+        pendingRef.current = false;
+      },
+      failed: setSubmitError,
+      endTime: () => getValues("endTime") ?? "",
+    });
+    return () => onRegister(rowId, null);
+  }, [rowId, unitName, productId, onRegister, getValues, handleSubmit]);
 
-         Cleared fields are named with `null` rather than left out. Omitting a
-         key does NOT clear a registered input — `reset` re-registers every
-         field and one with no value *reads the DOM into form state*, so the
-         old quantity would come straight back as the new one. */
-      const keep = getValues();
-      reset({
-        factoryId,
-        unitId: unit.id,
-        processId: keep.processId,
-        category: keep.category,
-        hasMachine: keep.hasMachine,
-        shift: keep.shift,
-        // The next entry starts where this one ended.
-        startTime: keep.endTime,
-        endTime: "",
-        batchNo: keep.batchNo,
-        batchStageId: keep.batchStageId,
-        equipmentNo: keep.equipmentNo,
-        qtyUnit: keep.qtyUnit,
-        speedType: keep.speedType,
-        speedRate: keep.speedRate,
-        targetSpeed: keep.targetSpeed,
-        operators: keep.operators,
-        targetQty: null,
-        qty: null,
-        qtyRejected: null,
-        actualSpeed: null,
-        comment: "",
-        actionFlag: "",
-        slowReason: "",
-      });
-    },
-    onError: (e: Error) => toast.error(`${unit.name}: ${e.message}`),
-  });
-
-  /** Back to an untouched line, the start clock on the running shift again. */
+  /**
+   * Back to how the line opened: blank, its start clock where it started.
+   *
+   * Cleared fields are named with `null` rather than left out. Omitting a key
+   * does NOT clear a registered input — `reset` re-registers every field and
+   * one with no value *reads the DOM into form state*, so the old quantity
+   * would come straight back.
+   */
   function clear() {
+    setSubmitError(null);
     reset({
       factoryId,
       unitId: unit.id,
@@ -536,9 +559,7 @@ export function LogGridRow({
       category: "production",
       hasMachine: false,
       shift: shiftTimes ? resolveCurrentShift(shiftTimes) : "morning",
-      startTime: shiftTimes
-        ? shiftTimes[resolveCurrentShift(shiftTimes)].startTime
-        : "",
+      startTime: startAt,
       endTime: "",
       batchNo: "",
       batchStageId: "",
@@ -558,26 +579,6 @@ export function LogGridRow({
     });
   }
 
-  function save() {
-    void handleSubmit(
-      // `.catch`, because the rejection is one `onError` has already reported;
-      // left uncaught it resurfaces as an unhandled rejection.
-      (values) => submit.mutateAsync(values).catch(() => {}),
-      // A silent no-op is the worst failure a row can have — say which field.
-      (errs) => {
-        const hit = Object.entries(errs)
-          .map(([field, error]) => ({ field, message: firstMessage(error) }))
-          .find((p) => p.message);
-        const label = hit ? FIELD_LABELS[hit.field] : undefined;
-        toast.error(
-          hit
-            ? `${unit.name} — ${label ? `${label}: ` : ""}${hit.message}`
-            : `${unit.name} — some details are missing.`,
-        );
-      },
-    )();
-  }
-
   /** Everything the schema is still waiting for, one line per field. */
   const problems = Object.entries(errors)
     .map(([field, error]) => ({
@@ -589,22 +590,8 @@ export function LogGridRow({
 
   const showStrip =
     problems.length > 0 ||
+    Boolean(submitError) ||
     (touched && (Boolean(batchBlock) || mustPickStage || isSlow || showStage));
-
-  /**
-   * Enter in a typed cell logs the row — the spreadsheet habit, and what makes
-   * a round of the floor a matter of typing rather than aiming at buttons.
-   * Only from this row's own inputs: a combobox's search box is portalled out
-   * of the row, and Enter there is choosing an option.
-   */
-  function onKeyDown(event: React.KeyboardEvent<HTMLTableRowElement>) {
-    if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
-    const target = event.target as HTMLElement;
-    if (target.tagName !== "INPUT") return;
-    if (!event.currentTarget.contains(target)) return;
-    event.preventDefault();
-    save();
-  }
 
   const speedUnitValue = composeSpeedUnit(
     speedType || "RPM",
@@ -613,25 +600,68 @@ export function LogGridRow({
 
   return (
     <>
-      <tr
-        onKeyDown={onKeyDown}
-        className={cn(
-          // Borders on the cells, not the row: the sheet is `border-separate`
-          // so its sticky header keeps its line, and a row's own border is not
-          // drawn in that mode.
-          "bg-surface [&>td]:border-t",
-          first && "[&>td]:border-t-line-strong",
-        )}
-      >
-        {/* Room. Fixed — the row was drawn for it. */}
+      {/* Borders on the cells, not the row: the sheet is `border-separate`
+          so its sticky header keeps its line, and a row's own border is not
+          drawn in that mode. */}
+      <tr className="bg-surface [&>td]:border-t">
+        {/* When — both clocks in one column, as the Log history shows them.
+            It opens the row, so it carries the row's spine: brand on a room's
+            own line, paler on a line added to it. A border rather than an
+            inset shadow, which the pickers' hover fill would paint over. */}
         <Cell
           className={cn(
-            primary
-              ? "shadow-[inset_3px_0_0_0_var(--color-brand)]"
-              : "shadow-[inset_3px_0_0_0_var(--color-brand-line)]",
+            "border-l-3",
+            primary ? "border-l-brand" : "border-l-brand-line",
           )}
-          title={unit.name}
         >
+          <span className="flex h-10 items-center">
+            <Controller
+              name="startTime"
+              control={control}
+              render={({ field }) => (
+                <TimeField
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                  ariaLabel={`Activity start — ${unit.name}`}
+                  ariaInvalid={Boolean(errors.startTime)}
+                  from={clockWindow?.from}
+                  to={clockWindow?.to}
+                  windowNote={clockWindow?.note}
+                  className={cn(PICKER, "min-w-0 flex-1 px-2.5")}
+                />
+              )}
+            />
+            <span aria-hidden className="shrink-0 text-[0.75rem] text-ink-5">
+              →
+            </span>
+            <Controller
+              name="endTime"
+              control={control}
+              render={({ field }) => (
+                <TimeField
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                  ariaLabel={`Activity end — ${unit.name}`}
+                  ariaInvalid={Boolean(errors.endTime)}
+                  from={clockWindow?.from}
+                  to={clockWindow?.to}
+                  windowNote={clockWindow?.note}
+                  className={cn(PICKER, "min-w-0 flex-1 px-2.5")}
+                />
+              )}
+            />
+          </span>
+        </Cell>
+
+        {/* Run time — derived from the two clocks, never typed. */}
+        <Cell>
+          <Static className="justify-end font-mono font-semibold text-brand">
+            {duration ? formatMinutes(duration) : "—"}
+          </Static>
+        </Cell>
+
+        {/* Room. Fixed — the row was drawn for it. */}
+        <Cell title={unit.name}>
           <span className="flex h-10 items-center gap-1.5 pr-1.5 pl-3.5">
             <span
               className={cn(
@@ -641,12 +671,12 @@ export function LogGridRow({
             >
               {primary ? unit.name : `+ ${unit.name}`}
             </span>
-            {!primary && onRemove && (
+            {onRemove && (
               <button
                 type="button"
                 onClick={onRemove}
                 title="Remove this row"
-                aria-label={`Remove this extra row for ${unit.name}`}
+                aria-label={`Remove this row for ${unit.name}`}
                 className="grid size-6 shrink-0 place-items-center rounded-md text-ink-5 transition hover:bg-danger-soft hover:text-danger-deep"
               >
                 <X className="size-3.5" />
@@ -716,50 +746,6 @@ export function LogGridRow({
           )}
         </Cell>
 
-        <Cell>
-          <Controller
-            name="startTime"
-            control={control}
-            render={({ field }) => (
-              <TimeField
-                value={field.value ?? ""}
-                onChange={field.onChange}
-                ariaLabel={`Activity start — ${unit.name}`}
-                ariaInvalid={Boolean(errors.startTime)}
-                from={clockWindow?.from}
-                to={clockWindow?.to}
-                windowNote={clockWindow?.note}
-                className={PICKER}
-              />
-            )}
-          />
-        </Cell>
-        <Cell>
-          <Controller
-            name="endTime"
-            control={control}
-            render={({ field }) => (
-              <TimeField
-                value={field.value ?? ""}
-                onChange={field.onChange}
-                ariaLabel={`Activity end — ${unit.name}`}
-                ariaInvalid={Boolean(errors.endTime)}
-                from={clockWindow?.from}
-                to={clockWindow?.to}
-                windowNote={clockWindow?.note}
-                className={PICKER}
-              />
-            )}
-          />
-        </Cell>
-
-        {/* Run time — derived from the two clocks, never typed. */}
-        <Cell>
-          <Static className="justify-end font-mono font-semibold text-brand">
-            {duration ? formatMinutes(duration) : "—"}
-          </Static>
-        </Cell>
-
         <Cell
           title={
             product && !isDowntime
@@ -811,6 +797,24 @@ export function LogGridRow({
           )}
         </Cell>
 
+        {/* Target speed × run time — arithmetic, not an opinion. */}
+        <Cell>
+          {isProduction ? (
+            <Static
+              className="justify-end font-mono"
+              title={
+                derivedTarget === null
+                  ? "Worked out from a per-minute or per-hour target speed and the run time"
+                  : undefined
+              }
+            >
+              {derivedTarget !== null ? derivedTarget.toLocaleString() : "—"}
+            </Static>
+          ) : (
+            <Blank />
+          )}
+        </Cell>
+
         <Cell>
           {isProduction ? (
             <input
@@ -828,19 +832,74 @@ export function LogGridRow({
           )}
         </Cell>
 
-        {/* Target speed × run time — arithmetic, not an opinion. */}
+        {/* Speed and equipment — machine activities only, as on the form. */}
         <Cell>
-          {isProduction ? (
-            <Static
-              className="justify-end font-mono"
-              title={
-                derivedTarget === null
-                  ? "Worked out from a per-minute or per-hour target speed and the run time"
-                  : undefined
-              }
-            >
-              {derivedTarget !== null ? derivedTarget.toLocaleString() : "—"}
-            </Static>
+          {hasMachine ? (
+            <SelectField
+              ariaLabel={`Speed unit — ${unit.name}`}
+              value={speedUnitValue}
+              onChange={(next) => {
+                const { type, rate } = decomposeSpeedUnit(next);
+                setValue("speedType", type, { shouldDirty: true });
+                setValue("speedRate", rate, { shouldDirty: true });
+              }}
+              options={SPEED_UNIT_OPTIONS}
+              className={PICKER}
+            />
+          ) : (
+            <Blank />
+          )}
+        </Cell>
+        <Cell>
+          {hasMachine ? (
+            <input
+              type="number"
+              step="any"
+              min={0}
+              {...register("targetSpeed", { valueAsNumber: true })}
+              placeholder="1200"
+              aria-label={`Target speed — ${unit.name}`}
+              aria-invalid={Boolean(errors.targetSpeed) || undefined}
+              className={cn(INPUT, "text-right font-mono")}
+            />
+          ) : (
+            <Blank />
+          )}
+        </Cell>
+        <Cell>
+          {hasMachine ? (
+            <input
+              type="number"
+              step="any"
+              min={0}
+              {...register("actualSpeed", { valueAsNumber: true })}
+              placeholder="980"
+              aria-label={`Actual speed — ${unit.name}`}
+              aria-invalid={Boolean(errors.actualSpeed) || undefined}
+              className={cn(INPUT, "text-right font-mono")}
+            />
+          ) : (
+            <Blank />
+          )}
+        </Cell>
+
+        <Cell
+          title={equipment ? equipment.name : undefined}
+        >
+          {hasMachine ? (
+            <input
+              {...register("equipmentNo")}
+              placeholder="EQ383"
+              autoComplete="off"
+              aria-label={`Equipment number — ${unit.name}`}
+              aria-invalid={Boolean(errors.equipmentNo) || undefined}
+              className={cn(
+                INPUT,
+                "font-mono",
+                equipment && RESOLVED,
+                (equipmentNo ?? "").trim() && !equipment && WARN,
+              )}
+            />
           ) : (
             <Blank />
           )}
@@ -939,76 +998,6 @@ export function LogGridRow({
           )}
         </Cell>
 
-        {/* Equipment and speed — machine activities only, as on the form. */}
-        <Cell title={equipment ? equipment.name : undefined}>
-          {hasMachine ? (
-            <input
-              {...register("equipmentNo")}
-              placeholder="EQ383"
-              autoComplete="off"
-              aria-label={`Equipment number — ${unit.name}`}
-              aria-invalid={Boolean(errors.equipmentNo) || undefined}
-              className={cn(
-                INPUT,
-                "font-mono",
-                equipment && RESOLVED,
-                (equipmentNo ?? "").trim() && !equipment && WARN,
-              )}
-            />
-          ) : (
-            <Blank />
-          )}
-        </Cell>
-        <Cell>
-          {hasMachine ? (
-            <SelectField
-              ariaLabel={`Speed unit — ${unit.name}`}
-              value={speedUnitValue}
-              onChange={(next) => {
-                const { type, rate } = decomposeSpeedUnit(next);
-                setValue("speedType", type, { shouldDirty: true });
-                setValue("speedRate", rate, { shouldDirty: true });
-              }}
-              options={SPEED_UNIT_OPTIONS}
-              className={PICKER}
-            />
-          ) : (
-            <Blank />
-          )}
-        </Cell>
-        <Cell>
-          {hasMachine ? (
-            <input
-              type="number"
-              step="any"
-              min={0}
-              {...register("targetSpeed", { valueAsNumber: true })}
-              placeholder="1200"
-              aria-label={`Target speed — ${unit.name}`}
-              aria-invalid={Boolean(errors.targetSpeed) || undefined}
-              className={cn(INPUT, "text-right font-mono")}
-            />
-          ) : (
-            <Blank />
-          )}
-        </Cell>
-        <Cell>
-          {hasMachine ? (
-            <input
-              type="number"
-              step="any"
-              min={0}
-              {...register("actualSpeed", { valueAsNumber: true })}
-              placeholder="980"
-              aria-label={`Actual speed — ${unit.name}`}
-              aria-invalid={Boolean(errors.actualSpeed) || undefined}
-              className={cn(INPUT, "text-right font-mono")}
-            />
-          ) : (
-            <Blank />
-          )}
-        </Cell>
-
         {/* The flag raises an issue, so it cannot be the one field the grid
             quietly drops. Downtime raises none — as on the form. */}
         <Cell>
@@ -1049,8 +1038,20 @@ export function LogGridRow({
           />
         </Cell>
 
+        {/* What is left to do, said on the line itself: a line typed into
+            and not yet filed is marked until Log all files it, so a sheet
+            half-way through a round of the floor shows which half. */}
         <Cell>
-          <span className="flex h-10 items-center justify-end gap-1 px-2">
+          <span className="flex h-10 items-center justify-end gap-1.5 px-2">
+            {pending && (
+              <span
+                title="Typed but not logged yet — Log all at the bottom files it"
+                className="inline-flex items-center gap-1 text-[0.625rem] font-bold tracking-[0.05em] whitespace-nowrap text-warn-deep uppercase"
+              >
+                <span aria-hidden className="size-1.5 rounded-full bg-warn" />
+                Not logged
+              </span>
+            )}
             {touched && (
               <button
                 type="button"
@@ -1062,15 +1063,6 @@ export function LogGridRow({
                 <RotateCcw className="size-3.5" />
               </button>
             )}
-            <button
-              type="button"
-              onClick={save}
-              disabled={isSubmitting}
-              className="inline-flex h-7 items-center gap-1.5 rounded-lg bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-3 text-[0.75rem] font-semibold text-white shadow-brand transition hover:brightness-[1.06] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-70"
-            >
-              {isSubmitting && <Loader2 className="size-3 animate-spin" />}
-              {isSubmitting ? "Logging…" : "Log"}
-            </button>
           </span>
         </Cell>
       </tr>
@@ -1156,6 +1148,13 @@ export function LogGridRow({
                 <div className="max-w-md">
                   <StageProgress stage={activeStage} pending={thisQty} />
                 </div>
+              )}
+
+              {submitError && (
+                <Note tone="danger">
+                  <strong className="font-semibold">Not logged: </strong>
+                  {submitError}
+                </Note>
               )}
 
               {problems.map((problem) => (

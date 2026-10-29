@@ -9,30 +9,30 @@ import { cn } from "@/lib/utils";
  */
 
 export type GridColumnKey =
+  | "time"
+  | "hrs"
   | "room"
   | "activity"
   | "batch"
   | "product"
-  | "start"
-  | "end"
-  | "hrs"
   | "qty"
   | "unit"
-  | "rejected"
   | "target"
-  | "operators"
-  | "equipment"
+  | "rejected"
   | "speedUnit"
   | "targetSpeed"
   | "actualSpeed"
+  | "equipment"
+  | "operators"
   | "flag"
   | "comment"
   | "actions";
 
 /**
- * Left to right in the order an entry is thought through: where, what, which
- * batch, when, how much, who — then the machine detail and the notes that only
- * some activities have. Pixel widths sized to what each column holds; the grid
+ * Left to right in the Log history's order, so the sheet an entry is typed
+ * into and the table it is later read back from put every field in the same
+ * place: when, then where and what, then how much, then how fast, then who,
+ * then what was said. Pixel widths sized to what each column holds; the grid
  * is wider than a laptop and scrolls sideways as one sheet — no column is
  * pinned.
  */
@@ -42,22 +42,23 @@ export const GRID_COLUMNS: {
   width: number;
   align?: "right";
 }[] = [
+  // Both clocks in one column, as the Log history shows them — two pickers
+  // with an arrow between, wide enough for both.
+  { key: "time", label: "Start → End", width: 248 },
+  { key: "hrs", label: "Hrs", width: 88, align: "right" },
   { key: "room", label: "Room", width: 140 },
   { key: "activity", label: "Activity / stage", width: 188 },
   { key: "batch", label: "Batch #", width: 116 },
   { key: "product", label: "Product", width: 170 },
-  { key: "start", label: "Start", width: 132 },
-  { key: "end", label: "End", width: 132 },
-  { key: "hrs", label: "Hrs", width: 88, align: "right" },
   { key: "qty", label: "Qty", width: 104, align: "right" },
   { key: "unit", label: "Unit", width: 112 },
+  { key: "target", label: "Shift target", width: 112, align: "right" },
   { key: "rejected", label: "Rejected", width: 96, align: "right" },
-  { key: "target", label: "Target qty", width: 104, align: "right" },
-  { key: "operators", label: "Operators", width: 172 },
-  { key: "equipment", label: "EQ no.", width: 100 },
   { key: "speedUnit", label: "Speed unit", width: 150 },
   { key: "targetSpeed", label: "Target speed", width: 104, align: "right" },
   { key: "actualSpeed", label: "Actual speed", width: 104, align: "right" },
+  { key: "equipment", label: "EQ no.", width: 100 },
+  { key: "operators", label: "Operators", width: 172 },
   { key: "flag", label: "Flag", width: 168 },
   { key: "comment", label: "Comment", width: 220 },
   { key: "actions", label: "", width: 132 },

@@ -1,6 +1,5 @@
 "use client";
 
-import { useForm } from "react-hook-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, ShieldAlert } from "lucide-react";
@@ -18,8 +17,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { pipelineKeys } from "@/lib/factory/pipeline-queries";
+import { amendmentKeys } from "@/lib/factory/shift-log-amendments";
 import { amendLogEntry, logKeys } from "@/lib/factory/shift-log-queries";
 import { logTableKeys } from "@/lib/factory/shift-log-table-queries";
+import { useForm } from "@/lib/use-form";
 import { cn } from "@/lib/utils";
 
 /** The entry being amended — only what the dialog has to show or send. */
@@ -83,6 +84,9 @@ export function AmendEntryDialog({
         queryClient.invalidateQueries({ queryKey: logKeys.factory(factoryId) }),
         queryClient.invalidateQueries({
           queryKey: pipelineKeys.all(factoryId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: amendmentKeys.all(factoryId),
         }),
       ]);
       toast.success("Amendment recorded — the original entry is unchanged.");

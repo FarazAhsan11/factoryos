@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Controller, useForm } from "react-hook-form";
+import { Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Check,
@@ -42,6 +42,7 @@ import {
   workerValues,
   type Worker,
 } from "@/lib/factory/worker-queries";
+import { useForm } from "@/lib/use-form";
 import { cn } from "@/lib/utils";
 
 const LABEL = "text-xs font-medium text-ink-3";

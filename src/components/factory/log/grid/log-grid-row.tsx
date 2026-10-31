@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Controller, useFieldArray, useWatch } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Popover } from "@base-ui/react/popover";
@@ -57,6 +57,7 @@ import {
   resolveShiftForEntry,
   type RunningShift,
 } from "@/lib/factory/shift-time-queries";
+import { useForm } from "@/lib/use-form";
 import { cn } from "@/lib/utils";
 
 /**
@@ -122,6 +123,7 @@ export function LogGridRow({
   startAt,
   restored,
   onRemove,
+  onClear,
   onRegister,
   onPendingChange,
 }: {
@@ -143,6 +145,8 @@ export function LogGridRow({
   /** What this line held before the page reloaded, if it held anything. */
   restored?: Partial<LogEntryValues>;
   onRemove: () => void;
+  /** Swaps this line for a blank one in its place — see `clearRow`. */
+  onClear: () => void;
   /** Hands the grid this line's handle on mount, and null on unmount. */
   onRegister: (rowId: string, handle: GridRowHandle | null) => void;
   /** Whether the line holds typed work that Log all would file. */
@@ -171,13 +175,19 @@ export function LogGridRow({
     handleSubmit,
     setValue,
     getValues,
-    reset,
     formState: { errors },
   } = useForm<LogEntryValues, unknown, LogEntryParsed>({
     resolver: zodResolver(logEntrySchema),
+    /*
+     * What a line held before a reload goes in here, never through `reset`.
+     * The row must not call `reset` at all: it empties RHF's field map, and
+     * the compiler caches `register("batchNo")` for good, so the input never
+     * re-registers. It stays on screen blank, and anything typed into it is
+     * ignored while the form goes on holding — and filing — the old value.
+     * StrictMode's double-mount re-registers it, so `npm run dev` hides this
+     * on a reload; only a production build shows it.
+     */
     defaultValues: {
-      factoryId,
-      unitId: unit.id,
       processId: "",
       shift: "morning",
       startTime: startAt,
@@ -189,6 +199,9 @@ export function LogGridRow({
       // asks for everything, so no cell already filled disappears on selection.
       category: "production",
       hasMachine: false,
+      ...restored,
+      factoryId,
+      unitId: unit.id,
     },
   });
 
@@ -197,22 +210,6 @@ export function LogGridRow({
     append: addOperator,
     remove: removeOperator,
   } = useFieldArray({ control, name: "operators" });
-
-  /**
-   * Put back what this line held before a reload, once, before paint — the
-   * form's draft restore, line by line. `keepDefaultValues` so Clear still
-   * returns it to a blank line rather than to the restore.
-   */
-  const restoreDone = useRef(false);
-  useLayoutEffect(() => {
-    if (restoreDone.current) return;
-    restoreDone.current = true;
-    if (!restored) return;
-    reset(
-      { ...getValues(), ...restored, factoryId, unitId: unit.id },
-      { keepDefaultValues: true },
-    );
-  }, [restored, reset, getValues, factoryId, unit.id]);
 
   const [
     processId,
@@ -542,43 +539,6 @@ export function LogGridRow({
     return () => onRegister(rowId, null);
   }, [rowId, unitName, productId, onRegister, getValues, handleSubmit]);
 
-  /**
-   * Back to how the line opened: blank, its start clock where it started.
-   *
-   * Cleared fields are named with `null` rather than left out. Omitting a key
-   * does NOT clear a registered input — `reset` re-registers every field and
-   * one with no value *reads the DOM into form state*, so the old quantity
-   * would come straight back.
-   */
-  function clear() {
-    setSubmitError(null);
-    reset({
-      factoryId,
-      unitId: unit.id,
-      processId: "",
-      category: "production",
-      hasMachine: false,
-      shift: shiftTimes ? resolveCurrentShift(shiftTimes) : "morning",
-      startTime: startAt,
-      endTime: "",
-      batchNo: "",
-      batchStageId: "",
-      equipmentNo: "",
-      qtyUnit: "",
-      speedType: "RPM",
-      speedRate: "hr",
-      targetSpeed: null,
-      operators: [{ name: "" }],
-      targetQty: null,
-      qty: null,
-      qtyRejected: null,
-      actualSpeed: null,
-      comment: "",
-      actionFlag: "",
-      slowReason: "",
-    });
-  }
-
   /** Everything the schema is still waiting for, one line per field. */
   const problems = Object.entries(errors)
     .map(([field, error]) => ({
@@ -730,20 +690,16 @@ export function LogGridRow({
         {/* What the batch number resolved to — the form's auto-fill panel,
             landed in the column that names it. */}
         <Cell>
-          {product ? (
-            <Static
-              title={`${product.name}${product.code ? ` · ${product.code}` : ""}`}
-            >
-              {product.name}
-              {product.code && (
-                <span className="ml-1.5 font-mono text-[0.6875rem] text-ink-5">
-                  {product.code}
-                </span>
-              )}
-            </Static>
-          ) : (
-            <Static className="text-ink-6">—</Static>
-          )}
+          <Static title={product?.name} className={cn(!product && "text-ink-4")}>
+            {product?.name ?? "—"}
+          </Static>
+        </Cell>
+        <Cell>
+          <Static
+            className={cn("font-mono text-[0.75rem]", !product?.code && "text-ink-4")}
+          >
+            {product?.code || "—"}
+          </Static>
         </Cell>
 
         <Cell
@@ -790,8 +746,10 @@ export function LogGridRow({
                 />
               )}
             />
-          ) : isProduction && activeStage?.target_unit ? (
-            <Static>{activeStage.target_unit}</Static>
+          ) : isProduction ? (
+            // Shaded before the batch is typed too: it says this one fills
+            // itself in, where the hatching would say it never will.
+            <Static>{activeStage?.target_unit ?? "—"}</Static>
           ) : (
             <Blank />
           )}
@@ -1055,7 +1013,7 @@ export function LogGridRow({
             {touched && (
               <button
                 type="button"
-                onClick={clear}
+                onClick={onClear}
                 title="Clear this row"
                 aria-label={`Clear the row for ${unit.name}`}
                 className="grid size-7 shrink-0 place-items-center rounded-md text-ink-5 transition hover:bg-sunken hover:text-ink"

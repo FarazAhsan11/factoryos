@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
+import { Controller, useFieldArray, useWatch } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -84,6 +84,7 @@ import {
   logKeys,
   updateLogEntry,
 } from "@/lib/factory/shift-log-queries";
+import { amendmentKeys } from "@/lib/factory/shift-log-amendments";
 import { logTableKeys } from "@/lib/factory/shift-log-table-queries";
 import {
   formatReportDate,
@@ -96,6 +97,7 @@ import {
   shiftTimeKeys,
   type RunningShift,
 } from "@/lib/factory/shift-time-queries";
+import { useForm } from "@/lib/use-form";
 import { cn } from "@/lib/utils";
 
 /**
@@ -508,6 +510,9 @@ function EditEntryForm({
         }),
         queryClient.invalidateQueries({
           queryKey: ["shift_log_batch", factoryId],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: amendmentKeys.all(factoryId),
         }),
       ]);
       toast.success("Entry corrected — the change is recorded on the record.");

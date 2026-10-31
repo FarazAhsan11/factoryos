@@ -1,6 +1,6 @@
 "use client";
 
-import { Controller, useForm } from "react-hook-form";
+import { Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   useMutation,
@@ -28,6 +28,7 @@ import {
   weeklyOffKeys,
   type Holiday,
 } from "@/lib/factory/holiday-queries";
+import { useForm } from "@/lib/use-form";
 import { cn } from "@/lib/utils";
 
 const FIELD =

@@ -8,7 +8,7 @@ import {
   useState,
   type Ref,
 } from "react";
-import { Controller, useForm, useWatch } from "react-hook-form";
+import { Controller, useWatch } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -80,6 +80,7 @@ import {
   updateProduct,
   type Product,
 } from "@/lib/factory/product-queries";
+import { useForm } from "@/lib/use-form";
 import { cn } from "@/lib/utils";
 import { formatDay } from "@/lib/factory/dates";
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { Controller, useForm, useWatch } from "react-hook-form";
+import { Controller, useWatch } from "react-hook-form";
 import { useMutation } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
@@ -24,6 +24,7 @@ import {
   stageName,
   type BatchStage,
 } from "@/lib/factory/batch-stage-queries";
+import { useForm } from "@/lib/use-form";
 import { cn } from "@/lib/utils";
 
 function fmt(n: number | null | undefined) {

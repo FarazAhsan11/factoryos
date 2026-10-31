@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Controller, useForm, useWatch } from "react-hook-form";
+import { Controller, useWatch } from "react-hook-form";
 import {
   Check,
   CheckCheck,
@@ -42,6 +42,7 @@ import {
 } from "@/lib/factory/action-queries";
 import { WorkerSelect } from "@/components/factory/worker-select";
 import { useWorkers } from "@/lib/factory/worker-queries";
+import { useForm } from "@/lib/use-form";
 import { secondNow, useRenderClock } from "@/lib/use-render-clock";
 import { cn } from "@/lib/utils";
 

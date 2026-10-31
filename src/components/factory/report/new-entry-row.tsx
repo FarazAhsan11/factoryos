@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
+import { Controller, useFieldArray, useWatch } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Popover } from "@base-ui/react/popover";
@@ -61,6 +61,7 @@ import {
   shiftTimeKeys,
   type RunningShift,
 } from "@/lib/factory/shift-time-queries";
+import { useForm } from "@/lib/use-form";
 import { cn } from "@/lib/utils";
 
 /**

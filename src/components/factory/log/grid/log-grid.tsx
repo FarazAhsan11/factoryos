@@ -4,6 +4,7 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } f
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Check,
+  Eraser,
   Flag,
   History,
   Loader2,
@@ -31,6 +32,10 @@ import {
 import { ColumnResizeHandle } from "@/components/ui/column-resize-handle";
 import { actionKeys } from "@/lib/factory/action-queries";
 import { batchStageKeys } from "@/lib/factory/batch-stage-queries";
+import {
+  readClearedEntries,
+  writeClearedEntries,
+} from "@/lib/factory/log-grid-cleared";
 import {
   readGridDraft,
   writeGridDraft,
@@ -69,6 +74,10 @@ import { cn } from "@/lib/utils";
  * whichever view — the sheet is the floor's day so far, so it shows what has
  * been done as well as what is left. Corrections to those are made from the
  * activity feed or the shift report, as everywhere.
+ *
+ * **Clear history takes those entries off this sheet**, for whoever pressed it
+ * and for the day (`log-grid-cleared.ts`). Nothing is deleted: they stay in the
+ * activity feed, the shift report and Log history, and typed lines stay put.
  *
  * **A line is opened with + under its room**, as many as the room needs, its
  * start clock where the room's last entry ended. A filed line is removed: its
@@ -133,6 +142,24 @@ export function LogGrid({
     (rowId: string) => removeLines(new Set([rowId])),
     [removeLines],
   );
+
+  /**
+   * Back to how a line opened: the same place under its room, the same start
+   * clock, everything else blank. A new id remounts it as a new form, which is
+   * what clearing has to be — see the note on `reset` in `LogGridRow`.
+   */
+  const clearRow = useCallback((rowId: string) => {
+    const id = `line-${crypto.randomUUID()}`;
+    setLines((prev) => {
+      const next: Record<string, GridLine[]> = {};
+      for (const [unitId, list] of Object.entries(prev)) {
+        next[unitId] = list.map((line) =>
+          line.id === rowId ? { ...line, id } : line,
+        );
+      }
+      return next;
+    });
+  }, []);
 
   const setRowPending = useCallback((rowId: string, pending: boolean) => {
     setPendingIds((prev) => {
@@ -235,6 +262,31 @@ export function LogGrid({
     }
     return byUnit;
   }, [dayEntries]);
+
+  /**
+   * Today's entries cleared off this sheet — read once, like the draft above.
+   * What the rooms draw is `shownByUnit`; `loggedByUnit` stays the whole day,
+   * because a new line's start clock and "Nothing logged today" are facts about
+   * the room, and clearing the sheet doesn't change either.
+   */
+  const [clearedIds, setClearedIds] = useState<ReadonlySet<string>>(
+    () => new Set(readClearedEntries(factoryId, userId, todayKey())),
+  );
+  const shownByUnit = useMemo(() => {
+    const byUnit: Record<string, LogEntry[]> = {};
+    for (const [unitId, list] of Object.entries(loggedByUnit)) {
+      byUnit[unitId] = list.filter((entry) => !clearedIds.has(entry.id));
+    }
+    return byUnit;
+  }, [loggedByUnit, clearedIds]);
+  const hasHistory = dayEntries.some((entry) => !clearedIds.has(entry.id));
+
+  function clearHistory() {
+    const ids = dayEntries.map((entry) => entry.id);
+    setClearedIds(new Set(ids));
+    writeClearedEntries(factoryId, userId, { date, ids });
+    toast.success("History cleared from the grid — entries stay in Log history.");
+  }
 
   /**
    * Opens a line under a room, its start clock where the room's work last
@@ -453,6 +505,17 @@ export function LogGrid({
             <ShieldCheck className="size-3" />
             Audit-protected
           </span>
+          {hasHistory && (
+            <button
+              type="button"
+              onClick={clearHistory}
+              title="Hide today's logged entries from this grid. They stay in Log history."
+              className="inline-flex items-center gap-1 rounded-full border border-line bg-surface px-2.5 py-1 text-[0.625rem] font-semibold text-ink-4 transition hover:border-brand hover:bg-brand-tint hover:text-brand"
+            >
+              <Eraser className="size-3" aria-hidden />
+              Clear history
+            </button>
+          )}
         </div>
       </header>
 
@@ -540,10 +603,12 @@ export function LogGrid({
             canManage={canManage}
             registers={registers}
             loggedByUnit={loggedByUnit}
+            shownByUnit={shownByUnit}
             restoredRows={restored?.rows ?? NO_RESTORE}
             lines={lines}
             onAddRow={addLine}
             onRemoveRow={removeRow}
+            onClearRow={clearRow}
             onRegister={registerRow}
             onPendingChange={setRowPending}
           />
@@ -658,10 +723,12 @@ function RoomBlocks({
   canManage,
   registers,
   loggedByUnit,
+  shownByUnit,
   restoredRows,
   lines,
   onAddRow,
   onRemoveRow,
+  onClearRow,
   onRegister,
   onPendingChange,
 }: {
@@ -669,10 +736,12 @@ function RoomBlocks({
   canManage: boolean;
   registers: LogRegisters;
   loggedByUnit: Record<string, LogEntry[]>;
+  shownByUnit: Record<string, LogEntry[]>;
   restoredRows: GridDraft["rows"];
   lines: Record<string, GridLine[]>;
   onAddRow: (unitId: string) => void;
   onRemoveRow: (rowId: string) => void;
+  onClearRow: (rowId: string) => void;
   onRegister: (rowId: string, handle: GridRowHandle | null) => void;
   onPendingChange: (rowId: string, pending: boolean) => void;
 }) {
@@ -688,11 +757,13 @@ function RoomBlocks({
       // per render would re-render every room whenever any one of them logs.
       unit={unit}
       registers={registers}
-      logged={loggedByUnit[unit.id] ?? NO_ENTRIES}
+      logged={shownByUnit[unit.id] ?? NO_ENTRIES}
+      filedToday={Boolean(loggedByUnit[unit.id]?.length)}
       restoredRows={restoredRows}
       lines={lines[unit.id] ?? NO_LINES}
       onAddRow={onAddRow}
       onRemoveRow={onRemoveRow}
+      onClearRow={onClearRow}
       onRegister={onRegister}
       onPendingChange={onPendingChange}
     />
@@ -710,10 +781,12 @@ function RoomBlock({
   unit,
   registers,
   logged,
+  filedToday,
   restoredRows,
   lines,
   onAddRow,
   onRemoveRow,
+  onClearRow,
   onRegister,
   onPendingChange,
 }: {
@@ -721,15 +794,19 @@ function RoomBlock({
   canManage: boolean;
   unit: { id: string; name: string };
   registers: LogRegisters;
+  /** Today's entries still on the sheet. */
   logged: LogEntry[];
+  /** Whether the room filed anything today, cleared off the sheet or not. */
+  filedToday: boolean;
   restoredRows: GridDraft["rows"];
   lines: GridLine[];
   onAddRow: (unitId: string) => void;
   onRemoveRow: (rowId: string) => void;
+  onClearRow: (rowId: string) => void;
   onRegister: (rowId: string, handle: GridRowHandle | null) => void;
   onPendingChange: (rowId: string, pending: boolean) => void;
 }) {
-  /** Nothing logged and nothing open — said in the heading, not left blank. */
+  /** Nothing to show and nothing open — said in the heading, not left blank. */
   const empty = logged.length === 0 && lines.length === 0;
 
   return (
@@ -750,8 +827,10 @@ function RoomBlock({
               {unit.name}
             </span>
             {empty && (
+              // Never "Nothing logged" for a cleared room: it isn't true, and
+              // it reads as an invitation to log the same work twice.
               <span className="text-[0.6875rem] text-ink-5">
-                Nothing logged today.
+                {filedToday ? "History cleared." : "Nothing logged today."}
               </span>
             )}
           </div>
@@ -774,6 +853,7 @@ function RoomBlock({
           startAt={line.startAt}
           restored={restoredRows[line.id]}
           onRemove={() => onRemoveRow(line.id)}
+          onClear={() => onClearRow(line.id)}
           onRegister={onRegister}
           onPendingChange={onPendingChange}
         />
@@ -833,6 +913,7 @@ function LoggedRow({
     ),
     batch: <span className="font-mono">{entry.batch_no || "—"}</span>,
     product: entry.product?.name ?? "—",
+    code: <span className="font-mono">{entry.product?.code || "—"}</span>,
     time: (
       <span className="font-mono">
         {clock(entry.start_time)}

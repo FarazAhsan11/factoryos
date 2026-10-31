@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, type DefaultValues } from "react-hook-form";
+import { type DefaultValues } from "react-hook-form";
 import { FileWarning, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 
@@ -22,6 +22,7 @@ import {
 import { createDeviation } from "@/lib/factory/deviation-queries";
 import { pipelineKeys } from "@/lib/factory/pipeline-queries";
 import { fetchProducts, productKeys } from "@/lib/factory/product-queries";
+import { useForm } from "@/lib/use-form";
 
 // `type` is left unset on purpose: which kind of case this is decides its
 // number, and a pre-selected answer is one nobody gave.

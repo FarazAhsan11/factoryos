@@ -1,17 +1,17 @@
 "use client";
 
-import { Flag, PenLine } from "lucide-react";
+import { Flag, History, PenLine } from "lucide-react";
 
+import { formatMinutes } from "@/lib/factory/shift-log-queries";
 import {
   formatQty,
-  formatRunTime,
   progressPct,
   type ShiftReportRoom,
   type ShiftReportRow,
 } from "@/lib/factory/shift-report-queries";
 import {
   REPORT_COLUMNS,
-  REPORT_SPAN,
+  REPORT_GROUPS,
 } from "@/components/factory/report/report-columns";
 import { ColumnResizeHandle } from "@/components/ui/column-resize-handle";
 import { useColumnResize } from "@/lib/use-column-resize";
@@ -20,7 +20,26 @@ import { cn } from "@/lib/utils";
 const COLUMNS = REPORT_COLUMNS;
 const COLUMN_WIDTHS = COLUMNS.map((column) => column.width);
 const TABLE_WIDTH = COLUMN_WIDTHS.reduce((sum, w) => sum + w, 0);
-const SPAN = REPORT_SPAN;
+/** Every column but the row's controls, which always open the sheet. */
+const DATA_COLUMNS = COLUMNS.filter((column) => column.key !== "edit");
+/** Each group with how many columns its heading spans. */
+const GROUPS = REPORT_GROUPS.map((group) => ({
+  ...group,
+  span: COLUMNS.filter((column) => column.group === group.key).length,
+}));
+/** The columns that open a group, which is where the gap before a panel goes. */
+const GROUP_OPENERS = new Set(
+  REPORT_GROUPS.map(
+    (group) => COLUMNS.find((column) => column.group === group.key)?.key,
+  ),
+);
+/**
+ * The gap between two panels. A border the colour of the sheet rather than a
+ * rule, so a group ends in open space. On each cell, heading and body alike,
+ * which only lines up because the table's borders are separate: a collapsed
+ * border straddles the column edge, and scrolls away from a sticky heading.
+ */
+const PANEL_GAP = "border-l-[0.375rem] border-l-surface";
 
 /** "06:45:00" → "06:45". */
 function clock(value: string | null): string {
@@ -28,7 +47,8 @@ function clock(value: string | null): string {
 }
 
 /**
- * The report proper: every room, in room order, with what it ran this shift.
+ * The report proper: the rooms that logged something, in room order, with what
+ * each ran this shift.
  *
  * Not the prototype's columns as they were. Three of its columns showed
  * the same numbers twice — *Shift Total* and *Achieved* were both `qty`,
@@ -41,6 +61,7 @@ export function ShiftReportTable({
   rooms,
   unitWord,
   onEdit,
+  onHistory,
   canEdit,
 }: {
   rooms: ShiftReportRoom[];
@@ -51,6 +72,8 @@ export function ShiftReportTable({
    * already looking at rather than a page away in the entry feed.
    */
   onEdit: (entry: ShiftReportRow) => void;
+  /** Opens an amended entry's history. Anyone reading the sheet may. */
+  onHistory: (entry: ShiftReportRow) => void;
   /** Their own entry, or a manager's — the same rule RLS enforces on the write. */
   canEdit: (entry: ShiftReportRow) => boolean;
 }) {
@@ -87,7 +110,7 @@ export function ShiftReportTable({
           still wrap at spaces — "TARGET / SPEED" — but never inside a word. */}
       <table
         className={cn(
-          "table-fixed border-collapse text-[0.75rem]",
+          "table-fixed border-separate border-spacing-0 text-[0.75rem]",
           widths === null && "w-full",
         )}
         style={
@@ -103,22 +126,50 @@ export function ShiftReportTable({
         </colgroup>
 
         <thead>
-          {/* The colour is on the row, but the stickiness has to be on the
-              cells: `position: sticky` on a `<tr>` is ignored outside Firefox. */}
-          <tr className="text-white print:bg-surface print:text-black">
+          {/* The group titles. Stickiness has to be on the cells:
+              `position: sticky` on a `<tr>` is ignored outside Firefox. The
+              cell is the sheet's colour and the cap sits inside it, because a
+              rounded corner on the cell itself would round the gap instead. */}
+          <tr>
+            <td className="sticky top-0 z-10 h-8 bg-surface print:hidden" />
+            {GROUPS.map((group) => (
+              <th
+                key={group.key}
+                colSpan={group.span}
+                scope="colgroup"
+                className="sticky top-0 z-10 h-8 bg-surface pt-2 pl-1.5 text-left align-bottom print:static"
+              >
+                <span
+                  style={{ "--accent": group.accent } as React.CSSProperties}
+                  className="flex h-6 items-center rounded-t-lg bg-ink px-3 text-[0.5938rem] font-bold tracking-[0.1em] whitespace-nowrap text-(--accent) uppercase shadow-[inset_0_0.125rem_0_0_var(--accent)] print:bg-surface print:text-black print:shadow-none"
+                >
+                  {group.label}
+                </span>
+              </th>
+            ))}
+          </tr>
+          <tr>
+            {/* A cell here for every column, the controls' included:
+                `useColumnResize` reads this row's cells as the column list. */}
             {COLUMNS.map((column, i) =>
               column.key === "edit" ? (
                 /* The edit column is leftmost so it is reachable without
                    scrolling the sheet sideways, and it carries no heading: an
                    icon column labelled "Edit" spends a header on something
                    the icon already says. */
-                <Th key={column.key} className="print:hidden">
-                  <span className="sr-only">Correct entry</span>
-                </Th>
+                <th
+                  key={column.key}
+                  className="sticky top-8 z-10 bg-surface print:hidden"
+                >
+                  <span className="sr-only">
+                    Correct entry and amendment history
+                  </span>
+                </th>
               ) : (
                 <Th
                   key={column.key}
                   align={column.align}
+                  className={cn(GROUP_OPENERS.has(column.key) && PANEL_GAP)}
                   onResize={resize(i)}
                 >
                   {column.key === "room" ? unitWord : column.label}
@@ -129,106 +180,34 @@ export function ShiftReportTable({
         </thead>
 
         <tbody>
-          {/* A room with entries gets a heading and its rows; a room without
-              keeps a line of its own rather than dropping off the sheet. */}
-          {rooms.map((room) =>
-            room.entries.length === 0 ? (
-              <IdleRow key={room.unitId} room={room} />
-            ) : (
-              <RoomBlock
-                key={room.unitId}
-                room={room}
-                onEdit={onEdit}
-                canEdit={canEdit}
-              />
-            ),
-          )}
+          {rooms.map((room) => (
+            <RoomBlock
+              key={room.unitId}
+              room={room}
+              onEdit={onEdit}
+              onHistory={onHistory}
+              canEdit={canEdit}
+            />
+          ))}
         </tbody>
       </table>
     </div>
   );
 }
 
-/**
- * A room that logged nothing this shift — kept on the sheet, not dropped.
- *
- * A report listing only the busy rooms can't answer "was anything running in
- * 7?", and the blank row is the answer. Its status comes from the pipeline
- * board: a room holding a batch is not the same as a room standing ready.
- */
-function IdleRow({ room }: { room: ShiftReportRoom }) {
-  const held = room.idleStatus === "HOLD";
-  return (
-    /* One line across the sheet, starting where a busy room's band title
-       starts. Room is no longer the first column — the sheet opens on when —
-       so a name parked in the Room column sat behind an empty time band, in
-       the middle of the sheet, out of line with every other room's name.
-
-       Still not a row of em-dashes: the dashes were so many separate
-       invitations to look for a number, and there is none to find — the answer
-       is the status, and it fits in a sentence. */
-    <tr className="border-t border-line-soft bg-sunken-2/70 print:bg-surface">
-      <td className="print:hidden" />
-      <td colSpan={SPAN - 1} className="px-3 py-2">
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/* A fixed width, so the statuses down the sheet line up. */}
-          <span
-            title={room.name}
-            className="w-[6.5rem] shrink-0 truncate text-[0.75rem] font-medium text-ink-4"
-          >
-            {room.name}
-          </span>
-          <span
-            className={cn(
-              "rounded-full px-2 py-0.5 text-[0.625rem] font-bold tracking-[0.07em] uppercase ring-1",
-              held
-                ? "bg-warn-soft text-warn-deep ring-warn-line"
-                : "bg-sunken-2 text-ink-4 ring-line",
-            )}
-          >
-            {room.idleStatus}
-          </span>
-          <span className="text-[0.6875rem] text-ink-5">
-            Nothing logged this shift.
-          </span>
-        </div>
-      </td>
-    </tr>
-  );
-}
-
 function RoomBlock({
   room,
   onEdit,
+  onHistory,
   canEdit,
 }: {
   room: ShiftReportRoom;
   onEdit: (entry: ShiftReportRow) => void;
+  onHistory: (entry: ShiftReportRow) => void;
   canEdit: (entry: ShiftReportRow) => boolean;
 }) {
   return (
     <>
-      {/* A titled band opening each room: its name, nothing else. The entry
-          count and produced total used to sit beside the name, and both are
-          already on the sheet — the rows are right underneath to be counted,
-          and the summary strip above the table carries the shift's produced
-          total. Said twice, they were noise between the reader and the rows. */}
-      <tr className="border-t border-line bg-sunken-2 print:bg-sunken">
-        {/* An empty cell for the edit column, so the band's title starts where
-            the sheet's first column starts rather than at the table's edge. */}
-        <td className="print:hidden" />
-        <td colSpan={SPAN - 1} className="px-3 py-2">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="flex items-center gap-2 text-[0.75rem] font-bold uppercase tracking-[0.07em] text-ink">
-              <span
-                aria-hidden
-                className="h-3.5 w-1 rounded-full bg-brand print:hidden"
-              />
-              {room.name}
-            </span>
-          </div>
-        </td>
-      </tr>
       {room.entries.map((entry, i) => (
         <EntryRow
           key={entry.id}
@@ -236,6 +215,7 @@ function RoomBlock({
           first={i === 0}
           room={room}
           onEdit={onEdit}
+          onHistory={onHistory}
           canEdit={canEdit(entry)}
         />
       ))}
@@ -248,198 +228,247 @@ function EntryRow({
   first,
   room,
   onEdit,
+  onHistory,
   canEdit,
 }: {
   entry: ShiftReportRow;
   first: boolean;
   room: ShiftReportRoom;
   onEdit: (entry: ShiftReportRow) => void;
+  onHistory: (entry: ShiftReportRow) => void;
   canEdit: boolean;
 }) {
-  const pct = progressPct(entry);
   const operators = entry.operators?.filter(Boolean).join(", ");
-  // The comment is what someone chose to say; the slow reason is what the form
-  // made them pick. Show the comment when there is one, fall back to the
-  // reason — an empty cell where a run was flagged slow reads as nothing wrong.
-  const remark = entry.comment || entry.slow_reason;
+  // A preparatory room says what it counts in; a production stage counts in
+  // whatever its plan does. Nothing to count, nothing to count it in.
+  const unit =
+    entry.qty === null ? null : (entry.qty_unit ?? entry.stage_unit);
+
+  const cells: Record<string, ReportCell> = {
+    // On every row, not just a room's first: this column is what the CSV and
+    // the printed sheet are read by. Stronger on the first, so the rooms can
+    // be found running down the sheet without a band between them.
+    room: {
+      value: room.name,
+      title: room.name,
+      className: cn(
+        "text-[0.6875rem]",
+        first ? "font-semibold text-ink-2" : "text-ink-4",
+      ),
+    },
+    stage: {
+      value: (
+        <>
+          <span className="font-medium text-ink">
+            {entry.process_name ?? "—"}
+          </span>
+          {entry.action_flag && (
+            <span className="mt-0.5 flex items-center gap-1 text-[0.6562rem] font-bold uppercase tracking-wide text-danger-deep">
+              <Flag className="size-3 shrink-0" />
+              {entry.action_flag}
+            </span>
+          )}
+        </>
+      ),
+    },
+    // When, as the Log history shows it: the start, and the end after an
+    // arrow, a shade lighter — the duration beside it is the figure; this is
+    // when it happened.
+    time: {
+      value: (
+        <>
+          {entry.start_time ? clock(entry.start_time) : "—"}
+          {entry.end_time && (
+            <span className="text-ink-5"> → {clock(entry.end_time)}</span>
+          )}
+        </>
+      ),
+      className: "font-mono text-[0.6875rem] text-ink-3",
+    },
+    runTime: {
+      value: formatMinutes(entry.duration_minutes),
+      className: "font-mono text-[0.6875rem]",
+    },
+    batch: {
+      value: entry.batch_no || "—",
+      className: "font-mono text-[0.6875rem]",
+    },
+    product: {
+      value: entry.product_name ?? "—",
+      title: entry.product_name ?? "",
+    },
+    code: {
+      value: entry.product_code || "—",
+      className: "font-mono text-[0.6875rem]",
+    },
+    qty: {
+      value: formatQty(entry.qty),
+      className: "font-mono font-semibold text-brand-deep",
+    },
+    unit: { value: unit ?? "—", className: "text-[0.6875rem]" },
+    target: { value: formatQty(entry.target_qty), className: "font-mono" },
+    rejected: {
+      value: formatQty(entry.qty_rejected),
+      className: cn(
+        "font-mono",
+        (entry.qty_rejected ?? 0) > 0 && "font-semibold text-danger-deep",
+      ),
+    },
+    accumulative: {
+      value: <Accumulative entry={entry} />,
+      className: "font-mono",
+    },
+    targetSpeed: { value: entry.target_speed || "—", className: "font-mono" },
+    actualSpeed: {
+      value: entry.actual_speed
+        ? `${entry.actual_speed}${entry.speed_unit ? ` ${entry.speed_unit}` : ""}`
+        : "—",
+      className: "font-mono",
+    },
+    slowReason: {
+      value: entry.slow_reason || "—",
+      title: entry.slow_reason ?? "",
+    },
+    equipment: {
+      value: entry.equipment_no || "—",
+      className: "font-mono text-[0.6875rem]",
+    },
+    operators: { value: operators || "—", title: operators },
+    comments: { value: entry.comment || "—", title: entry.comment ?? "" },
+  };
+
+  // Row rules live on the cells: a separate-borders table draws none on a row.
+  // A shade stronger where one room hands over to the next.
+  const rule = first ? "border-t-line-strong" : "border-t-line-soft";
 
   return (
     <tr
       className={cn(
-        "group border-t border-line-soft align-middle transition-colors",
-        // Three backgrounds, three kinds of row, darkest to lightest: the
-        // room band, then a room that logged nothing, then this — a real
-        // entry, on white. They were all within a few percent of each other,
-        // which left a filed entry looking like a placeholder for one.
+        "group align-middle transition-colors",
         entry.action_flag
           ? "bg-danger-soft print:bg-danger-soft"
           : "bg-surface hover:bg-brand-soft/40 print:hover:bg-transparent",
       )}
     >
-      {/* Carries the row spine as well as the pencil.
+      {/* Carries the row spine as well as the pencil and the history.
 
-          Three near-identical greys were never going to answer "is this an
-          entry or an empty room?" — the palette's steps are eight shades
-          apart and the sheet is read at arm length. A solid bar down the left
-          of every filed row does answer it, the same way the activity feed's
-          spine does, and it takes its colour from the row: red where the entry
-          is flagged, brand where it is ordinary.
+          A solid bar down the left of every filed row, the same way the
+          activity feed's spine does, taking its colour from the row: red where
+          the entry is flagged, brand where it is ordinary.
 
-          The pencil itself is dimmed until the row is hovered or the button is
+          The pencil is dimmed until the row is hovered or the button is
           focused, so a sheet of forty rows isn't forty pencils competing with
           the numbers — but never hidden, because a control that only exists on
-          hover cannot be found on a tablet. */}
+          hover cannot be found on a tablet.
+
+          The history shows only on an entry that has been amended, in the
+          violet an amendment is everywhere else, so a corrected row can be
+          picked out without opening anything. */}
       <Td
         className={cn(
-          "print:hidden",
+          "px-1.5 print:hidden",
+          rule,
           entry.action_flag
             ? "shadow-[inset_4px_0_0_0_var(--color-danger)]"
             : "shadow-[inset_4px_0_0_0_var(--color-brand)]",
         )}
       >
-        {canEdit ? (
-          <button
-            type="button"
-            onClick={() => onEdit(entry)}
-            title="Correct this entry"
-            aria-label={`Correct the ${entry.process_name ?? "entry"} entry in ${room.name}`}
-            className="grid size-6 place-items-center rounded-lg text-ink-6 opacity-60 transition group-hover:opacity-100 hover:bg-brand-soft hover:text-brand focus-visible:opacity-100 focus-visible:ring-3 focus-visible:ring-brand/25 focus-visible:outline-none"
-          >
-            <PenLine className="size-3.5" aria-hidden />
-          </button>
-        ) : (
-          <span
-            title="Only the operator who filed this entry, or a manager, can correct it"
-            className="grid size-6 place-items-center text-ink-6/40"
-            aria-hidden
-          >
-            <PenLine className="size-3.5" />
-          </span>
-        )}
-      </Td>
-
-      {/* When, as the Log history shows it: the start, and the end after an
-          arrow, a shade lighter — the run time beside it is the figure; this
-          is when it happened. */}
-      <Td className="font-mono text-[0.6875rem] text-ink-3">
-        {entry.start_time ? clock(entry.start_time) : "—"}
-        {entry.end_time && (
-          <span className="text-ink-5"> → {clock(entry.end_time)}</span>
-        )}
-      </Td>
-      <Td align="right" className="font-mono">
-        {formatRunTime(entry.duration_minutes)}
-      </Td>
-
-      {/* Named once per room — the band above carries it, and repeating it
-          down every row of a nine-entry block is noise. Kept as a column all
-          the same: it is what the CSV export and the printed sheet are read
-          by, where there are no bands to look up to. */}
-      <Td
-        className="text-[0.6875rem] text-ink-5"
-        title={first ? room.name : undefined}
-      >
-        {first ? room.name : ""}
-      </Td>
-
-      <Td>
-        <span className="font-medium text-ink">
-          {entry.process_name ?? "—"}
+        <span className="flex items-center gap-0.5">
+          {canEdit ? (
+            <button
+              type="button"
+              onClick={() => onEdit(entry)}
+              title="Correct this entry"
+              aria-label={`Correct the ${entry.process_name ?? "entry"} entry in ${room.name}`}
+              className="grid size-6 place-items-center rounded-lg text-ink-6 opacity-60 transition group-hover:opacity-100 hover:bg-brand-soft hover:text-brand focus-visible:opacity-100 focus-visible:ring-3 focus-visible:ring-brand/25 focus-visible:outline-none"
+            >
+              <PenLine className="size-3.5" aria-hidden />
+            </button>
+          ) : (
+            <span
+              title="Only the operator who filed this entry, or a manager, can correct it"
+              className="grid size-6 place-items-center text-ink-6/40"
+              aria-hidden
+            >
+              <PenLine className="size-3.5" />
+            </span>
+          )}
+          {entry.amended_at && (
+            <button
+              type="button"
+              onClick={() => onHistory(entry)}
+              title="Amendment history"
+              aria-label={`Amendment history of the ${entry.process_name ?? "entry"} entry in ${room.name}`}
+              className="grid size-6 place-items-center rounded-lg text-violet transition hover:bg-violet-soft hover:text-violet-deep focus-visible:ring-3 focus-visible:ring-brand/25 focus-visible:outline-none"
+            >
+              <History className="size-3.5" aria-hidden />
+            </button>
+          )}
         </span>
-        {entry.action_flag && (
-          <span className="mt-0.5 flex items-center gap-1 text-[0.6562rem] font-bold uppercase tracking-wide text-danger-deep">
-            <Flag className="size-3 shrink-0" />
-            {entry.action_flag}
-          </span>
-        )}
       </Td>
 
-      <Td className="font-mono text-[0.6875rem]">
-        {entry.batch_no || "—"}
-      </Td>
-      <Td title={entry.product_name ?? ""}>
-        {entry.product_name ?? "—"}
-      </Td>
-      <Td className="font-mono text-[0.6875rem]">
-        {entry.product_code || "—"}
-      </Td>
-
-      <Td
-        align="right"
-        className="font-mono font-semibold text-brand-deep"
-      >
-        {formatQty(entry.qty)}
-        {/* A preparatory room hands over "3 drums", not "3". On a printed
-            handover the bare number is the one thing nobody can go back and
-            ask about. */}
-        {entry.qty_unit && entry.qty !== null && (
-          <span className="ml-1 text-[0.5625rem] font-medium text-ink-5">
-            {entry.qty_unit}
-          </span>
-        )}
-      </Td>
-      <Td align="right" className="font-mono">
-        {formatQty(entry.target_qty)}
-      </Td>
-      <Td
-        align="right"
-        className={cn(
-          "font-mono",
-          (entry.qty_rejected ?? 0) > 0 && "font-semibold text-danger-deep",
-        )}
-      >
-        {formatQty(entry.qty_rejected)}
-      </Td>
-      <Td align="right" className="font-mono">
-        {formatQty(entry.accumulative)}
-      </Td>
-
-      <Td>
-        {pct === null ? (
-          <span className="text-ink-6">—</span>
-        ) : (
-          <div className="min-w-[72px]">
-            <span className="font-mono text-[0.6562rem] font-semibold tabular-nums text-ink-3">
-              {pct}%
-            </span>
-            <span className="mt-1 block h-2 w-full overflow-hidden rounded-full bg-sunken-2 ring-1 ring-line-soft ring-inset">
-              <span
-                className="block h-full rounded-full"
-                style={{
-                  width: `${pct}%`,
-                  background:
-                    pct >= 80
-                      ? "var(--color-teal)"
-                      : pct >= 50
-                        ? "var(--color-warn)"
-                        : "var(--color-danger)",
-                }}
-              />
-            </span>
-          </div>
-        )}
-      </Td>
-
-      <Td align="right" className="font-mono">
-        {entry.target_speed || "—"}
-      </Td>
-      <Td align="right" className="font-mono">
-        {entry.actual_speed
-          ? `${entry.actual_speed}${entry.speed_unit ? ` ${entry.speed_unit}` : ""}`
-          : "—"}
-      </Td>
-
-      <Td className="font-mono text-[0.6875rem]">
-        {entry.equipment_no || "—"}
-      </Td>
-      <Td title={operators}>
-        {operators || "—"}
-      </Td>
-
-      <Td title={remark ?? ""}>
-        {remark || "—"}
-      </Td>
+      {DATA_COLUMNS.map((column) => {
+        const cell = cells[column.key];
+        return (
+          <Td
+            key={column.key}
+            align={column.align}
+            title={cell.title}
+            className={cn(
+              rule,
+              GROUP_OPENERS.has(column.key) && PANEL_GAP,
+              // The family the palette keeps for computed fields, see-through
+              // so a tinted cell stays part of a red flagged row.
+              column.derived && "bg-brand-soft/50",
+              cell.className,
+            )}
+          >
+            {cell.value}
+          </Td>
+        );
+      })}
     </tr>
+  );
+}
+
+/** One cell's content, by column key — `REPORT_COLUMNS` decides where it goes. */
+interface ReportCell {
+  value: React.ReactNode;
+  title?: string;
+  className?: string;
+}
+
+/**
+ * The batch's running total, with its progress under it. Progress has no column
+ * of its own on the plant's sheet, and this is the figure it is drawn from.
+ */
+function Accumulative({ entry }: { entry: ShiftReportRow }) {
+  const pct = progressPct(entry);
+  return (
+    <>
+      {formatQty(entry.accumulative)}
+      {pct !== null && (
+        <span className="mt-1 flex items-center gap-1.5" title={`${pct}%`}>
+          <span className="block h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-sunken-2 ring-1 ring-line-soft ring-inset">
+            <span
+              className="block h-full rounded-full"
+              style={{
+                width: `${pct}%`,
+                background:
+                  pct >= 80
+                    ? "var(--color-teal)"
+                    : pct >= 50
+                      ? "var(--color-warn)"
+                      : "var(--color-danger)",
+              }}
+            />
+          </span>
+          <span className="text-[0.5625rem] font-semibold text-ink-3">
+            {pct}%
+          </span>
+        </span>
+      )}
+    </>
   );
 }
 
@@ -463,7 +492,7 @@ function Th({
         // "REQUIRE / D" is worse — it reads as a typo in a document people
         // sign. `break-normal` is what forbids the second; the column widths
         // above are what make the first unnecessary.
-        "sticky top-0 z-10 px-3 py-2 text-[0.625rem] leading-tight font-bold tracking-[0.06em] break-normal uppercase",
+        "sticky top-8 z-10 px-3 py-2 text-[0.625rem] leading-tight font-bold tracking-[0.06em] break-normal uppercase",
         // A deep indigo band rather than flat near-black: it belongs to the
         // same family as everything else on the page, and the gradient keeps
         // a sixteen-column header from reading as a solid bar of ink.
@@ -503,7 +532,7 @@ function Td({
         // column to fit its contents — without it a long product name pushes
         // its own text under the neighbouring column instead of ending in an
         // ellipsis. The full string stays in the cell's `title`.
-        "truncate px-3 py-2 text-ink-2",
+        "truncate border-t px-3 py-2 text-ink-2",
         align === "right" ? "text-right tabular-nums" : "text-left",
         className,
       )}

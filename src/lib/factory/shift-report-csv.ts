@@ -1,7 +1,8 @@
+import { formatMinutes } from "@/lib/factory/shift-log-queries";
 import {
-  formatRunTime,
   progressPct,
   type ShiftReportRoom,
+  type ShiftReportRow,
 } from "@/lib/factory/shift-report-queries";
 import type { RunningShift } from "@/lib/factory/shift-time-queries";
 
@@ -16,27 +17,40 @@ import type { RunningShift } from "@/lib/factory/shift-time-queries";
  */
 
 const HEADERS = [
+  // In the sheet's order, so the file reads the way the screen does.
   "Room",
-  "Status / stage",
-  "Flag",
-  "EQ no.",
-  "Run time",
-  "Product",
-  "Code",
+  "Activity / Stage",
+  "Start → End",
+  "Duration",
   "Batch",
-  "Shift qty",
-  "Accumulative",
+  "Product",
+  "Product Code",
+  "Qty produced",
+  "Unit",
   // The entry own target_qty (speed x duration), not the batch order
   // quantity — named as the sheet and the log form name it.
   "Shift target",
-  "Progress %",
   "Rejected",
+  "Accumulative Total",
+  "Target speed",
+  "Actual speed",
+  "Slow reason",
+  "EQ No.",
   "Operators",
   "Comments",
-  "Speed",
+  // What the sheet folds into another cell. A file has no second line in a
+  // cell, and each of these is still worth being able to sort by.
+  "Flag",
+  "Progress %",
   "Speed unit",
-  "Target speed",
 ] as const;
+
+/** "06:45 → 07:30", or just the start while an entry has no end. */
+function window(entry: ShiftReportRow): string {
+  const start = entry.start_time?.slice(0, 5) ?? "";
+  const end = entry.end_time?.slice(0, 5);
+  return end ? `${start} → ${end}` : start;
+}
 
 /** Same guard the shift-log export uses: a leading `=` is a formula in Excel. */
 function escape(value: string | number | null | undefined): string {
@@ -51,40 +65,30 @@ export function toShiftReportCsv(rooms: ShiftReportRoom[]): string {
   const lines: string[] = [HEADERS.join(",")];
 
   for (const room of rooms) {
-    // Idle rooms are exported too. Their absence from the file would be read
-    // as "no such room", not as "that room was idle" — the same reason they
-    // stay on the printed sheet.
-    if (room.entries.length === 0) {
-      lines.push(
-        [room.name, room.idleStatus ?? "READY", ...Array(16).fill("")]
-          .map(escape)
-          .join(","),
-      );
-      continue;
-    }
-
     for (const entry of room.entries) {
-      const pct = progressPct(entry);
       lines.push(
         [
           room.name,
           entry.process_name,
-          entry.action_flag,
-          entry.equipment_no,
-          formatRunTime(entry.duration_minutes),
+          window(entry),
+          formatMinutes(entry.duration_minutes),
+          entry.batch_no,
           entry.product_name,
           entry.product_code,
-          entry.batch_no,
           entry.qty,
-          entry.accumulative,
+          entry.qty === null ? null : (entry.qty_unit ?? entry.stage_unit),
           entry.target_qty,
-          pct,
           entry.qty_rejected,
-          entry.operators?.filter(Boolean).join(" / "),
-          entry.comment || entry.slow_reason,
-          entry.actual_speed,
-          entry.speed_unit,
+          entry.accumulative,
           entry.target_speed,
+          entry.actual_speed,
+          entry.slow_reason,
+          entry.equipment_no,
+          entry.operators?.filter(Boolean).join(" / "),
+          entry.comment,
+          entry.action_flag,
+          progressPct(entry),
+          entry.speed_unit,
         ]
           .map(escape)
           .join(","),

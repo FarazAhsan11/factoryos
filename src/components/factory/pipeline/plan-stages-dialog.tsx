@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Controller, useForm, useWatch } from "react-hook-form";
+import { Controller, useWatch } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -77,6 +77,7 @@ import {
   type SlotCheck,
 } from "@/lib/factory/schedule";
 import { useRoomSlots } from "@/lib/factory/use-room-slots";
+import { useForm } from "@/lib/use-form";
 import { useRenderClock } from "@/lib/use-render-clock";
 import { cn } from "@/lib/utils";
 

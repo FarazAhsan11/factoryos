@@ -5,27 +5,23 @@ import { useQuery } from "@tanstack/react-query";
 import { Download, Moon, Printer, Sun } from "lucide-react";
 import { toast } from "sonner";
 
+import { AmendmentHistoryDialog } from "@/components/factory/report/amendment-history-dialog";
 import { EditEntryDialog } from "@/components/factory/report/edit-entry-dialog";
 import { ShiftReportHeader } from "@/components/factory/report/shift-report-header";
-import { ShiftReportSummary } from "@/components/factory/report/shift-report-summary";
 import { ShiftReportTable } from "@/components/factory/report/shift-report-table";
 import { DateField } from "@/components/ui/date-picker";
 import { downloadCsv } from "@/lib/factory/shift-log-csv";
-import {
-  fetchPipelineJobs,
-  pipelineKeys,
-} from "@/lib/factory/pipeline-queries";
 import {
   shiftReportFilename,
   toShiftReportCsv,
 } from "@/lib/factory/shift-report-csv";
 import {
   fetchShiftReportEntries,
+  formatReportDate,
   groupByRoom,
   shiftReportKeys,
   summarise,
   todayISO,
-  type IdleStatus,
   type ShiftReportRow,
 } from "@/lib/factory/shift-report-queries";
 import {
@@ -33,26 +29,18 @@ import {
   shiftTimeKeys,
   type RunningShift,
 } from "@/lib/factory/shift-time-queries";
-import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
 import { useRenderClock } from "@/lib/use-render-clock";
 import { cn } from "@/lib/utils";
 
-/** Pipeline status → what an idle room's row should say it is doing. */
-const IDLE_FROM_PIPELINE: Record<string, IdleStatus> = {
-  production: "PRODUCTION",
-  hold: "HOLD",
-  planned: "PLANNED",
-};
-
 /**
- * Shift Report — one day, one shift, the whole floor on one sheet.
+ * Shift Report — one day, one shift, on one sheet.
  *
  * A different question from the data table, which is why it is a different
  * screen rather than another preset filter. The data table answers "find me
  * the entries matching this" and pages through thousands; this answers "what
  * happened on the floor during that shift", which is a fixed small slice
- * always read whole — and read *by room*, including the rooms that did
- * nothing, because their silence is part of the answer.
+ * always read whole, by room. It lists what was logged and nothing else: a
+ * room with no entries is not on the sheet.
  */
 export function ShiftReportWorkspace({
   factoryId,
@@ -82,6 +70,8 @@ export function ShiftReportWorkspace({
    * sending someone back to the entry feed to hunt for the row again.
    */
   const [editing, setEditing] = useState<ShiftReportRow | null>(null);
+  /** The row whose amendment history is open. */
+  const [history, setHistory] = useState<ShiftReportRow | null>(null);
 
   const {
     data: entries = [],
@@ -96,43 +86,12 @@ export function ShiftReportWorkspace({
     refetchInterval: date === today ? 60_000 : false,
   });
 
-  const { data: unitList = [] } = useQuery({
-    queryKey: setupKeys.all("factory_units", factoryId),
-    queryFn: () => fetchSetupItems("factory_units", factoryId),
-  });
-
   const { data: shiftTimes } = useQuery({
     queryKey: shiftTimeKeys.all(factoryId),
     queryFn: () => fetchShiftTimes(factoryId),
   });
 
-  const { data: jobs = [] } = useQuery({
-    queryKey: pipelineKeys.all(factoryId),
-    queryFn: () => fetchPipelineJobs(factoryId),
-  });
-
-  // What each idle room is doing, per the board. Only production, hold and
-  // planned say anything — a finished job left a room free, which is READY.
-  const pipelineByUnit = useMemo(() => {
-    const map = new Map<string, IdleStatus>();
-    for (const job of jobs) {
-      const status = IDLE_FROM_PIPELINE[job.status];
-      if (job.unit_id && status) map.set(job.unit_id, status);
-    }
-    return map;
-  }, [jobs]);
-
-  const rooms = useMemo(
-    () =>
-      groupByRoom(
-        unitList
-          .filter((u) => u.active)
-          .map((u) => ({ id: u.id, name: u.name })),
-        entries,
-        pipelineByUnit,
-      ),
-    [unitList, entries, pipelineByUnit],
-  );
+  const rooms = useMemo(() => groupByRoom(entries), [entries]);
 
   const totals = useMemo(() => summarise(entries), [entries]);
 
@@ -226,33 +185,29 @@ export function ShiftReportWorkspace({
             shift={shift}
             clock={shiftTimes?.[shift]}
             unitWord={units.singular}
+            unitWordPlural={units.plural}
+            totals={totals}
           />
-          <ShiftReportSummary totals={totals} unitWordPlural={units.plural} />
 
           {rooms.length === 0 ? (
+            /* Names the shift as well as the day: the sheet is one shift, and
+               the other may well have entries. */
             <div className="px-4 py-16 text-center">
               <p className="text-sm font-medium text-ink-3">
-                No {units.plural.toLowerCase()} set up yet.
+                Nothing logged on {formatReportDate(date)}
               </p>
               <p className="mt-1 text-xs text-ink-5">
-                Add them in Admin &amp; Settings and the report fills itself in.
+                {shift === "morning" ? "Morning" : "Afternoon"} shift
               </p>
             </div>
           ) : (
-            <>
-              <ShiftReportTable
-                rooms={rooms}
-                unitWord={units.singular}
-                onEdit={setEditing}
-                canEdit={canEdit}
-              />
-              {totals.entries === 0 && (
-                <p className="shrink-0 border-t border-line bg-sunken px-4 py-2.5 text-center text-xs text-ink-5 print:hidden">
-                  Nothing was logged on this shift — every{" "}
-                  {units.singular.toLowerCase()} shows its board status instead.
-                </p>
-              )}
-            </>
+            <ShiftReportTable
+              rooms={rooms}
+              unitWord={units.singular}
+              onEdit={setEditing}
+              onHistory={setHistory}
+              canEdit={canEdit}
+            />
           )}
         </div>
       )}
@@ -266,6 +221,12 @@ export function ShiftReportWorkspace({
         shift={shift}
         units={units}
         onClose={() => setEditing(null)}
+      />
+      <AmendmentHistoryDialog
+        entry={history}
+        factoryId={factoryId}
+        unitWord={units.singular}
+        onClose={() => setHistory(null)}
       />
     </div>
   );
@@ -324,15 +285,7 @@ function Ghost({
 function ReportSkeleton() {
   return (
     <div className="flex flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-card lg:min-h-0 lg:flex-1">
-      <div className="h-[76px] shrink-0 animate-pulse border-b border-line bg-sunken" />
-      <div className="grid shrink-0 grid-cols-2 divide-x divide-line-soft border-b border-line bg-sunken sm:grid-cols-5">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="px-5 py-3.5">
-            <span className="block h-2.5 w-16 animate-pulse rounded bg-sunken-2" />
-            <span className="mt-2 block h-6 w-12 animate-pulse rounded bg-sunken-2" />
-          </div>
-        ))}
-      </div>
+      <div className="h-11 shrink-0 animate-pulse border-b border-line bg-sunken" />
       <div className="min-h-[320px] flex-1 animate-pulse bg-sunken/40" />
     </div>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import { Controller, useForm, useWatch } from "react-hook-form";
+import { Controller, useWatch } from "react-hook-form";
 import { useMutation } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Beaker, Loader2, Package, RefreshCw } from "lucide-react";
@@ -32,6 +32,7 @@ import {
   updateBatchJob,
   type PipelineJob,
 } from "@/lib/factory/pipeline-queries";
+import { useForm } from "@/lib/use-form";
 import { cn } from "@/lib/utils";
 
 const FIELD =

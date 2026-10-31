@@ -2,7 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, useWatch } from "react-hook-form";
+import { useWatch } from "react-hook-form";
 import { CheckCircle2, Loader2, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 
@@ -56,6 +56,7 @@ import {
 } from "@/lib/factory/deviation-queries";
 import { pipelineKeys } from "@/lib/factory/pipeline-queries";
 import { useWorkers } from "@/lib/factory/worker-queries";
+import { useForm } from "@/lib/use-form";
 import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/factory/dates";
 

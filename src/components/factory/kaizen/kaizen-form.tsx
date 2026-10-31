@@ -1,6 +1,6 @@
 "use client";
 
-import { Controller, useForm, useWatch } from "react-hook-form";
+import { Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Lightbulb, Loader2, UserRound } from "lucide-react";
@@ -17,6 +17,7 @@ import {
   submitKaizenIdea,
 } from "@/lib/factory/kaizen-queries";
 import { SelectField } from "@/components/ui/select-field";
+import { useForm } from "@/lib/use-form";
 import { cn } from "@/lib/utils";
 
 const LABEL =

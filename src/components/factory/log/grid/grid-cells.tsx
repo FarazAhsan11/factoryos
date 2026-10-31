@@ -15,6 +15,7 @@ export type GridColumnKey =
   | "activity"
   | "batch"
   | "product"
+  | "code"
   | "qty"
   | "unit"
   | "target"
@@ -50,6 +51,7 @@ export const GRID_COLUMNS: {
   { key: "activity", label: "Activity / stage", width: 188 },
   { key: "batch", label: "Batch #", width: 116 },
   { key: "product", label: "Product", width: 170 },
+  { key: "code", label: "Product code", width: 116 },
   { key: "qty", label: "Qty", width: 104, align: "right" },
   { key: "unit", label: "Unit", width: 112 },
   { key: "target", label: "Shift target", width: 112, align: "right" },
@@ -112,9 +114,10 @@ export function Cell({
 }
 
 /**
- * A value the row shows but nobody types — the run time, the product the
- * batch resolved to, the derived target. Shaded like a spreadsheet's formula
- * cell, so it reads as worked out rather than waiting to be filled in.
+ * A value the row shows but nobody types — the run time, the product and unit
+ * the batch resolved to, the derived target. Shaded like a spreadsheet's formula
+ * cell, and strongly enough to see at a glance across a wide sheet, so it reads
+ * as filled in for you rather than waiting to be typed.
  */
 export function Static({
   children,
@@ -129,7 +132,7 @@ export function Static({
     <span
       title={title}
       className={cn(
-        "flex h-10 items-center bg-brand-tint/70 px-3 text-[0.7812rem] text-ink-3",
+        "flex h-10 items-center bg-brand-line px-3 text-[0.7812rem] font-medium text-ink-2",
         className,
       )}
     >

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
+import { Controller, useFieldArray, useWatch } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -90,6 +90,7 @@ import {
   formatMinutes,
   logKeys,
 } from "@/lib/factory/shift-log-queries";
+import { useForm } from "@/lib/use-form";
 import { cn } from "@/lib/utils";
 
 /**

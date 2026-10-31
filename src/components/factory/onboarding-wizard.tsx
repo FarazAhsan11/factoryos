@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Controller, useForm } from "react-hook-form";
+import { Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -13,6 +13,7 @@ import {
   onboardingSchema,
   type OnboardingValues,
 } from "@/app/factory/[slug]/schemas";
+import { useForm } from "@/lib/use-form";
 import { cn } from "@/lib/utils";
 
 const FIELD =

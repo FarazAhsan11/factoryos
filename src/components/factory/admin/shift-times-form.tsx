@@ -1,12 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  Controller,
-  useForm,
-  useWatch,
-  type UseFormRegister,
-} from "react-hook-form";
+import { Controller, useWatch, type UseFormRegister } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { AlertTriangle, Loader2, Moon, Sun } from "lucide-react";
@@ -28,6 +23,7 @@ import {
   shiftTimeKeys,
   type RunningShift,
 } from "@/lib/factory/shift-time-queries";
+import { useForm } from "@/lib/use-form";
 import { TimeField } from "@/components/ui/date-picker";
 
 const FIELD =

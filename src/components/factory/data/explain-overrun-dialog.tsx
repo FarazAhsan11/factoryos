@@ -1,6 +1,5 @@
 "use client";
 
-import { useForm } from "react-hook-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, TrendingUp } from "lucide-react";
@@ -19,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { explainOverrun, logKeys } from "@/lib/factory/shift-log-queries";
 import { logTableKeys } from "@/lib/factory/shift-log-table-queries";
+import { useForm } from "@/lib/use-form";
 import { cn } from "@/lib/utils";
 
 /** The entry being explained — only what the dialog shows or sends. */

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Controller, useForm, type Control } from "react-hook-form";
+import { Controller, type Control } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CalendarPlus, Loader2, Lock } from "lucide-react";
 
@@ -14,6 +14,7 @@ import {
 import { FIELD } from "@/components/factory/admin/settings-ui";
 import { DateField } from "@/components/ui/date-picker";
 import { todayKey } from "@/lib/factory/dates";
+import { useForm } from "@/lib/use-form";
 import { useRenderClock } from "@/lib/use-render-clock";
 import { cn } from "@/lib/utils";
 

@@ -42,6 +42,8 @@ export interface ShiftReportRow {
   qty: number | null;
   /** What `qty` counts in on a preparatory entry (drums, kg…). */
   qty_unit: string | null;
+  /** What the entry's stage counts in — production's unit; see the fetch. */
+  stage_unit: string | null;
   qty_rejected: number | null;
   accumulative: number | null;
   operators: string[];
@@ -98,20 +100,34 @@ export async function fetchShiftReportEntries(
     .order("created_at", { ascending: true });
 
   if (error) throw new Error(error.message);
-  return (data ?? []) as unknown as ShiftReportRow[];
+  const rows = (data ?? []) as unknown as Omit<ShiftReportRow, "stage_unit">[];
+
+  // A production entry stores no unit of its own — it counts in whatever its
+  // stage does — and the view doesn't carry one. Read for this slice alone: a
+  // sheet of a few dozen rows doesn't need every stage the factory ever planned.
+  const stageIds = [...new Set(rows.flatMap((r) => r.batch_stage_id ?? []))];
+  const units = new Map<string, string>();
+  if (stageIds.length > 0) {
+    const { data: stages, error: stageError } = await supabase
+      .from("batch_stages")
+      .select("id, target_unit")
+      .in("id", stageIds);
+    if (stageError) throw new Error(stageError.message);
+    for (const stage of stages ?? []) units.set(stage.id, stage.target_unit);
+  }
+
+  return rows.map((row) => ({
+    ...row,
+    stage_unit: units.get(row.batch_stage_id ?? "") ?? null,
+  }));
 }
 
 /* ── Shaping ──────────────────────────────────────────────────────────── */
-
-/** What a room with no entries this shift was doing, per the pipeline board. */
-export type IdleStatus = "READY" | "PRODUCTION" | "HOLD" | "PLANNED";
 
 export interface ShiftReportRoom {
   unitId: string;
   name: string;
   entries: ShiftReportRow[];
-  /** Only set when `entries` is empty — an idle room still says something. */
-  idleStatus: IdleStatus | null;
   /** Everything this room made this shift. */
   producedQty: number;
 }
@@ -129,49 +145,28 @@ export function compareRoomNames(a: string, b: string): number {
 }
 
 /**
- * Every room in the factory, in room order, each with its entries.
- *
- * Rooms with nothing logged are **kept**, not dropped. A shift report that
- * lists only the busy rooms cannot answer "was anything running in 7?", and
- * the blank row is the answer — which is exactly why the prototype prints
- * them. Their status comes from the pipeline board rather than being assumed
- * idle: a room holding a batch is not the same as a room standing ready.
+ * The rooms that logged something this shift, in room order, each with its
+ * entries. A room with no entries has no place on the sheet, so the entries
+ * alone decide who is listed — a room since deactivated included, because its
+ * work still happened.
  */
-export function groupByRoom(
-  units: { id: string; name: string }[],
-  entries: ShiftReportRow[],
-  pipelineByUnit: Map<string, IdleStatus>,
-): ShiftReportRoom[] {
-  const byUnit = new Map<string, ShiftReportRow[]>();
+export function groupByRoom(entries: ShiftReportRow[]): ShiftReportRoom[] {
+  const rooms = new Map<string, ShiftReportRoom>();
   for (const entry of entries) {
-    const list = byUnit.get(entry.unit_id);
-    if (list) list.push(entry);
-    else byUnit.set(entry.unit_id, [entry]);
-  }
-
-  // Units the factory has, plus any room that logged an entry but has since
-  // been deactivated — its work still happened and still belongs on the sheet.
-  const known = new Map(units.map((u) => [u.id, u.name]));
-  for (const entry of entries) {
-    if (!known.has(entry.unit_id)) {
-      known.set(entry.unit_id, entry.unit_name ?? "—");
+    const room = rooms.get(entry.unit_id);
+    if (room) {
+      room.entries.push(entry);
+      room.producedQty += entry.qty ?? 0;
+    } else {
+      rooms.set(entry.unit_id, {
+        unitId: entry.unit_id,
+        name: entry.unit_name ?? "—",
+        entries: [entry],
+        producedQty: entry.qty ?? 0,
+      });
     }
   }
-
-  return [...known.entries()]
-    .map(([unitId, name]) => {
-      const rows = byUnit.get(unitId) ?? [];
-      return {
-        unitId,
-        name,
-        entries: rows,
-        idleStatus: rows.length
-          ? null
-          : (pipelineByUnit.get(unitId) ?? "READY"),
-        producedQty: rows.reduce((sum, r) => sum + (r.qty ?? 0), 0),
-      };
-    })
-    .sort((a, b) => compareRoomNames(a.name, b.name));
+  return [...rooms.values()].sort((a, b) => compareRoomNames(a.name, b.name));
 }
 
 export interface ShiftReportTotals {
@@ -234,12 +229,6 @@ export function formatReportDate(iso: string): string {
   const [y, m, d] = iso.split("-").map(Number);
   const month = MONTHS[(m ?? 1) - 1] ?? MONTHS[0];
   return `${d ?? 1} ${month} ${y}`;
-}
-
-/** 95 → "1.6h". Minutes under an hour keep their own unit. */
-export function formatRunTime(minutes: number): string {
-  if (!minutes) return "—";
-  return minutes < 60 ? `${minutes}m` : `${(minutes / 60).toFixed(1)}h`;
 }
 
 /** Thousands separators, and an em-dash for "doesn't apply". */

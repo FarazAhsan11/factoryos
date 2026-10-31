@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import { Controller, useForm, useWatch } from "react-hook-form";
+import { Controller, useWatch } from "react-hook-form";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CheckCircle2, Loader2, Sparkles } from "lucide-react";
@@ -36,6 +36,7 @@ import { todayKey } from "@/lib/factory/dates";
 import { draftSlot, slotCheck } from "@/lib/factory/schedule";
 import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
 import { useRoomSlots } from "@/lib/factory/use-room-slots";
+import { useForm } from "@/lib/use-form";
 import { useRenderClock } from "@/lib/use-render-clock";
 import { cn } from "@/lib/utils";
 

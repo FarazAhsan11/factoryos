@@ -434,6 +434,8 @@ actionKeys.all(factoryId)         // a flag may have raised an action
 
 `amend-entry-dialog.tsx` invalidates `logTableKeys`, `logKeys` and `pipelineKeys` — an amendment re-runs the status trigger.
 
+`shift_log_record_amendment` (`0055`) fires only on an amendment, never on a new entry, so its key `amendmentKeys.all(factoryId)` is invalidated by the two dialogs that amend — `amend-entry-dialog.tsx` and `edit-entry-dialog.tsx` — rather than by the entry form.
+
 **If you add another trigger on `shift_log_entries`, add its cache key here too.** The write succeeds either way; the UI just won't show it until something else refetches.
 
 ---
@@ -521,7 +523,7 @@ src/components/factory/data/data-table-stats.tsx   → became a <tfoot>
 
 **Files:** `shift-report-queries.ts`, `shift-report-csv.ts`, `shift-report-workspace.tsx`, `shift-report-table.tsx`, `shift-report-summary.tsx`, `shift-report-header.tsx`, migration `0022`. Ported from the `factoryos_v13.html` prototype's Shift Report view.
 
-One day, one shift, the whole floor on one sheet. Supervisor and up, under Analytics in `nav.ts`.
+One day, one shift, on one sheet. Supervisor and up, under Analytics in `nav.ts`.
 
 ### Why it isn't a preset on the data table
 
@@ -529,13 +531,15 @@ They answer different questions. The **data table** answers *"find me the entrie
 
 So this one fetches the slice from the same `shift_log_entries_expanded` view and does the grouping, room ordering and totals in the browser, where the same rows have to be laid out anyway. Aggregating it in SQL would mean a view or RPC producing exactly one screen's shape and nothing else.
 
-### Idle rooms are the point
+### Only what was logged
 
-A room that logged nothing is **kept on the sheet**, not filtered out. A report listing only the busy rooms can't answer "was anything running in 7?" — and the blank row is the answer.
+The entries alone decide who is on the sheet. A room that logged nothing is **not listed** — on screen, on paper or in the CSV — and `groupByRoom` needs neither the unit list nor the board. An earlier version kept every room, with a status from `pipeline_jobs`, so the sheet could answer "was anything running in 7?"; with twenty-five rooms that buried a handful of real rows under a page of blanks, and Floor status is the screen for that question.
 
-Their status comes from `pipeline_jobs` rather than being assumed idle: a room holding a batch is not a room standing ready. `IDLE_FROM_PIPELINE` maps `production`/`hold`/`planned`; a finished job left the room free, so that falls through to `READY`.
+A day and shift with no entries says so, naming the date. Rooms with entries but since deactivated in Admin are kept — their work still happened.
 
-Rooms with entries but since deactivated in Admin are also kept — their work still happened.
+### Amendment history
+
+The icon beside an amended row's pencil (shown only where `amended_at` is set) opens `AmendmentHistoryDialog`, reading `shift_log_amendments` (`0055`). The trigger compares the row before and after, so what changed is what the row did rather than what a caller said; `changes` of `[]` is a note added and nothing else, and null is an amendment from before `0055`, shown as "Not recorded". Never write to the table from the app — there is no policy that would let you.
 
 ### Room ordering
 

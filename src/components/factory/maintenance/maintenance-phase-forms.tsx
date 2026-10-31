@@ -2,14 +2,7 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  Controller,
-  useForm,
-  useWatch,
-  type FieldValues,
-  type Path,
-  type UseFormRegister,
-} from "react-hook-form";
+import { Controller, useWatch, type FieldValues, type Path, type UseFormRegister } from "react-hook-form";
 import { CheckCircle2, Loader2, PlayCircle } from "lucide-react";
 import { toast } from "sonner";
 
@@ -34,6 +27,7 @@ import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
 import { SelectField } from "@/components/ui/select-field";
 import { WorkerSelect } from "@/components/factory/worker-select";
 import { useWorkers } from "@/lib/factory/worker-queries";
+import { useForm } from "@/lib/use-form";
 import { cn } from "@/lib/utils";
 
 const CONTROL =

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Controller, useForm, useWatch } from "react-hook-form";
+import { Controller, useWatch } from "react-hook-form";
 import { Loader2, Plus, Wrench } from "lucide-react";
 import { toast } from "sonner";
 
@@ -26,6 +26,7 @@ import {
 import { fetchProducts, productKeys } from "@/lib/factory/product-queries";
 import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
 import { SelectField } from "@/components/ui/select-field";
+import { useForm } from "@/lib/use-form";
 import { cn } from "@/lib/utils";
 
 const CONTROL =

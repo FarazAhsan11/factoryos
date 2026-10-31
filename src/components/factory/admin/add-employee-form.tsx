@@ -1,6 +1,6 @@
 "use client";
 
-import { Controller, useForm } from "react-hook-form";
+import { Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
@@ -17,6 +17,7 @@ import {
 
 import { FIELD } from "@/components/factory/admin/settings-ui";
 import { SelectField } from "@/components/ui/select-field";
+import { useForm } from "@/lib/use-form";
 const LABEL = "text-xs font-medium text-ink-3";
 
 /**

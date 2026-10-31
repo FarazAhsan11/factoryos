@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Controller, useForm } from "react-hook-form";
+import { Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
@@ -17,6 +17,7 @@ import {
 } from "@/app/factory/[slug]/admin/schemas";
 import { SelectField } from "@/components/ui/select-field";
 import type { FactoryContext } from "@/lib/factory/context";
+import { useForm } from "@/lib/use-form";
 
 const FIELD =
   "h-10 w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-ink outline-none transition placeholder:text-ink-5 focus:border-brand focus:ring-4 focus:ring-brand/12 disabled:bg-sunken disabled:text-ink-5";

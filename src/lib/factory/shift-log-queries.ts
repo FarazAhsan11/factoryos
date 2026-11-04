@@ -4,7 +4,12 @@ import {
   type LogEntryParsed,
 } from "@/app/factory/[slug]/log/schemas";
 import { createClient } from "@/lib/supabase/client";
-import type { RunningShift } from "@/lib/factory/shift-time-queries";
+import {
+  breakMinutesWithin,
+  fetchShiftTimes,
+  type RunningShift,
+  type ShiftTimes,
+} from "@/lib/factory/shift-time-queries";
 
 /**
  * Shift log → entries. Reads and the insert go straight from the browser to
@@ -243,6 +248,26 @@ export function durationMinutes(start: string, end: string): number {
   return mins < 0 ? mins + 24 * 60 : mins;
 }
 
+/**
+ * An entry's run time: the span between its clocks less any scheduled break
+ * inside it (Admin → Shift times). A run from 09:00 to 11:00 across a 30-minute
+ * tea break ran for 1h 30min — that is what is stored, shown, and multiplied
+ * by target speed.
+ *
+ * `span` is kept alongside because deciding which shift an entry belongs to
+ * is about where its clocks sit, breaks included.
+ */
+export function entryDuration(
+  start: string | undefined,
+  end: string | undefined,
+  times: ShiftTimes | undefined,
+): { span: number; breaks: number; net: number } {
+  if (!start || !end) return { span: 0, breaks: 0, net: 0 };
+  const span = durationMinutes(start, end);
+  const breaks = Math.min(span, breakMinutesWithin(times, start, end));
+  return { span, breaks, net: span - breaks };
+}
+
 /** 95 → "1h 35min"; 45 → "45min". */
 export function formatMinutes(mins: number): string {
   if (!mins) return "—";
@@ -266,6 +291,7 @@ export function formatMinutes(mins: number): string {
 export function entryColumns(
   values: LogEntryParsed | EditEntryParsed,
   productId: string | null,
+  shiftTimes: ShiftTimes | undefined,
 ) {
   const production = values.category === "production";
   const preparatory = values.category === "preparatory";
@@ -285,7 +311,9 @@ export function entryColumns(
     shift: values.shift,
     start_time: values.startTime,
     end_time: values.endTime,
-    duration_minutes: durationMinutes(values.startTime, values.endTime),
+    // Net of scheduled breaks — see `entryDuration`.
+    duration_minutes: entryDuration(values.startTime, values.endTime, shiftTimes)
+      .net,
     // Equipment belongs to a machine stage, same rule as speed below. Without
     // this, typing an equipment number and then switching to a manual
     // activity files a manual entry carrying kit it never touched.
@@ -361,15 +389,19 @@ export async function updateLogEntry(
   productId: string | null,
   batchStageId: string | null,
   existingNote: string | null,
+  shiftTimes: ShiftTimes | undefined,
 ): Promise<void> {
   const supabase = createClient();
   const stamp = new Date().toISOString().slice(0, 10);
   const entry = `[${stamp}] ${values.note.trim()}`;
+  // The stored duration is net of breaks, so it must never be written
+  // without them — fetch if the caller's query hasn't landed yet.
+  const times = shiftTimes ?? (await fetchShiftTimes(values.factoryId));
 
   const { error } = await supabase
     .from("shift_log_entries")
     .update({
-      ...entryColumns(values, productId),
+      ...entryColumns(values, productId, times),
       // Downtime is forced null by the guard; everywhere else this is either
       // the stage the caller resolved or null, which asks the guard to resolve
       // it again from the batch and activity.
@@ -397,15 +429,19 @@ export async function createLogEntry(
   loggedBy: string,
   logDate: string,
   productId: string | null,
+  shiftTimes: ShiftTimes | undefined,
 ): Promise<LogEntry> {
   const supabase = createClient();
+  // The stored duration is net of breaks, so it must never be written
+  // without them — fetch if the caller's query hasn't landed yet.
+  const times = shiftTimes ?? (await fetchShiftTimes(values.factoryId));
 
   const { data, error } = await supabase
     .from("shift_log_entries")
     .insert({
       factory_id: values.factoryId,
       log_date: logDate,
-      ...entryColumns(values, productId),
+      ...entryColumns(values, productId, times),
       // Null is the normal answer — `shift_log_stage_guard` fills it in when
       // the batch runs this activity once, and refuses the entry when it runs
       // it several times without saying which. Downtime is forced null there.

@@ -85,7 +85,7 @@ import {
 } from "@/lib/factory/log-draft";
 import {
   createLogEntry,
-  durationMinutes,
+  entryDuration,
   fetchBatchEntries,
   formatMinutes,
   logKeys,
@@ -591,8 +591,13 @@ export function LogEntryForm({
   const thisQty = typeof qty === "number" && !Number.isNaN(qty) ? qty : 0;
   const runningTotal = previousQty + thisQty;
 
-  const duration =
-    startTime && endTime ? durationMinutes(startTime, endTime) : 0;
+  // Net of any scheduled break inside the run (Admin → Shift times); the
+  // shift is still decided by the raw span between the clocks.
+  const {
+    span,
+    breaks: breakMins,
+    net: duration,
+  } = entryDuration(startTime, endTime, shiftTimes);
 
   // Downtime is waiting time — no one is operating anything, so no name is
   // demanded and the pickers aren't rendered. Same predicate the schema
@@ -613,10 +618,10 @@ export function LogEntryForm({
     if (!shiftTimes) return;
     setValue(
       "shift",
-      resolveShiftForEntry(shiftTimes, startTime ?? "", duration) ??
+      resolveShiftForEntry(shiftTimes, startTime ?? "", span) ??
         resolveCurrentShift(shiftTimes),
     );
-  }, [shiftTimes, startTime, duration, setValue]);
+  }, [shiftTimes, startTime, span, setValue]);
 
   /**
    * The shift target is arithmetic, not an opinion: target speed × how long
@@ -689,7 +694,13 @@ export function LogEntryForm({
     // The working day is read at submit time, not when the page loaded — a
     // form left open across midnight must not file the entry under yesterday.
     mutationFn: (values: LogEntryParsed) =>
-      createLogEntry(values, userId, todayKey(), product?.id ?? null),
+      createLogEntry(
+        values,
+        userId,
+        todayKey(),
+        product?.id ?? null,
+        shiftTimes,
+      ),
     onSuccess: async (entry) => {
       // Invalidate every day in the cache, not just today's: the feed may be
       // showing another date, and the new row could belong on it.
@@ -997,7 +1008,12 @@ export function LogEntryForm({
                 />
               </div>
             </Field>
-            <Field label="Duration" note="(auto)">
+            <Field
+              label="Duration"
+              note={
+                breakMins ? `(auto · ${breakMins}min break off)` : "(auto)"
+              }
+            >
               <output
                 className={cn(
                   CONTROL,
@@ -1005,7 +1021,7 @@ export function LogEntryForm({
                   "flex items-center border-brand-line bg-brand-tint font-semibold text-brand",
                 )}
               >
-                {duration ? formatMinutes(duration) : "—"}
+                {duration ? formatMinutes(duration) : span ? "0min" : "—"}
               </output>
             </Field>
           </FieldRow>

@@ -48,7 +48,7 @@ import {
 } from "@/lib/factory/batch-stage-queries";
 import { findEquipment } from "@/lib/factory/equipment-queries";
 import {
-  durationMinutes,
+  entryDuration,
   fetchBatchEntries,
   formatMinutes,
 } from "@/lib/factory/shift-log-queries";
@@ -405,18 +405,23 @@ export function LogGridRow({
 
   /* ── The figures the row works out ──────────────────────────────────── */
 
-  const duration =
-    startTime && endTime ? durationMinutes(startTime, endTime) : 0;
+  // Net of any scheduled break inside the run (Admin → Shift times); the
+  // shift is still decided by the raw span between the clocks.
+  const {
+    span,
+    breaks: breakMins,
+    net: duration,
+  } = entryDuration(startTime, endTime, shiftTimes);
 
   // The shift is a fact about the entry's own times — whichever window holds
   // more of the activity — not about when the row was typed.
   useEffect(() => {
     if (!shiftTimes) return;
     const next =
-      resolveShiftForEntry(shiftTimes, startTime ?? "", duration) ??
+      resolveShiftForEntry(shiftTimes, startTime ?? "", span) ??
       resolveCurrentShift(shiftTimes);
     if (getValues("shift") !== next) setValue("shift", next);
-  }, [shiftTimes, startTime, duration, setValue, getValues]);
+  }, [shiftTimes, startTime, span, setValue, getValues]);
 
   /**
    * How wide the two clocks open: the operator's own shift, or the whole day
@@ -613,10 +618,16 @@ export function LogGridRow({
           </span>
         </Cell>
 
-        {/* Run time — derived from the two clocks, never typed. */}
+        {/* Run time — derived from the two clocks less scheduled breaks,
+            never typed. */}
         <Cell>
-          <Static className="justify-end font-mono font-semibold text-brand">
-            {duration ? formatMinutes(duration) : "—"}
+          <Static
+            className="justify-end font-mono font-semibold text-brand"
+            title={
+              breakMins ? `${breakMins}min scheduled break taken off` : undefined
+            }
+          >
+            {duration ? formatMinutes(duration) : span ? "0min" : "—"}
           </Static>
         </Cell>
 

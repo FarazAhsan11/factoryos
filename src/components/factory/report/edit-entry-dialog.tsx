@@ -78,8 +78,8 @@ import {
 import { fetchProducts, productKeys } from "@/lib/factory/product-queries";
 import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
 import {
-  durationMinutes,
   entryColumns,
+  entryDuration,
   formatMinutes,
   logKeys,
   updateLogEntry,
@@ -96,6 +96,7 @@ import {
   resolveShiftForEntry,
   shiftTimeKeys,
   type RunningShift,
+  type ShiftTimes,
 } from "@/lib/factory/shift-time-queries";
 import { useForm } from "@/lib/use-form";
 import { cn } from "@/lib/utils";
@@ -347,8 +348,13 @@ function EditEntryForm({
     (category as ProcessCategory) ?? "production",
   );
 
-  const duration =
-    startTime && endTime ? durationMinutes(startTime, endTime) : 0;
+  // Net of any scheduled break inside the run (Admin → Shift times); the
+  // shift is still decided by the raw span between the clocks.
+  const {
+    span,
+    breaks: breakMins,
+    net: duration,
+  } = entryDuration(startTime, endTime, shiftTimes);
 
   const product = useMemo(() => {
     const term = (batchNo ?? "").trim().toLowerCase();
@@ -421,10 +427,10 @@ function EditEntryForm({
     const resolved = resolveShiftForEntry(
       shiftTimes,
       startTime ?? "",
-      duration,
+      span,
     );
     if (resolved) setValue("shift", resolved);
-  }, [shiftTimes, startTime, duration, setValue]);
+  }, [shiftTimes, startTime, span, setValue]);
 
   /**
    * The shift target is arithmetic: target speed × how long the activity ran.
@@ -475,8 +481,17 @@ function EditEntryForm({
         unitNames,
         processNames,
         unitWord: units.singular,
+        shiftTimes,
       }),
-    [entry, values, product, unitNames, processNames, units.singular],
+    [
+      entry,
+      values,
+      product,
+      unitNames,
+      processNames,
+      units.singular,
+      shiftTimes,
+    ],
   );
 
   const save = useMutation({
@@ -487,6 +502,7 @@ function EditEntryForm({
         product?.id ?? null,
         resolvedStageId,
         entry.amend_note,
+        shiftTimes,
       ),
     onSuccess: async () => {
       /* Every reader of this row. The write re-runs the shift log's triggers,
@@ -606,7 +622,12 @@ function EditEntryForm({
                 )}
               />
             </Field>
-            <Field label="Duration" note="(auto)">
+            <Field
+              label="Duration"
+              note={
+                breakMins ? `(auto · ${breakMins}min break off)` : "(auto)"
+              }
+            >
               <output
                 className={cn(
                   CONTROL,
@@ -614,7 +635,7 @@ function EditEntryForm({
                   "flex items-center border-brand-line bg-brand-tint font-semibold text-brand",
                 )}
               >
-                {duration ? formatMinutes(duration) : "—"}
+                {duration ? formatMinutes(duration) : span ? "0min" : "—"}
               </output>
             </Field>
           </FieldRow>
@@ -1320,6 +1341,7 @@ function describeChanges(
     unitNames: Map<string, string>;
     processNames: Map<string, string>;
     unitWord: string;
+    shiftTimes: ShiftTimes | undefined;
   },
 ): FieldChange[] {
   const parsed = logEntryFieldsSchema.safeParse(values);
@@ -1328,6 +1350,7 @@ function describeChanges(
   const next = entryColumns(
     { ...parsed.data, note: "" },
     lookups.productId,
+    lookups.shiftTimes,
   ) as Record<string, unknown>;
   const before = entry as unknown as Record<string, unknown>;
 

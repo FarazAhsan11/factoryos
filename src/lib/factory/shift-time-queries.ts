@@ -16,6 +16,9 @@ export type RunningShift = "morning" | "afternoon";
  */
 export type ShiftClock = ShiftClockValues;
 
+/** Both shifts' clocks, as `fetchShiftTimes` returns them. */
+export type ShiftTimes = Record<RunningShift, ShiftClockValues>;
+
 /** The prototype's defaults — used until a factory saves its own. */
 export const DEFAULT_SHIFT_TIMES: Record<RunningShift, ShiftClockValues> = {
   morning: {
@@ -125,6 +128,49 @@ export function productiveMinutes(shift: ShiftClockValues): number {
     (shift.break1Start ? shift.break1Minutes : 0) +
     (shift.break2Start ? shift.break2Minutes : 0);
   return Math.max(0, shiftLengthMinutes(shift) - breaks);
+}
+
+/**
+ * How many minutes of an activity's `[start, end)` fall inside a scheduled
+ * break (Admin → Shift times), so they can come off its run time.
+ *
+ * Every configured break of both shifts is checked, not just the entry's own
+ * shift: breaks are fixed clock windows, and an entry that straddles the
+ * handover can cross either shift's. Counted minute by minute on a 24-hour
+ * circle, so a break or an activity that wraps past midnight is measured
+ * correctly and two overlapping breaks are never taken off twice.
+ *
+ * Zero while the shift times are still loading — the write path fetches them
+ * itself before storing a duration (see `createLogEntry`).
+ */
+export function breakMinutesWithin(
+  times: ShiftTimes | undefined,
+  startClock: string,
+  endClock: string,
+): number {
+  const start = minutesOfDay(startClock);
+  const end = minutesOfDay(endClock);
+  if (!times || start === null || end === null) return 0;
+
+  const DAY = 24 * 60;
+  const span = (end - start + DAY) % DAY;
+  if (!span) return 0;
+
+  const onBreak = new Uint8Array(DAY);
+  for (const shift of [times.morning, times.afternoon]) {
+    for (const [at, mins] of [
+      [shift.break1Start, shift.break1Minutes],
+      [shift.break2Start, shift.break2Minutes],
+    ] as const) {
+      const from = minutesOfDay(at);
+      if (from === null || !Number.isFinite(mins) || mins <= 0) continue;
+      for (let i = 0; i < mins; i++) onBreak[(from + i) % DAY] = 1;
+    }
+  }
+
+  let total = 0;
+  for (let i = 0; i < span; i++) total += onBreak[(start + i) % DAY];
+  return total;
 }
 
 /** 510 → "8h 30m". */

@@ -50,7 +50,7 @@ import { fetchProducts, productKeys } from "@/lib/factory/product-queries";
 import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
 import {
   createLogEntry,
-  durationMinutes,
+  entryDuration,
   fetchBatchEntries,
   formatMinutes,
   logKeys,
@@ -332,7 +332,12 @@ export function NewEntryRow({
 
   /* ── The figures the sheet's own columns show ───────────────────────── */
 
-  const duration = durationMinutes(startTime ?? "", endTime ?? "");
+  // Net of any scheduled break inside the run (Admin → Shift times).
+  const {
+    span,
+    breaks: breakMins,
+    net: duration,
+  } = entryDuration(startTime, endTime, shiftTimes);
 
   const derivedTarget = targetQtyFromSpeed(
     speedType,
@@ -441,7 +446,7 @@ export function NewEntryRow({
   const submit = useMutation({
     // `date`, not today: the row belongs to the sheet it was added to.
     mutationFn: (values: LogEntryParsed) =>
-      createLogEntry(values, userId, date, product?.id ?? null),
+      createLogEntry(values, userId, date, product?.id ?? null, shiftTimes),
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({
@@ -587,9 +592,16 @@ export function NewEntryRow({
 
         {/* Run time is derived from the two clocks in the strip below. */}
         <Cell>
-          {duration > 0 ? (
-            <Static className="justify-end font-mono">
-              {formatMinutes(duration)}
+          {span > 0 ? (
+            <Static
+              className="justify-end font-mono"
+              title={
+                breakMins
+                  ? `${breakMins}min scheduled break taken off`
+                  : undefined
+              }
+            >
+              {duration ? formatMinutes(duration) : "0min"}
             </Static>
           ) : (
             <Blank />

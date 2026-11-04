@@ -367,6 +367,7 @@ export function LogGrid({
             userId,
             day,
             line.productId(),
+            registers.shiftTimes,
           );
           // Above its line at once, rather than after the refetch below.
           queryClient.setQueryData<LogEntry[]>(

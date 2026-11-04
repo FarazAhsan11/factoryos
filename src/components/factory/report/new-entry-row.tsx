@@ -18,6 +18,7 @@ import {
   logEntrySchema,
   operatorsRequired,
   planRequired,
+  processOptionGroups,
   speedTypeTakesRate,
   targetQtyFromSpeed,
   type LogEntryParsed,
@@ -629,11 +630,7 @@ export function NewEntryRow({
                 placeholder="Activity…"
                 searchPlaceholder="Activity name…"
                 emptyMessage="No activity matches that."
-                options={activeProcesses.map((p) => ({
-                  value: p.id,
-                  label: p.name,
-                  meta: p.category as string,
-                }))}
+                groups={processOptionGroups(activeProcesses)}
                 className={SELECT}
               />
             )}

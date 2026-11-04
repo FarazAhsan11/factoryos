@@ -25,6 +25,7 @@ import {
   type StagePlanValues,
   type StageUnit,
 } from "@/app/factory/[slug]/pipeline/schemas";
+import { processOptionGroups } from "@/app/factory/[slug]/log/schemas";
 import { DateField } from "@/components/ui/date-picker";
 import {
   CONTROL,
@@ -342,11 +343,7 @@ export function StagePlanEditor({
                               searchPlaceholder="Activity name…"
                               emptyMessage="No activity matches that."
                               className={CONTROL}
-                              options={processes.map((proc) => ({
-                                value: proc.id,
-                                label: proc.name,
-                                meta: proc.category ?? undefined,
-                              }))}
+                              groups={processOptionGroups(processes)}
                             />
                           )}
                         />

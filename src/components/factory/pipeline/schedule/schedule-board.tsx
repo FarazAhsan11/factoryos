@@ -8,7 +8,6 @@ import {
   Sparkles,
 } from "lucide-react";
 
-import { BatchTypeBadge } from "@/components/factory/pipeline/batch-type-badge";
 import {
   cleanShort,
   stageName,
@@ -208,42 +207,53 @@ function StageCard({
               : "border-line",
         )}
       >
-        <div className="flex flex-wrap items-center gap-1.5">
-          {job && <BatchTypeBadge type={job.batch_type} />}
-          {/* Behind plan is the one thing worth interrupting the card for: the
-            day has passed and nobody has started it. */}
-          {stage.is_behind_plan && (
-            <span className="inline-flex items-center gap-1 rounded-md bg-warn-tint px-1.5 py-0.5 text-[0.625rem] font-bold tracking-[0.02em] text-warn-ink uppercase ring-1 ring-warn-line/70">
-              <AlertTriangle className="size-3" aria-hidden />
-              Behind
+        {/* The batch opens the card; the two flags worth a glance sit small in
+            its top-right corner rather than in a row of their own. The batch
+            type is left to the Queue and the batch itself — on a lane of
+            cards it was the same word repeated on every one. */}
+        <div className="flex items-start justify-between gap-2">
+          <p className="flex min-w-0 items-baseline gap-1.5">
+            <span className="font-mono text-[0.8125rem] font-semibold tracking-tight text-brand">
+              {job?.batch_no ?? "—"}
             </span>
-          )}
-          {/* The clean the room needs after this stage (0052). */}
-          {clean && (
-            <span
-              className={cn(
-                "ml-auto inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-mono text-[0.625rem] font-bold ring-1",
-                stage.clean_type === "full"
-                  ? "bg-teal-soft text-teal-deep ring-teal-line"
-                  : "bg-warn-tint text-warn-ink ring-warn-line",
+            {job?.product_code && (
+              <span className="truncate font-mono text-[0.6562rem] text-ink-5">
+                {job.product_code}
+              </span>
+            )}
+          </p>
+
+          {(stage.is_behind_plan || clean) && (
+            <span className="flex shrink-0 items-center gap-1">
+              {/* The clean the room needs after this stage (0052). */}
+              {clean && (
+                <span
+                  title={`${stage.clean_type === "full" ? "Full" : "Provisional"} clean after this stage · ${fmt(stage.clean_hours)}h`}
+                  className={cn(
+                    "inline-flex items-center gap-0.5 rounded-full px-1.5 py-px font-mono text-[0.5938rem] font-semibold",
+                    stage.clean_type === "full"
+                      ? "bg-teal-soft text-teal-deep"
+                      : "bg-warn-tint text-warn-ink",
+                  )}
+                >
+                  <Sparkles className="size-2.5" aria-hidden />
+                  {clean} {fmt(stage.clean_hours)}h
+                </span>
               )}
-            >
-              <Sparkles className="size-3" aria-hidden />
-              {clean} · {fmt(stage.clean_hours)}h
+              {/* Behind plan: the day has passed and nobody has finished it.
+                  The date line below already says by how much. */}
+              {stage.is_behind_plan && (
+                <span
+                  title="Behind plan — its planned day has passed unfinished."
+                  className="inline-flex items-center gap-0.5 rounded-full bg-warn-tint px-1.5 py-px text-[0.5938rem] font-semibold text-warn-ink"
+                >
+                  <AlertTriangle className="size-2.5" aria-hidden />
+                  Behind
+                </span>
+              )}
             </span>
           )}
         </div>
-
-        <p className="flex items-baseline gap-1.5">
-          <span className="font-mono text-[0.8125rem] font-semibold tracking-tight text-brand">
-            {job?.batch_no ?? "—"}
-          </span>
-          {job?.product_code && (
-            <span className="truncate font-mono text-[0.6562rem] text-ink-5">
-              {job.product_code}
-            </span>
-          )}
-        </p>
 
         <p className="line-clamp-1 text-[0.8125rem] font-semibold text-ink">
           {job?.product_name ?? "Unnamed batch"}

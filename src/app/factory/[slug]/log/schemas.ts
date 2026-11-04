@@ -44,6 +44,25 @@ export const PROCESS_CATEGORIES = [
 
 export type ProcessCategory = (typeof PROCESS_CATEGORIES)[number]["value"];
 
+/**
+ * Activities as dropdown groups — a heading per category, in this list's
+ * order, each holding its activities — the way the shift log's picker shows
+ * them. A heading reads better than the category repeated beside every name,
+ * which also cut the longer names short. Empty categories are left out, and
+ * an activity with no category (from before 0030) goes under Production, the
+ * shape it is treated as everywhere else.
+ */
+export function processOptionGroups(
+  processes: readonly { id: string; name: string; category?: string | null }[],
+): { label: string; options: { value: string; label: string }[] }[] {
+  return PROCESS_CATEGORIES.map((c) => ({
+    label: c.label,
+    options: processes
+      .filter((p) => (p.category ?? "production") === c.value)
+      .map((p) => ({ value: p.id, label: p.name })),
+  })).filter((g) => g.options.length > 0);
+}
+
 /** The three values as a zod-ready tuple, derived so the two can't drift. */
 export const PROCESS_CATEGORY_VALUES = PROCESS_CATEGORIES.map(
   (c) => c.value,

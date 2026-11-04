@@ -64,6 +64,7 @@ import {
   type BatchStage,
   plannedOverOrder,
 } from "@/lib/factory/batch-stage-queries";
+import { processOptionGroups } from "@/app/factory/[slug]/log/schemas";
 import { SelectField } from "@/components/ui/select-field";
 import { DateField } from "@/components/ui/date-picker";
 import { formatReportDate } from "@/lib/factory/shift-report-queries";
@@ -1208,11 +1209,7 @@ function AddStageRow({
                     searchPlaceholder="Activity name…"
                     emptyMessage="No activity matches that."
                     className={CONTROL}
-                    options={processes.map((proc) => ({
-                      value: proc.id,
-                      label: proc.name,
-                      meta: proc.category ?? undefined,
-                    }))}
+                    groups={processOptionGroups(processes)}
                   />
                 )}
               />

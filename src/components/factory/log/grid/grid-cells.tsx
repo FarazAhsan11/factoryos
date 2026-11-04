@@ -20,9 +20,11 @@ export type GridColumnKey =
   | "unit"
   | "target"
   | "rejected"
+  | "progress"
   | "speedUnit"
   | "targetSpeed"
   | "actualSpeed"
+  | "slowReason"
   | "equipment"
   | "operators"
   | "flag"
@@ -56,9 +58,14 @@ export const GRID_COLUMNS: {
   { key: "unit", label: "Unit", width: 112 },
   { key: "target", label: "Shift target", width: 112, align: "right" },
   { key: "rejected", label: "Rejected", width: 96, align: "right" },
+  // Read only: how far the planned stage has got, this line included.
+  { key: "progress", label: "Stage progress", width: 168 },
   { key: "speedUnit", label: "Speed unit", width: 150 },
   { key: "targetSpeed", label: "Target speed", width: 104, align: "right" },
   { key: "actualSpeed", label: "Actual speed", width: 104, align: "right" },
+  // Beside the speeds it explains, as on the shift report — asked only when
+  // actual speed is below target.
+  { key: "slowReason", label: "Slow reason", width: 176 },
   { key: "equipment", label: "EQ no.", width: 100 },
   { key: "operators", label: "Operators", width: 172 },
   { key: "flag", label: "Flag", width: 168 },

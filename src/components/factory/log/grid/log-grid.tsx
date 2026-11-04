@@ -1010,11 +1010,15 @@ function LoggedRow({
     unit: entry.qty_unit ?? "—",
     rejected: <span className="font-mono">{fmt(entry.qty_rejected)}</span>,
     target: <span className="font-mono">{fmt(entry.target_qty)}</span>,
+    // A stage's progress is a fact about now, not about this entry — it
+    // belongs on the lines still being typed.
+    progress: "—",
     operators: operators || "—",
     equipment: <span className="font-mono">{entry.equipment_no || "—"}</span>,
     speedUnit: entry.speed_unit ?? "—",
     targetSpeed: <span className="font-mono">{fmt(entry.target_speed)}</span>,
     actualSpeed: <span className="font-mono">{fmt(entry.actual_speed)}</span>,
+    slowReason: entry.slow_reason || "—",
     flag: entry.action_flag ? (
       <span className="inline-flex items-center gap-1 font-semibold text-danger-deep">
         <Flag className="size-3" /> {entry.action_flag}
@@ -1022,7 +1026,7 @@ function LoggedRow({
     ) : (
       "—"
     ),
-    comment: entry.comment || entry.slow_reason || "—",
+    comment: entry.comment || "—",
   };
 
   return (

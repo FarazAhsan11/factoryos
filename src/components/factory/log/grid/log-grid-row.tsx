@@ -39,6 +39,7 @@ import {
 } from "@/components/factory/log/grid/grid-cells";
 import type { LogRegisters } from "@/components/factory/log/grid/use-log-registers";
 import { OperatorPicker } from "@/components/factory/log/operator-picker";
+import { StageProgressCell } from "@/components/factory/log/grid/stage-progress-cell";
 import { StageProgress } from "@/components/factory/log/stage-progress";
 import { TimeField } from "@/components/ui/date-picker";
 import { SelectField } from "@/components/ui/select-field";
@@ -483,7 +484,11 @@ export function LogGridRow({
   const overTolerance = activeStage
     ? stageIsOverTolerance(activeStage, thisQty)
     : false;
-  const showStage = Boolean(activeStage && activeStage.target_qty);
+  // The stage progress card is unwired from the grid for now (it crowded the
+  // strip under a line); the card and its plumbing stay for when it returns.
+  // The Stage progress column reads the same plan in compact form.
+  const hasStagePlan = Boolean(activeStage && activeStage.target_qty);
+  const showStage = SHOW_STAGE_PROGRESS && hasStagePlan;
 
   /** Below target speed — the one case the schema demands a reason. */
   const isSlow =
@@ -564,7 +569,7 @@ export function LogGridRow({
   const showStrip =
     problems.length > 0 ||
     Boolean(submitError) ||
-    (touched && (Boolean(batchBlock) || mustPickStage || isSlow || showStage));
+    (touched && (Boolean(batchBlock) || mustPickStage || showStage));
 
   const speedUnitValue = composeSpeedUnit(
     speedType || "RPM",
@@ -809,6 +814,24 @@ export function LogGridRow({
           )}
         </Cell>
 
+        {/* The planned stage this line counts towards, as far as it has got —
+            this line's quantity included. Read only. Downtime takes no stage;
+            other work shows a dash until its batch and activity name one. */}
+        <Cell>
+          {isDowntime ? (
+            <Blank />
+          ) : touched && hasStagePlan && activeStage ? (
+            <StageProgressCell stage={activeStage} pending={thisQty} />
+          ) : (
+            <span
+              title="Shows once the batch and activity name a planned stage"
+              className="flex h-10 items-center px-3 text-[0.75rem] text-ink-6"
+            >
+              —
+            </span>
+          )}
+        </Cell>
+
         {/* Speed and equipment — machine activities only, as on the form. */}
         <Cell>
           {hasMachine ? (
@@ -855,6 +878,43 @@ export function LogGridRow({
               aria-invalid={Boolean(errors.actualSpeed) || undefined}
               className={cn(INPUT, "text-right font-mono")}
             />
+          ) : (
+            <Blank />
+          )}
+        </Cell>
+
+        {/* Why it ran slow — its own column beside the speeds, live only
+            once actual speed is below target, which is when the schema asks
+            for it. Amber until answered, like a batch the gate would refuse. */}
+        <Cell>
+          {isSlow ? (
+            <Controller
+              name="slowReason"
+              control={control}
+              render={({ field }) => (
+                <SelectField
+                  ariaLabel={`Reason it ran slow — ${unit.name}`}
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  ariaInvalid={Boolean(errors.slowReason)}
+                  clearable
+                  placeholder="Select reason…"
+                  options={SLOW_REASONS.map((reason) => ({
+                    value: reason,
+                    label: reason,
+                  }))}
+                  className={cn(PICKER, !field.value && WARN)}
+                />
+              )}
+            />
+          ) : hasMachine ? (
+            <span
+              title="Only asked when actual speed is below target"
+              className="flex h-10 items-center px-3 text-[0.75rem] text-ink-6"
+            >
+              —
+            </span>
           ) : (
             <Blank />
           )}
@@ -1057,7 +1117,7 @@ export function LogGridRow({
             {/* Pinned to the left of the scroll box so the strip stays on
                 screen while the row above is scrolled sideways. */}
             <div className="sticky left-0 w-fit max-w-[min(100%,56rem)] space-y-2 px-3.5 py-2.5 pl-4 shadow-[inset_3px_0_0_0_var(--color-brand-line)]">
-              {(mustPickStage || isSlow) && (
+              {mustPickStage && (
                 <div className="flex flex-wrap items-center gap-2">
                   {mustPickStage && (
                     <StripField label="Stage — this batch runs it more than once">
@@ -1079,30 +1139,6 @@ export function LogGridRow({
                                 : undefined,
                             }))}
                             className={cn(STRIP_CONTROL, "w-56")}
-                          />
-                        )}
-                      />
-                    </StripField>
-                  )}
-                  {isSlow && (
-                    <StripField label="⚠ Reason below target speed" tone="warn">
-                      <Controller
-                        name="slowReason"
-                        control={control}
-                        render={({ field }) => (
-                          <SelectField
-                            ariaLabel={`Reason it ran slow — ${unit.name}`}
-                            value={field.value ?? ""}
-                            onChange={field.onChange}
-                            onBlur={field.onBlur}
-                            ariaInvalid={Boolean(errors.slowReason)}
-                            clearable
-                            placeholder="Select reason…"
-                            options={SLOW_REASONS.map((reason) => ({
-                              value: reason,
-                              label: reason,
-                            }))}
-                            className={cn(STRIP_CONTROL, "w-64")}
                           />
                         )}
                       />
@@ -1149,6 +1185,13 @@ export function LogGridRow({
     </>
   );
 }
+
+/**
+ * Whether the strip under a line shows the stage's progress card (planned vs
+ * taken, as the form shows it). Off for now — the card is still built and
+ * wired, only switched off here, so turning it back on is this one line.
+ */
+const SHOW_STAGE_PROGRESS = false;
 
 /**
  * The speed unit as one choice rather than the form's two controls — a

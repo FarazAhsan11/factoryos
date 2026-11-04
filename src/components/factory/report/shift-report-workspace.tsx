@@ -91,7 +91,11 @@ export function ShiftReportWorkspace({
     queryFn: () => fetchShiftTimes(factoryId),
   });
 
-  const rooms = useMemo(() => groupByRoom(entries), [entries]);
+  const shiftStart = shiftTimes?.[shift]?.startTime;
+  const rooms = useMemo(
+    () => groupByRoom(entries, shiftStart),
+    [entries, shiftStart],
+  );
 
   const totals = useMemo(() => summarise(entries), [entries]);
 

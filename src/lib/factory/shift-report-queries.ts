@@ -149,8 +149,17 @@ export function compareRoomNames(a: string, b: string): number {
  * entries. A room with no entries has no place on the sheet, so the entries
  * alone decide who is listed — a room since deactivated included, because its
  * work still happened.
+ *
+ * Within a room, entries run in the order the work happened — by start time,
+ * not by when they were filed — so a 07:00 clean logged late still sits above
+ * the 11:00 run. Measured from the shift's start (`shiftStart`, "HH:MM") so a
+ * shift that runs past midnight puts 23:30 before 00:30. Ties, and entries
+ * with no start, fall back to filing order.
  */
-export function groupByRoom(entries: ShiftReportRow[]): ShiftReportRoom[] {
+export function groupByRoom(
+  entries: ShiftReportRow[],
+  shiftStart?: string,
+): ShiftReportRoom[] {
   const rooms = new Map<string, ShiftReportRoom>();
   for (const entry of entries) {
     const room = rooms.get(entry.unit_id);
@@ -166,7 +175,26 @@ export function groupByRoom(entries: ShiftReportRow[]): ShiftReportRoom[] {
       });
     }
   }
+  const origin = clockMinutes(shiftStart) ?? 0;
+  /** Minutes into the shift; an entry with no start sorts last. */
+  const at = (entry: ShiftReportRow) => {
+    const start = clockMinutes(entry.start_time);
+    return start === null ? Infinity : (start - origin + 1440) % 1440;
+  };
+  for (const room of rooms.values()) {
+    room.entries.sort(
+      (a, b) => at(a) - at(b) || a.created_at.localeCompare(b.created_at),
+    );
+  }
+
   return [...rooms.values()].sort((a, b) => compareRoomNames(a.name, b.name));
+}
+
+/** "07:00" or "07:00:00" → 420; null when there is no clock to read. */
+function clockMinutes(clock: string | null | undefined): number | null {
+  if (!clock) return null;
+  const [h, m] = clock.split(":").map(Number);
+  return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : null;
 }
 
 export interface ShiftReportTotals {

@@ -121,6 +121,7 @@ export function LogGridRow({
   registers,
   primary,
   startAt,
+  prefill,
   restored,
   onRemove,
   onClear,
@@ -142,6 +143,12 @@ export function LogGridRow({
   primary: boolean;
   /** Where the start clock opens, "HH:MM" — or "" for blank. */
   startAt: string;
+  /**
+   * Values the line opens holding, set by the grid rather than typed — the
+   * Idle button's whole-shift idle entry. Still a line like any other: it is
+   * filed only when Log is pressed, and anything in it can be changed first.
+   */
+  prefill?: Partial<LogEntryValues>;
   /** What this line held before the page reloaded, if it held anything. */
   restored?: Partial<LogEntryValues>;
   onRemove: () => void;
@@ -199,6 +206,7 @@ export function LogGridRow({
       // asks for everything, so no cell already filled disappears on selection.
       category: "production",
       hasMachine: false,
+      ...prefill,
       ...restored,
       factoryId,
       unitId: unit.id,

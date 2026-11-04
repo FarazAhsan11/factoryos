@@ -8,6 +8,7 @@ import {
   Flag,
   History,
   Loader2,
+  Pause,
   Plus,
   ShieldCheck,
   Sheet,
@@ -15,6 +16,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import type { LogEntryValues } from "@/app/factory/[slug]/log/schemas";
 import {
   Cell,
   GRID_COLUMNS,
@@ -305,6 +307,49 @@ export function LogGrid({
       startAt = last?.end_time?.slice(0, 5) ?? "";
     }
     const line = { id: `line-${crypto.randomUUID()}`, startAt };
+    setLines((prev) => ({
+      ...prev,
+      [unitId]: [...(prev[unitId] ?? []), line],
+    }));
+  }
+
+  /**
+   * The factory's Idle activity, if it has one — a downtime stage named
+   * "Idle" (exactly, else the first downtime stage whose name contains it).
+   * Without one the Idle button isn't offered: there is nothing to file it as.
+   */
+  const idleProcess = useMemo(() => {
+    const downtime = registers.processes.filter(
+      (p) => p.category === "downtime",
+    );
+    const named = (p: { name: string }) => p.name.trim().toLowerCase();
+    return (
+      downtime.find((p) => named(p) === "idle") ??
+      downtime.find((p) => named(p).includes("idle")) ??
+      null
+    );
+  }, [registers.processes]);
+
+  /**
+   * Opens a line for a room that stood idle: the whole of the running shift,
+   * start to end, as the Idle activity. Only a line — nothing is filed until
+   * Log is pressed, so the clocks can still be trimmed first. The shift is
+   * read now, at the click, so a grid left open across the handover offers
+   * the shift that is actually running.
+   */
+  function addIdleLine(unitId: string) {
+    const times = registers.shiftTimes;
+    if (!idleProcess || !times) return;
+    const clock = times[resolveCurrentShift(times)];
+    const line: GridLine = {
+      id: `line-${crypto.randomUUID()}`,
+      startAt: clock.startTime,
+      prefill: {
+        processId: idleProcess.id,
+        startTime: clock.startTime,
+        endTime: clock.endTime,
+      },
+    };
     setLines((prev) => ({
       ...prev,
       [unitId]: [...(prev[unitId] ?? []), line],
@@ -608,6 +653,9 @@ export function LogGrid({
             restoredRows={restored?.rows ?? NO_RESTORE}
             lines={lines}
             onAddRow={addLine}
+            onAddIdle={
+              idleProcess && registers.shiftTimes ? addIdleLine : undefined
+            }
             onRemoveRow={removeRow}
             onClearRow={clearRow}
             onRegister={registerRow}
@@ -667,6 +715,8 @@ interface GridLine {
   id: string;
   /** Where its start clock opens, "HH:MM" — or "" for blank. */
   startAt: string;
+  /** Values it opens holding — see `addIdleLine`. */
+  prefill?: Partial<LogEntryValues>;
 }
 
 /**
@@ -728,6 +778,7 @@ function RoomBlocks({
   restoredRows,
   lines,
   onAddRow,
+  onAddIdle,
   onRemoveRow,
   onClearRow,
   onRegister,
@@ -741,6 +792,8 @@ function RoomBlocks({
   restoredRows: GridDraft["rows"];
   lines: Record<string, GridLine[]>;
   onAddRow: (unitId: string) => void;
+  /** Undefined when the factory has no Idle activity to file. */
+  onAddIdle?: (unitId: string) => void;
   onRemoveRow: (rowId: string) => void;
   onClearRow: (rowId: string) => void;
   onRegister: (rowId: string, handle: GridRowHandle | null) => void;
@@ -763,6 +816,7 @@ function RoomBlocks({
       restoredRows={restoredRows}
       lines={lines[unit.id] ?? NO_LINES}
       onAddRow={onAddRow}
+      onAddIdle={onAddIdle}
       onRemoveRow={onRemoveRow}
       onClearRow={onClearRow}
       onRegister={onRegister}
@@ -786,6 +840,7 @@ function RoomBlock({
   restoredRows,
   lines,
   onAddRow,
+  onAddIdle,
   onRemoveRow,
   onClearRow,
   onRegister,
@@ -802,6 +857,7 @@ function RoomBlock({
   restoredRows: GridDraft["rows"];
   lines: GridLine[];
   onAddRow: (unitId: string) => void;
+  onAddIdle?: (unitId: string) => void;
   onRemoveRow: (rowId: string) => void;
   onClearRow: (rowId: string) => void;
   onRegister: (rowId: string, handle: GridRowHandle | null) => void;
@@ -809,6 +865,12 @@ function RoomBlock({
 }) {
   /** Nothing to show and nothing open — said in the heading, not left blank. */
   const empty = logged.length === 0 && lines.length === 0;
+  /**
+   * Idle is offered only to a room that has filed nothing all day — cleared
+   * off the sheet counts as filed — and has no line open. Once pressed, the
+   * line it opens is the room's work, and the button goes.
+   */
+  const offerIdle = Boolean(onAddIdle) && !filedToday && lines.length === 0;
 
   return (
     <tbody>
@@ -852,6 +914,7 @@ function RoomBlock({
           registers={registers}
           primary={i === 0}
           startAt={line.startAt}
+          prefill={line.prefill}
           restored={restoredRows[line.id]}
           onRemove={() => onRemoveRow(line.id)}
           onClear={() => onClearRow(line.id)}
@@ -865,7 +928,7 @@ function RoomBlock({
           the heading above. */}
       <tr>
         <td colSpan={GRID_SPAN} className="border-t border-line-soft p-0">
-          <div className="sticky left-0 w-fit px-3.5 py-1.5">
+          <div className="sticky left-0 flex w-fit items-center gap-1.5 px-3.5 py-1.5">
             <button
               type="button"
               onClick={() => onAddRow(unit.id)}
@@ -875,6 +938,17 @@ function RoomBlock({
               <Plus className="size-3" aria-hidden />
               Add row
             </button>
+            {offerIdle && (
+              <button
+                type="button"
+                onClick={() => onAddIdle?.(unit.id)}
+                title={`Fill a row for ${unit.name} as Idle for the whole running shift — check it, then Log`}
+                className="inline-flex h-6 items-center gap-1 rounded-md border border-line bg-surface px-1.5 text-[0.625rem] font-semibold text-ink-4 transition hover:border-warn hover:bg-warn-tint hover:text-warn-ink"
+              >
+                <Pause className="size-3" aria-hidden />
+                Idle
+              </button>
+            )}
           </div>
         </td>
       </tr>

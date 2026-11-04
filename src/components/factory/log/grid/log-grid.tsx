@@ -1037,6 +1037,8 @@ function LoggedRow({
             <Cell
               key={column.key}
               title={`${unitName} — logged at ${filedAt}`}
+              // The room opens the sheet, so it carries the row's teal spine.
+              className={cn(i === 0 && "border-l-3 border-l-teal")}
             >
               <span className="flex h-9 items-center gap-1.5 pl-3.5 text-[0.75rem] text-teal-deep">
                 <Check className="size-3.5 shrink-0" aria-hidden />

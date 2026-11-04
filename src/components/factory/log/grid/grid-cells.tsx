@@ -32,12 +32,16 @@ export type GridColumnKey =
   | "actions";
 
 /**
- * Left to right in the Log history's order, so the sheet an entry is typed
- * into and the table it is later read back from put every field in the same
- * place: when, then where and what, then how much, then how fast, then who,
- * then what was said. Pixel widths sized to what each column holds; the grid
- * is wider than a laptop and scrolls sideways as one sheet — no column is
- * pinned.
+ * Left to right in the shift report's order (`REPORT_COLUMNS`), so the sheet
+ * an entry is typed into and the sheet it is printed on put every field in the
+ * same place: where and what, when, which batch, how much, against what, how
+ * fast and on what, then who and what was said. The grid's few extra columns
+ * sit in the group they belong to — the speed unit with the machine, the flag
+ * with the notes. Pixel widths sized to what each column holds; the grid is
+ * wider than a laptop and scrolls sideways as one sheet — no column is pinned.
+ *
+ * `LogGridRow` draws its cells in this same order by hand; moving a column
+ * here means moving its cell there too.
  */
 export const GRID_COLUMNS: {
   key: GridColumnKey;
@@ -45,12 +49,12 @@ export const GRID_COLUMNS: {
   width: number;
   align?: "right";
 }[] = [
-  // Both clocks in one column, as the Log history shows them — two pickers
-  // with an arrow between, wide enough for both.
-  { key: "time", label: "Start → End", width: 248 },
-  { key: "hrs", label: "Hrs", width: 88, align: "right" },
   { key: "room", label: "Room", width: 140 },
   { key: "activity", label: "Activity / stage", width: 188 },
+  // Both clocks in one column, as the shift report shows them — two pickers
+  // with an arrow between, wide enough for both.
+  { key: "time", label: "Start → End", width: 248 },
+  { key: "hrs", label: "Duration", width: 96, align: "right" },
   { key: "batch", label: "Batch #", width: 116 },
   { key: "product", label: "Product", width: 170 },
   { key: "code", label: "Product code", width: 116 },

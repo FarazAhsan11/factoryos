@@ -582,16 +582,67 @@ export function LogGridRow({
           so its sticky header keeps its line, and a row's own border is not
           drawn in that mode. */}
       <tr className="bg-surface [&>td]:border-t">
-        {/* When — both clocks in one column, as the Log history shows them.
-            It opens the row, so it carries the row's spine: brand on a room's
-            own line, paler on a line added to it. A border rather than an
-            inset shadow, which the pickers' hover fill would paint over. */}
+        {/* Room. Fixed — the row was drawn for it. Columns run in the shift
+            report's order, so the room opens the row and carries its spine:
+            brand on a room's own line, paler on a line added to it. A border
+            rather than an inset shadow, which a hover fill would paint over. */}
         <Cell
+          title={unit.name}
           className={cn(
             "border-l-3",
             primary ? "border-l-brand" : "border-l-brand-line",
           )}
         >
+          <span className="flex h-10 items-center gap-1.5 pr-1.5 pl-3.5">
+            <span
+              className={cn(
+                "min-w-0 flex-1 truncate text-[0.7812rem]",
+                primary ? "font-semibold text-ink" : "text-ink-4",
+              )}
+            >
+              {primary ? unit.name : `+ ${unit.name}`}
+            </span>
+            {onRemove && (
+              <button
+                type="button"
+                onClick={onRemove}
+                title="Remove this row"
+                aria-label={`Remove this row for ${unit.name}`}
+                className="grid size-6 shrink-0 place-items-center rounded-md text-ink-5 transition hover:bg-danger-soft hover:text-danger-deep"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+          </span>
+        </Cell>
+
+        {/* Activity. Everything else on the row takes its shape from this. */}
+        <Cell>
+          <Controller
+            name="processId"
+            control={control}
+            render={({ field }) => (
+              <SelectField
+                ariaLabel={`Activity — ${unit.name}`}
+                value={field.value ?? ""}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                ariaInvalid={Boolean(errors.processId)}
+                placeholder="Select…"
+                searchPlaceholder="Activity name…"
+                emptyMessage="No activity matches that."
+                groups={processGroups.map((g) => ({
+                  label: g.label,
+                  options: g.items.map((p) => ({ value: p.id, label: p.name })),
+                }))}
+                className={PICKER}
+              />
+            )}
+          />
+        </Cell>
+
+        {/* When — both clocks in one column, as the shift report shows them. */}
+        <Cell>
           <span className="flex h-10 items-center">
             <Controller
               name="startTime"
@@ -642,56 +693,6 @@ export function LogGridRow({
           >
             {duration ? formatMinutes(duration) : span ? "0min" : "—"}
           </Static>
-        </Cell>
-
-        {/* Room. Fixed — the row was drawn for it. */}
-        <Cell title={unit.name}>
-          <span className="flex h-10 items-center gap-1.5 pr-1.5 pl-3.5">
-            <span
-              className={cn(
-                "min-w-0 flex-1 truncate text-[0.7812rem]",
-                primary ? "font-semibold text-ink" : "text-ink-4",
-              )}
-            >
-              {primary ? unit.name : `+ ${unit.name}`}
-            </span>
-            {onRemove && (
-              <button
-                type="button"
-                onClick={onRemove}
-                title="Remove this row"
-                aria-label={`Remove this row for ${unit.name}`}
-                className="grid size-6 shrink-0 place-items-center rounded-md text-ink-5 transition hover:bg-danger-soft hover:text-danger-deep"
-              >
-                <X className="size-3.5" />
-              </button>
-            )}
-          </span>
-        </Cell>
-
-        {/* Activity. Everything else on the row takes its shape from this. */}
-        <Cell>
-          <Controller
-            name="processId"
-            control={control}
-            render={({ field }) => (
-              <SelectField
-                ariaLabel={`Activity — ${unit.name}`}
-                value={field.value ?? ""}
-                onChange={field.onChange}
-                onBlur={field.onBlur}
-                ariaInvalid={Boolean(errors.processId)}
-                placeholder="Select…"
-                searchPlaceholder="Activity name…"
-                emptyMessage="No activity matches that."
-                groups={processGroups.map((g) => ({
-                  label: g.label,
-                  options: g.items.map((p) => ({ value: p.id, label: p.name })),
-                }))}
-                className={PICKER}
-              />
-            )}
-          />
         </Cell>
 
         {/* Batch. The cell the product, the stage and the gate resolve from. */}

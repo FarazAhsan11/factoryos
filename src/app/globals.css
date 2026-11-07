@@ -251,6 +251,20 @@
   --color-azure-soft: #dbeafe;
   --color-navy: #1e40af;
 
+  /* ── Rail — the deep-navy sidebar ─────────────────────────────────────
+     The one dark surface in the app. A navy that leans to indigo so the
+     brand accent sits in it rather than on it, and its own text ramp,
+     because the ink ramp above is built for light paper. Lines and hovers
+     on the rail are white at low alpha (`white/8`), not tokens: they have to
+     read on every step of its gradient. */
+  --color-rail-top: #1f2340; /* the top of the gradient, behind the tenant */
+  --color-rail: #181b31; /* the body, and the collapsed strip's flyout */
+  --color-rail-bottom: #10121f; /* where it settles at the foot */
+  --color-rail-ink: #eef0f8; /* active and hovered labels */
+  --color-rail-ink-2: #b4b9cf; /* resting labels */
+  --color-rail-ink-3: #7c82a0; /* section headings, the tenant's slug */
+  --color-rail-ink-4: #50566f; /* disabled, "Soon" */
+
   /* ── Elevation ────────────────────────────────────────────────────────
      Named so a shadow can be re-tuned once. `shadow-card` is the resting
      state of a panel, `shadow-lift` is what hovering one adds, and
@@ -291,6 +305,40 @@
 
   .scrollbar-slim::-webkit-scrollbar-thumb:hover {
     background-color: rgb(148 163 184);
+  }
+
+  /* The slim scrollbar on the dark rail — a pale thumb there glared. */
+  .scrollbar-rail {
+    scrollbar-color: rgb(255 255 255 / 0.14) transparent;
+  }
+  .scrollbar-rail::-webkit-scrollbar-thumb {
+    background-color: rgb(255 255 255 / 0.14);
+  }
+  .scrollbar-rail::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(255 255 255 / 0.26);
+  }
+
+  /* The rail's surface: navy settling darker toward the foot, with a faint
+     violet glow a third of the way down so the long column isn't one flat
+     slab. Both from the palette. */
+  .rail-surface {
+    background:
+      radial-gradient(
+        70% 35% at 20% 38%,
+        color-mix(in oklab, var(--color-violet) 13%, transparent),
+        transparent 70%
+      ),
+      radial-gradient(
+        60% 25% at 90% 0%,
+        color-mix(in oklab, var(--color-brand-bright) 16%, transparent),
+        transparent 70%
+      ),
+      linear-gradient(
+        180deg,
+        var(--color-rail-top) 0%,
+        var(--color-rail) 42%,
+        var(--color-rail-bottom) 100%
+      );
   }
 }
 

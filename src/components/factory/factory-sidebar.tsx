@@ -150,7 +150,7 @@ export function FactorySidebar({
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-[17rem] flex-col border-r border-line bg-gradient-to-b from-surface to-sunken shadow-2xl shadow-ink/10",
+          "rail-surface fixed inset-y-0 left-0 z-50 flex w-[17rem] flex-col border-r border-white/[0.06] text-rail-ink-2 shadow-2xl shadow-ink/30",
           "transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
           mobileOpen ? "translate-x-0" : "-translate-x-full",
           // From lg up it stops floating: it is part of the flex row, drops the
@@ -170,7 +170,7 @@ export function FactorySidebar({
             one thing you can want from a 72px strip. */}
         <div
           className={cn(
-            "flex h-[3.75rem] shrink-0 items-center gap-2.5 border-b border-line px-3",
+            "flex h-[3.75rem] shrink-0 items-center gap-2.5 border-b border-white/[0.07] px-3",
             icons && "lg:justify-center lg:px-0",
           )}
         >
@@ -182,10 +182,10 @@ export function FactorySidebar({
           >
             <FactoryMark logoUrl={logoUrl} />
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-ink">
+              <p className="truncate text-[0.8125rem] font-semibold tracking-[0.005em] text-rail-ink">
                 {factoryName}
               </p>
-              <p className="truncate text-[0.6875rem] text-ink-5">
+              <p className="truncate text-[0.65625rem] text-rail-ink-3">
                 {slug || "factory"} · workspace
               </p>
             </div>
@@ -195,7 +195,7 @@ export function FactorySidebar({
             type="button"
             onClick={() => setMobileOpen(false)}
             aria-label="Close navigation"
-            className="grid size-9 shrink-0 place-items-center rounded-lg text-ink-4 transition hover:bg-brand-soft hover:text-brand lg:hidden"
+            className="grid size-9 shrink-0 place-items-center rounded-lg text-rail-ink-3 transition hover:bg-white/[0.08] hover:text-rail-ink lg:hidden"
           >
             <X className="size-4" />
           </button>
@@ -210,7 +210,7 @@ export function FactorySidebar({
               "group relative hidden shrink-0 place-items-center rounded-lg transition lg:grid",
               icons
                 ? "size-9"
-                : "size-9 text-ink-5 hover:bg-brand-soft hover:text-brand",
+                : "size-9 text-rail-ink-3 hover:bg-white/[0.08] hover:text-rail-ink",
             )}
           >
             {icons ? (
@@ -219,14 +219,14 @@ export function FactorySidebar({
                 <Tip>Expand sidebar</Tip>
               </>
             ) : (
-              <PanelLeftClose className="size-[18px]" />
+              <PanelLeftClose className="size-[1.125rem]" />
             )}
           </button>
         </div>
 
         <nav
           className={cn(
-            "scrollbar-slim flex-1 overflow-y-auto overflow-x-hidden px-3 py-4",
+            "scrollbar-slim scrollbar-rail flex-1 overflow-y-auto overflow-x-hidden px-3 py-4",
             icons && "lg:px-2.5",
           )}
         >
@@ -237,7 +237,7 @@ export function FactorySidebar({
               {section.label && (
                 <p
                   className={cn(
-                    "px-3 pb-2 text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-ink-5",
+                    "px-3 pb-1.5 text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-rail-ink-3",
                     icons && "lg:hidden",
                   )}
                 >
@@ -245,7 +245,7 @@ export function FactorySidebar({
                 </p>
               )}
               {icons && section.label && (
-                <div className="mx-auto mb-2.5 hidden h-px w-7 rounded-full bg-line lg:block" />
+                <div className="mx-auto mb-2.5 hidden h-px w-7 rounded-full bg-white/10 lg:block" />
               )}
 
               <ul className="space-y-1">
@@ -289,16 +289,16 @@ export function FactorySidebar({
 }
 
 const ROW =
-  "group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-200";
+  "group relative flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[0.8125rem] leading-5 tracking-[0.005em] transition-all duration-200";
 /** The collapsed desktop strip: every row becomes a centred 44px square. */
 const ROW_ICONS =
   "lg:mx-auto lg:size-11 lg:justify-center lg:gap-0 lg:px-0 lg:py-0";
 const ROW_ACTIVE =
   // No transition into the active state: the gradient can't animate, so
   // easing only the text colour left the item half-selected for 200ms.
-  "bg-gradient-to-r from-brand to-brand-bright font-semibold text-white shadow-brand transition-none";
+  "bg-gradient-to-r from-brand-bright/35 to-brand-bright/10 font-medium text-white ring-1 ring-inset ring-white/[0.07] shadow-[0_8px_24px_-12px_var(--color-brand)] transition-none";
 const ROW_IDLE =
-  "text-ink-3 hover:bg-surface hover:text-ink hover:shadow-soft";
+  "text-rail-ink-2 hover:bg-white/[0.06] hover:text-rail-ink";
 
 /** A screen that stands alone — one click, no group. */
 function TopLink({
@@ -319,9 +319,9 @@ function TopLink({
       <span
         aria-disabled
         title="Arrives in a later build step"
-        className={cn(ROW, icons && ROW_ICONS, "cursor-not-allowed text-ink-6")}
+        className={cn(ROW, icons && ROW_ICONS, "cursor-not-allowed text-rail-ink-4")}
       >
-        <Icon className="size-[18px] shrink-0" />
+        <Icon className="size-4 shrink-0" />
         <Label hidden={icons}>{link.label}</Label>
         <Soon hidden={icons} />
         {icons && <Tip>{link.label} · soon</Tip>}
@@ -342,7 +342,7 @@ function TopLink({
     >
       <Icon
         className={cn(
-          "size-[18px] shrink-0 transition-transform duration-200",
+          "size-4 shrink-0 transition-transform duration-200",
           !active && "group-hover:scale-110",
         )}
       />
@@ -356,8 +356,7 @@ function TopLink({
  * A heading that folds open to its screens.
  *
  * Unfolded, the screens hang off a guide line under the heading's icon, and
- * the open one is marked on that line — so the eye finds "where am I" by
- * running down one rule rather than reading every label. The heading itself
+ * the open one is lifted by a tint of its own. The heading itself
  * turns brand-coloured while one of its screens is open, and stays that way
  * when folded, so a closed group still says it holds the current page.
  *
@@ -425,22 +424,22 @@ function NavGroupItem({
           icons && ROW_ICONS,
           holdsActive
             ? cn(
-                "font-semibold text-ink hover:bg-surface hover:shadow-soft",
+                "font-medium text-rail-ink hover:bg-white/[0.06]",
                 // Folded into the strip, the group *is* the current page's
                 // only marker — so it takes the full active treatment there.
                 icons &&
-                  "lg:bg-gradient-to-r lg:from-brand lg:to-brand-bright lg:text-white lg:shadow-brand",
+                  "lg:bg-gradient-to-r lg:from-brand-bright/35 lg:to-brand-bright/10 lg:text-white lg:ring-1 lg:ring-inset lg:ring-white/[0.07]",
               )
             : anyReady
               ? ROW_IDLE
-              : "text-ink-5 hover:bg-surface hover:text-ink-3",
+              : "text-rail-ink-4 hover:bg-white/[0.04] hover:text-rail-ink-3",
         )}
       >
         <Icon
           className={cn(
-            "size-[18px] shrink-0 transition-transform duration-200",
+            "size-4 shrink-0 transition-transform duration-200",
             holdsActive
-              ? cn("text-brand", icons && "lg:text-white")
+              ? cn("text-brand-line", icons && "lg:text-white")
               : "group-hover:scale-110",
           )}
         />
@@ -449,7 +448,7 @@ function NavGroupItem({
         <ChevronDown
           aria-hidden
           className={cn(
-            "size-4 shrink-0 text-ink-5 transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
+            "size-3.5 shrink-0 text-rail-ink-3 transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
             !open && "-rotate-90",
             icons && "lg:hidden",
           )}
@@ -470,14 +469,13 @@ function NavGroupItem({
         <div id={listId} className="min-h-0 overflow-hidden">
           <ul
             aria-label={group.label}
-            className="ml-[1.3rem] mt-1 space-y-0.5 border-l border-line pb-1 pl-2.5"
+            className="ml-[1.3rem] mt-1 space-y-0.5 border-l border-white/10 pb-1 pl-2.5"
           >
             {group.children.map((child) => (
               <li key={child.href}>
                 <SubLink
                   link={child}
                   active={active.has(child.href)}
-                  onRule
                   linkProps={linkProps}
                 />
               </li>
@@ -494,8 +492,8 @@ function NavGroupItem({
           className="fixed z-50 hidden pl-2 lg:block"
           style={{ top: flyout.top, left: flyout.left }}
         >
-          <div className="w-60 animate-in fade-in-0 slide-in-from-left-1 rounded-xl border border-line bg-surface p-1.5 shadow-xl shadow-ink/10 duration-150">
-            <p className="flex items-center gap-2 px-2.5 pb-1.5 pt-1 text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-ink-5">
+          <div className="w-60 animate-in fade-in-0 slide-in-from-left-1 rounded-xl border border-white/[0.08] bg-rail p-1.5 shadow-xl shadow-ink/30 duration-150">
+            <p className="flex items-center gap-2 px-2.5 pb-1.5 pt-1 text-[0.625rem] font-medium uppercase tracking-[0.12em] text-rail-ink-3">
               <Icon className="size-3.5" aria-hidden />
               {group.label}
             </p>
@@ -527,24 +525,21 @@ function NavGroupItem({
 function SubLink({
   link,
   active,
-  onRule = false,
   linkProps,
 }: {
   link: ResolvedLink;
   active: boolean;
-  /** Hanging off the group's guide line, so the open one ticks the line. */
-  onRule?: boolean;
   linkProps: LinkProps;
 }) {
   const row =
-    "relative flex w-full items-center gap-2 rounded-lg px-2.5 py-[7px] text-[0.8125rem] transition-colors duration-150";
+    "relative flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-[0.78125rem] leading-5 transition-colors duration-150";
 
   if (!link.ready) {
     return (
       <span
         aria-disabled
         title="Arrives in a later build step"
-        className={cn(row, "cursor-not-allowed text-ink-6")}
+        className={cn(row, "cursor-not-allowed text-rail-ink-4")}
       >
         <span className="flex-1 truncate">{link.label}</span>
         <Soon hidden={false} />
@@ -564,14 +559,8 @@ function SubLink({
       className={cn(
         row,
         active
-          ? "bg-brand-soft font-semibold text-brand-deep"
-          : "text-ink-4 hover:bg-surface hover:text-ink hover:shadow-soft",
-        // The marker sits on the group's guide line (past the list's
-        // padding), so the open screen is ticked on the rule itself. The
-        // flyout has no rule to tick, and the tint alone carries it there.
-        active &&
-          onRule &&
-          "before:absolute before:-left-[11.5px] before:top-1/2 before:h-5 before:w-[2px] before:-translate-y-1/2 before:rounded-full before:bg-brand",
+          ? "bg-white/[0.08] font-medium text-white"
+          : "text-rail-ink-2 hover:bg-white/[0.06] hover:text-rail-ink",
       )}
     >
       <span className="flex-1 truncate">{link.label}</span>
@@ -583,7 +572,7 @@ function Soon({ hidden }: { hidden: boolean }) {
   return (
     <span
       className={cn(
-        "rounded-full bg-sunken-2 px-1.5 py-0.5 text-[0.625rem] font-medium text-ink-5",
+        "rounded-full bg-white/[0.06] px-1.5 py-0.5 text-[0.5625rem] font-medium tracking-wide text-rail-ink-3 uppercase ring-1 ring-white/[0.08]",
         hidden && "lg:hidden",
       )}
     >
@@ -600,16 +589,16 @@ function FactoryMark({ logoUrl }: { logoUrl: string | null }) {
       <img
         src={logoUrl}
         alt=""
-        className="size-9 shrink-0 rounded-lg object-cover"
+        className="size-9 shrink-0 rounded-lg object-cover ring-1 ring-white/10"
       />
     );
   }
   return (
     <span
       aria-hidden
-      className="grid size-9 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-brand-soft to-brand-line text-brand"
+      className="grid size-9 shrink-0 place-items-center rounded-lg bg-white/[0.07] text-rail-ink-2 ring-1 ring-white/10"
     >
-      <Building2 className="size-[18px]" />
+      <Building2 className="size-[1.125rem]" />
     </span>
   );
 }

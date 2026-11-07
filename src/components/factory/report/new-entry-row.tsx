@@ -27,6 +27,7 @@ import {
 } from "@/app/factory/[slug]/log/schemas";
 import { OperatorPicker } from "@/components/factory/log/operator-picker";
 import { REPORT_SPAN } from "@/components/factory/report/report-columns";
+import { useShiftBoundaryConfirm } from "@/components/factory/log/shift-boundary-dialog";
 import { StageProgress } from "@/components/factory/log/stage-progress";
 import { TimeField } from "@/components/ui/date-picker";
 import { SelectField } from "@/components/ui/select-field";
@@ -59,6 +60,7 @@ import {
 import { shiftReportKeys } from "@/lib/factory/shift-report-queries";
 import {
   fetchShiftTimes,
+  shiftBoundaryWarning,
   shiftTimeKeys,
   type RunningShift,
 } from "@/lib/factory/shift-time-queries";
@@ -435,6 +437,20 @@ export function NewEntryRow({
     };
   }, [canManage, shiftTimes, shift]);
 
+  /**
+   * The clocks leave the shift this sheet is for — said under the row as they
+   * are typed, and asked about once more before it is filed. Never a block:
+   * a manager correcting an overrun past the handover has to be able to.
+   */
+  const shiftWarning = shiftBoundaryWarning(
+    shiftTimes,
+    shift,
+    startTime,
+    endTime,
+  );
+  const { ask: askShiftBoundary, dialog: shiftBoundaryDialog } =
+    useShiftBoundaryConfirm();
+
   const needsOperators = operatorsRequired(
     (category as ProcessCategory) ?? "production",
   );
@@ -544,7 +560,17 @@ export function NewEntryRow({
 
   function save() {
     void handleSubmit(
-      (values) => submit.mutateAsync(values).catch(() => {}),
+      async (values) => {
+        const message = shiftBoundaryWarning(
+          shiftTimes,
+          shift,
+          values.startTime,
+          values.endTime,
+        );
+        if (message && !(await askShiftBoundary([{ key: "entry", message }])))
+          return;
+        await submit.mutateAsync(values).catch(() => {});
+      },
       // A silent no-op is the worst failure a form like this can have: a cell
       // whose error has nowhere to render would leave the button dead with
       // nothing on screen to read.
@@ -1088,9 +1114,14 @@ export function NewEntryRow({
               would say it: the batch gate first, then the stage it resolved
               to and what that stage is planned for, then whatever the schema
               is still waiting for. */}
-          {(batchBlock || showStage || problems.length > 0) && (
+          {(batchBlock ||
+            showStage ||
+            shiftWarning ||
+            problems.length > 0) && (
             <div className="mt-2 space-y-1.5 border-t border-brand-line pt-2">
               {batchBlock && <Note tone="warn">{batchBlock}</Note>}
+
+              {shiftWarning && <Note tone="warn">{shiftWarning}</Note>}
 
               {/* The denominator the quantity is being typed against: what
                   this stage is planned for, how much of it is already logged,
@@ -1113,6 +1144,7 @@ export function NewEntryRow({
               ))}
             </div>
           )}
+          {shiftBoundaryDialog}
         </td>
       </tr>
     </>

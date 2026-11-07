@@ -265,6 +265,57 @@ export function resolveShiftForEntry(
 }
 
 /**
+ * Whether an entry's clocks leave the shift it is counted on — and if so, the
+ * sentence that says how. Null when the run sits inside its shift, or when
+ * there is not yet enough to judge (no times loaded, a clock still blank).
+ *
+ * **A warning, never a rule.** A run that overruns the handover, or a manager
+ * filing a late correction, is real work the factory has to be able to log;
+ * the point is that nobody does it by accident. So this is asked about before
+ * filing and never enforced by the schema or the database.
+ *
+ * Inside means inside the shift's own window. The ten minutes where two
+ * windows overlap at a handover count as inside both, so a run that ends at
+ * 15:15 in a shift ending 15:15 says nothing, whatever the next shift's start.
+ */
+export function shiftBoundaryWarning(
+  times: ShiftTimes | undefined,
+  shift: RunningShift | undefined,
+  startClock: string | undefined,
+  endClock: string | undefined,
+): string | null {
+  if (!times || !shift || !startClock || !endClock) return null;
+  const start = minutesOfDay(startClock);
+  const end = minutesOfDay(endClock);
+  if (start === null || end === null) return null;
+
+  const DAY = 24 * 60;
+  const span = (end - start + DAY) % DAY;
+  if (!span) return null;
+
+  const own = times[shift];
+  const otherSlot: RunningShift = shift === "morning" ? "afternoon" : "morning";
+  const other = times[otherSlot];
+  const inOwn = overlapWithShift(own, startClock, span);
+  if (inOwn >= span) return null;
+  const inOther = overlapWithShift(other, startClock, span);
+
+  const run = `${startClock} → ${endClock}`;
+  const label = (slot: RunningShift, clock: ShiftClockValues) =>
+    `${slot === "morning" ? "Morning" : "Afternoon"} shift (${clock.startTime} – ${clock.endTime})`;
+
+  if (inOwn === 0) {
+    return inOther >= span
+      ? `${run} is in the ${label(otherSlot, other)}, not the ${label(shift, own)} this entry is for.`
+      : `${run} falls outside the ${label(shift, own)}.`;
+  }
+  if (inOther > 0) {
+    return `${run} falls between two shifts — the ${label(shift, own)} and the ${label(otherSlot, other)}. It will be counted on the ${shift === "morning" ? "Morning" : "Afternoon"} shift.`;
+  } 
+  return `${formatDuration(span - inOwn)} of ${run} falls outside the ${label(shift, own)}.`;
+}
+
+/**
  * Local calendar day as `YYYY-MM-DD` — a shift is logged against the wall date.
  *
  * Re-exported from `@/lib/factory/dates` rather than defined twice: the zod

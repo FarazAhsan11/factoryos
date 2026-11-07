@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Download, Moon, Printer, Sun } from "lucide-react";
 import { toast } from "sonner";
@@ -32,6 +32,48 @@ import {
 import { useRenderClock } from "@/lib/use-render-clock";
 import { cn } from "@/lib/utils";
 
+/* The shift last picked is one viewer's preference, kept in the browser per
+   factory — an afternoon supervisor should not have to switch the sheet over
+   on every visit. An external store rather than state, as the header's
+   Details toggle is, so the server render and the first client render agree
+   (both Morning) and the stored choice follows without a hydration error. */
+
+const shiftListeners = new Set<() => void>();
+
+function subscribeShift(onChange: () => void) {
+  shiftListeners.add(onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    shiftListeners.delete(onChange);
+    window.removeEventListener("storage", onChange);
+  };
+}
+
+function shiftKey(factoryId: string) {
+  return `factoryos:shift-report-shift:${factoryId}`;
+}
+
+function readShift(factoryId: string): RunningShift {
+  try {
+    return window.localStorage.getItem(shiftKey(factoryId)) === "afternoon"
+      ? "afternoon"
+      : "morning";
+  } catch {
+    return "morning"; // private mode / blocked storage — the default stands
+  }
+}
+
+function writeShift(factoryId: string, value: RunningShift) {
+  try {
+    window.localStorage.setItem(shiftKey(factoryId), value);
+  } catch {
+    /* the choice simply doesn't persist */
+  }
+  shiftListeners.forEach((listener) => listener());
+}
+
+const serverShift = (): RunningShift => "morning";
+
 /**
  * Shift Report — one day, one shift, on one sheet.
  *
@@ -58,7 +100,12 @@ export function ShiftReportWorkspace({
   canManage: boolean;
 }) {
   const [date, setDate] = useState(todayISO);
-  const [shift, setShift] = useState<RunningShift>("morning");
+  const shift = useSyncExternalStore(
+    subscribeShift,
+    () => readShift(factoryId),
+    serverShift,
+  );
+  const setShift = (next: RunningShift) => writeShift(factoryId, next);
   // Today, read on every render — through the hook, or the React Compiler
   // would keep the day the sheet was opened (see `useRenderClock`).
   const today = useRenderClock(todayISO);

@@ -31,6 +31,7 @@ import {
   useLogRegisters,
   type LogRegisters,
 } from "@/components/factory/log/grid/use-log-registers";
+import { useShiftBoundaryConfirm } from "@/components/factory/log/shift-boundary-dialog";
 import { ColumnResizeHandle } from "@/components/ui/column-resize-handle";
 import { actionKeys } from "@/lib/factory/action-queries";
 import { batchStageKeys } from "@/lib/factory/batch-stage-queries";
@@ -53,6 +54,7 @@ import {
 } from "@/lib/factory/shift-log-queries";
 import {
   resolveCurrentShift,
+  shiftBoundaryWarning,
   todayKey,
 } from "@/lib/factory/shift-time-queries";
 import { useColumnResize } from "@/lib/use-column-resize";
@@ -363,6 +365,10 @@ export function LogGrid({
    * before the button has re-rendered as disabled would file every line twice.
    */
   const filing = useRef(false);
+  /** Asked before filing lines whose clocks leave their shift. */
+  const { ask: askShiftBoundary, dialog: shiftBoundaryDialog } =
+    useShiftBoundaryConfirm();
+
   async function logAll() {
     if (filing.current) return;
     // Room order, each room's lines top to bottom — the order the sheet reads
@@ -389,6 +395,22 @@ export function LogGrid({
           values: await handle.validate(),
         })),
       );
+
+      // Lines whose clocks leave their shift are asked about once, together,
+      // before anything is filed — never refused. Go back files nothing, so
+      // the sheet is never left half logged by a question.
+      const crossing = checked.flatMap(({ rowId, line, values }) => {
+        const message = values
+          ? shiftBoundaryWarning(
+              registers.shiftTimes,
+              values.shift,
+              values.startTime,
+              values.endTime,
+            )
+          : null;
+        return message ? [{ key: rowId, label: line.unitName, message }] : [];
+      });
+      if (crossing.length > 0 && !(await askShiftBoundary(crossing))) return;
 
       // The working day is read now, not when the grid opened — a grid left
       // open across midnight must not file under yesterday.
@@ -693,6 +715,8 @@ export function LogGrid({
           </button>
         </div>
       </footer>
+
+      {shiftBoundaryDialog}
     </section>
   );
 }

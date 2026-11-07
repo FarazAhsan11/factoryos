@@ -27,19 +27,15 @@ const GROUPS = REPORT_GROUPS.map((group) => ({
   ...group,
   span: COLUMNS.filter((column) => column.group === group.key).length,
 }));
-/** The columns that open a group, which is where the gap before a panel goes. */
-const GROUP_OPENERS = new Set(
-  REPORT_GROUPS.map(
+/** Entry starts the table; section dividers only belong between groups. */
+const SECTION_OPENERS = new Set(
+  REPORT_GROUPS.slice(1).map(
     (group) => COLUMNS.find((column) => column.group === group.key)?.key,
   ),
 );
-/**
- * The gap between two panels. A border the colour of the sheet rather than a
- * rule, so a group ends in open space. On each cell, heading and body alike,
- * which only lines up because the table's borders are separate: a collapsed
- * border straddles the column edge, and scrolls away from a sticky heading.
- */
-const PANEL_GAP = "border-l-[0.375rem] border-l-surface";
+/** Strong group boundaries; the other columns use a quiet hairline rule. */
+const SECTION_RULE = "border-l-2 border-l-line-strong";
+const COLUMN_RULE = "border-l border-l-line-soft";
 
 /** "06:45:00" → "06:45". */
 function clock(value: string | null): string {
@@ -126,10 +122,7 @@ export function ShiftReportTable({
         </colgroup>
 
         <thead>
-          {/* The group titles. Stickiness has to be on the cells:
-              `position: sticky` on a `<tr>` is ignored outside Firefox. The
-              cell is the sheet's colour and the cap sits inside it, because a
-              rounded corner on the cell itself would round the gap instead. */}
+          {/* Group labels and column headings share a continuous grid. */}
           <tr>
             <td className="sticky top-0 z-10 h-8 bg-surface print:hidden" />
             {GROUPS.map((group) => (
@@ -137,12 +130,9 @@ export function ShiftReportTable({
                 key={group.key}
                 colSpan={group.span}
                 scope="colgroup"
-                className="sticky top-0 z-10 h-8 bg-surface pt-2 pl-1.5 text-left align-bottom print:static"
+                className="sticky top-0 z-10 h-8 bg-surface px-1 pt-2 text-center align-bottom print:static"
               >
-                <span
-                  style={{ "--accent": group.accent } as React.CSSProperties}
-                  className="flex h-6 items-center rounded-t-lg bg-ink px-3 text-[0.5938rem] font-bold tracking-[0.1em] whitespace-nowrap text-(--accent) uppercase shadow-[inset_0_0.125rem_0_0_var(--accent)] print:bg-surface print:text-black print:shadow-none"
-                >
+                <span className="flex h-6 items-center justify-center rounded-t-md border-b border-line-strong bg-sunken/70 px-3 text-[0.6562rem] font-bold tracking-[0.12em] whitespace-nowrap text-ink-3 uppercase print:rounded-none print:bg-surface print:text-black">
                   {group.label}
                 </span>
               </th>
@@ -156,10 +146,11 @@ export function ShiftReportTable({
                 /* The edit column is leftmost so it is reachable without
                    scrolling the sheet sideways, and it carries no heading: an
                    icon column labelled "Edit" spends a header on something
-                   the icon already says. */
+                   the icon already says. Still part of the dark band, though:
+                   left white, it read as a hole bitten out of the heading. */
                 <th
                   key={column.key}
-                  className="sticky top-8 z-10 bg-surface print:hidden"
+                  className="sticky top-8 z-10 bg-ink print:hidden"
                 >
                   <span className="sr-only">
                     Correct entry and amendment history
@@ -169,7 +160,6 @@ export function ShiftReportTable({
                 <Th
                   key={column.key}
                   align={column.align}
-                  className={cn(GROUP_OPENERS.has(column.key) && PANEL_GAP)}
                   onResize={resize(i)}
                 >
                   {column.key === "room" ? unitWord : column.label}
@@ -179,7 +169,10 @@ export function ShiftReportTable({
           </tr>
         </thead>
 
-        <tbody>
+        {/* Each row's rule is a top border on its cells, so nothing draws one
+            under the last row — the sheet trailed off into the blank below
+            it. A closing rule there, in the room-handover weight. */}
+        <tbody className="[&>tr:last-child>td]:border-b [&>tr:last-child>td]:border-b-line-strong">
           {rooms.map((room) => (
             <RoomBlock
               key={room.unitId}
@@ -350,11 +343,7 @@ function EntryRow({
           : "bg-surface hover:bg-brand-soft/40 print:hover:bg-transparent",
       )}
     >
-      {/* Carries the row spine as well as the pencil and the history.
-
-          A solid bar down the left of every filed row, the same way the
-          activity feed's spine does, taking its colour from the row: red where
-          the entry is flagged, brand where it is ordinary.
+      {/* Carries the pencil and the history.
 
           The pencil is dimmed until the row is hovered or the button is
           focused, so a sheet of forty rows isn't forty pencils competing with
@@ -368,9 +357,6 @@ function EntryRow({
         className={cn(
           "px-1.5 print:hidden",
           rule,
-          entry.action_flag
-            ? "shadow-[inset_4px_0_0_0_var(--color-danger)]"
-            : "shadow-[inset_4px_0_0_0_var(--color-brand)]",
         )}
       >
         <span className="flex items-center gap-0.5">
@@ -416,7 +402,11 @@ function EntryRow({
             title={cell.title}
             className={cn(
               rule,
-              GROUP_OPENERS.has(column.key) && PANEL_GAP,
+              column.key === "room"
+                ? "border-l-0"
+                : SECTION_OPENERS.has(column.key)
+                  ? SECTION_RULE
+                  : COLUMN_RULE,
               // The family the palette keeps for computed fields, see-through
               // so a tinted cell stays part of a red flagged row.
               column.derived && "bg-brand-soft/50",
@@ -492,11 +482,9 @@ function Th({
         // "REQUIRE / D" is worse — it reads as a typo in a document people
         // sign. `break-normal` is what forbids the second; the column widths
         // above are what make the first unnecessary.
-        "sticky top-8 z-10 px-3 py-2 text-[0.625rem] leading-tight font-bold tracking-[0.06em] break-normal uppercase",
-        // A deep indigo band rather than flat near-black: it belongs to the
-        // same family as everything else on the page, and the gradient keeps
-        // a sixteen-column header from reading as a solid bar of ink.
-        "bg-[linear-gradient(180deg,var(--color-ink)_0%,#1d2140_100%)] text-white/85",
+        "sticky top-8 z-10 px-3 py-2.5 text-[0.6562rem] leading-tight font-semibold tracking-[0.035em] break-normal",
+        // A calm, high contrast heading band with restrained type styling.
+        "bg-ink text-white/90",
         "print:static print:bg-surface print:text-black",
         align === "right" ? "text-right" : "text-left",
         className,

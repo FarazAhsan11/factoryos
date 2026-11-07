@@ -48,6 +48,7 @@ import {
   SectionTitle,
 } from "@/components/factory/log/log-fields";
 import { OperatorPicker } from "@/components/factory/log/operator-picker";
+import { useShiftBoundaryConfirm } from "@/components/factory/log/shift-boundary-dialog";
 import { StageProgress } from "@/components/factory/log/stage-progress";
 import { TimeField } from "@/components/ui/date-picker";
 import { SelectField } from "@/components/ui/select-field";
@@ -74,6 +75,7 @@ import {
   fetchShiftTimes,
   resolveCurrentShift,
   resolveShiftForEntry,
+  shiftBoundaryWarning,
   shiftTimeKeys,
   todayKey,
   type RunningShift,
@@ -673,6 +675,20 @@ export function LogEntryForm({
     return a > b ? n >= a || n <= b : n >= a && n <= b;
   }, [clockWindow]);
 
+  /**
+   * The clocks leave the entry's shift — said under them as they are typed,
+   * and asked about once more before the entry is filed. Never a block: an
+   * overrun past the handover is real work that has to be loggable.
+   */
+  const shiftWarning = shiftBoundaryWarning(
+    shiftTimes,
+    shift,
+    startTime,
+    endTime,
+  );
+  const { ask: askShiftBoundary, dialog: shiftBoundaryDialog } =
+    useShiftBoundaryConfirm();
+
   const derivedTarget = targetQtyFromSpeed(
     speedType,
     speedRate,
@@ -831,7 +847,17 @@ export function LogEntryForm({
                  which in dev is the full-screen Next.js error overlay. The
                  database refusing an entry is an ordinary answer here — an
                  unissued batch, a stage over its tolerance — not a crash. */
-        (values) => submit.mutateAsync(values).catch(() => {}),
+        async (values) => {
+          const message = shiftBoundaryWarning(
+            shiftTimes,
+            values.shift,
+            values.startTime,
+            values.endTime,
+          );
+          if (message && !(await askShiftBoundary([{ key: "entry", message }])))
+            return;
+          await submit.mutateAsync(values).catch(() => {});
+        },
         // A silent no-op is the worst failure this form can have: the operator
         // presses Log entry, nothing happens, and there is nothing on screen to
         // read. Any field whose error isn't rendered — or is inside a section
@@ -1025,6 +1051,20 @@ export function LogEntryForm({
               </output>
             </Field>
           </FieldRow>
+
+          {shiftWarning && (
+            <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-warn-line bg-warn-tint px-3.5 py-3">
+              <span
+                aria-hidden
+                className="mt-px grid size-5 shrink-0 place-items-center rounded-md bg-warn-line/50 text-warn-ink"
+              >
+                <TriangleAlert className="size-3" />
+              </span>
+              <span className="min-w-0 text-xs leading-relaxed text-warn-ink">
+                {shiftWarning}
+              </span>
+            </div>
+          )}
         </section>
 
         {/* ── Batch & equipment ─────────────────────────────────────
@@ -1597,6 +1637,7 @@ export function LogEntryForm({
           {isSubmitting ? "Logging…" : "Log entry"}
         </button>
       </footer>
+      {shiftBoundaryDialog}
     </form>
   );
 }

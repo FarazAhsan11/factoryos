@@ -50,30 +50,30 @@ export const GRID_COLUMNS: {
   align?: "right";
 }[] = [
   { key: "room", label: "Room", width: 140 },
-  { key: "activity", label: "Activity / stage", width: 188 },
+  { key: "activity", label: "Activity / Stage", width: 188 },
   // Both clocks in one column, as the shift report shows them — two pickers
   // with an arrow between, wide enough for both.
   { key: "time", label: "Start → End", width: 248 },
   { key: "hrs", label: "Duration", width: 96, align: "right" },
-  { key: "batch", label: "Batch #", width: 116 },
+  { key: "batch", label: "Batch", width: 116 },
   { key: "product", label: "Product", width: 170 },
-  { key: "code", label: "Product code", width: 116 },
-  { key: "qty", label: "Qty", width: 104, align: "right" },
+  { key: "code", label: "Product Code", width: 116 },
+  { key: "qty", label: "Qty produced", width: 104, align: "right" },
   { key: "unit", label: "Unit", width: 112 },
   { key: "target", label: "Shift target", width: 112, align: "right" },
   { key: "rejected", label: "Rejected", width: 96, align: "right" },
   // Read only: how far the planned stage has got, this line included.
-  { key: "progress", label: "Stage progress", width: 168 },
+  { key: "progress", label: "Accumulative Total", width: 168 },
   { key: "speedUnit", label: "Speed unit", width: 150 },
   { key: "targetSpeed", label: "Target speed", width: 104, align: "right" },
   { key: "actualSpeed", label: "Actual speed", width: 104, align: "right" },
   // Beside the speeds it explains, as on the shift report — asked only when
   // actual speed is below target.
   { key: "slowReason", label: "Slow reason", width: 176 },
-  { key: "equipment", label: "EQ no.", width: 100 },
+  { key: "equipment", label: "EQ No.", width: 100 },
   { key: "operators", label: "Operators", width: 172 },
   { key: "flag", label: "Flag", width: 168 },
-  { key: "comment", label: "Comment", width: 220 },
+  { key: "comment", label: "Comments", width: 220 },
   { key: "actions", label: "", width: 132 },
 ];
 

@@ -56,6 +56,7 @@ import {
 import {
   resolveCurrentShift,
   resolveShiftForEntry,
+  shiftBoundaryWarning,
   type RunningShift,
 } from "@/lib/factory/shift-time-queries";
 import { useForm } from "@/lib/use-form";
@@ -566,9 +567,23 @@ export function LogGridRow({
     }))
     .filter((p) => Boolean(p.message));
 
+  /**
+   * Said as soon as both clocks are in, not only when Log all asks about it:
+   * the time to fix a slipped clock is while the row is still being typed.
+   * Not held back for `touched` like the batch notes: a line opens with at
+   * most its start clock, so an end clock is always someone's typing.
+   */
+  const shiftWarning = shiftBoundaryWarning(
+    shiftTimes,
+    shift,
+    startTime,
+    endTime,
+  );
+
   const showStrip =
     problems.length > 0 ||
     Boolean(submitError) ||
+    Boolean(shiftWarning) ||
     (touched && (Boolean(batchBlock) || mustPickStage || showStage));
 
   const speedUnitValue = composeSpeedUnit(
@@ -1163,6 +1178,8 @@ export function LogGridRow({
                   <StageProgress stage={activeStage} pending={thisQty} />
                 </div>
               )}
+
+              {shiftWarning && <Note tone="warn">{shiftWarning}</Note>}
 
               {submitError && (
                 <Note tone="danger">

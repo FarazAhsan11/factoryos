@@ -1,5 +1,4 @@
 import {
-  Boxes,
   CalendarRange,
   ClipboardList,
   FileSearch,
@@ -9,6 +8,7 @@ import {
   Lightbulb,
   Settings2,
   ShieldAlert,
+  Users,
   Wrench,
 } from "lucide-react";
 
@@ -182,7 +182,7 @@ export const FACTORY_NAV: NavSection[] = [
     ],
   },
   {
-    label: "Quality & maintenance",
+    label: "Quality",
     items: [
       {
         href: "/actions",
@@ -200,14 +200,43 @@ export const FACTORY_NAV: NavSection[] = [
         roles: SUPERVISOR_UP,
         ready: true,
       },
-      // The module is the breakdown request, not planned maintenance —
-      // named for what it is so nobody looks here for a PM calendar.
+    ],
+  },
+  {
+    // The plant's machines and the work done on them: the fault reports, the
+    // planned servicing, and the register both are raised against.
+    label: "Assets & Maintenance",
+    items: [
+      // One expandable group under its own heading, as asked: the section
+      // names the area, the group opens onto its screens.
       {
-        href: "/maintenance",
-        label: "Breakdown maintenance",
+        label: "Assets & Maintenance",
         icon: Wrench,
-        roles: ALL,
-        ready: true,
+        children: [
+          // The breakdown request (MR-2026-014). Everyone: anyone on the
+          // floor may report a fault.
+          {
+            href: "/maintenance",
+            label: "Maintenance Requests",
+            roles: ALL,
+            ready: true,
+          },
+          {
+            href: "/maintenance?tab=preventive",
+            label: "Preventive Maintenance schedule",
+            roles: SUPERVISOR_UP,
+            ready: false,
+          },
+          // The machines by asset number (ENC-09, BL-02) — still the
+          // Resources page's Equipment tab, listed here because it is what
+          // every maintenance request is raised against.
+          {
+            href: "/resources?tab=equipment",
+            label: "Equipment register",
+            roles: MANAGER_UP,
+            ready: true,
+          },
+        ],
       },
     ],
   },
@@ -250,28 +279,16 @@ export const FACTORY_NAV: NavSection[] = [
   {
     label: "Plant setup",
     items: [
-      // The two registers the floor names things from. Day-to-day records,
-      // so they sit apart from the configuration set once below.
+      // The people who perform and are assigned work — the shift log's
+      // operators and every other "who" picker. Not the logins: those are
+      // Configuration → Users. The Resources page's other tab, the equipment
+      // register, is listed under Assets & maintenance.
       {
-        label: "Resources",
-        icon: Boxes,
-        children: [
-          {
-            href: "/resources?tab=equipment",
-            label: "Equipment register",
-            roles: MANAGER_UP,
-            ready: true,
-          },
-          // The people who perform and are assigned work — the shift log's
-          // operators and every other "who" picker. Not the logins: those are
-          // Configuration → Users.
-          {
-            href: "/resources?tab=workforce",
-            label: "Workforce",
-            roles: MANAGER_UP,
-            ready: true,
-          },
-        ],
+        href: "/resources?tab=workforce",
+        label: "Workforce",
+        icon: Users,
+        roles: MANAGER_UP,
+        ready: true,
       },
       {
         label: "Configuration",

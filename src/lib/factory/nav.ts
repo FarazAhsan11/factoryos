@@ -7,7 +7,6 @@ import {
   LayoutDashboard,
   Lightbulb,
   Settings2,
-  ShieldAlert,
   Users,
   Wrench,
 } from "lucide-react";
@@ -184,13 +183,11 @@ export const FACTORY_NAV: NavSection[] = [
   {
     label: "Quality",
     items: [
-      {
-        href: "/actions",
-        label: "Issues & CAPA",
-        icon: ShieldAlert,
-        roles: SUPERVISOR_UP,
-        ready: true,
-      },
+      // Issues & CAPA (`/actions`) is unwired: no rail link, but the route,
+      // its components and queries, its prefetch and its NavigationFrame case
+      // all remain. Restore this entry to wire it back in:
+      //   { href: "/actions", label: "Issues & CAPA", icon: ShieldAlert,
+      //     roles: SUPERVISOR_UP, ready: true },
       // Supervisor and up: raising a quarantine NCR stops a batch, and
       // closing one is a QA sign-off.
       {

@@ -57,7 +57,7 @@ const TRIGGER =
   "flex h-10 w-full items-center gap-2 rounded-xl border border-line bg-surface px-3.5 text-left text-sm text-ink shadow-[0_1px_2px_rgb(20_22_43/0.04)] outline-none transition hover:border-line-strong focus-visible:border-brand focus-visible:ring-4 focus-visible:ring-brand/12 data-popup-open:border-brand data-popup-open:ring-4 data-popup-open:ring-brand/12 aria-invalid:border-danger aria-invalid:ring-4 aria-invalid:ring-danger/12 disabled:cursor-not-allowed disabled:bg-sunken disabled:opacity-70";
 
 const POPUP =
-  "z-50 flex max-h-[min(22rem,var(--available-height))] w-(--anchor-width) max-w-(--available-width) min-w-52 flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-[0_24px_60px_-20px_rgb(20_22_43/0.45)] ring-1 ring-ink/5 outline-none duration-150 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95";
+  "z-50 flex max-h-[min(22rem,var(--available-height))] w-max min-w-[max(13rem,var(--anchor-width))] max-w-[min(28rem,var(--available-width))] flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-[0_24px_60px_-20px_rgb(20_22_43/0.45)] ring-1 ring-ink/5 outline-none duration-150 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95";
 
 const ITEM =
   "grid cursor-default grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-ink outline-none select-none data-disabled:pointer-events-none data-disabled:opacity-45 data-highlighted:bg-brand-soft data-highlighted:text-brand-deep data-selected:font-semibold";
@@ -183,6 +183,9 @@ export function SelectField({
       >
         {Icon && <Icon className="size-4 shrink-0 text-ink-5" />}
         <span
+          // The whole choice on hover, for one too long for a narrow column
+          // ("3 — Out of specification but recoverable").
+          title={selected?.label}
           className={cn(
             "flex-1 truncate",
             selected === null && "text-placeholder",

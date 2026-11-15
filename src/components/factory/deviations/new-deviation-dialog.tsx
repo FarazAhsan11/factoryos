@@ -169,16 +169,24 @@ export function NewDeviationDialog({
             </DialogTitle>
             <DialogDescription>
               Initiation and identification — the case is numbered when it is
-              raised. The containment, risk, investigation and CAPA tabs are
-              filled as the case is worked.
+              raised. The risk, investigation and CAPA tabs are filled as the
+              case is worked.
             </DialogDescription>
           </DialogHeader>
 
           <form
             // Awaited so the button stays disabled for the round-trip; the
             // failure is already a toast, so it is not rethrown.
-            onSubmit={form.handleSubmit((values) =>
-              create.mutateAsync(values).catch(() => {}),
+            onSubmit={form.handleSubmit(
+              (values) => create.mutateAsync(values).catch(() => {}),
+              // A refused field can sit a long scroll above the button —
+              // bring the first error into view rather than seem to do nothing.
+              () =>
+                requestAnimationFrame(() =>
+                  document
+                    .querySelector('[role="dialog"] [role="alert"]')
+                    ?.scrollIntoView({ block: "center", behavior: "smooth" }),
+                ),
             )}
             className="flex min-h-0 flex-1 flex-col"
           >

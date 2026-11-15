@@ -6,6 +6,7 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -266,10 +267,13 @@ export function RegisterViews<K extends string>({
   label: string;
 }) {
   return (
+    // `overflow-y-hidden`: the active tab's underline sits on the row's own
+    // border (-mb-px), and with only `overflow-x-auto` that pixel turned the
+    // row into a scroll box with a stray scrollbar at its end.
     <div
       role="tablist"
       aria-label={label}
-      className="scrollbar-slim flex gap-5 overflow-x-auto border-b border-line"
+      className="flex gap-1 overflow-x-auto overflow-y-hidden border-b border-line [scrollbar-width:none]"
     >
       {views.map((v) => {
         const active = v.key === value;
@@ -282,17 +286,21 @@ export function RegisterViews<K extends string>({
             title={v.hint}
             onClick={() => onChange(v.key)}
             className={cn(
-              "-mb-px shrink-0 border-b-2 pt-1 pb-2.5 text-sm transition",
+              "-mb-px inline-flex shrink-0 items-center gap-2 rounded-t-lg border-b-2 px-3 pt-2 pb-2.5 text-sm transition",
               active
-                ? "border-brand font-semibold text-ink"
-                : "border-transparent text-ink-4 hover:text-ink",
+                ? "border-brand font-semibold text-brand-deep"
+                : "border-transparent font-medium text-ink-4 hover:bg-sunken-2/70 hover:text-ink",
             )}
           >
             {v.label}
             <span
               className={cn(
-                "ml-1 text-xs tabular-nums",
-                active ? "text-ink-4" : "text-ink-5",
+                "min-w-5 rounded-full px-1.5 py-px text-center text-[0.6875rem] font-semibold tabular-nums",
+                active
+                  ? "bg-brand text-white"
+                  : v.count > 0
+                    ? "bg-sunken-2 text-ink-3"
+                    : "bg-sunken text-ink-6",
               )}
             >
               {v.count}
@@ -321,16 +329,19 @@ export function ColumnsMenu<K extends string>({
         Columns
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>Show columns</DropdownMenuLabel>
-        {columns.map((c) => (
-          <DropdownMenuCheckboxItem
-            key={c.key}
-            checked={shown.includes(c.key)}
-            onCheckedChange={() => onToggle(c.key)}
-          >
-            {c.label}
-          </DropdownMenuCheckboxItem>
-        ))}
+        {/* Base UI refuses a group label outside a group. */}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Show columns</DropdownMenuLabel>
+          {columns.map((c) => (
+            <DropdownMenuCheckboxItem
+              key={c.key}
+              checked={shown.includes(c.key)}
+              onCheckedChange={() => onToggle(c.key)}
+            >
+              {c.label}
+            </DropdownMenuCheckboxItem>
+          ))}
+        </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );

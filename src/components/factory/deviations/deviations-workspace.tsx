@@ -91,7 +91,14 @@ export function DeviationsWorkspace({
   const queryClient = useQueryClient();
   const tab = resolveQualityTab(useSearchParams().get("tab"));
   const screen = tab === "capa" ? null : CASE_SCREENS[tab];
-  const [view, setView] = useState<View>("open");
+  // Each screen keeps its own view: "Awaiting CAPA" picked on Deviations
+  // must not open Customer complaints on an empty list.
+  const [viewByTab, setViewByTab] = useState<Partial<Record<string, View>>>(
+    {},
+  );
+  const view = viewByTab[tab] ?? "open";
+  const setView = (next: View) =>
+    setViewByTab((prev) => ({ ...prev, [tab]: next }));
   const [type, setType] = useState<TypeFilter>("all");
   const [search, setSearch] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);

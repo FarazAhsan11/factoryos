@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useWatch } from "react-hook-form";
@@ -32,6 +33,9 @@ import {
   Group,
   Muted,
   PersonControl,
+  FooterActions,
+  PRIMARY_BUTTON,
+  SECONDARY_BUTTON,
   SaveBar,
   SelectControl,
   YesNo,
@@ -833,6 +837,7 @@ export function CloseOutTab({
     },
   });
 
+  const formRef = useRef<HTMLFormElement>(null);
   const close = useMutation({
     mutationFn: (values: CloseOutValues) => closeDeviation(deviation, values),
     onSuccess: async () => {
@@ -906,6 +911,7 @@ export function CloseOutTab({
 
   return (
     <form
+      ref={formRef}
       onSubmit={form.handleSubmit((v) => close.mutateAsync(v).catch(() => {}))}
       className="space-y-4"
     >
@@ -922,7 +928,9 @@ export function CloseOutTab({
           <p>
             Still needed before this can be closed:{" "}
             {gaps.map((g, i) => (
-              <span key={g.tab}>
+              // Keyed by what, not by tab: one tab can hold two gaps (a
+              // complaint's adverse reaction and its immediate action).
+              <span key={g.what}>
                 {i > 0 && ", "}
                 <span className="font-semibold">{g.what}</span>
               </span>
@@ -1030,7 +1038,10 @@ export function CloseOutTab({
         />
       </Field>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft pt-4">
+      {/* In the dialog's fixed footer, beside Close. The submit is a plain
+          button that submits this form by ref, because once portalled it is
+          no longer inside the form in the DOM. */}
+      <FooterActions>
         {/* The owner and target date are worth keeping before the case is
             ready to close, so they can be saved on their own. */}
         <button
@@ -1042,28 +1053,29 @@ export function CloseOutTab({
               targetDate: form.getValues("targetDate"),
             })
           }
-          className="inline-flex h-10 items-center gap-2 rounded-xl border border-line bg-surface px-4 text-sm font-semibold text-ink-3 shadow-soft transition hover:border-brand hover:text-brand disabled:opacity-60"
+          className={SECONDARY_BUTTON}
         >
           {savePlan.isPending && <Loader2 className="size-4 animate-spin" />}
           Save without closing
         </button>
 
         <button
-          type="submit"
+          type="button"
+          onClick={() => formRef.current?.requestSubmit()}
           disabled={form.formState.isSubmitting || gaps.length > 0}
           title={
             gaps.length > 0
               ? "The tabs above still need filling in."
               : undefined
           }
-          className="inline-flex h-10 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-4 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60"
+          className={PRIMARY_BUTTON}
         >
           {form.formState.isSubmitting && (
             <Loader2 className="size-4 animate-spin" />
           )}
           Close {deviation.deviation_no}
         </button>
-      </div>
+      </FooterActions>
     </form>
   );
 }

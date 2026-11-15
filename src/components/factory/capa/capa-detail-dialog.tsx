@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -19,9 +20,11 @@ import {
   DateControl,
   Fact,
   Field,
+  FooterSlotProvider,
   Group,
   Muted,
   PersonControl,
+  SECONDARY_BUTTON,
   SaveBar,
   SelectControl,
   formatDate,
@@ -102,6 +105,7 @@ function Body({
 }) {
   const readOnly = !canReview(role);
   const editable = !readOnly && capa.status === "open";
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
 
   return (
     <>
@@ -155,6 +159,7 @@ function Body({
         </div>
       </DialogHeader>
 
+      <FooterSlotProvider value={slot}>
       <div className="scrollbar-slim min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-4">
         {editable ? (
           <HeaderForm capa={capa} factoryId={factoryId} />
@@ -176,13 +181,11 @@ function Body({
 
         <CapaPanel capa={capa} factoryId={factoryId} readOnly={readOnly} />
       </div>
+      </FooterSlotProvider>
 
-      <div className="flex shrink-0 items-center justify-end border-t border-line bg-surface px-5 py-3">
-        <button
-          type="button"
-          onClick={onClose}
-          className="h-9 shrink-0 rounded-lg border border-line bg-surface px-4 text-sm font-semibold text-ink-3 shadow-soft transition hover:border-brand hover:text-brand"
-        >
+      <div className="flex shrink-0 items-center justify-end gap-2 border-t border-line bg-surface px-5 py-3">
+        <div ref={setSlot} className="flex items-center gap-2" />
+        <button type="button" onClick={onClose} className={SECONDARY_BUTTON}>
           Close
         </button>
       </div>

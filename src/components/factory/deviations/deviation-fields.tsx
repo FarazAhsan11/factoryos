@@ -1,5 +1,7 @@
 "use client";
 
+import { createContext, useContext, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   Controller,
   type Control,
@@ -335,7 +337,36 @@ export function Badge({
   );
 }
 
-/** The save button every tab ends with. */
+/**
+ * Where a dialog's fixed footer takes a tab's actions. A dialog that provides
+ * one (the case dialog, the CAPA dialog) gets each tab's Save beside its own
+ * Close — always in view, however long the tab. Without one, the actions
+ * render where they are written.
+ */
+const FooterSlotContext = createContext<HTMLElement | null>(null);
+
+export const FooterSlotProvider = FooterSlotContext.Provider;
+
+/** Puts its children in the dialog's footer, when there is one. */
+export function FooterActions({ children }: { children: React.ReactNode }) {
+  const slot = useContext(FooterSlotContext);
+  return slot ? createPortal(children, slot) : <>{children}</>;
+}
+
+export const PRIMARY_BUTTON =
+  "inline-flex h-9 shrink-0 items-center gap-2 rounded-lg bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-4 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60";
+
+export const SECONDARY_BUTTON =
+  "inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-line bg-surface px-4 text-sm font-semibold text-ink-3 shadow-soft transition hover:border-brand hover:text-brand disabled:pointer-events-none disabled:opacity-60";
+
+/**
+ * The save button every tab ends with.
+ *
+ * Inside a dialog with a footer slot the button moves to the footer, beside
+ * Close; the note stays at the foot of the form. The button submits the form
+ * it was written in — found from an anchor left there, because once portalled
+ * it is no longer inside that form in the DOM.
+ */
 export function SaveBar({
   pending,
   label = "Save",
@@ -346,14 +377,38 @@ export function SaveBar({
   /** A note beside the button — what this save will not do. */
   children?: React.ReactNode;
 }) {
+  const slot = useContext(FooterSlotContext);
+  const anchor = useRef<HTMLSpanElement>(null);
+
+  if (slot) {
+    return (
+      <>
+        <span ref={anchor} hidden />
+        {children && (
+          <p className="border-t border-line-soft pt-3 text-[0.6875rem] text-ink-5">
+            {children}
+          </p>
+        )}
+        {createPortal(
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => anchor.current?.closest("form")?.requestSubmit()}
+            className={PRIMARY_BUTTON}
+          >
+            {pending && <Loader2 className="size-4 animate-spin" />}
+            {label}
+          </button>,
+          slot,
+        )}
+      </>
+    );
+  }
+
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft pt-4">
       <p className="text-[0.6875rem] text-ink-5">{children}</p>
-      <button
-        type="submit"
-        disabled={pending}
-        className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-4 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60"
-      >
+      <button type="submit" disabled={pending} className={PRIMARY_BUTTON}>
         {pending && <Loader2 className="size-4 animate-spin" />}
         {label}
       </button>

@@ -14,7 +14,9 @@ import {
 import {
   Badge,
   Fact,
+  FooterSlotProvider,
   Muted,
+  SECONDARY_BUTTON,
   formatDate,
 } from "@/components/factory/deviations/deviation-fields";
 import { CapaTab } from "@/components/factory/deviations/capa-tab";
@@ -123,6 +125,8 @@ function Body({
   onClose: () => void;
 }) {
   const [tab, setTab] = useState<Tab>("initiation");
+  /** The footer's action slot — each tab's Save lands here, beside Close. */
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
 
   const meta = typeMeta(deviation.type);
   const priority = priorityMeta(deviation.priority);
@@ -222,6 +226,7 @@ function Body({
         </div>
       </div>
 
+      <FooterSlotProvider value={slot}>
       <div className="scrollbar-slim min-h-0 flex-1 overflow-y-auto px-5 py-4">
         {tab === "initiation" && (
           <InitiationTab
@@ -260,6 +265,7 @@ function Body({
         )}
         {tab === "aging" && <Aging deviation={deviation} />}
       </div>
+      </FooterSlotProvider>
 
       <div className="flex shrink-0 items-center justify-between gap-3 border-t border-line bg-surface px-5 py-3">
         <p className="min-w-0 truncate text-xs text-ink-4">
@@ -288,13 +294,12 @@ function Body({
             </>
           )}
         </p>
-        <button
-          type="button"
-          onClick={onClose}
-          className="h-9 shrink-0 rounded-lg border border-line bg-surface px-4 text-sm font-semibold text-ink-3 shadow-soft transition hover:border-brand hover:text-brand"
-        >
-          Close
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <div ref={setSlot} className="flex items-center gap-2" />
+          <button type="button" onClick={onClose} className={SECONDARY_BUTTON}>
+            Close
+          </button>
+        </div>
       </div>
     </>
   );

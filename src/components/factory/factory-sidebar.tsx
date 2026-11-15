@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Building2, ChevronDown, PanelLeftClose, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -11,10 +11,15 @@ import type { FactoryRole } from "@/lib/factory/context";
 import {
   activeHrefs,
   navForRole,
+  type NavCount,
   type ResolvedGroup,
   type ResolvedLink,
   type UnitWords,
 } from "@/lib/factory/nav";
+import {
+  deviationKeys,
+  fetchQualityCounts,
+} from "@/lib/factory/deviation-queries";
 import { prefetchModule } from "@/lib/factory/nav-prefetch";
 import { useSidebar } from "@/components/factory/sidebar-context";
 
@@ -23,6 +28,8 @@ interface LinkProps {
   base: string;
   onWarm: (href: string) => void;
   onGo: (event: React.MouseEvent, href: string) => void;
+  /** Open-record counts for the links that carry one; empty until loaded. */
+  counts: Partial<Record<NavCount, number>>;
 }
 
 /**
@@ -100,8 +107,23 @@ export function FactorySidebar({
   const sections = navForRole(role, units);
   const active = activeHrefs(sections, section, liveTab);
 
+  // The Quality links' counts. Only asked for when this role's rail has a
+  // counted link, and under the deviations prefix, so saving a case or a CAPA
+  // anywhere refreshes the numbers here too.
+  const wantsCounts = sections.some((s) =>
+    s.items.some((e) =>
+      "children" in e ? e.children.some((c) => c.count) : e.count,
+    ),
+  );
+  const { data: counts = {} } = useQuery({
+    queryKey: deviationKeys.railCounts(factoryId),
+    queryFn: () => fetchQualityCounts(factoryId),
+    enabled: wantsCounts,
+  });
+
   const linkProps: LinkProps = {
     base,
+    counts,
     onWarm: (href) => prefetchModule(queryClient, factoryId, href),
     onGo: (event, href) => {
       // Let modified clicks (new tab, etc.) behave normally.
@@ -564,7 +586,18 @@ function SubLink({
       )}
     >
       <span className="flex-1 truncate">{link.label}</span>
+      <Count value={link.count ? linkProps.counts[link.count] : undefined} />
     </Link>
+  );
+}
+
+/** How many open records sit behind a link — quiet, and absent at zero. */
+function Count({ value }: { value: number | undefined }) {
+  if (!value) return null;
+  return (
+    <span className="shrink-0 text-[0.6875rem] font-medium tabular-nums text-rail-ink-3">
+      {value}
+    </span>
   );
 }
 

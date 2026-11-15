@@ -5,6 +5,7 @@ import {
   batchStageKeys,
   fetchFactoryStages,
 } from "@/lib/factory/batch-stage-queries";
+import { capaKeys, fetchCapas } from "@/lib/factory/capa-queries";
 import {
   deviationKeys,
   fetchDeviations,
@@ -198,8 +199,22 @@ const WARMERS: Record<string, Warm> = {
       queryFn: () => fetchMaintenanceRequests(factoryId),
     });
   },
+  // Deviations, Non-conformances and Customer complaints are one cached
+  // case list cut by type, so the bare path warms all three.
   "/deviations": (client, factoryId) => {
     workers(client, factoryId);
+    void client.prefetchQuery({
+      queryKey: deviationKeys.all(factoryId),
+      queryFn: () => fetchDeviations(factoryId),
+    });
+  },
+  // The CAPA register, plus the cases its rows open.
+  "/deviations?tab=capa": (client, factoryId) => {
+    workers(client, factoryId);
+    void client.prefetchQuery({
+      queryKey: capaKeys.all(factoryId),
+      queryFn: () => fetchCapas(factoryId),
+    });
     void client.prefetchQuery({
       queryKey: deviationKeys.all(factoryId),
       queryFn: () => fetchDeviations(factoryId),

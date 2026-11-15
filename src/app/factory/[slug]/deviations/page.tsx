@@ -4,7 +4,7 @@ import { DeviationsWorkspace } from "@/components/factory/deviations/deviations-
 import { getFactoryContext } from "@/lib/factory/context";
 
 export const metadata: Metadata = {
-  title: "Deviations & NCRs · FactoryOS",
+  title: "Quality · FactoryOS",
 };
 
 export default async function DeviationsPage({
@@ -23,6 +23,7 @@ export default async function DeviationsPage({
       <DeviationsWorkspace
         factoryId={factory.id}
         userId={viewer.id}
+        viewerName={viewer.fullName}
         role={role}
       />
     </div>

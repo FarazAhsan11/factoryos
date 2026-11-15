@@ -7,6 +7,7 @@ import { CheckCircle2, Loader2, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 
 import {
+  ROOT_CAUSE_CATEGORIES,
   STATUS_REASONS,
   actionPlanSchema,
   closeOutSchema,
@@ -23,7 +24,6 @@ import {
 } from "@/app/factory/[slug]/deviations/schemas";
 import {
   AREA,
-  Badge,
   Cols,
   CONTROL,
   DateControl,
@@ -40,8 +40,8 @@ import {
 import { InitiationFields } from "@/components/factory/deviations/initiation-fields";
 import {
   DISPOSITIONS,
-  RISK_PILL,
   RISK_SCALES,
+  RISK_TEXT,
   closeDeviation,
   deviationKeys,
   outstanding,
@@ -51,6 +51,7 @@ import {
   saveInitiation,
   saveInvestigation,
   saveRisk,
+  riskOf,
   scaleLabel,
   type Deviation,
 } from "@/lib/factory/deviation-queries";
@@ -130,8 +131,17 @@ export function InitiationTab({
       specification: deviation.specification ?? "",
       actual: deviation.actual,
       impact: deviation.impact ?? "",
+      immediateActionDate: deviation.immediate_action_date ?? "",
+      immediateAction: deviation.immediate_action ?? "",
       disposition: deviation.disposition ?? "",
       actionId: deviation.action_id ?? "",
+      receivedVia: (deviation.received_via ?? "") as InitiationValues["receivedVia"],
+      adverseReaction:
+        deviation.adverse_reaction === null
+          ? ""
+          : deviation.adverse_reaction
+            ? "yes"
+            : "no",
     },
   });
 
@@ -176,6 +186,22 @@ function InitiationFacts({ deviation }: { deviation: Deviation }) {
             {deviation.nc_category ?? <Muted>—</Muted>}
           </Fact>
           <Fact label="SLA date">{formatDate(deviation.sla_date)}</Fact>
+          {deviation.type === "complaint" && (
+            <>
+              <Fact label="Received via">
+                {deviation.received_via ?? <Muted>—</Muted>}
+              </Fact>
+              <Fact label="Injury or adverse reaction reported">
+                {deviation.adverse_reaction === null ? (
+                  <Muted>Not answered</Muted>
+                ) : deviation.adverse_reaction ? (
+                  "Yes"
+                ) : (
+                  "No"
+                )}
+              </Fact>
+            </>
+          )}
         </dl>
       </Group>
 
@@ -269,11 +295,25 @@ function InitiationFacts({ deviation }: { deviation: Deviation }) {
           )}
         </dl>
       </Group>
+
+      <Group title="Immediate / containment action">
+        <dl className="grid gap-3">
+          <Fact label="Immediate action date">
+            {formatDate(deviation.immediate_action_date)}
+          </Fact>
+          <Fact label="Immediate action taken" wide>
+            {deviation.immediate_action ?? <Muted>Not recorded</Muted>}
+          </Fact>
+        </dl>
+      </Group>
     </div>
   );
 }
 
 /* ── Tab 2 · Immediate / containment action ───────────────────────────── */
+
+// Unwired: these fields are on the Initiation tab now (`InitiationFields`),
+// as the reference QMS has them. Kept, like `ActionPlanTab`, not deleted.
 
 export function ContainmentTab({
   deviation,
@@ -390,12 +430,11 @@ export function RiskTab({
   const likelihood = useWatch({ control: form.control, name: "likelihood" });
   const severity = useWatch({ control: form.control, name: "severity" });
   const detection = useWatch({ control: form.control, name: "detection" });
-  const score =
-    likelihood && severity && detection
-      ? Number(likelihood) * Number(severity) * Number(detection)
-      : null;
-  const conclusion =
-    score === null ? null : score >= 18 ? "High" : score >= 9 ? "Medium" : "Low";
+  const live = riskOf(
+    likelihood ? Number(likelihood) : null,
+    severity ? Number(severity) : null,
+    detection ? Number(detection) : null,
+  );
 
   if (readOnly) {
     return (
@@ -403,6 +442,7 @@ export function RiskTab({
         <RiskConclusionCard
           score={deviation.risk_score}
           conclusion={deviation.risk_conclusion}
+          slaDate={deviation.sla_date}
         />
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
           <Fact label="Likelihood">
@@ -440,7 +480,7 @@ export function RiskTab({
     >
       <Intro
         title="How bad, how likely, how visible"
-        body="Three scores, multiplied into the conclusion the register is filtered by. Detection runs the other way on purpose: 1 means it would be caught every time, which makes the risk lower."
+        body="Three scores from 1 to 5, multiplied into the conclusion the register is read by. For each, 1 is the lowest risk — for detection that means an existing check always catches it."
       />
 
       <Cols>
@@ -459,7 +499,12 @@ export function RiskTab({
         ))}
       </Cols>
 
-      <RiskConclusionCard score={score} conclusion={conclusion} live />
+      <RiskConclusionCard
+        score={live?.score ?? null}
+        conclusion={live?.conclusion ?? null}
+        slaDate={deviation.sla_date}
+        live
+      />
 
       <Cols of={2}>
         <Field label="Financial impact" htmlFor="dev-financial">
@@ -482,36 +527,53 @@ export function RiskTab({
   );
 }
 
+/**
+ * The calculation, laid out as the reference QMS shows it: the score, the
+ * risk it comes to, the case's SLA date beside them, and the rule in words.
+ */
 function RiskConclusionCard({
   score,
   conclusion,
+  slaDate,
   live,
 }: {
   score: number | null;
   conclusion: "Low" | "Medium" | "High" | null;
+  slaDate: string | null;
   live?: boolean;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-sunken px-4 py-3">
+    <div className="flex flex-wrap items-center gap-x-8 gap-y-3 rounded-2xl border border-line bg-sunken px-4 py-3.5">
       <div>
-        <p className="text-[0.625rem] font-bold tracking-[0.07em] text-ink-5 uppercase">
-          Risk conclusion
-        </p>
-        <p className="mt-0.5 text-xs text-ink-4">
-          {score === null
-            ? live
-              ? "Pick all three scores to see it."
-              : "Not assessed yet."
-            : `Likelihood × severity × detection = ${score} of 27`}
+        <p className="text-[0.6875rem] text-ink-5">Score</p>
+        <p className="mt-0.5 text-xl font-semibold tabular-nums text-ink">
+          {score ?? "—"}
         </p>
       </div>
-      {conclusion ? (
-        <Badge className={cn("text-xs", RISK_PILL[conclusion])}>
-          {conclusion}
-        </Badge>
-      ) : (
-        <Badge className="bg-sunken-2 text-ink-4">Not assessed</Badge>
-      )}
+      <div>
+        <p className="text-[0.6875rem] text-ink-5">Risk</p>
+        <p
+          className={cn(
+            "mt-0.5 text-xl font-semibold",
+            conclusion ? RISK_TEXT[conclusion] : "text-ink-5",
+          )}
+        >
+          {conclusion ?? "—"}
+        </p>
+      </div>
+      <div>
+        <p className="text-[0.6875rem] text-ink-5">SLA date</p>
+        <p className="mt-0.5 text-xl font-semibold tabular-nums text-ink">
+          {formatDate(slaDate)}
+        </p>
+      </div>
+      <p className="max-w-sm text-[0.75rem] leading-relaxed text-ink-4">
+        {score === null && live
+          ? "Pick all three scores to see the risk. "
+          : null}
+        Score = severity × likelihood × detection. 20+ is Medium, 60+ is High.
+        Severity 5 is always High.
+      </p>
     </div>
   );
 }
@@ -531,6 +593,8 @@ export function InvestigationTab({
     resolver: zodResolver(investigationSchema),
     defaultValues: {
       investigationFindings: deviation.investigation_findings ?? "",
+      rootCauseCategory: (deviation.root_cause_category ??
+        "") as InvestigationValues["rootCauseCategory"],
     },
   });
 
@@ -543,6 +607,9 @@ export function InvestigationTab({
   if (readOnly) {
     return (
       <dl className="grid gap-3">
+        <Fact label="Root cause category">
+          {deviation.root_cause_category ?? <Muted>—</Muted>}
+        </Fact>
         <Fact label="Investigation findings" wide>
           {deviation.investigation_findings ?? <Muted>Not recorded</Muted>}
         </Fact>
@@ -572,6 +639,23 @@ export function InvestigationTab({
           {...form.register("investigationFindings")}
         />
       </Field>
+      <Cols>
+        <Field
+          label="Root cause category"
+          htmlFor="dev-rc-category"
+          note="(optional)"
+        >
+          <SelectControl
+            control={form.control}
+            name="rootCauseCategory"
+            id="dev-rc-category"
+            clearable
+            clearLabel="Not categorised"
+            placeholder="Man, method, material…"
+            options={ROOT_CAUSE_CATEGORIES.map((c) => ({ value: c, label: c }))}
+          />
+        </Field>
+      </Cols>
       <SaveBar pending={form.formState.isSubmitting} />
     </form>
   );
@@ -827,7 +911,7 @@ export function CloseOutTab({
     >
       <Intro
         title="Close the case"
-        body="The close-out is the only gate: it needs the containment action, the risk assessment and the investigation findings. Once closed, the case cannot be edited."
+        body="The close-out is the only gate: it needs the containment action, the risk assessment, the investigation findings and the CAPA decision — a CAPA verified as effective, or a reason none is needed. Once closed, the case cannot be edited."
       />
 
       {/* What the database will refuse the close for, named by its tab, so

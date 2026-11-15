@@ -8,6 +8,7 @@ import { Lock } from "lucide-react";
 import {
   NC_CATEGORIES,
   ORIGINS,
+  RECEIVED_VIA,
   type InitiationValues,
 } from "@/app/factory/[slug]/deviations/schemas";
 import { BatchSummary } from "@/components/factory/batch/batch-summary";
@@ -20,8 +21,8 @@ import {
   Group,
   PersonControl,
   SelectControl,
+  YesNo,
 } from "@/components/factory/deviations/deviation-fields";
-import { useCapaOptions } from "@/components/factory/deviations/use-capa-options";
 import {
   equipmentKeys,
   fetchEquipment,
@@ -31,6 +32,7 @@ import {
   DEVIATION_TYPES,
   DISPOSITIONS,
   PRIORITIES,
+  type DeviationType,
 } from "@/lib/factory/deviation-queries";
 import { fetchProducts, productKeys } from "@/lib/factory/product-queries";
 import { useWorkers } from "@/lib/factory/worker-queries";
@@ -49,18 +51,27 @@ import { cn } from "@/lib/utils";
  * (to a machine name from the register). Both are the same conveniences the
  * shift log and the maintenance form already give.
  *
- * The **case type is a dropdown**. It decides the case's number — DEV or NCR
- * — so on an existing case it is locked and says why.
+ * The **case type is a dropdown**. It decides the case's number — DEV, NCR
+ * or CMP — so on an existing case it is locked and says why. Raised from a
+ * Quality screen it offers only that screen's types, and when there is only
+ * one (a non-conformance, a complaint) it is shown, not asked.
+ *
+ * The "Linked CAPA" picker that pointed at Issues & CAPA is no longer drawn:
+ * a case's CAPA is chosen on its CAPA tab now. `actionId` stays in the form's
+ * values, so an old link is saved back unchanged.
  */
 export function InitiationFields({
   form,
   factoryId,
   locked,
+  types,
 }: {
   form: UseFormReturn<InitiationValues>;
   factoryId: string;
   /** True on an existing case: the type is part of its number. */
   locked?: boolean;
+  /** The types this form may raise; every type when absent. */
+  types?: DeviationType[];
 }) {
   const {
     register,
@@ -77,7 +88,6 @@ export function InitiationFields({
     queryKey: equipmentKeys.all(factoryId),
     queryFn: () => fetchEquipment(factoryId),
   });
-  const capaGroups = useCapaOptions(factoryId);
   const { data: workers = [] } = useWorkers(factoryId);
 
   const type = useWatch({ control, name: "type" });
@@ -107,12 +117,35 @@ export function InitiationFields({
   }, [matched, customerName, setValue]);
 
   const isNcr = type === "ncr";
+  const isComplaint = type === "complaint";
+  const offered = DEVIATION_TYPES.filter(
+    (t) => !types || types.includes(t.value),
+  );
+  // One type on offer is not a question.
+  const fixedType = locked || offered.length === 1;
   const quarantine = isNcr && disposition === "quarantine";
   const typed = (batchNo ?? "").trim();
 
   return (
     <div className="space-y-6">
       <Group title="Case details">
+        {/* The title first, on every form: it is what the case is called. */}
+        <Field
+          label="Case title"
+          htmlFor="dev-title"
+          required
+          hint="The line this case is found by in a list of six hundred."
+          error={errors.title?.message}
+        >
+          <input
+            id="dev-title"
+            placeholder="e.g. PC2831 Creatine Chewable — tablets softening in pack"
+            aria-invalid={Boolean(errors.title)}
+            className={CONTROL}
+            {...register("title")}
+          />
+        </Field>
+
         <Cols>
           <Field
             label="Case type"
@@ -121,7 +154,7 @@ export function InitiationFields({
             error={errors.type?.message}
             note={locked ? "(fixed)" : undefined}
           >
-            {locked ? (
+            {fixedType ? (
               <p className={cn(CONTROL, "flex items-center gap-2 bg-sunken text-ink-3")}>
                 <Lock className="size-3.5 shrink-0 text-ink-5" />
                 {DEVIATION_TYPES.find((t) => t.value === type)?.label}
@@ -133,7 +166,7 @@ export function InitiationFields({
                 id="dev-type"
                 placeholder="Select case type…"
                 invalid={Boolean(errors.type)}
-                options={DEVIATION_TYPES.map((t) => ({
+                options={offered.map((t) => ({
                   value: t.value,
                   label: t.label,
                   hint: t.hint,
@@ -173,21 +206,31 @@ export function InitiationFields({
           </Field>
         </Cols>
 
-        <Field
-          label="Case title"
-          htmlFor="dev-title"
-          required
-          hint="The line this case is found by in a list of six hundred."
-          error={errors.title?.message}
-        >
-          <input
-            id="dev-title"
-            placeholder="e.g. PC2831 Creatine Chewable — tablets softening in pack"
-            aria-invalid={Boolean(errors.title)}
-            className={CONTROL}
-            {...register("title")}
-          />
-        </Field>
+        {isComplaint && (
+          <Cols>
+            <Field
+              label="Received via"
+              htmlFor="dev-received"
+              required
+              error={errors.receivedVia?.message}
+            >
+              <SelectControl
+                control={control}
+                name="receivedVia"
+                id="dev-received"
+                placeholder="How it reached you…"
+                invalid={Boolean(errors.receivedVia)}
+                options={RECEIVED_VIA.map((r) => ({ value: r, label: r }))}
+              />
+            </Field>
+            <Field
+              label="Injury or adverse reaction reported"
+              hint="Leave unanswered until it is known — the close-out asks for it."
+            >
+              <YesNo control={control} name="adverseReaction" />
+            </Field>
+          </Cols>
+        )}
 
         <Cols>
           <Field
@@ -312,19 +355,6 @@ export function InitiationFields({
               placeholder="QA manager name"
               className={CONTROL}
               {...register("qaReviewer")}
-            />
-          </Field>
-          <Field label="Linked CAPA" htmlFor="dev-capa" note="(optional)">
-            <SelectControl
-              control={control}
-              name="actionId"
-              id="dev-capa"
-              clearable
-              clearLabel="No CAPA"
-              placeholder="None"
-              searchPlaceholder="Issue title or batch…"
-              emptyMessage="No issues raised yet."
-              groups={capaGroups}
             />
           </Field>
         </Cols>
@@ -456,6 +486,40 @@ export function InitiationFields({
             placeholder="e.g. Minimal — within acceptance criteria after re-test"
             className={AREA}
             {...register("impact")}
+          />
+        </Field>
+      </Group>
+
+      {/* What was done straight away. It was its own Containment tab; it is
+          part of identifying the case, as the reference QMS has it. Both
+          fields are optional until the close-out, which demands them. */}
+      <Group title="Immediate / containment action">
+        <Cols>
+          <Field
+            label="Immediate action date"
+            htmlFor="dev-ia-date"
+            note="(needed to close)"
+          >
+            <DateControl
+              control={control}
+              name="immediateActionDate"
+              id="dev-ia-date"
+            />
+          </Field>
+        </Cols>
+        <Field
+          label="Immediate action taken"
+          htmlFor="dev-ia"
+          note="(needed to close)"
+          hint="What stopped this getting further — holds, quarantine, line stops."
+          error={errors.immediateAction?.message}
+        >
+          <textarea
+            id="dev-ia"
+            rows={3}
+            placeholder="e.g. Stock quarantined and returned for decanting, milling and compression."
+            className={AREA}
+            {...register("immediateAction")}
           />
         </Field>
       </Group>

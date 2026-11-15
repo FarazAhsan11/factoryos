@@ -15,7 +15,12 @@ import { z } from "zod";
  * type. The queries turn blank into null on the way in.
  */
 
-export const DEVIATION_TYPE_VALUES = ["planned", "unplanned", "ncr"] as const;
+export const DEVIATION_TYPE_VALUES = [
+  "planned",
+  "unplanned",
+  "ncr",
+  "complaint",
+] as const;
 export const DISPOSITION_VALUES = [
   "use_as_is",
   "rework",
@@ -49,6 +54,24 @@ export const NC_CATEGORIES = [
   "Other",
 ] as const;
 
+/** Mirrors `deviations_root_cause_category_known` in migration 0058. */
+export const ROOT_CAUSE_CATEGORIES = [
+  "Man",
+  "Method",
+  "Material",
+  "Machine",
+  "Environment",
+] as const;
+
+/** Mirrors `deviations_received_via_known` in migration 0057. */
+export const RECEIVED_VIA = [
+  "Email",
+  "Phone",
+  "Distributor",
+  "Website",
+  "Other",
+] as const;
+
 /** Mirrors `deviations_status_reason_known`. */
 export const STATUS_REASONS = [
   "Problem solved",
@@ -76,7 +99,7 @@ const date = z
 export const initiationSchema = z
   .object({
     type: z.enum(DEVIATION_TYPE_VALUES, {
-      message: "Planned deviation, unplanned deviation, or NCR?",
+      message: "What kind of case is this?",
     }),
     title: z
       .string()
@@ -114,8 +137,23 @@ export const initiationSchema = z
       .max(2000, "Keep the event description under 2000 characters."),
     impact: optional(1000),
 
+    // Immediate / containment action — on the initiation tab since the
+    // Containment tab was folded into it. Optional here; the close-out
+    // demands both.
+    immediateActionDate: date,
+    immediateAction: optional(2000),
+
     disposition: z.union([z.enum(DISPOSITION_VALUES), z.literal("")]),
     actionId: z.string(),
+
+    // Customer complaints only (migration 0057). Blank on every other type.
+    receivedVia: z.union([z.enum(RECEIVED_VIA), z.literal("")]),
+    // Tri-state: "" is unanswered, which the close-out refuses.
+    adverseReaction: z.union([z.enum(["yes", "no"]), z.literal("")]),
+  })
+  .refine((v) => v.type !== "complaint" || v.receivedVia !== "", {
+    path: ["receivedVia"],
+    message: "How was the complaint received?",
   })
   .refine((v) => v.type !== "ncr" || v.disposition !== "", {
     path: ["disposition"],
@@ -144,14 +182,17 @@ export type ContainmentValues = z.infer<typeof containmentSchema>;
 /* ── Tab 3 · Risk assessment ──────────────────────────────────────────── */
 
 /**
- * Three 1–3 scores and a yes/no. Held as strings because that is what a
- * `SelectField` and a radio group deal in; `""` is *not assessed yet*, which
- * is a real state right up until the close-out gate refuses it.
+ * Three 1–5 scores (migration 0058) and a yes/no. Held as strings because
+ * that is what a `SelectField` and a radio group deal in; `""` is *not
+ * assessed yet*, which is a real state right up until the close-out gate
+ * refuses it.
  */
+const score = z.union([z.enum(["1", "2", "3", "4", "5"]), z.literal("")]);
+
 export const riskSchema = z.object({
-  likelihood: z.union([z.enum(["1", "2", "3"]), z.literal("")]),
-  severity: z.union([z.enum(["1", "2", "3"]), z.literal("")]),
-  detection: z.union([z.enum(["1", "2", "3"]), z.literal("")]),
+  likelihood: score,
+  severity: score,
+  detection: score,
   financialImpact: z.union([z.enum(["yes", "no"]), z.literal("")]),
   riskDescription: optional(1000),
 });
@@ -162,6 +203,7 @@ export type RiskValues = z.infer<typeof riskSchema>;
 
 export const investigationSchema = z.object({
   investigationFindings: optional(4000),
+  rootCauseCategory: z.union([z.enum(ROOT_CAUSE_CATEGORIES), z.literal("")]),
 });
 
 export type InvestigationValues = z.infer<typeof investigationSchema>;
@@ -190,6 +232,160 @@ export const actionPlanSchema = z
   });
 
 export type ActionPlanValues = z.infer<typeof actionPlanSchema>;
+
+/* ── CAPA (migration 0057) ────────────────────────────────────────────── */
+
+/**
+ * The case's CAPA decision. "" is undecided — a real state until the
+ * close-out, which refuses it. Saying No takes a reason, because "no CAPA"
+ * with nothing beside it is indistinguishable from "nobody thought about it".
+ */
+export const capaDecisionSchema = z
+  .object({
+    needed: z.union([z.enum(["yes", "no"]), z.literal("")]),
+    reason: optional(1000),
+  })
+  .refine((v) => v.needed !== "no" || v.reason.length >= 10, {
+    path: ["reason"],
+    message: "Say why no CAPA is needed.",
+  });
+
+export type CapaDecisionValues = z.infer<typeof capaDecisionSchema>;
+
+/** Mirrors `capas_reason_known` in migration 0059 — why a case earns a CAPA. */
+export const CAPA_REASONS = [
+  "Critical / Major impact",
+  "Recurring issue",
+  "Systemic",
+  "Regulatory / customer impact",
+] as const;
+
+/** Mirrors `capas_rca_method_known` — how the root cause was found. */
+export const RCA_METHODS = [
+  "5-Why",
+  "Fishbone (Ishikawa)",
+  "Fault tree",
+  "FMEA",
+] as const;
+
+/**
+ * Resolve directly — a correction and no CAPA. Stored as the case's "reason
+ * no CAPA is needed", which is what the close-out reads.
+ */
+export const resolveDirectSchema = z.object({
+  correction: z
+    .string()
+    .trim()
+    .min(10, "Say what was done to correct it, and why no CAPA is needed.")
+    .max(1000, "Keep it under 1000 characters."),
+});
+
+export type ResolveDirectValues = z.infer<typeof resolveDirectSchema>;
+
+/**
+ * Initiate a CAPA from a case — the whole plan in one form, written in one
+ * transaction by `initiate_capa()` (0059). Action rows with no description
+ * are dropped rather than refused: the form opens with one CA and one PA row,
+ * and a case with only a corrective action leaves the PA row blank.
+ */
+export const capaInitiateSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(3, "Give the CAPA a title — what it fixes, in a line.")
+    .max(160, "Keep the title under 160 characters."),
+  reason: z.enum(CAPA_REASONS, { message: "Why does this need a CAPA?" }),
+  owner: optional(80),
+  targetDate: date,
+  rootCause: optional(2000),
+  rcaMethod: z.union([z.enum(RCA_METHODS), z.literal("")]),
+  actions: z.array(
+    z.object({
+      kind: z.enum(["ca", "pa"]),
+      description: optional(2000),
+      owner: optional(80),
+      targetDate: date,
+    }),
+  ),
+  effectivenessCriteria: optional(1000),
+  verifyBy: date,
+});
+
+export type CapaInitiateValues = z.infer<typeof capaInitiateSchema>;
+
+/** Raising a CAPA from a case — the title and its owner; the rest follows. */
+export const capaCreateSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(3, "Give the CAPA a title — what it fixes, in a line.")
+    .max(160, "Keep the title under 160 characters."),
+  owner: optional(80),
+});
+
+export type CapaCreateValues = z.infer<typeof capaCreateSchema>;
+
+/** The CAPA's own header, editable while it is open. */
+export const capaHeaderSchema = capaCreateSchema.extend({
+  reason: z.union([z.enum(CAPA_REASONS), z.literal("")]),
+  targetDate: date,
+  rootCause: optional(2000),
+  rcaMethod: z.union([z.enum(RCA_METHODS), z.literal("")]),
+  effectivenessCriteria: optional(1000),
+  verifyBy: date,
+});
+
+export type CapaHeaderValues = z.infer<typeof capaHeaderSchema>;
+
+/**
+ * One action on a CAPA — the five fields the old CA / PA tabs had, plus which
+ * of the two it is. Closing it is a separate step (`capaActionCloseSchema`),
+ * because a closed action is frozen.
+ */
+export const capaActionSchema = z.object({
+  kind: z.enum(["ca", "pa"]),
+  description: z
+    .string()
+    .trim()
+    .min(5, "Describe the action.")
+    .max(2000, "Keep the description under 2000 characters."),
+  owner: optional(80),
+  targetDate: date,
+});
+
+export type CapaActionValues = z.infer<typeof capaActionSchema>;
+
+export const capaActionCloseSchema = z.object({
+  closedDate: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick the date it was closed."),
+  closedBy: z
+    .string()
+    .trim()
+    .min(1, "Closing an action needs a name against it.")
+    .max(80, "Keep the name under 80 characters."),
+});
+
+export type CapaActionCloseValues = z.infer<typeof capaActionCloseSchema>;
+
+/** Open → effective. `capas_guard` re-checks all of it, plus the actions. */
+export const capaVerifySchema = z.object({
+  effectivenessCriteria: z
+    .string()
+    .trim()
+    .min(5, "Say what would show the CAPA worked.")
+    .max(1000, "Keep the criteria under 1000 characters."),
+  verification: z
+    .string()
+    .trim()
+    .min(10, "Record the verification — what was checked and what it showed.")
+    .max(2000, "Keep the verification under 2000 characters."),
+  verifiedBy: z
+    .string()
+    .trim()
+    .min(1, "Verifying needs a name against it.")
+    .max(80, "Keep the name under 80 characters."),
+});
+
+export type CapaVerifyValues = z.infer<typeof capaVerifySchema>;
 
 /* ── Tab 7 · Close out ────────────────────────────────────────────────── */
 

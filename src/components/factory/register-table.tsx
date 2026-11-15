@@ -1,7 +1,14 @@
 "use client";
 
-import { Search, X } from "lucide-react";
+import { Columns3, Search, X } from "lucide-react";
 
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
 /*
@@ -35,16 +42,30 @@ export const TH_PINNED = cn(
  */
 export function RegisterTable({
   head,
+  plain,
   children,
 }: {
   head: React.ReactNode;
+  /**
+   * Sentence-case headings and a table that fits its box rather than
+   * stretching to every column's widest value — the Quality registers, read
+   * as a short list of columns a viewer chooses (`ColumnsMenu`).
+   */
+  plain?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <div className="scrollbar-slim h-full overflow-auto rounded-2xl border border-line bg-surface shadow-card max-lg:max-h-[75svh]">
-      <table className="w-full min-w-max text-sm">
+      <table className={cn("w-full text-sm", !plain && "min-w-max")}>
         <thead>
-          <tr className="text-left text-[0.625rem] font-bold tracking-[0.07em] whitespace-nowrap text-ink-3 uppercase">
+          <tr
+            className={cn(
+              "text-left whitespace-nowrap",
+              plain
+                ? "text-xs font-semibold text-ink-4"
+                : "text-[0.625rem] font-bold tracking-[0.07em] text-ink-3 uppercase",
+            )}
+          >
             {head}
           </tr>
         </thead>
@@ -225,5 +246,101 @@ export function RegisterSearch({
         </button>
       )}
     </div>
+  );
+}
+
+/**
+ * The views over a register — "Open 4  My cases 0  Overdue 1 …" — as a row
+ * of underlined tabs with their counts, the way the reference QMS lays them
+ * out. Each view is a question; the count says how many answer it.
+ */
+export function RegisterViews<K extends string>({
+  views,
+  value,
+  onChange,
+  label,
+}: {
+  views: { key: K; label: string; count: number; hint?: string }[];
+  value: K;
+  onChange: (next: K) => void;
+  label: string;
+}) {
+  return (
+    <div
+      role="tablist"
+      aria-label={label}
+      className="scrollbar-slim flex gap-5 overflow-x-auto border-b border-line"
+    >
+      {views.map((v) => {
+        const active = v.key === value;
+        return (
+          <button
+            key={v.key}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            title={v.hint}
+            onClick={() => onChange(v.key)}
+            className={cn(
+              "-mb-px shrink-0 border-b-2 pt-1 pb-2.5 text-sm transition",
+              active
+                ? "border-brand font-semibold text-ink"
+                : "border-transparent text-ink-4 hover:text-ink",
+            )}
+          >
+            {v.label}
+            <span
+              className={cn(
+                "ml-1 text-xs tabular-nums",
+                active ? "text-ink-4" : "text-ink-5",
+              )}
+            >
+              {v.count}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** The optional columns a viewer can switch on and off. */
+export function ColumnsMenu<K extends string>({
+  columns,
+  shown,
+  onToggle,
+}: {
+  columns: { key: K; label: string }[];
+  shown: K[];
+  onToggle: (key: K) => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger className="inline-flex h-[38px] shrink-0 items-center gap-2 rounded-xl border border-line bg-surface px-3.5 text-sm font-semibold text-ink-3 shadow-soft transition hover:border-line-strong hover:text-ink">
+        <Columns3 className="size-4" />
+        Columns
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel>Show columns</DropdownMenuLabel>
+        {columns.map((c) => (
+          <DropdownMenuCheckboxItem
+            key={c.key}
+            checked={shown.includes(c.key)}
+            onCheckedChange={() => onToggle(c.key)}
+          >
+            {c.label}
+          </DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/** "4 rows", under the table. */
+export function RegisterFoot({ count }: { count: number }) {
+  return (
+    <p className="mt-2.5 shrink-0 px-1 text-xs text-ink-5 tabular-nums">
+      {count} row{count === 1 ? "" : "s"}
+    </p>
   );
 }

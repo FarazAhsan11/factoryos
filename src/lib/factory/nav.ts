@@ -35,7 +35,14 @@ export interface NavLink {
   roles: FactoryRole[];
   /** False until the screen is actually built; rendered as "Soon". */
   ready: boolean;
+  /**
+   * A count of open records drawn beside the link — the Quality registers
+   * (`fetchQualityCounts`). Absent for every other link.
+   */
+  count?: NavCount;
 }
+
+export type NavCount = "deviations" | "ncr" | "complaints" | "capa";
 
 export interface NavGroup {
   label: string;
@@ -188,14 +195,51 @@ export const FACTORY_NAV: NavSection[] = [
       // all remain. Restore this entry to wire it back in:
       //   { href: "/actions", label: "Issues & CAPA", icon: ShieldAlert,
       //     roles: SUPERVISOR_UP, ready: true },
-      // Supervisor and up: raising a quarantine NCR stops a batch, and
-      // closing one is a QA sign-off.
+      //
+      // One expandable group under its own heading, as Assets & Maintenance
+      // is: the four registers are screens of one page (`/deviations`, chosen
+      // by `?tab=`, see `quality-tabs.ts`). Supervisor and up: raising a
+      // quarantine NCR stops a batch, and closing a case is a QA sign-off.
+      // Each counted link shows how many of its records are open.
       {
-        href: "/deviations",
-        label: "Deviations & NCRs",
+        label: "Quality",
         icon: FileWarning,
-        roles: SUPERVISOR_UP,
-        ready: true,
+        children: [
+          {
+            href: "/deviations?tab=dashboard",
+            label: "Dashboard",
+            roles: SUPERVISOR_UP,
+            ready: false,
+          },
+          {
+            href: "/deviations?tab=deviations",
+            label: "Deviations",
+            roles: SUPERVISOR_UP,
+            ready: true,
+            count: "deviations",
+          },
+          {
+            href: "/deviations?tab=ncr",
+            label: "Non-conformances",
+            roles: SUPERVISOR_UP,
+            ready: true,
+            count: "ncr",
+          },
+          {
+            href: "/deviations?tab=complaints",
+            label: "Customer complaints",
+            roles: SUPERVISOR_UP,
+            ready: true,
+            count: "complaints",
+          },
+          {
+            href: "/deviations?tab=capa",
+            label: "CAPA register",
+            roles: SUPERVISOR_UP,
+            ready: true,
+            count: "capa",
+          },
+        ],
       },
     ],
   },

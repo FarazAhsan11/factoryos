@@ -59,8 +59,12 @@ export function Field({
         {required && <span className="ml-0.5 text-danger">*</span>}
         {note && <span className="ml-1 text-[0.625rem] text-ink-5">{note}</span>}
       </label>
-      {hint && <p className="text-[0.6875rem] leading-snug text-ink-5">{hint}</p>}
       {children}
+      {/* Under the control, not over it: a hint above pushed its control
+          below its neighbours' in the same row. */}
+      {hint && !error && (
+        <p className="text-[0.6875rem] leading-snug text-ink-5">{hint}</p>
+      )}
       {error && (
         <p role="alert" className="text-[0.7188rem] text-danger">
           {error}

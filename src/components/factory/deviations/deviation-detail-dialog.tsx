@@ -4,13 +4,11 @@ import { useState } from "react";
 import {
   ClipboardCheck,
   ClipboardList,
-  FlaskConical,
   Gauge,
   History,
+  ListChecks,
   Lock,
   Search,
-  ShieldCheck,
-  Wrench,
 } from "lucide-react";
 
 import {
@@ -19,10 +17,9 @@ import {
   Muted,
   formatDate,
 } from "@/components/factory/deviations/deviation-fields";
+import { CapaTab } from "@/components/factory/deviations/capa-tab";
 import {
-  ActionPlanTab,
   CloseOutTab,
-  ContainmentTab,
   InitiationTab,
   InvestigationTab,
   RiskTab,
@@ -51,21 +48,21 @@ import { cn } from "@/lib/utils";
 
 type Tab =
   | "initiation"
-  | "containment"
   | "risk"
   | "investigation"
-  | "corrective"
-  | "preventive"
+  | "capa"
   | "closeout"
   | "aging";
 
 const TABS: { id: Tab; label: string; icon: typeof ClipboardList }[] = [
   { id: "initiation", label: "Initiation", icon: ClipboardList },
-  { id: "containment", label: "Containment", icon: ShieldCheck },
+  // Containment is part of Initiation now, as the reference QMS has it
+  // (`ContainmentTab` is kept in deviation-tab-forms.tsx, unwired).
   { id: "risk", label: "Risk", icon: Gauge },
   { id: "investigation", label: "Investigation", icon: Search },
-  { id: "corrective", label: "Corrective", icon: Wrench },
-  { id: "preventive", label: "Preventive", icon: FlaskConical },
+  // The case's CA and PA used to be two inline tabs here (`ActionPlanTab`,
+  // still in deviation-tab-forms.tsx, unwired). They are a CAPA record now.
+  { id: "capa", label: "CAPA", icon: ListChecks },
   { id: "closeout", label: "Close out", icon: ClipboardCheck },
   { id: "aging", label: "Aging", icon: History },
 ];
@@ -233,13 +230,6 @@ function Body({
             readOnly={readOnly}
           />
         )}
-        {tab === "containment" && (
-          <ContainmentTab
-            deviation={deviation}
-            factoryId={factoryId}
-            readOnly={readOnly}
-          />
-        )}
         {tab === "risk" && (
           <RiskTab
             deviation={deviation}
@@ -254,19 +244,10 @@ function Body({
             readOnly={readOnly}
           />
         )}
-        {tab === "corrective" && (
-          <ActionPlanTab
+        {tab === "capa" && (
+          <CapaTab
             deviation={deviation}
             factoryId={factoryId}
-            kind="ca"
-            readOnly={readOnly}
-          />
-        )}
-        {tab === "preventive" && (
-          <ActionPlanTab
-            deviation={deviation}
-            factoryId={factoryId}
-            kind="pa"
             readOnly={readOnly}
           />
         )}
@@ -365,15 +346,19 @@ function Aging({ deviation }: { deviation: Deviation }) {
           done={Boolean(deviation.investigated_at)}
         />
         <Step
-          label="Corrective action closed"
-          at={formatDate(deviation.ca_closed_date)}
-          done={Boolean(deviation.ca_closed_date)}
+          label={
+            deviation.capa_no ? `CAPA decided — ${deviation.capa_no}` : "CAPA decided"
+          }
+          at={deviation.capa_needed ? "Needed" : "Not needed"}
+          done={deviation.capa_needed !== null}
         />
-        <Step
-          label="Preventive action closed"
-          at={formatDate(deviation.pa_closed_date)}
-          done={Boolean(deviation.pa_closed_date)}
-        />
+        {deviation.capa_needed !== false && (
+          <Step
+            label="CAPA verified effective"
+            at={formatStamp(deviation.capa_verified_at)}
+            done={deviation.capa_status === "effective"}
+          />
+        )}
         <Step
           label="Case closed"
           at={formatStamp(deviation.closed_at)}

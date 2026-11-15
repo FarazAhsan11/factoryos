@@ -1,35 +1,40 @@
 "use client";
 
 import { useCallback, useDeferredValue, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { CapaRegister } from "@/components/factory/capa/capa-register";
 import { DeviationDetailDialog } from "@/components/factory/deviations/deviation-detail-dialog";
-import { DeviationsTable } from "@/components/factory/deviations/deviations-table";
+import {
+  DeviationsTable,
+  OPTIONAL_COLUMNS,
+  defaultColumns,
+  type CaseColumn,
+} from "@/components/factory/deviations/deviations-table";
 import { NewDeviationDialog } from "@/components/factory/deviations/new-deviation-dialog";
 import {
+  ColumnsMenu,
+  RegisterFoot,
   RegisterSearch,
   RegisterSkeleton,
+  RegisterViews,
 } from "@/components/factory/register-table";
 import { canReview } from "@/lib/factory/action-queries";
 import type { FactoryRole } from "@/lib/factory/context";
 import {
   DEVIATION_TYPES,
+  caseStage,
   deviationKeys,
   fetchDeviations,
   type Deviation,
-  type DeviationStatus,
   type DeviationType,
 } from "@/lib/factory/deviation-queries";
+import { CASE_SCREENS, resolveQualityTab } from "@/lib/factory/quality-tabs";
 import { cn } from "@/lib/utils";
 
-type StatusFilter = DeviationStatus | "all";
+type View = "open" | "mine" | "awaiting" | "overdue" | "closed" | "all";
 type TypeFilter = DeviationType | "all";
-
-const STATUS_FILTERS: { key: StatusFilter; label: string; hint: string }[] = [
-  { key: "open", label: "Open", hint: "Raised, not yet closed out" },
-  { key: "closed", label: "Closed", hint: "Signed off by QA" },
-  { key: "all", label: "All", hint: "Every case ever raised" },
-];
 
 /** What the keyword box searches — the columns somebody actually types into. */
 function haystack(d: Deviation): string {
@@ -41,45 +46,65 @@ function haystack(d: Deviation): string {
     d.product_code,
     d.customer_name,
     d.supplier_name,
+    d.raw_material_code,
+    d.raw_material_name,
     d.nc_category,
     d.owner_name,
     d.raised_by,
+    d.capa_no,
   ]
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
 }
 
+const same = (a: string | null, b: string) =>
+  (a ?? "").trim().toLowerCase() === b;
+
 /**
- * Deviations & NCRs — the QMS register.
+ * Quality — the case registers and the CAPA register, one page.
  *
- * A table, not a tray of cards: this is a list that gets read down a column
- * — every High risk case, everything still open on batch 44637 — and read
- * across only once you have found the row you want, which is what opening it
- * is for. Every field the case carries is a column; the case number stays
- * pinned while the rest scroll.
+ * Which screen is open comes from the rail, through `?tab=`
+ * (`resolveQualityTab`): Deviations, Non-conformances and Customer complaints
+ * are the one cached case list cut by type, and the CAPA register is its own
+ * list. Switching between them only rewrites the URL, so nothing is fetched
+ * twice and the case dialog — opened from a case row or from a CAPA's cases —
+ * is one dialog for all four.
  *
- * Filtered by three things that answer different questions: status (with
- * counts), type, and a keyword box over the columns people type into.
+ * Laid out the way the client's reference QMS is: heading, a row of views
+ * with their counts (Open, My cases, Awaiting CAPA, Overdue, Closed, All),
+ * the search and a Columns menu, a short table, and a row count. "My cases"
+ * are the ones whose owner or raiser is the signed-in person's name.
  */
 export function DeviationsWorkspace({
   factoryId,
   userId,
+  viewerName,
   role,
 }: {
   factoryId: string;
   userId: string;
+  /** The signed-in person's full name, for "My cases". */
+  viewerName: string | null;
   role: FactoryRole;
 }) {
   const queryClient = useQueryClient();
-  const [status, setStatus] = useState<StatusFilter>("open");
+  const tab = resolveQualityTab(useSearchParams().get("tab"));
+  const screen = tab === "capa" ? null : CASE_SCREENS[tab];
+  const [view, setView] = useState<View>("open");
   const [type, setType] = useState<TypeFilter>("all");
   const [search, setSearch] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
+  // The optional columns each screen shows. Kept per screen, and only for as
+  // long as the page is open.
+  const [chosen, setChosen] = useState<Partial<Record<string, CaseColumn[]>>>(
+    {},
+  );
 
   // The table re-filters on a background render, so typing stays responsive
   // with six hundred cases in the cache.
   const term = useDeferredValue(search).trim().toLowerCase();
+  const me = (viewerName ?? "").trim().toLowerCase();
 
   const {
     data: deviations = [],
@@ -97,135 +122,177 @@ export function DeviationsWorkspace({
     [queryClient, factoryId],
   );
 
-  // The status counts follow the other two filters, so "Open 3" always
-  // describes the list its chip would show.
+  // The screen's own cases first; the view counts then follow the type and
+  // keyword filters, so "Open 3" always describes the list its tab shows.
+  const onScreen = useMemo(
+    () => deviations.filter((d) => screen?.types.includes(d.type)),
+    [deviations, screen],
+  );
   const narrowed = useMemo(
     () =>
-      deviations.filter(
+      onScreen.filter(
         (d) =>
-          (type === "all" || d.type === type) &&
+          (tab !== "deviations" || type === "all" || d.type === type) &&
           (!term || haystack(d).includes(term)),
       ),
-    [deviations, type, term],
+    [onScreen, tab, type, term],
   );
 
-  const counts = useMemo(
-    () => ({
-      open: narrowed.filter((d) => d.status === "open").length,
-      closed: narrowed.filter((d) => d.status === "closed").length,
-      all: narrowed.length,
-    }),
-    [narrowed],
-  );
+  const views = useMemo(() => {
+    const test: Record<View, (d: Deviation) => boolean> = {
+      open: (d) => d.status === "open",
+      mine: (d) =>
+        d.status === "open" &&
+        me !== "" &&
+        (same(d.owner_name, me) || same(d.raised_by, me)),
+      awaiting: (d) => caseStage(d) === "awaiting_capa",
+      overdue: (d) => d.is_overdue,
+      closed: (d) => d.status === "closed",
+      all: () => true,
+    };
+    const list: { key: View; label: string; hint: string }[] = [
+      { key: "open", label: "Open", hint: "Raised, not yet closed out" },
+      { key: "mine", label: "My cases", hint: "Open, and you own or raised it" },
+      {
+        key: "awaiting",
+        label: "Awaiting CAPA",
+        hint: "Its CAPA is still being worked",
+      },
+      { key: "overdue", label: "Overdue", hint: "Open past its SLA date" },
+      { key: "closed", label: "Closed", hint: "Signed off" },
+      { key: "all", label: "All", hint: "Every case ever raised" },
+    ];
+    return {
+      test,
+      tabs: list.map((v) => ({ ...v, count: narrowed.filter(test[v.key]).length })),
+    };
+  }, [narrowed, me]);
 
   const visible = useMemo(
-    () =>
-      status === "all" ? narrowed : narrowed.filter((d) => d.status === status),
-    [narrowed, status],
+    () => narrowed.filter(views.test[view]),
+    [narrowed, views, view],
   );
 
   // Read out of the fetched list rather than held in state, so an open case
   // re-renders the moment one of its tabs is saved.
   const open = deviations.find((d) => d.id === openId) ?? null;
 
+  const dialog = (
+    <DeviationDetailDialog
+      deviation={open}
+      factoryId={factoryId}
+      role={role}
+      onClose={() => setOpenId(null)}
+    />
+  );
+
+  if (!screen) {
+    return (
+      <div className="flex flex-col lg:min-h-0 lg:flex-1">
+        <CapaRegister
+          factoryId={factoryId}
+          role={role}
+          onOpenCase={setOpenId}
+        />
+        {dialog}
+      </div>
+    );
+  }
+
+  const caseTypes = DEVIATION_TYPES.filter((t) =>
+    screen.types.includes(t.value),
+  );
+  const columns = chosen[tab] ?? defaultColumns(screen.types);
+  // Received via and adverse reaction mean nothing off the complaints screen.
+  const offeredColumns = OPTIONAL_COLUMNS.filter(
+    (c) =>
+      tab === "complaints" ||
+      (c.key !== "received_via" && c.key !== "adverse_reaction"),
+  );
+
   return (
     <div className="flex flex-col lg:min-h-0 lg:flex-1">
-      <div className="mb-5 flex shrink-0 flex-wrap items-start justify-between gap-3">
+      <div className="mb-4 flex shrink-0 flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-[0.6875rem] font-bold tracking-[0.09em] text-ink-5 uppercase">
-            Quality assurance
-          </p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">
-            Deviations &amp; NCRs
+          <h1 className="text-2xl font-semibold tracking-tight text-ink">
+            {screen.heading}
           </h1>
-          <p className="mt-1 text-sm text-ink-4">
-            Every case, from what was found to how it was closed out —
-            identification, containment, risk, investigation and the CAPA.
-          </p>
+          <p className="mt-1 max-w-3xl text-sm text-ink-4">{screen.sub}</p>
         </div>
 
         {canReview(role) && (
           <NewDeviationDialog
+            // Keyed by screen, so a half-typed NCR never opens as a complaint.
+            key={tab}
             factoryId={factoryId}
             userId={userId}
+            types={screen.types}
+            buttonLabel={screen.newLabel}
+            title={screen.newTitle}
             onCreated={refresh}
           />
         )}
       </div>
 
-      <div className="mb-4 flex shrink-0 flex-wrap items-center gap-2">
-        <div
-          role="tablist"
-          aria-label="Case status"
-          className="flex gap-1 rounded-xl border border-line bg-sunken-2 p-1"
-        >
-          {STATUS_FILTERS.map(({ key, label, hint }) => {
-            const active = status === key;
-            return (
-              <button
-                key={key}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                title={hint}
-                onClick={() => setStatus(key)}
-                className={cn(
-                  "inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition",
-                  active
-                    ? "bg-surface text-brand-deep shadow-[0_1px_3px_rgb(20_22_43/0.12)] ring-1 ring-line"
-                    : "text-ink-4 hover:bg-surface/60 hover:text-ink",
-                )}
-              >
-                {label}
-                <span
-                  className={cn(
-                    "rounded-full px-1.5 text-[0.625rem] font-bold tabular-nums",
-                    active
-                      ? "bg-brand-soft text-brand-deep"
-                      : "bg-line text-ink-4",
-                  )}
-                >
-                  {counts[key]}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+      <div className="mb-4 shrink-0">
+        <RegisterViews
+          views={views.tabs}
+          value={view}
+          onChange={setView}
+          label="Case views"
+        />
+      </div>
 
-        {/* The kind of case cuts across the status chips rather than joining
-            them: an NCR is not a place a case can be. */}
-        <div
-          aria-label="Case type"
-          className="flex gap-1 rounded-xl border border-line bg-surface p-1 shadow-soft"
-        >
-          {[{ value: "all" as const, short: "All types" }, ...DEVIATION_TYPES].map(
-            (t) => {
-              const active = type === t.value;
-              return (
-                <button
-                  key={t.value}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => setType(t.value)}
-                  className={cn(
-                    "shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition",
-                    active
-                      ? "bg-sunken-2 text-ink ring-1 ring-line"
-                      : "text-ink-4 hover:text-ink",
-                  )}
-                >
-                  {t.short}
-                </button>
-              );
-            },
-          )}
-        </div>
+      <div className="mb-3 flex shrink-0 flex-wrap items-center justify-end gap-2">
+        {/* Planned or unplanned — only Deviations has more than one kind. */}
+        {caseTypes.length > 1 && (
+          <div
+            aria-label="Case type"
+            className="mr-auto flex gap-1 rounded-xl border border-line bg-surface p-1 shadow-soft"
+          >
+            {[{ value: "all" as const, short: "All" }, ...caseTypes].map(
+              (t) => {
+                const active = type === t.value;
+                return (
+                  <button
+                    key={t.value}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => setType(t.value)}
+                    className={cn(
+                      "shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition",
+                      active
+                        ? "bg-sunken-2 text-ink ring-1 ring-line"
+                        : "text-ink-4 hover:text-ink",
+                    )}
+                  >
+                    {t.short}
+                  </button>
+                );
+              },
+            )}
+          </div>
+        )}
 
-        <RegisterSearch
-          value={search}
-          onChange={setSearch}
-          placeholder="Filter by case no., title, batch, product, customer…"
-          label="Filter cases"
+        <div className="w-full sm:w-80 sm:flex-none">
+          <RegisterSearch
+            value={search}
+            onChange={setSearch}
+            placeholder="Search case no., title, batch, product…"
+            label="Search cases"
+          />
+        </div>
+        <ColumnsMenu
+          columns={offeredColumns}
+          shown={columns}
+          onToggle={(key) =>
+            setChosen((prev) => ({
+              ...prev,
+              [tab]: columns.includes(key)
+                ? columns.filter((c) => c !== key)
+                : [...columns, key],
+            }))
+          }
         />
       </div>
 
@@ -240,30 +307,27 @@ export function DeviationsWorkspace({
           <DeviationsTable
             deviations={visible}
             onOpen={setOpenId}
+            columns={columns}
             emptyTitle={
-              deviations.length === 0
-                ? "No deviations or NCRs yet."
-                : "Nothing matches those filters."
+              onScreen.length === 0
+                ? `No ${screen.heading.toLowerCase()} yet.`
+                : "Nothing here."
             }
             emptyBody={
-              deviations.length === 0
-                ? "Raise a case when something departs from spec."
+              onScreen.length === 0
+                ? `Raise a ${screen.noun} when one comes up.`
                 : term
-                  ? "Try a different keyword, or clear the filter."
-                  : status === "open"
-                    ? "Nothing is waiting on QA."
-                    : "Try another filter."
+                  ? "Try a different keyword, or clear the search."
+                  : view === "mine" && !me
+                    ? "Your profile has no name, so no case can be matched to you."
+                    : "Try another view."
             }
           />
         )}
       </div>
+      {!isPending && !isError && <RegisterFoot count={visible.length} />}
 
-      <DeviationDetailDialog
-        deviation={open}
-        factoryId={factoryId}
-        role={role}
-        onClose={() => setOpenId(null)}
-      />
+      {dialog}
     </div>
   );
 }

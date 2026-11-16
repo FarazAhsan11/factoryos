@@ -26,7 +26,6 @@ import {
   Field,
   Group,
   Muted,
-  PersonControl,
   SelectControl,
   formatDate,
 } from "@/components/factory/deviations/deviation-fields";
@@ -45,7 +44,6 @@ import {
 } from "@/lib/factory/capa-queries";
 import { formatDateTime, todayKey } from "@/lib/factory/dates";
 import { deviationKeys } from "@/lib/factory/deviation-queries";
-import { useWorkers } from "@/lib/factory/worker-queries";
 import { useForm } from "@/lib/use-form";
 import { cn } from "@/lib/utils";
 
@@ -355,7 +353,6 @@ function ActionForm({
   action?: CapaAction;
   onDone: () => void;
 }) {
-  const { data: workers = [] } = useWorkers(factoryId);
   const form = useForm<CapaActionValues>({
     resolver: zodResolver(capaActionSchema),
     defaultValues: {
@@ -438,13 +435,11 @@ function ActionForm({
 
       <Cols of={2}>
         <Field label="Owner" htmlFor="capa-action-owner">
-          <PersonControl
-            control={form.control}
-            name="owner"
+          <input
             id="capa-action-owner"
-            workers={workers}
-            label="Owner"
             placeholder="Who owns it"
+            className={CONTROL}
+            {...form.register("owner")}
           />
         </Field>
         <Field label="Target / due date" htmlFor="capa-action-target">

@@ -165,7 +165,7 @@ export function DeviationsWorkspace({
         label: "Awaiting CAPA",
         hint: "Its CAPA is still being worked",
       },
-      { key: "overdue", label: "Overdue", hint: "Open past its SLA date" },
+      { key: "overdue", label: "Overdue", hint: "Open past its due date" },
       { key: "closed", label: "Closed", hint: "Signed off" },
       { key: "all", label: "All", hint: "Every case ever raised" },
     ];

@@ -22,7 +22,6 @@ import {
   FooterSlotProvider,
   Group,
   Muted,
-  PersonControl,
   SECONDARY_BUTTON,
   SaveBar,
   SelectControl,
@@ -45,7 +44,6 @@ import {
 import type { FactoryRole } from "@/lib/factory/context";
 import { formatStamp } from "@/lib/factory/maintenance-queries";
 import { deviationKeys, typeMeta } from "@/lib/factory/deviation-queries";
-import { useWorkers } from "@/lib/factory/worker-queries";
 import { useForm } from "@/lib/use-form";
 import { cn } from "@/lib/utils";
 
@@ -191,7 +189,6 @@ function Body({
 /** The CAPA's own fields — editable while it is open, frozen once verified. */
 function HeaderForm({ capa, factoryId }: { capa: Capa; factoryId: string }) {
   const queryClient = useQueryClient();
-  const { data: workers = [] } = useWorkers(factoryId);
   const form = useForm<CapaHeaderValues>({
     resolver: zodResolver(capaHeaderSchema),
     defaultValues: {
@@ -247,13 +244,11 @@ function HeaderForm({ capa, factoryId }: { capa: Capa; factoryId: string }) {
             />
           </Field>
           <Field label="CAPA owner" htmlFor="capa-owner">
-            <PersonControl
-              control={form.control}
-              name="owner"
+            <input
               id="capa-owner"
-              workers={workers}
-              label="CAPA owner"
               placeholder="Who owns the plan"
+              className={CONTROL}
+              {...form.register("owner")}
             />
           </Field>
           <Field label="Target date" htmlFor="capa-target">

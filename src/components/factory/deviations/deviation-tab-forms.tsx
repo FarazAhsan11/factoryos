@@ -575,7 +575,7 @@ export function RiskTab({
 
 /**
  * The calculation, laid out as the reference QMS shows it: the score, the
- * risk it comes to, the case's SLA date beside them, and the rule in words.
+ * risk it comes to, the case's due date beside them, and the rule in words.
  */
 function RiskConclusionCard({
   score,
@@ -608,7 +608,8 @@ function RiskConclusionCard({
         </p>
       </div>
       <div>
-        <p className="text-[0.6875rem] text-ink-5">SLA date</p>
+        {/* Every case form calls it the due date now. */}
+        <p className="text-[0.6875rem] text-ink-5">Due date</p>
         <p className="mt-0.5 text-xl font-semibold tabular-nums text-ink">
           {formatDate(slaDate)}
         </p>

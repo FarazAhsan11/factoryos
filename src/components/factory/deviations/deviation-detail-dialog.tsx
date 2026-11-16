@@ -286,10 +286,10 @@ function Body({
                 (deviation.days_to_sla < 0 ? (
                   <span className="text-danger-deep">
                     {" "}
-                    · {Math.abs(deviation.days_to_sla)} past its SLA date
+                    · {Math.abs(deviation.days_to_sla)} past its due date
                   </span>
                 ) : (
-                  <> · {deviation.days_to_sla} to its SLA date</>
+                  <> · {deviation.days_to_sla} to its due date</>
                 ))}
             </>
           )}
@@ -319,10 +319,10 @@ function Aging({ deviation }: { deviation: Deviation }) {
         <Fact label="Age">
           {deviation.age_days} day{deviation.age_days === 1 ? "" : "s"}
         </Fact>
-        <Fact label="SLA date">{formatDate(deviation.sla_date)}</Fact>
-        <Fact label="Days to SLA">
+        <Fact label="Due date">{formatDate(deviation.sla_date)}</Fact>
+        <Fact label="Days to due date">
           {deviation.days_to_sla === null ? (
-            <Muted>No SLA set</Muted>
+            <Muted>No due date set</Muted>
           ) : deviation.days_to_sla < 0 ? (
             <span className="font-semibold text-danger-deep">
               {Math.abs(deviation.days_to_sla)} overdue

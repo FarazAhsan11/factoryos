@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useFieldArray } from "react-hook-form";
+import { useFieldArray, useWatch } from "react-hook-form";
 import { Loader2, Plus, Unlink, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -24,7 +24,6 @@ import {
   Field,
   Group,
   Muted,
-  PersonControl,
   SelectControl,
   formatDate,
 } from "@/components/factory/deviations/deviation-fields";
@@ -46,7 +45,6 @@ import {
   unlinkCapa,
   type Deviation,
 } from "@/lib/factory/deviation-queries";
-import { useWorkers } from "@/lib/factory/worker-queries";
 import { useRenderClock } from "@/lib/use-render-clock";
 import { useForm } from "@/lib/use-form";
 import { cn } from "@/lib/utils";
@@ -62,7 +60,7 @@ const PATHS: { value: Path; label: string; hint: string }[] = [
   {
     value: "capa",
     label: "Initiate CAPA",
-    hint: "Root cause, corrective & preventive actions",
+    hint: "Corrective & preventive actions, with owners and dates",
   },
   {
     value: "link",
@@ -154,6 +152,7 @@ export function CapaTab({
       deviation={deviation}
       factoryId={factoryId}
       capas={capas}
+      capasLoading={isPending}
     />
   );
 }
@@ -162,10 +161,12 @@ function PathPicker({
   deviation,
   factoryId,
   capas,
+  capasLoading,
 }: {
   deviation: Deviation;
   factoryId: string;
   capas: Capa[];
+  capasLoading: boolean;
 }) {
   const openCapas = capas.filter((c) => c.status === "open");
   const [path, setPath] = useState<Path>(
@@ -181,7 +182,10 @@ function PathPicker({
       <Group title="Resolution">
         <div role="radiogroup" className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {PATHS.map((p) => {
-            const disabled = p.value === "link" && openCapas.length === 0;
+            // Not while the register is still loading — only when it has
+            // loaded with no open CAPA.
+            const disabled =
+              p.value === "link" && !capasLoading && openCapas.length === 0;
             const active = path === p.value;
             return (
               <button
@@ -304,7 +308,6 @@ function InitiateCapa({
   factoryId: string;
 }) {
   const refresh = useRefresh(factoryId);
-  const { data: workers = [] } = useWorkers(factoryId);
   // Read through the render clock, never `todayKey()` in render — and only
   // the form's defaults use it, which are read once, on mount.
   const today = useRenderClock(todayKey);
@@ -348,7 +351,13 @@ function InitiateCapa({
     fields
       .map((f, index) => ({ f, index }))
       .filter(({ f }) => f.kind === kind);
-  const arrayError = form.formState.errors.actions?.root?.message;
+  // "Add at least one action" — shown only while it is still true, so it
+  // goes the moment a description is typed rather than at the next submit.
+  const watched = useWatch({ control: form.control, name: "actions" });
+  const anyAction = (watched ?? []).some((a) => a?.description?.trim());
+  const arrayError = anyAction
+    ? undefined
+    : form.formState.errors.actions?.root?.message;
 
   return (
     <form
@@ -372,54 +381,69 @@ function InitiateCapa({
               : "Preventive action (PA)"
           }
         >
-          <div className="hidden grid-cols-[3rem_minmax(0,1fr)_9.5rem_9.5rem_12rem_2.25rem] gap-2 text-[0.6875rem] font-medium text-ink-4 sm:grid">
-            <span />
-            <span>Action</span>
-            <span>Target / due date</span>
-            <span>Status</span>
-            <span>Owner</span>
-            <span />
-          </div>
+          {/* Each action is a small card: the action across the full width,
+              then its date, status and owner on a line beneath — so a
+              sentence is readable and a date is never cut short. */}
           {rows(kind).map(({ f, index }, n) => (
             <div
               key={f.id}
-              className="grid items-start gap-2 sm:grid-cols-[3rem_minmax(0,1fr)_9.5rem_9.5rem_12rem_2.25rem]"
+              className="grid items-start gap-x-2 gap-y-2 rounded-xl border border-line-soft bg-surface/70 p-2.5 sm:grid-cols-[2.75rem_minmax(0,1fr)_2.25rem]"
             >
               <span className="pt-2.5 font-mono text-xs font-semibold text-ink-4">
                 {kind.toUpperCase()}
                 {String(n + 1).padStart(2, "0")}
               </span>
-              <input
-                aria-label={
-                  kind === "ca" ? "Corrective action" : "Preventive action"
-                }
-                placeholder={
-                  kind === "ca"
-                    ? "What will remove the cause"
-                    : "What will stop it happening elsewhere"
-                }
-                className={CONTROL}
-                {...form.register(`actions.${index}.description`)}
-              />
-              <DateControl
-                control={form.control}
-                name={`actions.${index}.targetDate`}
-              />
-              <SelectControl
-                control={form.control}
-                name={`actions.${index}.status`}
-                options={ACTION_STATUSES.map((s) => ({
-                  value: s,
-                  label: ACTION_STATUS_LABELS[s],
-                }))}
-              />
-              <PersonControl
-                control={form.control}
-                name={`actions.${index}.owner`}
-                workers={workers}
-                label="Owner"
-                placeholder="Owner"
-              />
+              <div className="min-w-0 space-y-2">
+                <input
+                  aria-label={
+                    kind === "ca" ? "Corrective action" : "Preventive action"
+                  }
+                  placeholder={
+                    kind === "ca"
+                      ? "What will remove the cause"
+                      : "What will stop it happening elsewhere"
+                  }
+                  className={CONTROL}
+                  {...form.register(`actions.${index}.description`)}
+                />
+                <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1.3fr)]">
+                  <div className="space-y-1">
+                    <p className="text-[0.625rem] font-medium text-ink-4">
+                      Target / due date
+                    </p>
+                    <DateControl
+                      control={form.control}
+                      name={`actions.${index}.targetDate`}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[0.625rem] font-medium text-ink-4">
+                      Status
+                    </p>
+                    <SelectControl
+                      control={form.control}
+                      name={`actions.${index}.status`}
+                      options={ACTION_STATUSES.map((s) => ({
+                        value: s,
+                        label: ACTION_STATUS_LABELS[s],
+                      }))}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[0.625rem] font-medium text-ink-4">
+                      Owner
+                    </p>
+                    {/* Typed, as on every CAPA form — the owner is a name, not
+                        necessarily someone on the workforce register. */}
+                    <input
+                      aria-label="Owner"
+                      placeholder="Who owns it"
+                      className={CONTROL}
+                      {...form.register(`actions.${index}.owner`)}
+                    />
+                  </div>
+                </div>
+              </div>
               <button
                 type="button"
                 aria-label="Remove"

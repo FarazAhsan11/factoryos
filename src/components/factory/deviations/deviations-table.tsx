@@ -104,7 +104,7 @@ export function DeviationsTable({
           <th className={TH}>Status</th>
           <th className={TH}>Risk</th>
           <th className={TH}>Owner</th>
-          <th className={TH}>SLA date</th>
+          <th className={TH}>Due date</th>
           {extra.map((c) => (
             <th key={c.key} className={TH}>
               {c.label}

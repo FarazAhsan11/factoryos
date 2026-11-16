@@ -56,6 +56,14 @@ import { cn } from "@/lib/utils";
  * Quality screen it offers only that screen's types, and when there is only
  * one (a non-conformance, a complaint) it is shown, not asked.
  *
+ * **A deviation's form is shorter** (planned / unplanned only): no
+ * non-conformance category, supplier, QA reviewer, materials, document
+ * number, specification or potential impact; the customer is taken from the
+ * batch rather than typed; the case owner is a plain name; "Raised by" is
+ * prefilled with the signed-in person (editable); and the SLA date is called the due date. The fields stay
+ * in the schema and are simply not drawn, so an older deviation keeps what it
+ * had and saves it back unchanged. NCRs and complaints keep the full form.
+ *
  * The "Linked CAPA" picker that pointed at Issues & CAPA is no longer drawn:
  * a case's CAPA is chosen on its CAPA tab now. `actionId` stays in the form's
  * values, so an old link is saved back unchanged.
@@ -107,14 +115,31 @@ export function InitiationFields({
     [equipmentList, equipmentNo],
   );
 
-  // The batch already knows whose order it is (migration 0041). Filled in
-  // only while the field is empty, so a case raised against a customer the
-  // catalogue never recorded is never overwritten.
+  // A deviation's shorter form: raised from the Deviations screen (only
+  // planned / unplanned on offer), or an existing planned / unplanned case.
+  const deviationForm =
+    (types ?? (type ? [type] : [])).every(
+      (t) => t === "planned" || t === "unplanned",
+    ) &&
+    (types !== undefined || type !== undefined);
+
+  // The batch already knows whose order it is (migration 0041). On a
+  // deviation the customer is not typed at all — it is the batch's, kept in
+  // step as the number changes (once the catalogue has loaded, so an
+  // existing case is not blanked while it is still arriving). Elsewhere it is
+  // only filled while the field is empty, so a customer the catalogue never
+  // recorded is never overwritten.
   useEffect(() => {
+    if (deviationForm) {
+      if (products.length === 0) return;
+      const next = matched?.customer_name ?? "";
+      if (next !== (customerName ?? "")) setValue("customerName", next);
+      return;
+    }
     if (matched?.customer_name && !(customerName ?? "").trim()) {
       setValue("customerName", matched.customer_name);
     }
-  }, [matched, customerName, setValue]);
+  }, [deviationForm, products, matched, customerName, setValue]);
 
   const isNcr = type === "ncr";
   const isComplaint = type === "complaint";
@@ -129,22 +154,42 @@ export function InitiationFields({
   return (
     <div className="space-y-6">
       <Group title="Case details">
-        {/* The title first, on every form: it is what the case is called. */}
-        <Field
-          label="Case title"
-          htmlFor="dev-title"
-          required
-          hint="The line this case is found by in a list of six hundred."
-          error={errors.title?.message}
+        {/* The title first, on every form: it is what the case is called.
+            On a deviation the due date sits beside it — the title takes the
+            room, the date a narrow column. */}
+        <div
+          className={cn(
+            "grid gap-3",
+            deviationForm && "sm:grid-cols-[minmax(0,1fr)_14rem]",
+          )}
         >
-          <input
-            id="dev-title"
-            placeholder="e.g. PC2831 Creatine Chewable — tablets softening in pack"
-            aria-invalid={Boolean(errors.title)}
-            className={CONTROL}
-            {...register("title")}
-          />
-        </Field>
+          <Field
+            label="Case title"
+            htmlFor="dev-title"
+            required
+            hint="The line this case is found by in a list of six hundred."
+            error={errors.title?.message}
+          >
+            <input
+              id="dev-title"
+              placeholder="e.g. PC2831 Creatine Chewable — tablets softening in pack"
+              aria-invalid={Boolean(errors.title)}
+              className={CONTROL}
+              {...register("title")}
+            />
+          </Field>
+
+          {deviationForm && (
+            <Field
+              label="Due date"
+              htmlFor="dev-sla"
+              note="(optional)"
+              hint="When it should be closed by."
+            >
+              <DateControl control={control} name="slaDate" id="dev-sla" />
+            </Field>
+          )}
+        </div>
 
         <Cols>
           <Field
@@ -155,7 +200,12 @@ export function InitiationFields({
             note={locked ? "(fixed)" : undefined}
           >
             {fixedType ? (
-              <p className={cn(CONTROL, "flex items-center gap-2 bg-sunken text-ink-3")}>
+              <p
+                className={cn(
+                  CONTROL,
+                  "flex items-center gap-2 bg-sunken text-ink-3",
+                )}
+              >
                 <Lock className="size-3.5 shrink-0 text-ink-5" />
                 {DEVIATION_TYPES.find((t) => t.value === type)?.label}
               </p>
@@ -175,8 +225,8 @@ export function InitiationFields({
             )}
             {locked && (
               <p className="text-[0.6875rem] text-ink-5">
-                The type is part of the case number — raise a new case to
-                change it.
+                The type is part of the case number — raise a new case to change
+                it.
               </p>
             )}
           </Field>
@@ -232,36 +282,49 @@ export function InitiationFields({
           </Cols>
         )}
 
-        <Cols>
-          <Field
-            label="Non-conformance category"
-            htmlFor="dev-nc"
-            note="(optional)"
-          >
-            <SelectControl
-              control={control}
-              name="ncCategory"
-              id="dev-nc"
-              clearable
-              clearLabel="Not categorised"
-              placeholder="What kind…"
-              options={NC_CATEGORIES.map((c) => ({ value: c, label: c }))}
-            />
-          </Field>
+        {/* NCRs and complaints: category and SLA date on their own row. */}
+        {!deviationForm && (
+          <Cols>
+            {
+              <Field
+                label="Non-conformance category"
+                htmlFor="dev-nc"
+                note="(optional)"
+              >
+                <SelectControl
+                  control={control}
+                  name="ncCategory"
+                  id="dev-nc"
+                  clearable
+                  clearLabel="Not categorised"
+                  placeholder="What kind…"
+                  options={NC_CATEGORIES.map((c) => ({ value: c, label: c }))}
+                />
+              </Field>
+            }
 
-          <Field
-            label="SLA date"
-            htmlFor="dev-sla"
-            note="(optional)"
-            hint="When it should be closed by."
-          >
-            <DateControl control={control} name="slaDate" id="dev-sla" />
-          </Field>
-        </Cols>
+            <Field
+              label="SLA date"
+              htmlFor="dev-sla"
+              note="(optional)"
+              hint="When it should be closed by."
+            >
+              <DateControl control={control} name="slaDate" id="dev-sla" />
+            </Field>
+          </Cols>
+        )}
       </Group>
 
       <Group title="Product & batch">
-        <Cols>
+        {/* On a deviation the batch's details sit beside its number, one
+            compact row; elsewhere the card stays under the fields. */}
+        <div
+          className={cn(
+            deviationForm
+              ? "grid items-start gap-3 sm:grid-cols-[13rem_minmax(0,1fr)]"
+              : "grid gap-3 sm:grid-cols-2 lg:grid-cols-3",
+          )}
+        >
           <Field
             label="Batch number"
             htmlFor="dev-batch"
@@ -278,57 +341,95 @@ export function InitiationFields({
             />
           </Field>
 
-          <Field label="Customer" htmlFor="dev-customer" note="(optional)">
-            <input
-              id="dev-customer"
-              placeholder={matched?.customer_name ?? "Customer name"}
-              className={CONTROL}
-              {...register("customerName")}
-            />
-          </Field>
+          {/* A deviation's customer is the batch's: shown in the batch card
+              below and stored with the case, not typed. */}
+          {!deviationForm && (
+            <>
+              <Field label="Customer" htmlFor="dev-customer" note="(optional)">
+                <input
+                  id="dev-customer"
+                  placeholder={matched?.customer_name ?? "Customer name"}
+                  className={CONTROL}
+                  {...register("customerName")}
+                />
+              </Field>
 
-          <Field
-            label="Customer others"
-            htmlFor="dev-customer-other"
-            note="(optional)"
-          >
-            <input
-              id="dev-customer-other"
-              placeholder="Anyone else it concerns"
-              className={CONTROL}
-              {...register("customerOther")}
+              <Field
+                label="Customer others"
+                htmlFor="dev-customer-other"
+                note="(optional)"
+              >
+                <input
+                  id="dev-customer-other"
+                  placeholder="Anyone else it concerns"
+                  className={CONTROL}
+                  {...register("customerOther")}
+                />
+              </Field>
+            </>
+          )}
+
+          {deviationForm && (
+            <BatchSummary
+              factoryId={factoryId}
+              batchNo={batchNo ?? ""}
+              showCustomer
+              inline
+              // Level with the input, below the field's label.
+              className="sm:mt-[1.4rem]"
             />
-          </Field>
-        </Cols>
+          )}
+        </div>
 
         {/* Product name and code are never typed: they are the batch's, and a
             second copy here would be the one that went stale. */}
-        <BatchSummary factoryId={factoryId} batchNo={batchNo ?? ""} />
+        {!deviationForm && (
+          <BatchSummary factoryId={factoryId} batchNo={batchNo ?? ""} />
+        )}
 
-        <Cols of={2}>
-          <Field label="Supplier name" htmlFor="dev-supplier" note="(optional)">
-            <input
-              id="dev-supplier"
-              placeholder="Who supplied the material"
-              className={CONTROL}
-              {...register("supplierName")}
-            />
-          </Field>
-        </Cols>
+        {!deviationForm && (
+          <Cols of={2}>
+            <Field
+              label="Supplier name"
+              htmlFor="dev-supplier"
+              note="(optional)"
+            >
+              <input
+                id="dev-supplier"
+                placeholder="Who supplied the material"
+                className={CONTROL}
+                {...register("supplierName")}
+              />
+            </Field>
+          </Cols>
+        )}
       </Group>
 
       <Group title="People">
         <Cols>
           <Field label="Case owner" htmlFor="dev-owner" note="(optional)">
-            <PersonControl
-              control={control}
-              name="ownerName"
-              id="dev-owner"
-              workers={workers}
-              label="Case owner"
-              placeholder="Who is carrying this case"
-            />
+            {/* A typed name on a deviation for now; the workforce picker
+                elsewhere. */}
+            {deviationForm ? (
+              <input
+                id="dev-owner"
+                placeholder="Who is carrying this case"
+                className={CONTROL}
+                {...register("ownerName")}
+              />
+            ) : (
+              <PersonControl
+                control={control}
+                name="ownerName"
+                id="dev-owner"
+                workers={workers}
+                label="Case owner"
+                placeholder="Who is carrying this case"
+              />
+            )}
           </Field>
+          {/* Prefilled with whoever is signed in and raising it, and still
+              editable — the person holding the pen is not always the login. */}
           <Field label="Raised by" htmlFor="dev-raised" note="(optional)">
             <input
               id="dev-raised"
@@ -349,55 +450,67 @@ export function InitiationFields({
               {...register("supervisorName")}
             />
           </Field>
-          <Field label="QA reviewer" htmlFor="dev-qa" note="(optional)">
-            <input
-              id="dev-qa"
-              placeholder="QA manager name"
-              className={CONTROL}
-              {...register("qaReviewer")}
-            />
-          </Field>
+          {!deviationForm && (
+            <Field label="QA reviewer" htmlFor="dev-qa" note="(optional)">
+              <input
+                id="dev-qa"
+                placeholder="QA manager name"
+                className={CONTROL}
+                {...register("qaReviewer")}
+              />
+            </Field>
+          )}
         </Cols>
       </Group>
 
-      <Group title="Materials, equipment & documents">
+      <Group
+        title={
+          deviationForm
+            ? "Equipment & procedure"
+            : "Materials, equipment & documents"
+        }
+      >
         <Cols>
-          <Field
-            label="Raw material code"
-            htmlFor="dev-rm-code"
-            note="(optional)"
-          >
-            <input
-              id="dev-rm-code"
-              placeholder="e.g. RM1042"
-              className={cn(CONTROL, "font-mono")}
-              {...register("rawMaterialCode")}
-            />
-          </Field>
-          <Field
-            label="Raw material name"
-            htmlFor="dev-rm-name"
-            note="(optional)"
-          >
-            <input
-              id="dev-rm-name"
-              placeholder="e.g. Creatine monohydrate"
-              className={CONTROL}
-              {...register("rawMaterialName")}
-            />
-          </Field>
-          <Field
-            label="Packaging material code"
-            htmlFor="dev-pm-code"
-            note="(optional)"
-          >
-            <input
-              id="dev-pm-code"
-              placeholder="e.g. PM3701 10g silica sachet"
-              className={cn(CONTROL, "font-mono")}
-              {...register("packagingMaterialCode")}
-            />
-          </Field>
+          {!deviationForm && (
+            <>
+              <Field
+                label="Raw material code"
+                htmlFor="dev-rm-code"
+                note="(optional)"
+              >
+                <input
+                  id="dev-rm-code"
+                  placeholder="e.g. RM1042"
+                  className={cn(CONTROL, "font-mono")}
+                  {...register("rawMaterialCode")}
+                />
+              </Field>
+              <Field
+                label="Raw material name"
+                htmlFor="dev-rm-name"
+                note="(optional)"
+              >
+                <input
+                  id="dev-rm-name"
+                  placeholder="e.g. Creatine monohydrate"
+                  className={CONTROL}
+                  {...register("rawMaterialName")}
+                />
+              </Field>
+              <Field
+                label="Packaging material code"
+                htmlFor="dev-pm-code"
+                note="(optional)"
+              >
+                <input
+                  id="dev-pm-code"
+                  placeholder="e.g. PM3701 10g silica sachet"
+                  className={cn(CONTROL, "font-mono")}
+                  {...register("packagingMaterialCode")}
+                />
+              </Field>
+            </>
+          )}
 
           <Field label="Equipment no." htmlFor="dev-eq" note="(optional)">
             <input
@@ -431,31 +544,35 @@ export function InitiationFields({
               {...register("sopNumber")}
             />
           </Field>
-          <Field label="Document number" htmlFor="dev-doc" note="(optional)">
-            <input
-              id="dev-doc"
-              placeholder="Related document"
-              className={cn(CONTROL, "font-mono")}
-              {...register("documentNumber")}
-            />
-          </Field>
+          {!deviationForm && (
+            <Field label="Document number" htmlFor="dev-doc" note="(optional)">
+              <input
+                id="dev-doc"
+                placeholder="Related document"
+                className={cn(CONTROL, "font-mono")}
+                {...register("documentNumber")}
+              />
+            </Field>
+          )}
         </Cols>
       </Group>
 
       <Group title="The event">
-        <Field
-          label="Specification / requirement"
-          htmlFor="dev-spec"
-          note="(optional)"
-          error={errors.specification?.message}
-        >
-          <input
-            id="dev-spec"
-            placeholder="e.g. Mixing time = 30 min, capsule weight 285–295 mg"
-            className={CONTROL}
-            {...register("specification")}
-          />
-        </Field>
+        {!deviationForm && (
+          <Field
+            label="Specification / requirement"
+            htmlFor="dev-spec"
+            note="(optional)"
+            error={errors.specification?.message}
+          >
+            <input
+              id="dev-spec"
+              placeholder="e.g. Mixing time = 30 min, capsule weight 285–295 mg"
+              className={CONTROL}
+              {...register("specification")}
+            />
+          </Field>
+        )}
 
         <Field
           label="Event description"
@@ -474,20 +591,22 @@ export function InitiationFields({
           />
         </Field>
 
-        <Field
-          label="Potential impact on product quality"
-          htmlFor="dev-impact"
-          note="(optional)"
-          error={errors.impact?.message}
-        >
-          <textarea
-            id="dev-impact"
-            rows={2}
-            placeholder="e.g. Minimal — within acceptance criteria after re-test"
-            className={AREA}
-            {...register("impact")}
-          />
-        </Field>
+        {!deviationForm && (
+          <Field
+            label="Potential impact on product quality"
+            htmlFor="dev-impact"
+            note="(optional)"
+            error={errors.impact?.message}
+          >
+            <textarea
+              id="dev-impact"
+              rows={2}
+              placeholder="e.g. Minimal — within acceptance criteria after re-test"
+              className={AREA}
+              {...register("impact")}
+            />
+          </Field>
+        )}
       </Group>
 
       {/* What was done straight away. It was its own Containment tab; it is
@@ -526,7 +645,11 @@ export function InitiationFields({
 
       {isNcr && (
         <Group title="Batch disposition">
-          <Field label="Disposition decision" required error={errors.disposition?.message}>
+          <Field
+            label="Disposition decision"
+            required
+            error={errors.disposition?.message}
+          >
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
               {DISPOSITIONS.map((d) => (
                 <label

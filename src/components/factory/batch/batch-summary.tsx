@@ -27,11 +27,23 @@ function fmt(n: number): string {
 export function BatchSummary({
   factoryId,
   batchNo,
+  showCustomer,
+  inline,
   className,
 }: {
   factoryId: string;
   /** Raw text from the field, so "empty" reads differently from "no match". */
   batchNo: string;
+  /** Add the customer the batch is made for (the deviation form, which no
+   *  longer asks for it). */
+  showCustomer?: boolean;
+  /**
+   * A compact two-column card — label over value, product and customer on the
+   * first line, code and quantity on the second — to sit beside the batch
+   * field instead of taking a block of its own under it. Values wrap rather
+   * than truncate: a product name is often the longest thing on the form.
+   */
+  inline?: boolean;
   className?: string;
 }) {
   const query = batchNo.trim();
@@ -48,6 +60,9 @@ export function BatchSummary({
   }, [products, query]);
 
   if (!query) {
+    // Beside the field (the deviation form) an empty batch shows nothing:
+    // the field's own placeholder already says what to type.
+    if (inline) return null;
     return (
       <p className={cn("text-[0.6875rem] italic text-ink-5", className)}>
         Type a batch number to pull in its product.
@@ -67,6 +82,43 @@ export function BatchSummary({
     );
   }
 
+  if (inline) {
+    const facts: { label: string; value: string; mono?: boolean }[] = [
+      { label: "Product", value: product.name },
+      ...(showCustomer
+        ? [{ label: "Customer", value: product.customer_name || "—" }]
+        : []),
+      { label: "Code", value: product.code || "—", mono: true },
+      {
+        label: "Required qty",
+        value: product.required_qty > 0 ? fmt(product.required_qty) : "—",
+        mono: true,
+      },
+    ];
+    return (
+      <dl
+        className={cn(
+          "grid grid-cols-2 gap-x-5 gap-y-2 rounded-xl border border-brand-soft bg-brand-tint px-3.5 py-2.5",
+          className,
+        )}
+      >
+        {facts.map((f) => (
+          <div key={f.label} className="min-w-0">
+            <dt className="text-[0.625rem] text-ink-4">{f.label}</dt>
+            <dd
+              className={cn(
+                "text-[0.78rem] leading-snug font-medium break-words text-ink",
+                f.mono && "font-mono",
+              )}
+            >
+              {f.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    );
+  }
+
   return (
     <dl
       className={cn(
@@ -75,6 +127,9 @@ export function BatchSummary({
       )}
     >
       <Row label="Product" value={product.name} />
+      {showCustomer && (
+        <Row label="Customer" value={product.customer_name || "—"} />
+      )}
       <Row label="Code" value={product.code || "—"} mono />
       <Row
         label="Required qty"

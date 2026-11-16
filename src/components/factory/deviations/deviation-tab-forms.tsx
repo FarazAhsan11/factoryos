@@ -178,6 +178,8 @@ export function InitiationTab({
 }
 
 function InitiationFacts({ deviation }: { deviation: Deviation }) {
+  // A deviation shows the shorter set its form asks for (see InitiationFields).
+  const dev = deviation.type === "planned" || deviation.type === "unplanned";
   return (
     <div className="space-y-6">
       <Group title="Case details">
@@ -186,10 +188,14 @@ function InitiationFacts({ deviation }: { deviation: Deviation }) {
             {deviation.title}
           </Fact>
           <Fact label="Origin">{deviation.origin ?? <Muted>—</Muted>}</Fact>
-          <Fact label="Non-conformance">
-            {deviation.nc_category ?? <Muted>—</Muted>}
+          {!dev && (
+            <Fact label="Non-conformance">
+              {deviation.nc_category ?? <Muted>—</Muted>}
+            </Fact>
+          )}
+          <Fact label={dev ? "Due date" : "SLA date"}>
+            {formatDate(deviation.sla_date)}
           </Fact>
-          <Fact label="SLA date">{formatDate(deviation.sla_date)}</Fact>
           {deviation.type === "complaint" && (
             <>
               <Fact label="Received via">
@@ -223,12 +229,16 @@ function InitiationFacts({ deviation }: { deviation: Deviation }) {
           <Fact label="Customer">
             {deviation.customer_name ?? <Muted>—</Muted>}
           </Fact>
-          <Fact label="Customer others">
-            {deviation.customer_other ?? <Muted>—</Muted>}
-          </Fact>
-          <Fact label="Supplier">
-            {deviation.supplier_name ?? <Muted>—</Muted>}
-          </Fact>
+          {!dev && (
+            <>
+              <Fact label="Customer others">
+                {deviation.customer_other ?? <Muted>—</Muted>}
+              </Fact>
+              <Fact label="Supplier">
+                {deviation.supplier_name ?? <Muted>—</Muted>}
+              </Fact>
+            </>
+          )}
         </dl>
       </Group>
 
@@ -243,23 +253,31 @@ function InitiationFacts({ deviation }: { deviation: Deviation }) {
           <Fact label="Supervisor">
             {deviation.supervisor_name ?? <Muted>—</Muted>}
           </Fact>
-          <Fact label="QA reviewer">
-            {deviation.qa_reviewer ?? <Muted>—</Muted>}
-          </Fact>
+          {!dev && (
+            <Fact label="QA reviewer">
+              {deviation.qa_reviewer ?? <Muted>—</Muted>}
+            </Fact>
+          )}
         </dl>
       </Group>
 
-      <Group title="Materials, equipment & documents">
+      <Group
+        title={dev ? "Equipment & procedure" : "Materials, equipment & documents"}
+      >
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
-          <Fact label="Raw material code" mono>
-            {deviation.raw_material_code ?? <Muted>—</Muted>}
-          </Fact>
-          <Fact label="Raw material name">
-            {deviation.raw_material_name ?? <Muted>—</Muted>}
-          </Fact>
-          <Fact label="Packaging material code" mono>
-            {deviation.packaging_material_code ?? <Muted>—</Muted>}
-          </Fact>
+          {!dev && (
+            <>
+              <Fact label="Raw material code" mono>
+                {deviation.raw_material_code ?? <Muted>—</Muted>}
+              </Fact>
+              <Fact label="Raw material name">
+                {deviation.raw_material_name ?? <Muted>—</Muted>}
+              </Fact>
+              <Fact label="Packaging material code" mono>
+                {deviation.packaging_material_code ?? <Muted>—</Muted>}
+              </Fact>
+            </>
+          )}
           <Fact label="Equipment">
             {deviation.equipment_no ? (
               <>
@@ -276,15 +294,17 @@ function InitiationFacts({ deviation }: { deviation: Deviation }) {
           <Fact label="SOP number" mono>
             {deviation.sop_number ?? <Muted>—</Muted>}
           </Fact>
-          <Fact label="Document number" mono>
-            {deviation.document_number ?? <Muted>—</Muted>}
-          </Fact>
+          {!dev && (
+            <Fact label="Document number" mono>
+              {deviation.document_number ?? <Muted>—</Muted>}
+            </Fact>
+          )}
         </dl>
       </Group>
 
       <Group title="The event">
         <dl className="grid gap-3">
-          {deviation.specification && (
+          {!dev && deviation.specification && (
             <Fact label="Specification / requirement" wide>
               {deviation.specification}
             </Fact>
@@ -292,7 +312,7 @@ function InitiationFacts({ deviation }: { deviation: Deviation }) {
           <Fact label="Event description" wide>
             {deviation.actual}
           </Fact>
-          {deviation.impact && (
+          {!dev && deviation.impact && (
             <Fact label="Potential impact" wide>
               {deviation.impact}
             </Fact>

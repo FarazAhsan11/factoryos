@@ -62,9 +62,19 @@ export const EMPTY_CASE: DefaultValues<InitiationValues> = {
   adverseReaction: "",
 };
 
-/** The blank case for one screen: its type preset when it has only one. */
-function emptyFor(types: DeviationType[]): DefaultValues<InitiationValues> {
-  return { ...EMPTY_CASE, type: types.length === 1 ? types[0] : undefined };
+/**
+ * The blank case for one screen: its type preset when it has only one, and
+ * "Raised by" the person signed in and raising it.
+ */
+function emptyFor(
+  types: DeviationType[],
+  raisedBy: string,
+): DefaultValues<InitiationValues> {
+  return {
+    ...EMPTY_CASE,
+    type: types.length === 1 ? types[0] : undefined,
+    raisedBy,
+  };
 }
 
 /**
@@ -81,6 +91,7 @@ function emptyFor(types: DeviationType[]): DefaultValues<InitiationValues> {
 export function NewDeviationDialog({
   factoryId,
   userId,
+  viewerName,
   types,
   buttonLabel,
   title,
@@ -88,6 +99,8 @@ export function NewDeviationDialog({
 }: {
   factoryId: string;
   userId: string;
+  /** Who is signed in — recorded as "Raised by". */
+  viewerName: string;
   /** The case types this screen raises. */
   types: DeviationType[];
   buttonLabel: string;
@@ -96,7 +109,7 @@ export function NewDeviationDialog({
 }) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
-  const blank = emptyFor(types);
+  const blank = emptyFor(types, viewerName);
 
   const form = useForm<InitiationValues>({
     resolver: zodResolver(initiationSchema),

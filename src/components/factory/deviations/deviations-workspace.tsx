@@ -233,6 +233,7 @@ export function DeviationsWorkspace({
             key={tab}
             factoryId={factoryId}
             userId={userId}
+            viewerName={viewerName ?? ""}
             types={screen.types}
             buttonLabel={screen.newLabel}
             title={screen.newTitle}

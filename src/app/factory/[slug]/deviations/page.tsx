@@ -23,7 +23,9 @@ export default async function DeviationsPage({
       <DeviationsWorkspace
         factoryId={factory.id}
         userId={viewer.id}
-        viewerName={viewer.fullName}
+        // "Raised by" on a new case and "My cases" — the name, or the login
+        // when the profile has none.
+        viewerName={viewer.fullName ?? viewer.email}
         role={role}
       />
     </div>

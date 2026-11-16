@@ -122,6 +122,22 @@ export function InitiationFields({
       (t) => t === "planned" || t === "unplanned",
     ) &&
     (types !== undefined || type !== undefined);
+  // An NCR's form: raised from Non-conformances, or an existing NCR.
+  const ncrForm =
+    (types ?? (type ? [type] : [])).length > 0 &&
+    (types ?? [type]).every((t) => t === "ncr");
+  // What the two trimmed forms share: a due date (not "SLA"), the customer
+  // taken from the batch with the batch's details beside its number, and no
+  // QA reviewer, document number, specification or potential impact.
+  const short = deviationForm || ncrForm;
+  // A customer complaint's form: no non-conformance category, QA reviewer,
+  // materials / equipment / documents section or specification.
+  const complaintForm =
+    (types ?? (type ? [type] : [])).length > 0 &&
+    (types ?? [type]).every((t) => t === "complaint");
+  // Every trimmed form takes the customer from the batch and shows the
+  // batch's details beside its number.
+  const batchInline = short || complaintForm;
 
   // The batch already knows whose order it is (migration 0041). On a
   // deviation the customer is not typed at all — it is the batch's, kept in
@@ -130,7 +146,7 @@ export function InitiationFields({
   // only filled while the field is empty, so a customer the catalogue never
   // recorded is never overwritten.
   useEffect(() => {
-    if (deviationForm) {
+    if (batchInline) {
       if (products.length === 0) return;
       const next = matched?.customer_name ?? "";
       if (next !== (customerName ?? "")) setValue("customerName", next);
@@ -139,7 +155,7 @@ export function InitiationFields({
     if (matched?.customer_name && !(customerName ?? "").trim()) {
       setValue("customerName", matched.customer_name);
     }
-  }, [deviationForm, products, matched, customerName, setValue]);
+  }, [batchInline, products, matched, customerName, setValue]);
 
   const isNcr = type === "ncr";
   const isComplaint = type === "complaint";
@@ -279,13 +295,23 @@ export function InitiationFields({
             >
               <YesNo control={control} name="adverseReaction" />
             </Field>
+            <Field
+              label="Due date"
+              htmlFor="dev-sla"
+              note="(optional)"
+              hint="When it should be closed by."
+            >
+              <DateControl control={control} name="slaDate" id="dev-sla" />
+            </Field>
           </Cols>
         )}
 
-        {/* NCRs and complaints: category and SLA date on their own row. */}
-        {!deviationForm && (
+        {/* NCRs: category and due date on their own row. (A deviation has
+            its due date beside the title, a complaint beside the injury
+            question.) */}
+        {!deviationForm && !complaintForm && (
           <Cols>
-            {
+            {!complaintForm && (
               <Field
                 label="Non-conformance category"
                 htmlFor="dev-nc"
@@ -301,10 +327,10 @@ export function InitiationFields({
                   options={NC_CATEGORIES.map((c) => ({ value: c, label: c }))}
                 />
               </Field>
-            }
+            )}
 
             <Field
-              label="SLA date"
+              label={short ? "Due date" : "SLA date"}
               htmlFor="dev-sla"
               note="(optional)"
               hint="When it should be closed by."
@@ -320,7 +346,7 @@ export function InitiationFields({
             compact row; elsewhere the card stays under the fields. */}
         <div
           className={cn(
-            deviationForm
+            batchInline
               ? "grid items-start gap-3 sm:grid-cols-[13rem_minmax(0,1fr)]"
               : "grid gap-3 sm:grid-cols-2 lg:grid-cols-3",
           )}
@@ -341,9 +367,10 @@ export function InitiationFields({
             />
           </Field>
 
-          {/* A deviation's customer is the batch's: shown in the batch card
-              below and stored with the case, not typed. */}
-          {!deviationForm && (
+          {/* On a deviation or an NCR the customer is the batch's: shown in
+              the batch card beside the number and stored with the case, not
+              typed. */}
+          {!batchInline && (
             <>
               <Field label="Customer" htmlFor="dev-customer" note="(optional)">
                 <input
@@ -369,7 +396,7 @@ export function InitiationFields({
             </>
           )}
 
-          {deviationForm && (
+          {batchInline && (
             <BatchSummary
               factoryId={factoryId}
               batchNo={batchNo ?? ""}
@@ -383,7 +410,7 @@ export function InitiationFields({
 
         {/* Product name and code are never typed: they are the batch's, and a
             second copy here would be the one that went stale. */}
-        {!deviationForm && (
+        {!batchInline && (
           <BatchSummary factoryId={factoryId} batchNo={batchNo ?? ""} />
         )}
 
@@ -450,7 +477,7 @@ export function InitiationFields({
               {...register("supervisorName")}
             />
           </Field>
-          {!deviationForm && (
+          {!short && !complaintForm && (
             <Field label="QA reviewer" htmlFor="dev-qa" note="(optional)">
               <input
                 id="dev-qa"
@@ -463,102 +490,112 @@ export function InitiationFields({
         </Cols>
       </Group>
 
-      <Group
-        title={
-          deviationForm
-            ? "Equipment & procedure"
-            : "Materials, equipment & documents"
-        }
-      >
-        <Cols>
-          {!deviationForm && (
-            <>
-              <Field
-                label="Raw material code"
-                htmlFor="dev-rm-code"
-                note="(optional)"
-              >
-                <input
-                  id="dev-rm-code"
-                  placeholder="e.g. RM1042"
-                  className={cn(CONTROL, "font-mono")}
-                  {...register("rawMaterialCode")}
-                />
-              </Field>
-              <Field
-                label="Raw material name"
-                htmlFor="dev-rm-name"
-                note="(optional)"
-              >
-                <input
-                  id="dev-rm-name"
-                  placeholder="e.g. Creatine monohydrate"
-                  className={CONTROL}
-                  {...register("rawMaterialName")}
-                />
-              </Field>
-              <Field
-                label="Packaging material code"
-                htmlFor="dev-pm-code"
-                note="(optional)"
-              >
-                <input
-                  id="dev-pm-code"
-                  placeholder="e.g. PM3701 10g silica sachet"
-                  className={cn(CONTROL, "font-mono")}
-                  {...register("packagingMaterialCode")}
-                />
-              </Field>
-            </>
-          )}
-
-          <Field label="Equipment no." htmlFor="dev-eq" note="(optional)">
-            <input
-              id="dev-eq"
-              placeholder="e.g. EQ296"
-              className={cn(CONTROL, "font-mono")}
-              {...register("equipmentNo")}
-            />
-            {/* Resolved from the machine register, exactly as the shift log
-                resolves it — so a typo shows up as "not in the register". */}
-            {(equipmentNo ?? "").trim() && (
-              <p className="text-[0.6875rem] text-ink-5">
-                {equipment ? equipment.name : "Not in the machine register."}
-              </p>
+      {!complaintForm && (
+        <Group
+          title={
+            deviationForm
+              ? "Equipment & procedure"
+              : ncrForm
+                ? "Materials & equipment"
+                : "Materials, equipment & documents"
+          }
+        >
+          <Cols>
+            {!deviationForm && (
+              <>
+                <Field
+                  label="Raw material code"
+                  htmlFor="dev-rm-code"
+                  note="(optional)"
+                >
+                  <input
+                    id="dev-rm-code"
+                    placeholder="e.g. RM1042"
+                    className={cn(CONTROL, "font-mono")}
+                    {...register("rawMaterialCode")}
+                  />
+                </Field>
+                <Field
+                  label="Raw material name"
+                  htmlFor="dev-rm-name"
+                  note="(optional)"
+                >
+                  <input
+                    id="dev-rm-name"
+                    placeholder="e.g. Creatine monohydrate"
+                    className={CONTROL}
+                    {...register("rawMaterialName")}
+                  />
+                </Field>
+                <Field
+                  label="Packaging material code"
+                  htmlFor="dev-pm-code"
+                  note="(optional)"
+                >
+                  <input
+                    id="dev-pm-code"
+                    placeholder="e.g. PM3701 10g silica sachet"
+                    className={cn(CONTROL, "font-mono")}
+                    {...register("packagingMaterialCode")}
+                  />
+                </Field>
+              </>
             )}
-          </Field>
 
-          <Field label="Procedure name" htmlFor="dev-proc" note="(optional)">
-            <input
-              id="dev-proc"
-              placeholder="Procedure it departs from"
-              className={CONTROL}
-              {...register("procedureName")}
-            />
-          </Field>
-          <Field label="SOP number" htmlFor="dev-sop" note="(optional)">
-            <input
-              id="dev-sop"
-              placeholder="e.g. SOP-QA-014"
-              className={cn(CONTROL, "font-mono")}
-              {...register("sopNumber")}
-            />
-          </Field>
-          {!deviationForm && (
-            <Field label="Document number" htmlFor="dev-doc" note="(optional)">
+            <Field label="Equipment no." htmlFor="dev-eq" note="(optional)">
               <input
-                id="dev-doc"
-                placeholder="Related document"
+                id="dev-eq"
+                placeholder="e.g. EQ296"
                 className={cn(CONTROL, "font-mono")}
-                {...register("documentNumber")}
+                {...register("equipmentNo")}
+              />
+              {/* Resolved from the machine register, exactly as the shift log
+                resolves it — so a typo shows up as "not in the register". */}
+              {(equipmentNo ?? "").trim() && (
+                <p className="text-[0.6875rem] text-ink-5">
+                  {equipment ? equipment.name : "Not in the machine register."}
+                </p>
+              )}
+            </Field>
+
+            <Field label="Procedure name" htmlFor="dev-proc" note="(optional)">
+              <input
+                id="dev-proc"
+                placeholder="Procedure it departs from"
+                className={CONTROL}
+                {...register("procedureName")}
               />
             </Field>
-          )}
-        </Cols>
-      </Group>
+            {!ncrForm && (
+              <Field label="SOP number" htmlFor="dev-sop" note="(optional)">
+                <input
+                  id="dev-sop"
+                  placeholder="e.g. SOP-QA-014"
+                  className={cn(CONTROL, "font-mono")}
+                  {...register("sopNumber")}
+                />
+              </Field>
+            )}
+            {!short && (
+              <Field
+                label="Document number"
+                htmlFor="dev-doc"
+                note="(optional)"
+              >
+                <input
+                  id="dev-doc"
+                  placeholder="Related document"
+                  className={cn(CONTROL, "font-mono")}
+                  {...register("documentNumber")}
+                />
+              </Field>
+            )}
+          </Cols>
+        </Group>
+      )}
 
       <Group title="The event">
-        {!deviationForm && (
+        {!short && !complaintForm && (
           <Field
             label="Specification / requirement"
             htmlFor="dev-spec"
@@ -591,7 +628,7 @@ export function InitiationFields({
           />
         </Field>
 
-        {!deviationForm && (
+        {!short && (
           <Field
             label="Potential impact on product quality"
             htmlFor="dev-impact"

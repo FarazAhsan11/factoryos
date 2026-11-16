@@ -8,6 +8,7 @@ import { CheckCircle2, Loader2, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 
 import {
+  RCA_METHODS,
   ROOT_CAUSE_CATEGORIES,
   STATUS_REASONS,
   actionPlanSchema,
@@ -115,7 +116,8 @@ export function InitiationTab({
       title: deviation.title,
       priority: deviation.priority,
       origin: (deviation.origin ?? "") as InitiationValues["origin"],
-      ncCategory: (deviation.nc_category ?? "") as InitiationValues["ncCategory"],
+      ncCategory: (deviation.nc_category ??
+        "") as InitiationValues["ncCategory"],
       slaDate: deviation.sla_date ?? "",
       batchNo: deviation.batch_no ?? "",
       customerName: deviation.customer_name ?? "",
@@ -139,7 +141,8 @@ export function InitiationTab({
       immediateAction: deviation.immediate_action ?? "",
       disposition: deviation.disposition ?? "",
       actionId: deviation.action_id ?? "",
-      receivedVia: (deviation.received_via ?? "") as InitiationValues["receivedVia"],
+      receivedVia: (deviation.received_via ??
+        "") as InitiationValues["receivedVia"],
       adverseReaction:
         deviation.adverse_reaction === null
           ? ""
@@ -180,6 +183,10 @@ export function InitiationTab({
 function InitiationFacts({ deviation }: { deviation: Deviation }) {
   // A deviation shows the shorter set its form asks for (see InitiationFields).
   const dev = deviation.type === "planned" || deviation.type === "unplanned";
+  const ncr = deviation.type === "ncr";
+  // Shared by the trimmed deviation and NCR forms (see InitiationFields).
+  const short = dev || ncr;
+  const complaint = deviation.type === "complaint";
   return (
     <div className="space-y-6">
       <Group title="Case details">
@@ -188,12 +195,12 @@ function InitiationFacts({ deviation }: { deviation: Deviation }) {
             {deviation.title}
           </Fact>
           <Fact label="Origin">{deviation.origin ?? <Muted>—</Muted>}</Fact>
-          {!dev && (
+          {ncr && (
             <Fact label="Non-conformance">
               {deviation.nc_category ?? <Muted>—</Muted>}
             </Fact>
           )}
-          <Fact label={dev ? "Due date" : "SLA date"}>
+          <Fact label={short || complaint ? "Due date" : "SLA date"}>
             {formatDate(deviation.sla_date)}
           </Fact>
           {deviation.type === "complaint" && (
@@ -229,15 +236,15 @@ function InitiationFacts({ deviation }: { deviation: Deviation }) {
           <Fact label="Customer">
             {deviation.customer_name ?? <Muted>—</Muted>}
           </Fact>
+          {!short && !complaint && (
+            <Fact label="Customer others">
+              {deviation.customer_other ?? <Muted>—</Muted>}
+            </Fact>
+          )}
           {!dev && (
-            <>
-              <Fact label="Customer others">
-                {deviation.customer_other ?? <Muted>—</Muted>}
-              </Fact>
-              <Fact label="Supplier">
-                {deviation.supplier_name ?? <Muted>—</Muted>}
-              </Fact>
-            </>
+            <Fact label="Supplier">
+              {deviation.supplier_name ?? <Muted>—</Muted>}
+            </Fact>
           )}
         </dl>
       </Group>
@@ -253,7 +260,7 @@ function InitiationFacts({ deviation }: { deviation: Deviation }) {
           <Fact label="Supervisor">
             {deviation.supervisor_name ?? <Muted>—</Muted>}
           </Fact>
-          {!dev && (
+          {!short && !complaint && (
             <Fact label="QA reviewer">
               {deviation.qa_reviewer ?? <Muted>—</Muted>}
             </Fact>
@@ -261,50 +268,60 @@ function InitiationFacts({ deviation }: { deviation: Deviation }) {
         </dl>
       </Group>
 
-      <Group
-        title={dev ? "Equipment & procedure" : "Materials, equipment & documents"}
-      >
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
-          {!dev && (
-            <>
-              <Fact label="Raw material code" mono>
-                {deviation.raw_material_code ?? <Muted>—</Muted>}
-              </Fact>
-              <Fact label="Raw material name">
-                {deviation.raw_material_name ?? <Muted>—</Muted>}
-              </Fact>
-              <Fact label="Packaging material code" mono>
-                {deviation.packaging_material_code ?? <Muted>—</Muted>}
-              </Fact>
-            </>
-          )}
-          <Fact label="Equipment">
-            {deviation.equipment_no ? (
+      {!complaint && (
+        <Group
+          title={
+            dev
+              ? "Equipment & procedure"
+              : ncr
+                ? "Materials & equipment"
+                : "Materials, equipment & documents"
+          }
+        >
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+            {!dev && (
               <>
-                <span className="font-mono">{deviation.equipment_no}</span>
-                {deviation.equipment_name && ` · ${deviation.equipment_name}`}
+                <Fact label="Raw material code" mono>
+                  {deviation.raw_material_code ?? <Muted>—</Muted>}
+                </Fact>
+                <Fact label="Raw material name">
+                  {deviation.raw_material_name ?? <Muted>—</Muted>}
+                </Fact>
+                <Fact label="Packaging material code" mono>
+                  {deviation.packaging_material_code ?? <Muted>—</Muted>}
+                </Fact>
               </>
-            ) : (
-              <Muted>—</Muted>
             )}
-          </Fact>
-          <Fact label="Procedure">
-            {deviation.procedure_name ?? <Muted>—</Muted>}
-          </Fact>
-          <Fact label="SOP number" mono>
-            {deviation.sop_number ?? <Muted>—</Muted>}
-          </Fact>
-          {!dev && (
-            <Fact label="Document number" mono>
-              {deviation.document_number ?? <Muted>—</Muted>}
+            <Fact label="Equipment">
+              {deviation.equipment_no ? (
+                <>
+                  <span className="font-mono">{deviation.equipment_no}</span>
+                  {deviation.equipment_name && ` · ${deviation.equipment_name}`}
+                </>
+              ) : (
+                <Muted>—</Muted>
+              )}
             </Fact>
-          )}
-        </dl>
-      </Group>
+            <Fact label="Procedure">
+              {deviation.procedure_name ?? <Muted>—</Muted>}
+            </Fact>
+            {!ncr && (
+              <Fact label="SOP number" mono>
+                {deviation.sop_number ?? <Muted>—</Muted>}
+              </Fact>
+            )}
+            {!short && (
+              <Fact label="Document number" mono>
+                {deviation.document_number ?? <Muted>—</Muted>}
+              </Fact>
+            )}
+          </dl>
+        </Group>
+      )}
 
       <Group title="The event">
         <dl className="grid gap-3">
-          {!dev && deviation.specification && (
+          {!short && !complaint && deviation.specification && (
             <Fact label="Specification / requirement" wide>
               {deviation.specification}
             </Fact>
@@ -312,7 +329,7 @@ function InitiationFacts({ deviation }: { deviation: Deviation }) {
           <Fact label="Event description" wide>
             {deviation.actual}
           </Fact>
-          {!dev && deviation.impact && (
+          {!short && deviation.impact && (
             <Fact label="Potential impact" wide>
               {deviation.impact}
             </Fact>
@@ -430,7 +447,8 @@ export function RiskTab({
     defaultValues: {
       likelihood: (deviation.likelihood?.toString() ??
         "") as RiskValues["likelihood"],
-      severity: (deviation.severity?.toString() ?? "") as RiskValues["severity"],
+      severity: (deviation.severity?.toString() ??
+        "") as RiskValues["severity"],
       detection: (deviation.detection?.toString() ??
         "") as RiskValues["detection"],
       financialImpact:
@@ -509,7 +527,11 @@ export function RiskTab({
 
       <Cols>
         {(["likelihood", "severity", "detection"] as const).map((scale) => (
-          <Field key={scale} label={RISK_SCALES[scale].label} htmlFor={`dev-${scale}`}>
+          <Field
+            key={scale}
+            label={RISK_SCALES[scale].label}
+            htmlFor={`dev-${scale}`}
+          >
             <SelectControl
               control={form.control}
               name={scale}
@@ -619,6 +641,8 @@ export function InvestigationTab({
       investigationFindings: deviation.investigation_findings ?? "",
       rootCauseCategory: (deviation.root_cause_category ??
         "") as InvestigationValues["rootCauseCategory"],
+      rootCause: deviation.root_cause ?? "",
+      rcaMethod: (deviation.rca_method ?? "") as InvestigationValues["rcaMethod"],
     },
   });
 
@@ -631,11 +655,15 @@ export function InvestigationTab({
   if (readOnly) {
     return (
       <dl className="grid gap-3">
-        <Fact label="Root cause category">
-          {deviation.root_cause_category ?? <Muted>—</Muted>}
-        </Fact>
         <Fact label="Investigation findings" wide>
           {deviation.investigation_findings ?? <Muted>Not recorded</Muted>}
+        </Fact>
+        <Fact label="Root cause" wide>
+          {deviation.root_cause ?? <Muted>Not recorded</Muted>}
+        </Fact>
+        <Fact label="Method">{deviation.rca_method ?? <Muted>—</Muted>}</Fact>
+        <Fact label="Root cause category">
+          {deviation.root_cause_category ?? <Muted>—</Muted>}
         </Fact>
       </dl>
     );
@@ -663,6 +691,37 @@ export function InvestigationTab({
           {...form.register("investigationFindings")}
         />
       </Field>
+      {/* Root cause analysis — here, where the cause is found, rather than
+          on the CAPA (0061). */}
+      <Group title="Root cause analysis">
+        <div className="grid gap-3 lg:grid-cols-3">
+          <Field
+            label="Root cause"
+            htmlFor="dev-root-cause"
+            note="(optional)"
+            className="lg:col-span-2"
+          >
+            <textarea
+              id="dev-root-cause"
+              rows={2}
+              placeholder="Can be completed once the investigation finishes"
+              className={AREA}
+              {...form.register("rootCause")}
+            />
+          </Field>
+          <Field label="Method" htmlFor="dev-rca-method" note="(optional)">
+            <SelectControl
+              control={form.control}
+              name="rcaMethod"
+              id="dev-rca-method"
+              clearable
+              clearLabel="Not chosen"
+              placeholder="5-Why, Fishbone…"
+              options={RCA_METHODS.map((m) => ({ value: m, label: m }))}
+            />
+          </Field>
+        </div>
+      </Group>
       <Cols>
         <Field
           label="Root cause category"
@@ -765,7 +824,10 @@ export function ActionPlanTab({
       />
 
       <Cols>
-        <Field label={`${corrective ? "CA" : "PA"} owner`} htmlFor={`dev-${kind}-owner`}>
+        <Field
+          label={`${corrective ? "CA" : "PA"} owner`}
+          htmlFor={`dev-${kind}-owner`}
+        >
           <PersonControl
             control={form.control}
             name="owner"
@@ -894,8 +956,7 @@ export function CloseOutTab({
               Closed by {deviation.qa_sign_name}
             </p>
             <p className="text-xs text-teal-deep/80">
-              {deviation.closed_at &&
-                formatDateTime(deviation.closed_at)}
+              {deviation.closed_at && formatDateTime(deviation.closed_at)}
               {deviation.status_reason && ` · ${deviation.status_reason}`}
             </p>
           </div>
@@ -983,7 +1044,9 @@ export function CloseOutTab({
                   <span className="block text-sm font-semibold text-ink">
                     {d.label}
                   </span>
-                  <span className="block text-[0.6875rem] text-ink-5">{d.hint}</span>
+                  <span className="block text-[0.6875rem] text-ink-5">
+                    {d.hint}
+                  </span>
                 </span>
               </label>
             ))}

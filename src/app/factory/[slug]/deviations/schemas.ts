@@ -54,6 +54,14 @@ export const NC_CATEGORIES = [
   "Other",
 ] as const;
 
+/** Mirrors `deviations_rca_method_known` (0061) — how the root cause was found. */
+export const RCA_METHODS = [
+  "5-Why",
+  "Fishbone (Ishikawa)",
+  "Fault tree",
+  "FMEA",
+] as const;
+
 /** Mirrors `deviations_root_cause_category_known` in migration 0058. */
 export const ROOT_CAUSE_CATEGORIES = [
   "Man",
@@ -204,6 +212,10 @@ export type RiskValues = z.infer<typeof riskSchema>;
 export const investigationSchema = z.object({
   investigationFindings: optional(4000),
   rootCauseCategory: z.union([z.enum(ROOT_CAUSE_CATEGORIES), z.literal("")]),
+  // Root cause analysis — on the case since 0061 (it was asked when a CAPA
+  // was initiated).
+  rootCause: optional(2000),
+  rcaMethod: z.union([z.enum(RCA_METHODS), z.literal("")]),
 });
 
 export type InvestigationValues = z.infer<typeof investigationSchema>;
@@ -260,13 +272,6 @@ export const CAPA_REASONS = [
   "Regulatory / customer impact",
 ] as const;
 
-/** Mirrors `capas_rca_method_known` — how the root cause was found. */
-export const RCA_METHODS = [
-  "5-Why",
-  "Fishbone (Ishikawa)",
-  "Fault tree",
-  "FMEA",
-] as const;
 
 /**
  * Resolve directly — a correction and no CAPA. Stored as the case's "reason
@@ -282,33 +287,31 @@ export const resolveDirectSchema = z.object({
 
 export type ResolveDirectValues = z.infer<typeof resolveDirectSchema>;
 
+/** An action's status while it is being worked; closing is its own step. */
+export const ACTION_STATUSES = ["open", "in_progress"] as const;
+
 /**
- * Initiate a CAPA from a case — the whole plan in one form, written in one
- * transaction by `initiate_capa()` (0059). Action rows with no description
- * are dropped rather than refused: the form opens with one CA and one PA row,
- * and a case with only a corrective action leaves the PA row blank.
+ * Initiate a CAPA from a case — only its actions: each CA / PA with a target
+ * (due) date, a status and an owner. The CAPA takes the case's title; its
+ * reason, owner, dates and verification are filled in later from the
+ * register. Rows with no description are dropped rather than refused — the
+ * form opens with one CA and one PA row, and a case with only a corrective
+ * action leaves the PA row blank — but at least one action is needed.
  */
 export const capaInitiateSchema = z.object({
-  title: z
-    .string()
-    .trim()
-    .min(3, "Give the CAPA a title — what it fixes, in a line.")
-    .max(160, "Keep the title under 160 characters."),
-  reason: z.enum(CAPA_REASONS, { message: "Why does this need a CAPA?" }),
-  owner: optional(80),
-  targetDate: date,
-  rootCause: optional(2000),
-  rcaMethod: z.union([z.enum(RCA_METHODS), z.literal("")]),
-  actions: z.array(
-    z.object({
-      kind: z.enum(["ca", "pa"]),
-      description: optional(2000),
-      owner: optional(80),
-      targetDate: date,
+  actions: z
+    .array(
+      z.object({
+        kind: z.enum(["ca", "pa"]),
+        description: optional(2000),
+        owner: optional(80),
+        targetDate: date,
+        status: z.enum(ACTION_STATUSES),
+      }),
+    )
+    .refine((rows) => rows.some((r) => r.description.length > 0), {
+      message: "Add at least one corrective or preventive action.",
     }),
-  ),
-  effectivenessCriteria: optional(1000),
-  verifyBy: date,
 });
 
 export type CapaInitiateValues = z.infer<typeof capaInitiateSchema>;
@@ -329,8 +332,6 @@ export type CapaCreateValues = z.infer<typeof capaCreateSchema>;
 export const capaHeaderSchema = capaCreateSchema.extend({
   reason: z.union([z.enum(CAPA_REASONS), z.literal("")]),
   targetDate: date,
-  rootCause: optional(2000),
-  rcaMethod: z.union([z.enum(RCA_METHODS), z.literal("")]),
   effectivenessCriteria: optional(1000),
   verifyBy: date,
 });
@@ -351,6 +352,7 @@ export const capaActionSchema = z.object({
     .max(2000, "Keep the description under 2000 characters."),
   owner: optional(80),
   targetDate: date,
+  status: z.enum(ACTION_STATUSES),
 });
 
 export type CapaActionValues = z.infer<typeof capaActionSchema>;

@@ -8,6 +8,7 @@ import { CheckCircle2, Loader2, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import {
+  ACTION_STATUSES,
   capaActionCloseSchema,
   capaActionSchema,
   capaVerifySchema,
@@ -26,10 +27,12 @@ import {
   Group,
   Muted,
   PersonControl,
+  SelectControl,
   formatDate,
 } from "@/components/factory/deviations/deviation-fields";
 import {
   ACTION_KINDS,
+  ACTION_STATUS_LABELS,
   actionKindMeta,
   addCapaAction,
   capaKeys,
@@ -97,7 +100,8 @@ export function CapaPanel({
                 <th className="px-3 py-2">Type</th>
                 <th className="px-3 py-2">Description</th>
                 <th className="px-3 py-2">Owner</th>
-                <th className="px-3 py-2">Target date</th>
+                <th className="px-3 py-2">Target / due date</th>
+                <th className="px-3 py-2">Status</th>
                 <th className="px-3 py-2">Actual closed date</th>
                 <th className="px-3 py-2">Closed by</th>
                 {!frozen && <th className="px-3 py-2" />}
@@ -106,13 +110,13 @@ export function CapaPanel({
             <tbody>
               {isPending ? (
                 <tr>
-                  <td colSpan={7} className="px-3 py-4 text-center text-ink-5">
+                  <td colSpan={8} className="px-3 py-4 text-center text-ink-5">
                     <Loader2 className="mx-auto size-4 animate-spin" />
                   </td>
                 </tr>
               ) : actions.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-3 py-4 text-center text-ink-5">
+                  <td colSpan={8} className="px-3 py-4 text-center text-ink-5">
                     No actions yet.
                   </td>
                 </tr>
@@ -265,6 +269,20 @@ function ActionRow({
       <td className="px-3 py-2.5 whitespace-nowrap tabular-nums">
         {formatDate(action.target_date)}
       </td>
+      <td className="px-3 py-2.5 whitespace-nowrap">
+        {/* Closed is the close itself; otherwise the status it is set to. */}
+        <Badge
+          className={
+            closed
+              ? "bg-teal-soft text-teal-deep"
+              : action.status === "in_progress"
+                ? "bg-brand-soft text-brand-deep"
+                : "bg-sunken-2 text-ink-4"
+          }
+        >
+          {ACTION_STATUS_LABELS[closed ? "closed" : action.status]}
+        </Badge>
+      </td>
       <td className="px-3 py-2.5 whitespace-nowrap tabular-nums">
         {closed ? (
           <span className="font-medium text-teal-deep">
@@ -345,6 +363,7 @@ function ActionForm({
       description: action?.description ?? "",
       owner: action?.owner_name ?? "",
       targetDate: action?.target_date ?? "",
+      status: action?.status ?? "open",
     },
   });
 
@@ -428,11 +447,22 @@ function ActionForm({
             placeholder="Who owns it"
           />
         </Field>
-        <Field label="Target date" htmlFor="capa-action-target">
+        <Field label="Target / due date" htmlFor="capa-action-target">
           <DateControl
             control={form.control}
             name="targetDate"
             id="capa-action-target"
+          />
+        </Field>
+        <Field label="Status" htmlFor="capa-action-status">
+          <SelectControl
+            control={form.control}
+            name="status"
+            id="capa-action-status"
+            options={ACTION_STATUSES.map((s) => ({
+              value: s,
+              label: ACTION_STATUS_LABELS[s],
+            }))}
           />
         </Field>
       </Cols>

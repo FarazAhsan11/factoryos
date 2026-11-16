@@ -28,6 +28,14 @@ import { createClient } from "@/lib/supabase/client";
 
 export type CapaStatus = "open" | "effective";
 export type CapaActionKind = "ca" | "pa";
+/** Stored while the action is worked; "closed" is the close itself. */
+export type CapaActionStatus = "open" | "in_progress";
+
+export const ACTION_STATUS_LABELS: Record<CapaActionStatus | "closed", string> = {
+  open: "Open",
+  in_progress: "In progress",
+  closed: "Closed",
+};
 
 export const CAPA_STATUS_LABELS: Record<CapaStatus, string> = {
   open: "Open",
@@ -110,6 +118,7 @@ export interface CapaAction {
   target_date: string | null;
   closed_date: string | null;
   closed_by_name: string | null;
+  status: CapaActionStatus;
   created_at: string;
 }
 
@@ -122,7 +131,7 @@ const COLUMNS = `
 
 const ACTION_COLUMNS = `
   id, capa_id, kind, description, owner_name, target_date,
-  closed_date, closed_by_name, created_at
+  closed_date, closed_by_name, status, created_at
 `;
 
 /** Under the deviations prefix — see `deviationKeys`. */
@@ -189,16 +198,18 @@ export async function initiateCapa(
   values: CapaInitiateValues,
 ): Promise<string> {
   const supabase = createClient();
+  // Only the actions are asked for. A blank title takes the case's title in
+  // `initiate_capa` (0061); the rest is filled in from the register.
   const { data, error } = await supabase.rpc("initiate_capa", {
     p_case: caseId,
-    p_title: values.title.trim(),
-    p_reason: values.reason,
-    p_owner: values.owner.trim(),
-    p_target: text(values.targetDate),
-    p_root_cause: values.rootCause.trim(),
-    p_rca_method: values.rcaMethod,
-    p_criteria: values.effectivenessCriteria.trim(),
-    p_verify_by: text(values.verifyBy),
+    p_title: "",
+    p_reason: null,
+    p_owner: null,
+    p_target: null,
+    p_root_cause: null,
+    p_rca_method: null,
+    p_criteria: null,
+    p_verify_by: null,
     p_actions: values.actions
       .filter((a) => a.description.trim())
       .map((a) => ({
@@ -206,6 +217,7 @@ export async function initiateCapa(
         description: a.description.trim(),
         owner_name: a.owner.trim() || null,
         target_date: a.targetDate || null,
+        status: a.status,
       })),
   });
   if (error) throw new Error(error.message);
@@ -228,8 +240,6 @@ export function saveCapaHeader(
     owner_name: text(values.owner),
     reason: text(values.reason),
     target_date: text(values.targetDate),
-    root_cause: text(values.rootCause),
-    rca_method: text(values.rcaMethod),
     effectiveness_criteria: text(values.effectivenessCriteria),
     verify_by: text(values.verifyBy),
   });
@@ -259,6 +269,7 @@ export async function addCapaAction(
     description: values.description.trim(),
     owner_name: text(values.owner),
     target_date: text(values.targetDate),
+    status: values.status,
   });
   if (error) throw new Error(error.message);
 }
@@ -276,6 +287,7 @@ export async function updateCapaAction(
       description: values.description.trim(),
       owner_name: text(values.owner),
       target_date: text(values.targetDate),
+      status: values.status,
     })
     .eq("id", id);
   if (error) throw new Error(error.message);

@@ -254,6 +254,9 @@ export interface Deviation {
   investigated_at: string | null;
   /** Man / Method / Material / Machine / Environment (0058). */
   root_cause_category: string | null;
+  /** Root cause analysis, on the Investigation tab (0061). */
+  root_cause: string | null;
+  rca_method: string | null;
 
   /* ── Tabs 5 & 6 · Corrective and preventive action ─────────────────── */
   ca_owner: string | null;
@@ -328,7 +331,7 @@ const COLUMNS = `
   created_at, age_days, days_to_sla, is_overdue, is_quarantining,
   received_via, adverse_reaction,
   capa_needed, capa_not_needed_reason, capa_id, capa_no, capa_status, capa_verified_at,
-  root_cause_category
+  root_cause_category, root_cause, rca_method
 `;
 
 /**
@@ -512,6 +515,8 @@ export function saveInvestigation(
   return patch(id, {
     investigation_findings: text(values.investigationFindings),
     root_cause_category: text(values.rootCauseCategory),
+    root_cause: text(values.rootCause),
+    rca_method: text(values.rcaMethod),
   });
 }
 

@@ -8,8 +8,7 @@ import { Loader2, Plus, Unlink, X } from "lucide-react";
 import { toast } from "sonner";
 
 import {
-  CAPA_REASONS,
-  RCA_METHODS,
+  ACTION_STATUSES,
   capaInitiateSchema,
   resolveDirectSchema,
   type CapaInitiateValues,
@@ -19,7 +18,6 @@ import { CapaPanel } from "@/components/factory/capa/capa-panel";
 import {
   AREA,
   Badge,
-  Cols,
   CONTROL,
   DateControl,
   Fact,
@@ -32,6 +30,7 @@ import {
 } from "@/components/factory/deviations/deviation-fields";
 import { SelectField } from "@/components/ui/select-field";
 import {
+  ACTION_STATUS_LABELS,
   CAPA_STATUS_LABELS,
   CAPA_STATUS_PILL,
   capaKeys,
@@ -291,6 +290,12 @@ function ResolveDirect({
 
 /* ── Initiate CAPA ────────────────────────────────────────────────────── */
 
+/**
+ * Only the actions: corrective (CA) and preventive (PA), each with its
+ * target / due date, status and owner. The CAPA takes the case's title; its
+ * reason, owner, dates and verification are filled in from the register. The
+ * root cause and its method are the case's own, on the Investigation tab.
+ */
 function InitiateCapa({
   deviation,
   factoryId,
@@ -307,18 +312,22 @@ function InitiateCapa({
   const form = useForm<CapaInitiateValues>({
     resolver: zodResolver(capaInitiateSchema),
     defaultValues: {
-      title: deviation.title,
-      reason: undefined,
-      owner: deviation.owner_name ?? "",
-      targetDate: addDays(today, 45),
-      rootCause: "",
-      rcaMethod: "",
       actions: [
-        { kind: "ca", description: "", owner: "", targetDate: addDays(today, 21) },
-        { kind: "pa", description: "", owner: "", targetDate: addDays(today, 21) },
+        {
+          kind: "ca",
+          description: "",
+          owner: "",
+          targetDate: addDays(today, 21),
+          status: "open",
+        },
+        {
+          kind: "pa",
+          description: "",
+          owner: "",
+          targetDate: addDays(today, 21),
+          status: "open",
+        },
       ],
-      effectivenessCriteria: "",
-      verifyBy: addDays(today, 90),
     },
   });
   const { fields, append, remove } = useFieldArray({
@@ -334,127 +343,75 @@ function InitiateCapa({
     },
     onError: (e: Error) => toast.error(e.message),
   });
-  const errors = form.formState.errors;
 
   const rows = (kind: "ca" | "pa") =>
     fields
       .map((f, index) => ({ f, index }))
       .filter(({ f }) => f.kind === kind);
+  const arrayError = form.formState.errors.actions?.root?.message;
 
   return (
     <form
-      onSubmit={form.handleSubmit((v) => initiate.mutateAsync(v).catch(() => {}))}
+      onSubmit={form.handleSubmit((v) =>
+        initiate.mutateAsync(v).catch(() => {}),
+      )}
       className="space-y-5 rounded-2xl border border-warn-line bg-warn-tint/30 p-4"
     >
       <p className="flex flex-wrap items-center gap-2 text-sm text-ink-4">
         <Badge className="bg-warn-soft text-warn-deep">CAPA</Badge>
-        A new CAPA will be created and linked to {deviation.deviation_no}.
+        Initiate a CAPA for {deviation.deviation_no} — list its corrective and
+        preventive actions.
       </p>
-
-      <Field
-        label="CAPA title"
-        htmlFor="capa-i-title"
-        required
-        error={errors.title?.message}
-      >
-        <input
-          id="capa-i-title"
-          aria-invalid={Boolean(errors.title)}
-          className={CONTROL}
-          {...form.register("title")}
-        />
-      </Field>
-
-      <Cols>
-        <Field
-          label="Reason"
-          htmlFor="capa-i-reason"
-          required
-          error={errors.reason?.message}
-        >
-          <SelectControl
-            control={form.control}
-            name="reason"
-            id="capa-i-reason"
-            placeholder="Why a CAPA…"
-            invalid={Boolean(errors.reason)}
-            options={CAPA_REASONS.map((r) => ({ value: r, label: r }))}
-          />
-        </Field>
-        <Field label="CAPA owner" htmlFor="capa-i-owner">
-          <PersonControl
-            control={form.control}
-            name="owner"
-            id="capa-i-owner"
-            workers={workers}
-            label="CAPA owner"
-            placeholder="Who owns the plan"
-          />
-        </Field>
-        <Field label="Target date" htmlFor="capa-i-target">
-          <DateControl
-            control={form.control}
-            name="targetDate"
-            id="capa-i-target"
-          />
-        </Field>
-      </Cols>
-
-      <Group title="Root cause analysis">
-        <div className="grid gap-3 lg:grid-cols-3">
-          <Field
-            label="Root cause"
-            htmlFor="capa-i-rc"
-            className="lg:col-span-2"
-          >
-            <textarea
-              id="capa-i-rc"
-              rows={2}
-              placeholder="Can be completed once the investigation finishes"
-              className={AREA}
-              {...form.register("rootCause")}
-            />
-          </Field>
-          <Field label="Method" htmlFor="capa-i-rcm">
-            <SelectControl
-              control={form.control}
-              name="rcaMethod"
-              id="capa-i-rcm"
-              clearable
-              clearLabel="Not chosen"
-              placeholder="5-Why, Fishbone…"
-              options={RCA_METHODS.map((m) => ({ value: m, label: m }))}
-            />
-          </Field>
-        </div>
-      </Group>
 
       {(["ca", "pa"] as const).map((kind) => (
         <Group
           key={kind}
-          title={kind === "ca" ? "Corrective actions" : "Preventive actions"}
+          title={
+            kind === "ca"
+              ? "Corrective action (CA)"
+              : "Preventive action (PA)"
+          }
         >
-          <p className="-mt-2 text-[0.6875rem] text-ink-5">
-            {kind === "ca"
-              ? "Remove the cause."
-              : "Stop it happening elsewhere."}
-          </p>
+          <div className="hidden grid-cols-[3rem_minmax(0,1fr)_9.5rem_9.5rem_12rem_2.25rem] gap-2 text-[0.6875rem] font-medium text-ink-4 sm:grid">
+            <span />
+            <span>Action</span>
+            <span>Target / due date</span>
+            <span>Status</span>
+            <span>Owner</span>
+            <span />
+          </div>
           {rows(kind).map(({ f, index }, n) => (
             <div
               key={f.id}
-              className="grid items-start gap-2 sm:grid-cols-[3rem_1fr_12rem_10rem_2.25rem]"
+              className="grid items-start gap-2 sm:grid-cols-[3rem_minmax(0,1fr)_9.5rem_9.5rem_12rem_2.25rem]"
             >
               <span className="pt-2.5 font-mono text-xs font-semibold text-ink-4">
                 {kind.toUpperCase()}
                 {String(n + 1).padStart(2, "0")}
               </span>
               <input
-                aria-label={kind === "ca" ? "Corrective action" : "Preventive action"}
-                placeholder={
+                aria-label={
                   kind === "ca" ? "Corrective action" : "Preventive action"
+                }
+                placeholder={
+                  kind === "ca"
+                    ? "What will remove the cause"
+                    : "What will stop it happening elsewhere"
                 }
                 className={CONTROL}
                 {...form.register(`actions.${index}.description`)}
+              />
+              <DateControl
+                control={form.control}
+                name={`actions.${index}.targetDate`}
+              />
+              <SelectControl
+                control={form.control}
+                name={`actions.${index}.status`}
+                options={ACTION_STATUSES.map((s) => ({
+                  value: s,
+                  label: ACTION_STATUS_LABELS[s],
+                }))}
               />
               <PersonControl
                 control={form.control}
@@ -462,10 +419,6 @@ function InitiateCapa({
                 workers={workers}
                 label="Owner"
                 placeholder="Owner"
-              />
-              <DateControl
-                control={form.control}
-                name={`actions.${index}.targetDate`}
               />
               <button
                 type="button"
@@ -485,44 +438,27 @@ function InitiateCapa({
                 description: "",
                 owner: "",
                 targetDate: addDays(today, 21),
+                status: "open",
               })
             }
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand hover:underline"
           >
             <Plus className="size-3.5" />
-            Add
+            Add {kind.toUpperCase()}
           </button>
         </Group>
       ))}
 
-      <Group title="Effectiveness check">
-        <div className="grid gap-3 lg:grid-cols-3">
-          <Field
-            label="Effectiveness criteria"
-            htmlFor="capa-i-eff"
-            className="lg:col-span-2"
-          >
-            <input
-              id="capa-i-eff"
-              placeholder="e.g. No recurrence across next 10 batches"
-              className={CONTROL}
-              {...form.register("effectivenessCriteria")}
-            />
-          </Field>
-          <Field label="Verify by" htmlFor="capa-i-verify">
-            <DateControl
-              control={form.control}
-              name="verifyBy"
-              id="capa-i-verify"
-            />
-          </Field>
-        </div>
-      </Group>
+      {arrayError && (
+        <p role="alert" className="text-[0.7188rem] text-danger">
+          {arrayError}
+        </p>
+      )}
 
       <Submit
         pending={form.formState.isSubmitting}
         label="Initiate CAPA"
-        note="Rows left blank are not saved. Everything stays editable until the CAPA is verified."
+        note="Rows left blank are not saved. Each action is closed later with its date and a name."
       />
     </form>
   );
@@ -703,10 +639,6 @@ function LinkedSummary({
           <span className={cn(capa.is_overdue && "font-semibold text-danger-deep")}>
             {formatDate(capa.target_date)}
           </span>
-        </Fact>
-        <Fact label="Method">{capa.rca_method ?? <Muted>—</Muted>}</Fact>
-        <Fact label="Root cause" wide>
-          {capa.root_cause ?? <Muted>Not recorded yet</Muted>}
         </Fact>
       </dl>
     </div>

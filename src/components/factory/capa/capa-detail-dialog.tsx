@@ -7,7 +7,6 @@ import { toast } from "sonner";
 
 import {
   CAPA_REASONS,
-  RCA_METHODS,
   capaHeaderSchema,
   type CapaHeaderValues,
 } from "@/app/factory/[slug]/deviations/schemas";
@@ -171,10 +170,6 @@ function Body({
                 {capa.owner_name ?? <Muted>—</Muted>}
               </Fact>
               <Fact label="Target date">{formatDate(capa.target_date)}</Fact>
-              <Fact label="Method">{capa.rca_method ?? <Muted>—</Muted>}</Fact>
-              <Fact label="Root cause" wide>
-                {capa.root_cause ?? <Muted>Not recorded</Muted>}
-              </Fact>
             </dl>
           </Group>
         )}
@@ -204,8 +199,6 @@ function HeaderForm({ capa, factoryId }: { capa: Capa; factoryId: string }) {
       owner: capa.owner_name ?? "",
       reason: (capa.reason ?? "") as CapaHeaderValues["reason"],
       targetDate: capa.target_date ?? "",
-      rootCause: capa.root_cause ?? "",
-      rcaMethod: (capa.rca_method ?? "") as CapaHeaderValues["rcaMethod"],
       effectivenessCriteria: capa.effectiveness_criteria ?? "",
       verifyBy: capa.verify_by ?? "",
     },
@@ -271,27 +264,6 @@ function HeaderForm({ capa, factoryId }: { capa: Capa; factoryId: string }) {
             />
           </Field>
         </Cols>
-        <div className="grid gap-3 lg:grid-cols-3">
-          <Field label="Root cause" htmlFor="capa-rc" className="lg:col-span-2">
-            <textarea
-              id="capa-rc"
-              rows={2}
-              className={AREA}
-              {...form.register("rootCause")}
-            />
-          </Field>
-          <Field label="Method" htmlFor="capa-rcm">
-            <SelectControl
-              control={form.control}
-              name="rcaMethod"
-              id="capa-rcm"
-              clearable
-              clearLabel="Not chosen"
-              placeholder="5-Why, Fishbone…"
-              options={RCA_METHODS.map((m) => ({ value: m, label: m }))}
-            />
-          </Field>
-        </div>
         <Cols of={2}>
           <Field
             label="Verify by"

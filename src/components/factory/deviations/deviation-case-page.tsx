@@ -11,7 +11,7 @@ import { CapaTab } from "@/components/factory/deviations/capa-tab";
 import { CaseAttachments } from "@/components/factory/deviations/case-attachments";
 import { DevCloseOutTab } from "@/components/factory/deviations/dev-closeout-tab";
 import { DevInvestigationTab } from "@/components/factory/deviations/dev-investigation-tab";
-import { Aging } from "@/components/factory/deviations/deviation-detail-dialog";
+import { CaseHistory } from "@/components/factory/deviations/case-history";
 import { InitiationTab } from "@/components/factory/deviations/deviation-tab-forms";
 import { canReview } from "@/lib/factory/action-queries";
 import type { FactoryRole } from "@/lib/factory/context";
@@ -342,7 +342,9 @@ export function DeviationCasePage({
               viewerName={viewerName}
             />
           )}
-          {section === "history" && <Aging deviation={d} />}
+          {section === "history" && (
+            <CaseHistory deviation={d} factoryId={factoryId} />
+          )}
         </div>
       </div>
     </div>

@@ -8,11 +8,12 @@ import { Check, Loader2, Minus } from "lucide-react";
 
 import { AssessmentTab } from "@/components/factory/deviations/assessment-tab";
 import { CapaTab } from "@/components/factory/deviations/capa-tab";
+import { CaseAttachments } from "@/components/factory/deviations/case-attachments";
+import { DevInvestigationTab } from "@/components/factory/deviations/dev-investigation-tab";
 import { Aging } from "@/components/factory/deviations/deviation-detail-dialog";
 import {
   CloseOutTab,
   InitiationTab,
-  InvestigationTab,
 } from "@/components/factory/deviations/deviation-tab-forms";
 import { canReview } from "@/lib/factory/action-queries";
 import type { FactoryRole } from "@/lib/factory/context";
@@ -67,7 +68,7 @@ function sectionState(d: Deviation, id: CaseSection): "ok" | "na" | "todo" | nul
       return d.assessed_at ? "ok" : "todo";
     case "investigation":
       if (d.investigation_required === false) return "na";
-      return (d.investigation_findings ?? "").trim().length >= 10 ? "ok" : "todo";
+      return d.investigation_approved_at ? "ok" : "todo";
     case "actions":
       return d.capa_needed === false ||
         (d.capa_needed && d.capa_status === "effective")
@@ -94,12 +95,14 @@ export function DeviationCasePage({
   slug,
   caseId,
   role,
+  userId,
   viewerName,
 }: {
   factoryId: string;
   slug: string;
   caseId: string;
   role: FactoryRole;
+  userId: string;
   viewerName: string;
 }) {
   const searchParams = useSearchParams();
@@ -285,11 +288,23 @@ export function DeviationCasePage({
 
         <div className="px-5 py-6 sm:px-7">
           {section === "details" && (
-            <InitiationTab
-              deviation={d}
-              factoryId={factoryId}
-              readOnly={!open || !reviewer}
-            />
+            <div className="space-y-8">
+              <InitiationTab
+                deviation={d}
+                factoryId={factoryId}
+                readOnly={!open || !reviewer}
+              />
+              <div className="border-t border-line-soft pt-6">
+                <CaseAttachments
+                  factoryId={factoryId}
+                  deviationId={d.id}
+                  section="details"
+                  userId={userId}
+                  userName={viewerName}
+                  canAttach={open && reviewer}
+                />
+              </div>
+            </div>
           )}
           {section === "assessment" && (
             <AssessmentTab
@@ -306,19 +321,13 @@ export function DeviationCasePage({
                 {d.investigation_not_required_reason}
               </p>
             ) : (
-              <>
-                {!d.assessed_at && open && (
-                  <p className="mb-5 rounded-xl border border-line-soft bg-sunken px-4 py-3 text-sm text-ink-3">
-                    The investigation follows the initial assessment. You can
-                    start writing notes now.
-                  </p>
-                )}
-                <InvestigationTab
-                  deviation={d}
-                  factoryId={factoryId}
-                  readOnly={!open || !reviewer}
-                />
-              </>
+              <DevInvestigationTab
+                deviation={d}
+                factoryId={factoryId}
+                canEdit={open && reviewer}
+                userId={userId}
+                viewerName={viewerName}
+              />
             ))}
           {section === "actions" && (
             <CapaTab

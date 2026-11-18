@@ -5,6 +5,7 @@ import {
   type ContainmentValues,
   type AssessmentValues,
   type DeviationInitiationValues,
+  type DevInvestigationValues,
   type InitiationValues,
   type InvestigationValues,
   type RiskValues,
@@ -337,6 +338,22 @@ export interface Deviation {
   /** Signed when set. */
   assessed_at: string | null;
   assessed_by_name: string | null;
+
+  /* ── A deviation's investigation (0064) ────────────────────────────── */
+  other_batch_nos: string[];
+  checks_reviewed: string[];
+  root_cause_categories: string[];
+  human_procedure_clear: boolean | null;
+  human_trained: boolean | null;
+  human_preventable: boolean | null;
+  root_cause_conclusion: string | null;
+  investigation_submitted_at: string | null;
+  investigation_submitted_by_name: string | null;
+  investigation_returned_at: string | null;
+  investigation_returned_by_name: string | null;
+  investigation_return_reason: string | null;
+  investigation_approved_at: string | null;
+  investigation_approved_by_name: string | null;
 }
 
 const COLUMNS = `
@@ -363,7 +380,13 @@ const COLUMNS = `
   occurred_at, department_id, department_name, location, detection_point,
   batch_nos, product_ids, product_names, hold_batch,
   investigation_required, investigation_not_required_reason, red_flags,
-  classification, classification_reason, assessed_at, assessed_by_name
+  classification, classification_reason, assessed_at, assessed_by_name,
+  other_batch_nos, checks_reviewed, root_cause_categories,
+  human_procedure_clear, human_trained, human_preventable, root_cause_conclusion,
+  investigation_submitted_at, investigation_submitted_by_name,
+  investigation_returned_at, investigation_returned_by_name,
+  investigation_return_reason, investigation_approved_at,
+  investigation_approved_by_name
 `;
 
 /**
@@ -664,11 +687,91 @@ export function signAssessment(
   });
 }
 
+/* ── A deviation's investigation (0064) ───────────────────────────────── */
+
+export function devInvestigationValues(d: Deviation): DevInvestigationValues {
+  const yn = (b: boolean | null) => (b === null ? "" : b ? "yes" : "no");
+  return {
+    otherBatches: d.other_batch_nos.join(", "),
+    impact: d.impact ?? "",
+    checksReviewed: d.checks_reviewed as DevInvestigationValues["checksReviewed"],
+    findings: d.investigation_findings ?? "",
+    rootCauseCategories:
+      d.root_cause_categories as DevInvestigationValues["rootCauseCategories"],
+    humanProcedureClear: yn(d.human_procedure_clear),
+    humanTrained: yn(d.human_trained),
+    humanPreventable: yn(d.human_preventable),
+    rootCause: d.root_cause ?? "",
+    conclusion: (d.root_cause_conclusion ??
+      "") as DevInvestigationValues["conclusion"],
+    method: (d.rca_method ?? "") as DevInvestigationValues["method"],
+  };
+}
+
+function devInvestigationPatch(v: DevInvestigationValues) {
+  const yn = (s: string) => (s === "" ? null : s === "yes");
+  const human = v.rootCauseCategories.includes("Man (people)");
+  return {
+    other_batch_nos: parseBatches(v.otherBatches),
+    impact: text(v.impact),
+    checks_reviewed: v.checksReviewed,
+    investigation_findings: text(v.findings),
+    root_cause_categories: v.rootCauseCategories,
+    // Only asked when "Man (people)" is ticked; cleared when it is not.
+    human_procedure_clear: human ? yn(v.humanProcedureClear) : null,
+    human_trained: human ? yn(v.humanTrained) : null,
+    human_preventable: human ? yn(v.humanPreventable) : null,
+    root_cause: text(v.rootCause),
+    root_cause_conclusion: text(v.conclusion),
+    rca_method: text(v.method),
+  };
+}
+
+export function saveDevInvestigation(
+  id: string,
+  v: DevInvestigationValues,
+): Promise<void> {
+  return patch(id, devInvestigationPatch(v));
+}
+
+/** Hand it to QA. The database re-checks every answer and stamps the time. */
+export function submitDevInvestigation(
+  id: string,
+  v: DevInvestigationValues,
+  by: string,
+): Promise<void> {
+  return patch(id, {
+    ...devInvestigationPatch(v),
+    investigation_submitted_at: new Date().toISOString(),
+    investigation_submitted_by_name: by.trim(),
+  });
+}
+
+export function approveDevInvestigation(id: string, by: string): Promise<void> {
+  return patch(id, {
+    investigation_approved_at: new Date().toISOString(),
+    investigation_approved_by_name: by.trim(),
+  });
+}
+
+export function sendBackDevInvestigation(
+  id: string,
+  reason: string,
+  by: string,
+): Promise<void> {
+  return patch(id, {
+    investigation_submitted_at: null,
+    investigation_return_reason: reason.trim(),
+    investigation_returned_by_name: by.trim(),
+  });
+}
+
 /* ── A deviation's stage, as the reference QMS names it ───────────────── */
 
 export type DevStage =
   | "Awaiting assessment"
   | "Investigating"
+  | "Awaiting approval"
   | "Actions"
   | "Awaiting CAPA"
   | "Ready to close"
@@ -689,11 +792,8 @@ const isDeviation = (d: Deviation) =>
 export function devStage(d: Deviation): DevStage {
   if (d.status === "closed") return "Closed";
   if (!d.assessed_at) return "Awaiting assessment";
-  if (
-    d.investigation_required !== false &&
-    (d.investigation_findings ?? "").trim().length < 10
-  ) {
-    return "Investigating";
+  if (d.investigation_required !== false && !d.investigation_approved_at) {
+    return d.investigation_submitted_at ? "Awaiting approval" : "Investigating";
   }
   if (d.capa_needed === null || (d.capa_needed && !d.capa_id)) return "Actions";
   if (d.capa_needed && d.capa_status !== "effective") return "Awaiting CAPA";
@@ -711,7 +811,12 @@ export function nextStep(d: Deviation): { text: string; tab: CaseSection } | nul
       };
     case "Investigating":
       return {
-        text: `${owner}: complete the investigation.`,
+        text: `${owner}: complete the investigation and submit it.`,
+        tab: "investigation",
+      };
+    case "Awaiting approval":
+      return {
+        text: "QA: approve the investigation, or send it back.",
         tab: "investigation",
       };
     case "Actions":
@@ -734,6 +839,7 @@ export function nextStep(d: Deviation): { text: string; tab: CaseSection } | nul
 export const DEV_STAGE_DOT: Record<DevStage, string> = {
   "Awaiting assessment": "bg-violet",
   Investigating: "bg-brand",
+  "Awaiting approval": "bg-violet",
   Actions: "bg-warn",
   "Awaiting CAPA": "bg-warn",
   "Ready to close": "bg-teal",
@@ -967,10 +1073,15 @@ export function outstanding(deviation: Deviation): {
   ) {
     gaps.push({ tab: "risk", what: "the risk assessment" });
   }
-  if (
-    (deviation.investigation_findings ?? "").trim().length < 10 &&
-    !(isDeviation(deviation) && deviation.investigation_required === false)
-  ) {
+  if (isDeviation(deviation)) {
+    // Submitted and approved (0064), unless the assessment said none needed.
+    if (
+      deviation.investigation_required !== false &&
+      !deviation.investigation_approved_at
+    ) {
+      gaps.push({ tab: "investigation", what: "the approved investigation" });
+    }
+  } else if ((deviation.investigation_findings ?? "").trim().length < 10) {
     gaps.push({ tab: "investigation", what: "the investigation findings" });
   }
   if (deviation.capa_needed === null) {

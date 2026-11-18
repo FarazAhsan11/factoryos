@@ -26,6 +26,7 @@ export default async function DeviationCaseRoute({
       slug={slug}
       caseId={caseId}
       role={role}
+      userId={viewer.id}
       viewerName={viewer.fullName ?? viewer.email}
     />
   );

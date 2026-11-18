@@ -628,3 +628,93 @@ export const assessmentSignSchema = assessmentSchema.superRefine((v, ctx) => {
     need("rationale", `A ${v.classification} case needs the rationale.`);
   }
 });
+
+/* ── A deviation's investigation (migration 0064) ─────────────────────── */
+
+/** Mirrors `deviations_checks_reviewed_known` — what the investigation looked at. */
+export const CHECKS_REVIEWED = [
+  "Batch record",
+  "Equipment history",
+  "Previous similar cases",
+  "Environmental data",
+  "Raw material or packaging changes",
+  "Training records",
+  "Other batches",
+] as const;
+
+/** The 6M — `deviations_root_cause_categories_known`. Several may be ticked. */
+export const ROOT_CAUSE_6M = [
+  "Man (people)",
+  "Machine",
+  "Method",
+  "Material",
+  "Measurement",
+  "Environment",
+] as const;
+
+/** `deviations_root_cause_conclusion_known`. */
+export const RC_CONCLUSIONS = ["Confirmed", "Probable", "Not confirmed"] as const;
+
+/** `deviations_rca_method_known` since 0064 — "Simple review" for minor cases. */
+export const DEV_RCA_METHODS = ["Simple review", ...RCA_METHODS] as const;
+
+/**
+ * The investigation as a draft — anything may be blank while it is written.
+ * `devInvestigationSubmitSchema` demands what submitting does.
+ */
+export const devInvestigationSchema = z.object({
+  otherBatches: optional(400),
+  impact: optional(2000),
+  checksReviewed: z.array(z.enum(CHECKS_REVIEWED)),
+  findings: optional(4000),
+  rootCauseCategories: z.array(z.enum(ROOT_CAUSE_6M)),
+  humanProcedureClear: yesNo,
+  humanTrained: yesNo,
+  humanPreventable: yesNo,
+  rootCause: optional(2000),
+  conclusion: z.union([z.enum(RC_CONCLUSIONS), z.literal("")]),
+  method: z.union([z.enum(DEV_RCA_METHODS), z.literal("")]),
+});
+
+export type DevInvestigationValues = z.infer<typeof devInvestigationSchema>;
+
+export const devInvestigationSubmitSchema = devInvestigationSchema.superRefine(
+  (v, ctx) => {
+    const need = (path: keyof DevInvestigationValues, message: string) =>
+      ctx.addIssue({ code: "custom", path: [path], message });
+    if (v.impact.length < 5) need("impact", "Assess the impact on the product.");
+    if (v.findings.length < 10) need("findings", "Record what the investigation found.");
+    if (v.rootCauseCategories.length === 0) {
+      need("rootCauseCategories", "Tick at least one category.");
+    }
+    if (v.rootCauseCategories.includes("Man (people)")) {
+      if (!v.humanProcedureClear) need("humanProcedureClear", "Answer this.");
+      if (!v.humanTrained) need("humanTrained", "Answer this.");
+      if (!v.humanPreventable) need("humanPreventable", "Answer this.");
+    }
+    if (v.rootCause.length < 5) need("rootCause", "State the root cause.");
+    if (!v.conclusion) need("conclusion", "Confirmed, probable or not confirmed?");
+    if (!v.method) need("method", "Name the method.");
+  },
+);
+
+/* ── Attachments (migration 0064) ─────────────────────────────────────── */
+
+/** 10 MB — the `case-files` bucket's own limit, which is the real one. */
+export const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
+
+/** The bucket's `allowed_mime_types`, with the extensions a picker offers. */
+export const ATTACHMENT_TYPES: Record<string, string> = {
+  "application/pdf": ".pdf",
+  "image/jpeg": ".jpg,.jpeg",
+  "image/png": ".png",
+  "image/webp": ".webp",
+  "image/heic": ".heic",
+  "application/msword": ".doc",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+    ".docx",
+  "application/vnd.ms-excel": ".xls",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
+  "text/csv": ".csv",
+  "text/plain": ".txt",
+};

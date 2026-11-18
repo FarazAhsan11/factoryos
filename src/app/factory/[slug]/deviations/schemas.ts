@@ -718,3 +718,48 @@ export const ATTACHMENT_TYPES: Record<string, string> = {
   "text/csv": ".csv",
   "text/plain": ".txt",
 };
+
+/* ── A deviation's close-out (migration 0065) ─────────────────────────── */
+
+/** The reasons a deviation closes for — `deviations_status_reason_known`. */
+export const DEV_CLOSE_REASONS = [
+  "Resolved",
+  "No action required",
+  "Duplicate",
+] as const;
+
+/** The close-out as a draft; `devCloseOutSignSchema` demands the signature's. */
+export const devCloseOutSchema = z.object({
+  unresolvedRisk: yesNo,
+  summary: optional(2000),
+  reason: z.union([z.enum(DEV_CLOSE_REASONS), z.literal("")]),
+  duplicateOf: optional(40),
+  /** Typed as text, e.g. "1250.50"; blank is not recorded. */
+  cost: z
+    .string()
+    .trim()
+    .regex(/^(\d{1,10}(\.\d{1,2})?)?$/, "A sum in dollars, e.g. 1250.50."),
+});
+
+export type DevCloseOutValues = z.infer<typeof devCloseOutSchema>;
+
+export const devCloseOutSignSchema = devCloseOutSchema.superRefine((v, ctx) => {
+  const need = (path: keyof DevCloseOutValues, message: string) =>
+    ctx.addIssue({ code: "custom", path: [path], message });
+  if (v.unresolvedRisk === "") {
+    need("unresolvedRisk", "Is any product or patient risk unresolved?");
+  }
+  if (v.unresolvedRisk === "yes") {
+    need(
+      "unresolvedRisk",
+      "The case cannot close while risk remains. Keep it open or raise a new case.",
+    );
+  }
+  if (v.summary.length < 10) {
+    need("summary", "Record what was decided, what was done, and any risk that remains.");
+  }
+  if (!v.reason) need("reason", "Why is the case being closed?");
+  if (v.reason === "Duplicate" && !v.duplicateOf) {
+    need("duplicateOf", "Which case does it duplicate?");
+  }
+});

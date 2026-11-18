@@ -5,6 +5,7 @@ import {
   type ContainmentValues,
   type AssessmentValues,
   type DeviationInitiationValues,
+  type DevCloseOutValues,
   type DevInvestigationValues,
   type InitiationValues,
   type InvestigationValues,
@@ -354,6 +355,14 @@ export interface Deviation {
   investigation_return_reason: string | null;
   investigation_approved_at: string | null;
   investigation_approved_by_name: string | null;
+
+  /* ── A deviation's close-out (0065) ────────────────────────────────── */
+  unresolved_risk: boolean | null;
+  duplicate_of: string | null;
+  cost_of_quality: number | null;
+  /** A Critical case's first of two close-out signatures. */
+  close_first_signed_at: string | null;
+  close_first_signed_by_name: string | null;
 }
 
 const COLUMNS = `
@@ -386,7 +395,9 @@ const COLUMNS = `
   investigation_submitted_at, investigation_submitted_by_name,
   investigation_returned_at, investigation_returned_by_name,
   investigation_return_reason, investigation_approved_at,
-  investigation_approved_by_name
+  investigation_approved_by_name,
+  unresolved_risk, duplicate_of, cost_of_quality,
+  close_first_signed_at, close_first_signed_by_name
 `;
 
 /**
@@ -766,6 +777,112 @@ export function sendBackDevInvestigation(
   });
 }
 
+/* ── A deviation's close-out (0065) ───────────────────────────────────── */
+
+export function devCloseOutValues(d: Deviation): DevCloseOutValues {
+  const reasons = ["Resolved", "No action required", "Duplicate"];
+  return {
+    unresolvedRisk:
+      d.unresolved_risk === null ? "" : d.unresolved_risk ? "yes" : "no",
+    summary: d.closing_note ?? "",
+    reason: (d.status_reason && reasons.includes(d.status_reason)
+      ? d.status_reason
+      : "") as DevCloseOutValues["reason"],
+    duplicateOf: d.duplicate_of ?? "",
+    cost: d.cost_of_quality === null ? "" : String(d.cost_of_quality),
+  };
+}
+
+function devCloseOutPatch(v: DevCloseOutValues) {
+  return {
+    unresolved_risk: v.unresolvedRisk === "" ? null : v.unresolvedRisk === "yes",
+    closing_note: text(v.summary),
+    status_reason: text(v.reason),
+    // One or the other, as the form shows them.
+    duplicate_of: v.reason === "Duplicate" ? text(v.duplicateOf) : null,
+    cost_of_quality:
+      v.reason !== "Duplicate" && v.cost ? Number(v.cost) : null,
+  };
+}
+
+export function saveDevCloseOut(id: string, v: DevCloseOutValues): Promise<void> {
+  return patch(id, devCloseOutPatch(v));
+}
+
+/** A Critical case's first signature — the case stays open. */
+export function firstSignDevCloseOut(
+  id: string,
+  v: DevCloseOutValues,
+  by: string,
+): Promise<void> {
+  return patch(id, {
+    ...devCloseOutPatch(v),
+    close_first_signed_at: new Date().toISOString(),
+    close_first_signed_by_name: by.trim(),
+  });
+}
+
+/**
+ * The closing signature. After a first signature the close-out is fixed, so
+ * only the status and the name are sent.
+ */
+export function closeDevCase(
+  d: Deviation,
+  v: DevCloseOutValues,
+  by: string,
+): Promise<void> {
+  return patch(d.id, {
+    ...(d.close_first_signed_at ? {} : devCloseOutPatch(v)),
+    status: "closed",
+    qa_sign_name: by.trim(),
+  });
+}
+
+/** How many QA signatures the close-out needs. */
+export const signaturesNeeded = (d: Deviation) =>
+  d.classification === "Critical" ? 2 : 1;
+
+/**
+ * The close-out checklist, as the reference QMS draws it — each item and
+ * whether it is done. The sign button waits for every one.
+ */
+export function devChecklist(d: Deviation): { label: string; done: boolean }[] {
+  const list: { label: string; done: boolean }[] = [
+    { label: "Initial assessment signed", done: Boolean(d.assessed_at) },
+    d.investigation_required === false
+      ? { label: "Investigation not required (reason recorded)", done: true }
+      : { label: "Investigation approved", done: Boolean(d.investigation_approved_at) },
+    {
+      label: "Immediate action recorded",
+      done: Boolean((d.immediate_action ?? "").trim()),
+    },
+    {
+      label: "CAPA decision made",
+      done:
+        (d.capa_needed === false &&
+          (d.capa_not_needed_reason ?? "").trim().length >= 10) ||
+        (d.capa_needed === true && Boolean(d.capa_id)),
+    },
+  ];
+  if (d.capa_needed) {
+    list.push({
+      label: `${d.capa_no ?? "CAPA"} verified effective`,
+      done: d.capa_status === "effective",
+    });
+  }
+  list.push(
+    { label: "No unresolved product or patient risk", done: d.unresolved_risk === false },
+    {
+      label: "Close-out summary and reason",
+      done:
+        (d.closing_note ?? "").trim().length >= 10 &&
+        Boolean(d.status_reason) &&
+        (d.status_reason !== "Duplicate" || Boolean((d.duplicate_of ?? "").trim())),
+    },
+  );
+  return list;
+}
+
 /* ── A deviation's stage, as the reference QMS names it ───────────────── */
 
 export type DevStage =
@@ -775,6 +892,7 @@ export type DevStage =
   | "Actions"
   | "Awaiting CAPA"
   | "Ready to close"
+  | "Awaiting 2nd signature"
   | "Closed";
 
 export type CaseSection =
@@ -797,7 +915,7 @@ export function devStage(d: Deviation): DevStage {
   }
   if (d.capa_needed === null || (d.capa_needed && !d.capa_id)) return "Actions";
   if (d.capa_needed && d.capa_status !== "effective") return "Awaiting CAPA";
-  return "Ready to close";
+  return d.close_first_signed_at ? "Awaiting 2nd signature" : "Ready to close";
 }
 
 /** What happens next, and the tab it happens on. */
@@ -831,6 +949,11 @@ export function nextStep(d: Deviation): { text: string; tab: CaseSection } | nul
       };
     case "Ready to close":
       return { text: "QA: sign the close-out.", tab: "closeout" };
+    case "Awaiting 2nd signature":
+      return {
+        text: "A second QA approver signs (Critical case).",
+        tab: "closeout",
+      };
     default:
       return null;
   }
@@ -843,6 +966,7 @@ export const DEV_STAGE_DOT: Record<DevStage, string> = {
   Actions: "bg-warn",
   "Awaiting CAPA": "bg-warn",
   "Ready to close": "bg-teal",
+  "Awaiting 2nd signature": "bg-violet",
   Closed: "bg-ink-5",
 };
 

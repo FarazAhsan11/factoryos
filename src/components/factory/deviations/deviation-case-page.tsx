@@ -9,12 +9,10 @@ import { Check, Loader2, Minus } from "lucide-react";
 import { AssessmentTab } from "@/components/factory/deviations/assessment-tab";
 import { CapaTab } from "@/components/factory/deviations/capa-tab";
 import { CaseAttachments } from "@/components/factory/deviations/case-attachments";
+import { DevCloseOutTab } from "@/components/factory/deviations/dev-closeout-tab";
 import { DevInvestigationTab } from "@/components/factory/deviations/dev-investigation-tab";
 import { Aging } from "@/components/factory/deviations/deviation-detail-dialog";
-import {
-  CloseOutTab,
-  InitiationTab,
-} from "@/components/factory/deviations/deviation-tab-forms";
+import { InitiationTab } from "@/components/factory/deviations/deviation-tab-forms";
 import { canReview } from "@/lib/factory/action-queries";
 import type { FactoryRole } from "@/lib/factory/context";
 import { addDays, formatDay } from "@/lib/factory/dates";
@@ -337,10 +335,11 @@ export function DeviationCasePage({
             />
           )}
           {section === "closeout" && (
-            <CloseOutTab
+            <DevCloseOutTab
               deviation={d}
               factoryId={factoryId}
-              readOnly={!reviewer}
+              canEdit={reviewer}
+              viewerName={viewerName}
             />
           )}
           {section === "history" && <Aging deviation={d} />}

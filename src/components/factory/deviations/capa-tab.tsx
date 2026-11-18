@@ -49,7 +49,7 @@ import { useRenderClock } from "@/lib/use-render-clock";
 import { useForm } from "@/lib/use-form";
 import { cn } from "@/lib/utils";
 
-type Path = "direct" | "capa" | "link" | "later";
+type Path = "direct" | "capa" | "link";
 
 const PATHS: { value: Path; label: string; hint: string }[] = [
   {
@@ -67,23 +67,18 @@ const PATHS: { value: Path; label: string; hint: string }[] = [
     label: "Link to existing CAPA",
     hint: "Same root cause as an open CAPA",
   },
-  {
-    value: "later",
-    label: "Decide at review",
-    hint: "Owner chooses later",
-  },
 ];
 
 /**
  * The case's CAPA tab — how the case is resolved.
  *
- * Four paths, as the reference system offers them: **resolve directly** (a
+ * Three paths: **resolve directly** (a
  * correction, no CAPA — stored as the reason none is needed), **initiate a
  * CAPA** (the whole plan in one form: why, owner, target, root cause, the
  * first CA and PA rows, the effectiveness check), **link to an existing
  * CAPA** with the same root cause (its root cause and actions are shared,
- * not duplicated), or **decide at review** (undecided — the close-out will
- * ask). Once a CAPA is linked, it is worked right here through the same panel
+ * not duplicated). Until one is chosen the case is undecided, and the
+ * close-out refuses it. Once a CAPA is linked, it is worked right here through the same panel
  * the register draws.
  */
 export function CapaTab({
@@ -169,18 +164,21 @@ function PathPicker({
   capasLoading: boolean;
 }) {
   const openCapas = capas.filter((c) => c.status === "open");
-  const [path, setPath] = useState<Path>(
+  // Nothing chosen until someone chooses: an undecided case shows the three
+  // paths and no form ("Decide at review" is gone — undecided is simply the
+  // state before a choice, and the close-out still refuses it).
+  const [path, setPath] = useState<Path | null>(
     deviation.capa_needed === false
       ? "direct"
       : deviation.capa_needed
         ? "capa"
-        : "later",
+        : null,
   );
 
   return (
     <div className="space-y-5">
       <Group title="Resolution">
-        <div role="radiogroup" className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <div role="radiogroup" className="grid gap-2 sm:grid-cols-3">
           {PATHS.map((p) => {
             // Not while the register is still loading — only when it has
             // loaded with no open CAPA.
@@ -230,8 +228,11 @@ function PathPicker({
           openCapas={openCapas}
         />
       )}
-      {path === "later" && (
-        <DecideLater deviation={deviation} factoryId={factoryId} />
+      {path === null && (
+        <p className="rounded-xl border border-dashed border-line-strong bg-surface px-4 py-3 text-xs text-ink-5">
+          Choose how the case is resolved. It cannot be closed until one is
+          chosen.
+        </p>
       )}
     </div>
   );
@@ -542,53 +543,6 @@ function LinkExisting({
           Link to CAPA
         </button>
       </div>
-    </div>
-  );
-}
-
-/* ── Decide at review ─────────────────────────────────────────────────── */
-
-function DecideLater({
-  deviation,
-  factoryId,
-}: {
-  deviation: Deviation;
-  factoryId: string;
-}) {
-  const refresh = useRefresh(factoryId);
-  const clear = useMutation({
-    mutationFn: () => saveCapaDecision(deviation.id, null, ""),
-    onSuccess: async () => {
-      await refresh();
-      toast.success("Left to decide at review.");
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  // Nothing to save when nothing has been decided yet.
-  if (deviation.capa_needed === null) {
-    return (
-      <p className="rounded-xl border border-dashed border-line-strong bg-surface px-4 py-3 text-xs text-ink-5">
-        The owner chooses a path later. The case cannot be closed until one is
-        chosen.
-      </p>
-    );
-  }
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-surface p-4">
-      <p className="text-xs text-ink-4">
-        This clears the earlier decision. The case cannot be closed until a
-        path is chosen again.
-      </p>
-      <button
-        type="button"
-        disabled={clear.isPending}
-        onClick={() => clear.mutate()}
-        className={SUBMIT}
-      >
-        {clear.isPending && <Loader2 className="size-4 animate-spin" />}
-        Decide at review
-      </button>
     </div>
   );
 }

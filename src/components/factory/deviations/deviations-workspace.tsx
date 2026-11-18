@@ -2,7 +2,7 @@
 
 import { useCallback, useDeferredValue, useMemo, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Plus } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -111,6 +111,7 @@ export function DeviationsWorkspace({
   const [type, setType] = useState<TypeFilter>("all");
   const [search, setSearch] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
+  const router = useRouter();
   // The optional columns each screen shows. Kept per screen, and only for as
   // long as the page is open.
   const [chosen, setChosen] = useState<Partial<Record<string, CaseColumn[]>>>(
@@ -193,6 +194,17 @@ export function DeviationsWorkspace({
   // re-renders the moment one of its tabs is saved.
   const open = deviations.find((d) => d.id === (openId ?? caseParam)) ?? null;
 
+  // A planned or unplanned deviation opens as its own page; an NCR or a
+  // complaint still in the case dialog.
+  const openCase = (id: string) => {
+    const d = deviations.find((x) => x.id === id);
+    if (d && (d.type === "planned" || d.type === "unplanned")) {
+      router.push(`/factory/${slug}/deviations/${id}`);
+    } else {
+      setOpenId(id);
+    }
+  };
+
   const dialog = (
     <DeviationDetailDialog
       deviation={open}
@@ -221,7 +233,7 @@ export function DeviationsWorkspace({
         <CapaRegister
           factoryId={factoryId}
           role={role}
-          onOpenCase={setOpenId}
+          onOpenCase={openCase}
         />
         {dialog}
       </div>
@@ -347,7 +359,7 @@ export function DeviationsWorkspace({
         ) : (
           <DeviationsTable
             deviations={visible}
-            onOpen={setOpenId}
+            onOpen={openCase}
             columns={columns}
             emptyTitle={
               onScreen.length === 0

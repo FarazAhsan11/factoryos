@@ -54,7 +54,6 @@ import {
   deviationInitiationValues,
   deviationKeys,
   outstanding,
-  priorityMeta,
   saveActionPlan,
   saveCloseOutPlan,
   saveContainment,
@@ -248,18 +247,6 @@ function DeviationInitiationFacts({ deviation }: { deviation: Deviation }) {
           </Fact>
           <Fact label="Raised by">
             {deviation.raised_by ?? <Muted>—</Muted>}
-          </Fact>
-        </dl>
-      </Group>
-      <Group title="Case settings">
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
-          <Fact label="Priority">{priorityMeta(deviation.priority).label}</Fact>
-          <Fact label="Due date">{formatDate(deviation.sla_date)}</Fact>
-          <Fact label="Case owner">
-            {deviation.owner_name ?? <Muted>—</Muted>}
-          </Fact>
-          <Fact label="Supervisor">
-            {deviation.supervisor_name ?? <Muted>—</Muted>}
           </Fact>
         </dl>
       </Group>

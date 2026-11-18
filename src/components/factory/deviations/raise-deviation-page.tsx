@@ -43,10 +43,6 @@ const BLANK: DeviationInitiationValues = {
   equipmentNo: "",
   procedureName: "",
   sopNumber: "",
-  priority: "medium",
-  slaDate: "",
-  ownerName: "",
-  supervisorName: "",
 };
 
 /** "18 Nov 2026, 22:30" — now, to the minute. */
@@ -57,9 +53,9 @@ const nowLabel = () =>
  * Raise a deviation — a page of its own, not a modal, as the reference QMS
  * has it: Deviations / New, the form, then Raise · Cancel · who and when.
  *
- * Only a deviation's first section is asked here. Priority, due date and
- * owner are set on the case once it is raised; the risk, investigation, CAPA
- * and close-out follow on its tabs. Raising opens the new case.
+ * Only a deviation's first section is asked here. QA's initial assessment
+ * sets the category, owner, class and due date; the investigation, actions
+ * and close-out follow on the case's tabs. Raising opens the case's page.
  */
 export function RaiseDeviationPage({
   factoryId,
@@ -127,7 +123,7 @@ export function RaiseDeviationPage({
       } else {
         toast.success(`${raised.deviation_no} raised.`);
       }
-      router.push(`${listHref}?case=${raised.id}`);
+      router.push(`${listHref}/${raised.id}`);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -147,8 +143,8 @@ export function RaiseDeviationPage({
         New deviation
       </h1>
       <p className="mt-1 max-w-3xl text-sm text-ink-4">
-        Record what happened and what was done about it. Priority, owner and
-        due date are set on the case once it is raised.
+        Record what happened and what was done about it. QA classifies it and
+        sets the owner and due date at the initial assessment.
       </p>
 
       <form

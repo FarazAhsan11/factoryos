@@ -325,7 +325,7 @@ function Body({
  * nothing. It is the answer to "how long has this been sitting?", which on
  * the reference system is its own tab for exactly that reason.
  */
-function Aging({ deviation }: { deviation: Deviation }) {
+export function Aging({ deviation }: { deviation: Deviation }) {
   return (
     <div className="space-y-5">
       <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl border border-line bg-surface p-4 sm:grid-cols-3">

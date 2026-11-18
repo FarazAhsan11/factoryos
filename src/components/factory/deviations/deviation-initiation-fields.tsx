@@ -20,14 +20,10 @@ import {
 import {
   AREA,
   CONTROL,
-  DateControl,
   Field,
-  Group,
   SelectControl,
 } from "@/components/factory/deviations/deviation-fields";
-import { WorkerSelect } from "@/components/factory/worker-select";
 import { DateTimeField } from "@/components/ui/date-picker";
-import { PRIORITIES } from "@/lib/factory/deviation-queries";
 import {
   equipmentKeys,
   fetchEquipment,
@@ -35,7 +31,6 @@ import {
 } from "@/lib/factory/equipment-queries";
 import { fetchProducts, productKeys } from "@/lib/factory/product-queries";
 import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
-import { useWorkers } from "@/lib/factory/worker-queries";
 import { cn } from "@/lib/utils";
 
 /**
@@ -53,8 +48,8 @@ import { cn } from "@/lib/utils";
  *
  * Used by the raise page (`/deviations/new`) and by the case's Initiation
  * tab, so the two cannot drift. On the tab (`editing`) the type is fixed — it
- * is part of the number — and the case's own settings follow: priority, due
- * date, owner and supervisor, which QA sets once the case exists.
+ * is part of the number. Owner, category, class and due date are the initial
+ * assessment's, on its own tab.
  *
  * The **department** is the factory's own list (Configuration → Departments).
  * The **batches** are typed as one line and each is resolved from the product
@@ -68,7 +63,7 @@ export function DeviationInitiationFields({
 }: {
   form: UseFormReturn<DeviationInitiationValues>;
   factoryId: string;
-  /** An existing case: the type is locked and the case settings are shown. */
+  /** An existing case: the type is locked. */
   editing?: boolean;
 }) {
   const {
@@ -86,7 +81,6 @@ export function DeviationInitiationFields({
     queryKey: equipmentKeys.all(factoryId),
     queryFn: () => fetchEquipment(factoryId),
   });
-  const { data: workers = [] } = useWorkers(factoryId);
 
   const type = useWatch({ control, name: "type" });
   const departmentId = useWatch({ control, name: "departmentId" });
@@ -354,62 +348,6 @@ export function DeviationInitiationFields({
           />
         </Field>
       </div>
-
-      {editing && (
-        <Group title="Case settings">
-          <div className="grid gap-x-6 gap-y-5 md:grid-cols-2">
-            <Field label="Priority" htmlFor="dev-priority">
-              <SelectControl
-                control={control}
-                name="priority"
-                id="dev-priority"
-                options={PRIORITIES.map((p) => ({
-                  value: p.value,
-                  label: p.label,
-                }))}
-              />
-            </Field>
-            <Field
-              label="Due date"
-              htmlFor="dev-sla"
-              note="(optional)"
-              hint="When it should be closed by."
-            >
-              <DateControl control={control} name="slaDate" id="dev-sla" />
-            </Field>
-            <Field label="Case owner" htmlFor="dev-owner" note="(optional)">
-              <Controller
-                name="ownerName"
-                control={control}
-                render={({ field }) => (
-                  <WorkerSelect
-                    id="dev-owner"
-                    value={field.value ?? ""}
-                    onChange={field.onChange}
-                    onBlur={field.onBlur}
-                    workers={workers}
-                    placeholder="Who is carrying this case"
-                    ariaLabel="Case owner"
-                    inputClassName={CONTROL}
-                  />
-                )}
-              />
-            </Field>
-            <Field
-              label="Supervisor's name"
-              htmlFor="dev-supervisor"
-              note="(optional)"
-            >
-              <input
-                id="dev-supervisor"
-                placeholder="Supervisor on shift"
-                className={CONTROL}
-                {...register("supervisorName")}
-              />
-            </Field>
-          </div>
-        </Group>
-      )}
     </div>
   );
 }
@@ -490,7 +428,7 @@ function BatchesResolved({
 }
 
 /** Two or three joined buttons for one answer — the reference form's toggle. */
-function Segmented<T extends FieldValues>({
+export function Segmented<T extends FieldValues>({
   control,
   name,
   label,

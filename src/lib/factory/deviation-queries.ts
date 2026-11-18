@@ -3,6 +3,7 @@ import {
   type ActionPlanValues,
   type CloseOutValues,
   type ContainmentValues,
+  type AssessmentValues,
   type DeviationInitiationValues,
   type InitiationValues,
   type InvestigationValues,
@@ -326,6 +327,16 @@ export interface Deviation {
   product_names: string[];
   /** Deviations only. Null on older cases and every other type. */
   hold_batch: boolean | null;
+
+  /* ── A deviation's initial assessment (0063) ───────────────────────── */
+  investigation_required: boolean | null;
+  investigation_not_required_reason: string | null;
+  red_flags: string[];
+  classification: "Critical" | "Major" | "Minor" | null;
+  classification_reason: string | null;
+  /** Signed when set. */
+  assessed_at: string | null;
+  assessed_by_name: string | null;
 }
 
 const COLUMNS = `
@@ -350,7 +361,9 @@ const COLUMNS = `
   capa_needed, capa_not_needed_reason, capa_id, capa_no, capa_status, capa_verified_at,
   root_cause_category, root_cause, rca_method,
   occurred_at, department_id, department_name, location, detection_point,
-  batch_nos, product_ids, product_names, hold_batch
+  batch_nos, product_ids, product_names, hold_batch,
+  investigation_required, investigation_not_required_reason, red_flags,
+  classification, classification_reason, assessed_at, assessed_by_name
 `;
 
 /**
@@ -522,10 +535,6 @@ function deviationInitiationPatch(values: DeviationInitiationValues) {
     equipment_no: text(values.equipmentNo),
     procedure_name: text(values.procedureName),
     sop_number: text(values.sopNumber),
-    priority: values.priority,
-    sla_date: text(values.slaDate),
-    owner_name: text(values.ownerName),
-    supervisor_name: text(values.supervisorName),
   };
 }
 
@@ -587,12 +596,149 @@ export function deviationInitiationValues(
     equipmentNo: deviation.equipment_no ?? "",
     procedureName: deviation.procedure_name ?? "",
     sopNumber: deviation.sop_number ?? "",
-    priority: deviation.priority,
-    slaDate: deviation.sla_date ?? "",
-    ownerName: deviation.owner_name ?? "",
-    supervisorName: deviation.supervisor_name ?? "",
   };
 }
+
+/* ── The initial assessment (0063) ────────────────────────────────────── */
+
+export function assessmentValues(deviation: Deviation): AssessmentValues {
+  const yn = (b: boolean | null) => (b === null ? "" : b ? "yes" : "no");
+  const sc = (n: number | null) =>
+    (n === null ? "" : String(n)) as AssessmentValues["severity"];
+  return {
+    category: (deviation.nc_category ?? "") as AssessmentValues["category"],
+    ownerName: deviation.owner_name ?? "",
+    investigationRequired: yn(deviation.investigation_required),
+    investigationNotRequiredReason:
+      deviation.investigation_not_required_reason ?? "",
+    redFlags: deviation.red_flags as AssessmentValues["redFlags"],
+    severity: sc(deviation.severity),
+    detection: sc(deviation.detection),
+    likelihood: sc(deviation.likelihood),
+    classification: (deviation.classification ??
+      "") as AssessmentValues["classification"],
+    classificationReason: deviation.classification_reason ?? "",
+    rationale: deviation.risk_description ?? "",
+  };
+}
+
+function assessmentPatch(v: AssessmentValues) {
+  const num = (s: string) => (s ? Number(s) : null);
+  return {
+    nc_category: text(v.category),
+    owner_name: text(v.ownerName),
+    investigation_required:
+      v.investigationRequired === "" ? null : v.investigationRequired === "yes",
+    investigation_not_required_reason:
+      v.investigationRequired === "no"
+        ? text(v.investigationNotRequiredReason)
+        : null,
+    red_flags: v.redFlags,
+    severity: num(v.severity),
+    detection: num(v.detection),
+    likelihood: num(v.likelihood),
+    classification: text(v.classification),
+    classification_reason: text(v.classificationReason),
+    risk_description: text(v.rationale),
+  };
+}
+
+/** Save the assessment as it stands, unsigned. */
+export function saveAssessment(id: string, v: AssessmentValues): Promise<void> {
+  return patch(id, assessmentPatch(v));
+}
+
+/**
+ * Sign it. The database re-checks everything, stamps the time and signer,
+ * and sets the due date and priority from the class.
+ */
+export function signAssessment(
+  id: string,
+  v: AssessmentValues,
+  signedBy: string,
+): Promise<void> {
+  return patch(id, {
+    ...assessmentPatch(v),
+    assessed_at: new Date().toISOString(),
+    assessed_by_name: signedBy.trim(),
+  });
+}
+
+/* ── A deviation's stage, as the reference QMS names it ───────────────── */
+
+export type DevStage =
+  | "Awaiting assessment"
+  | "Investigating"
+  | "Actions"
+  | "Awaiting CAPA"
+  | "Ready to close"
+  | "Closed";
+
+export type CaseSection =
+  | "details"
+  | "assessment"
+  | "investigation"
+  | "actions"
+  | "closeout"
+  | "history";
+
+const isDeviation = (d: Deviation) =>
+  d.type === "planned" || d.type === "unplanned";
+
+/** Read from what the case holds — never stored. */
+export function devStage(d: Deviation): DevStage {
+  if (d.status === "closed") return "Closed";
+  if (!d.assessed_at) return "Awaiting assessment";
+  if (
+    d.investigation_required !== false &&
+    (d.investigation_findings ?? "").trim().length < 10
+  ) {
+    return "Investigating";
+  }
+  if (d.capa_needed === null || (d.capa_needed && !d.capa_id)) return "Actions";
+  if (d.capa_needed && d.capa_status !== "effective") return "Awaiting CAPA";
+  return "Ready to close";
+}
+
+/** What happens next, and the tab it happens on. */
+export function nextStep(d: Deviation): { text: string; tab: CaseSection } | null {
+  const owner = d.owner_name || "Owner";
+  switch (devStage(d)) {
+    case "Awaiting assessment":
+      return {
+        text: "QA: initial assessment — classify, score risk, set the owner.",
+        tab: "assessment",
+      };
+    case "Investigating":
+      return {
+        text: `${owner}: complete the investigation.`,
+        tab: "investigation",
+      };
+    case "Actions":
+      return {
+        text: `${owner}: decide on a CAPA, or resolve directly.`,
+        tab: "actions",
+      };
+    case "Awaiting CAPA":
+      return {
+        text: `Waiting for ${d.capa_no ?? "the CAPA"} to be verified effective.`,
+        tab: "actions",
+      };
+    case "Ready to close":
+      return { text: "QA: sign the close-out.", tab: "closeout" };
+    default:
+      return null;
+  }
+}
+
+export const DEV_STAGE_DOT: Record<DevStage, string> = {
+  "Awaiting assessment": "bg-violet",
+  Investigating: "bg-brand",
+  Actions: "bg-warn",
+  "Awaiting CAPA": "bg-warn",
+  "Ready to close": "bg-teal",
+  Closed: "bg-ink-5",
+};
 
 async function patch(id: string, values: Record<string, unknown>) {
   const supabase = createClient();
@@ -785,6 +931,7 @@ export function scaleLabel(
  */
 export type OutstandingTab =
   | "initiation"
+  | "assessment"
   | "containment"
   | "risk"
   | "investigation"
@@ -806,7 +953,13 @@ export function outstanding(deviation: Deviation): {
     // Its date is no longer demanded (0062).
     gaps.push({ tab: "initiation", what: "the immediate action" });
   }
-  if (
+  if (isDeviation(deviation)) {
+    // Scored and classified at the initial assessment (0063); no financial
+    // impact asked.
+    if (!deviation.assessed_at) {
+      gaps.push({ tab: "assessment", what: "the signed initial assessment" });
+    }
+  } else if (
     deviation.likelihood === null ||
     deviation.severity === null ||
     deviation.detection === null ||
@@ -814,7 +967,10 @@ export function outstanding(deviation: Deviation): {
   ) {
     gaps.push({ tab: "risk", what: "the risk assessment" });
   }
-  if ((deviation.investigation_findings ?? "").trim().length < 10) {
+  if (
+    (deviation.investigation_findings ?? "").trim().length < 10 &&
+    !(isDeviation(deviation) && deviation.investigation_required === false)
+  ) {
     gaps.push({ tab: "investigation", what: "the investigation findings" });
   }
   if (deviation.capa_needed === null) {

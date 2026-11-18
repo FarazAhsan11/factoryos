@@ -222,9 +222,8 @@ const dateTime = z
  * The fields are the reference QMS's (qms-v4): title, planned or unplanned,
  * when it happened, department, location, detected at, batches, what
  * happened, the immediate action, whether to hold the batch, equipment,
- * procedure and reference document. Priority, due date, case owner and
- * supervisor are not asked on the raise page — QA sets them once the case
- * exists — so they are here with their defaults and drawn on the tab only.
+ * procedure and reference document. Category, owner, class and due date are
+ * not asked here: they are the initial assessment's (`assessmentSchema`).
  */
 export const deviationInitiationSchema = z
   .object({
@@ -255,12 +254,6 @@ export const deviationInitiationSchema = z
     equipmentNo: optional(40),
     procedureName: optional(120),
     sopNumber: optional(60),
-
-    // Set on the case, not at raise.
-    priority: z.enum(PRIORITY_VALUES),
-    slaDate: date,
-    ownerName: optional(80),
-    supervisorName: optional(80),
   })
   .refine((v) => v.detectionPoint !== "", {
     path: ["detectionPoint"],
@@ -533,3 +526,105 @@ export const closeOutSchema = z
   });
 
 export type CloseOutValues = z.infer<typeof closeOutSchema>;
+
+/* ── A deviation's initial assessment (migration 0063) ────────────────── */
+
+/** Mirrors `deviations_red_flags_known`. Any one means severity 5. */
+export const RED_FLAGS = [
+  "Product mix-up",
+  "Wrong identity or strength",
+  "Suspected contamination",
+  "Potential recall",
+  "Data integrity concern",
+] as const;
+
+export const CLASSES = ["Critical", "Major", "Minor"] as const;
+export type CaseClass = (typeof CLASSES)[number];
+
+/** Days from raising to the due date, by class — `deviations_assessment_guard`. */
+export const CLASS_DUE_DAYS: Record<CaseClass, number> = {
+  Critical: 15,
+  Major: 30,
+  Minor: 60,
+};
+
+const yesNo = z.union([z.enum(["yes", "no"]), z.literal("")]);
+
+/**
+ * The assessment as a draft: anything may be blank, so QA can save half of
+ * it and come back. `assessmentSignSchema` is the same form, demanding what
+ * the signature does.
+ */
+export const assessmentSchema = z.object({
+  category: z.union([z.enum(NC_CATEGORIES), z.literal("")]),
+  ownerName: optional(80),
+  investigationRequired: yesNo,
+  investigationNotRequiredReason: optional(1000),
+  redFlags: z.array(z.enum(RED_FLAGS)),
+  severity: score,
+  detection: score,
+  likelihood: score,
+  classification: z.union([z.enum(CLASSES), z.literal("")]),
+  classificationReason: optional(1000),
+  rationale: optional(1000),
+});
+
+export type AssessmentValues = z.infer<typeof assessmentSchema>;
+
+/**
+ * The class the scores propose — the same rule as the database. Any red flag
+ * is Critical; then High → Critical, Medium (or severity 4) → Major, else
+ * Minor. Null until all three scores are in.
+ */
+export function proposedClass(v: {
+  redFlags: readonly string[];
+  severity: string;
+  detection: string;
+  likelihood: string;
+}): CaseClass | null {
+  if (v.redFlags.length > 0) return "Critical";
+  if (!v.severity || !v.detection || !v.likelihood) return null;
+  const sev = Number(v.severity);
+  const n = sev * Number(v.detection) * Number(v.likelihood);
+  if (sev === 5 || n >= 60) return "Critical";
+  if (n >= 20 || sev === 4) return "Major";
+  return "Minor";
+}
+
+export const assessmentSignSchema = assessmentSchema.superRefine((v, ctx) => {
+  const need = (path: keyof AssessmentValues, message: string) =>
+    ctx.addIssue({ code: "custom", path: [path], message });
+  if (!v.category) need("category", "Choose the category.");
+  if (!v.ownerName) need("ownerName", "Name the case owner.");
+  if (!v.investigationRequired) {
+    need("investigationRequired", "Is an investigation required?");
+  }
+  if (
+    v.investigationRequired === "no" &&
+    v.investigationNotRequiredReason.length < 5
+  ) {
+    need("investigationNotRequiredReason", "Say why no investigation is needed.");
+  }
+  if (!v.severity) need("severity", "Score the severity.");
+  if (!v.detection) need("detection", "Which control would catch it?");
+  if (!v.likelihood) need("likelihood", "Score the likelihood.");
+  if (!v.classification) need("classification", "Classify the case.");
+  const proposed = proposedClass(v);
+  if (
+    v.classification &&
+    proposed &&
+    v.classification !== proposed &&
+    v.classificationReason.length < 5
+  ) {
+    need(
+      "classificationReason",
+      `Say why it is ${v.classification}, not ${proposed}.`,
+    );
+  }
+  if (
+    (v.classification === "Critical" || v.classification === "Major") &&
+    v.rationale.length < 5
+  ) {
+    need("rationale", `A ${v.classification} case needs the rationale.`);
+  }
+});

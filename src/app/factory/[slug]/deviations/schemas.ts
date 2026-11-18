@@ -178,6 +178,112 @@ export const initiationSchema = z
 
 export type InitiationValues = z.infer<typeof initiationSchema>;
 
+/* ── A deviation's initiation (migration 0062) ────────────────────────── */
+
+/** Mirrors `deviations_detection_point_known` — where it was found. */
+export const DETECTION_POINTS = [
+  "Incoming inspection",
+  "In-process",
+  "QC testing",
+  "Warehouse",
+  "Audit",
+  "Customer",
+  "Other",
+] as const;
+
+/**
+ * "46686, 46690" → ["46686", "46690"]: split on commas, semicolons and
+ * whitespace, blanks and repeats (any case) dropped, first spelling kept. The
+ * trigger tidies the list the same way; this is so the form shows what will
+ * be stored.
+ */
+export function parseBatches(text: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of text.split(/[\s,;]+/)) {
+    const b = raw.trim();
+    if (!b || seen.has(b.toLowerCase())) continue;
+    seen.add(b.toLowerCase());
+    out.push(b);
+  }
+  return out;
+}
+
+/** `YYYY-MM-DDTHH:mm` from `DateTimeField`, or "". */
+const dateTime = z
+  .string()
+  .trim()
+  .regex(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})?$/, "Pick a date and time.");
+
+/**
+ * Raising a planned or unplanned deviation — the page at `/deviations/new`,
+ * and the same form again on the case's Initiation tab.
+ *
+ * The fields are the reference QMS's (qms-v4): title, planned or unplanned,
+ * when it happened, department, location, detected at, batches, what
+ * happened, the immediate action, whether to hold the batch, equipment,
+ * procedure and reference document. Priority, due date, case owner and
+ * supervisor are not asked on the raise page — QA sets them once the case
+ * exists — so they are here with their defaults and drawn on the tab only.
+ */
+export const deviationInitiationSchema = z
+  .object({
+    type: z.enum(["planned", "unplanned"]),
+    title: z
+      .string()
+      .trim()
+      .min(3, "Give the deviation a title — what it is, in a line.")
+      .max(160, "Keep the title under 160 characters."),
+    occurredAt: dateTime.refine((v) => v !== "", "When did it happen?"),
+    departmentId: z.string().min(1, "Which department did it happen in?"),
+    location: optional(120),
+    detectionPoint: z.union([z.enum(DETECTION_POINTS), z.literal("")]),
+    /** Typed as one line; `parseBatches` reads it. */
+    batches: optional(400),
+    actual: z
+      .string()
+      .trim()
+      .min(10, "Say what happened — what, how much, how it was found.")
+      .max(2000, "Keep it under 2000 characters."),
+    immediateAction: z
+      .string()
+      .trim()
+      .min(2, "Say what was done straight away, or “None needed”.")
+      .max(2000, "Keep it under 2000 characters."),
+    // "" is unanswered, and refused: holding a batch is not a default.
+    hold: z.union([z.enum(["yes", "no"]), z.literal("")]),
+    equipmentNo: optional(40),
+    procedureName: optional(120),
+    sopNumber: optional(60),
+
+    // Set on the case, not at raise.
+    priority: z.enum(PRIORITY_VALUES),
+    slaDate: date,
+    ownerName: optional(80),
+    supervisorName: optional(80),
+  })
+  .refine((v) => v.detectionPoint !== "", {
+    path: ["detectionPoint"],
+    message: "Where was it detected?",
+  })
+  .refine((v) => v.hold !== "", {
+    path: ["hold"],
+    message: "Say whether the batch goes on hold.",
+  })
+  .refine((v) => v.hold !== "yes" || parseBatches(v.batches).length > 0, {
+    path: ["batches"],
+    message: "Holding a batch needs its number.",
+  })
+  // Read in validation, not in render — a submit is an event.
+  .refine((v) => !v.occurredAt || new Date(v.occurredAt).getTime() <= Date.now() + 5 * 60_000, {
+    path: ["occurredAt"],
+    message: "When it happened can't be in the future.",
+  });
+
+export type DeviationInitiationValues = z.infer<
+  typeof deviationInitiationSchema
+>;
+
 /* ── Tab 2 · Immediate / containment action ───────────────────────────── */
 
 export const containmentSchema = z.object({

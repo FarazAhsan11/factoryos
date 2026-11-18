@@ -140,11 +140,17 @@ export function DeviationsTable({
             </td>
 
             <td className="max-w-[14rem] min-w-[9rem] px-3 py-3 align-middle text-[0.8125rem]">
-              {d.product_name ?? <span className="text-ink-6">—</span>}
+              {(d.product_names.length > 0
+                ? d.product_names.join(", ")
+                : d.product_name) ?? <span className="text-ink-6">—</span>}
             </td>
 
             <td className={cn(CELL, "font-mono tabular-nums")}>
-              <Val value={d.batch_no} />
+              <Val
+                value={
+                  d.batch_nos.length > 0 ? d.batch_nos.join(", ") : d.batch_no
+                }
+              />
             </td>
 
             <td className={CELL}>

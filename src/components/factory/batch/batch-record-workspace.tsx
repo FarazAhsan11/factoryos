@@ -150,8 +150,11 @@ export function BatchRecordWorkspace({
   );
   const batchDeviations = useMemo(
     () =>
-      deviations.filter(
-        (d) => (d.batch_no ?? "").trim().toLowerCase() === key,
+      // Any batch on the case — a deviation can name several (0062).
+      deviations.filter((d) =>
+        (d.batch_nos.length > 0 ? d.batch_nos : [d.batch_no ?? ""]).some(
+          (b) => b.trim().toLowerCase() === key,
+        ),
       ),
     [deviations, key],
   );

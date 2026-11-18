@@ -14,12 +14,14 @@ import {
   actionPlanSchema,
   closeOutSchema,
   containmentSchema,
+  deviationInitiationSchema,
   initiationSchema,
   investigationSchema,
   riskSchema,
   type ActionPlanValues,
   type CloseOutValues,
   type ContainmentValues,
+  type DeviationInitiationValues,
   type InitiationValues,
   type InvestigationValues,
   type RiskValues,
@@ -42,17 +44,21 @@ import {
   YesNo,
   formatDate,
 } from "@/components/factory/deviations/deviation-fields";
+import { DeviationInitiationFields } from "@/components/factory/deviations/deviation-initiation-fields";
 import { InitiationFields } from "@/components/factory/deviations/initiation-fields";
 import {
   DISPOSITIONS,
   RISK_SCALES,
   RISK_TEXT,
   closeDeviation,
+  deviationInitiationValues,
   deviationKeys,
   outstanding,
+  priorityMeta,
   saveActionPlan,
   saveCloseOutPlan,
   saveContainment,
+  saveDeviationInitiation,
   saveInitiation,
   saveInvestigation,
   saveRisk,
@@ -101,6 +107,168 @@ function useTabSave<T>(
 /* ── Tab 1 · Initiation ───────────────────────────────────────────────── */
 
 export function InitiationTab({
+  deviation,
+  factoryId,
+  readOnly,
+}: {
+  deviation: Deviation;
+  factoryId: string;
+  readOnly: boolean;
+}) {
+  // A planned or unplanned deviation is initiated on the reference QMS's form
+  // (0062) — the raise page's fields; NCRs and complaints keep theirs.
+  if (deviation.type === "planned" || deviation.type === "unplanned") {
+    return readOnly ? (
+      <DeviationInitiationFacts deviation={deviation} />
+    ) : (
+      <DeviationInitiationTab deviation={deviation} factoryId={factoryId} />
+    );
+  }
+  return (
+    <CaseInitiationTab
+      deviation={deviation}
+      factoryId={factoryId}
+      readOnly={readOnly}
+    />
+  );
+}
+
+function DeviationInitiationTab({
+  deviation,
+  factoryId,
+}: {
+  deviation: Deviation;
+  factoryId: string;
+}) {
+  const queryClient = useQueryClient();
+  const form = useForm<DeviationInitiationValues>({
+    resolver: zodResolver(deviationInitiationSchema),
+    defaultValues: deviationInitiationValues(deviation),
+  });
+  const save = useTabSave<DeviationInitiationValues>(
+    factoryId,
+    async (values) => {
+      await saveDeviationInitiation(deviation.id, values);
+      // A hold switched on, or batches added to one, moves the board.
+      await queryClient.invalidateQueries({
+        queryKey: pipelineKeys.all(factoryId),
+      });
+    },
+    "Case details saved.",
+  );
+
+  return (
+    <form
+      noValidate
+      onSubmit={form.handleSubmit((v) => save.mutateAsync(v).catch(() => {}))}
+      className="space-y-6"
+    >
+      <DeviationInitiationFields form={form} factoryId={factoryId} editing />
+      <SaveBar pending={form.formState.isSubmitting}>
+        Corrections are saved straight onto the case. Switching the hold off
+        does not release a card already held — the next production entry does.
+      </SaveBar>
+    </form>
+  );
+}
+
+function DeviationInitiationFacts({ deviation }: { deviation: Deviation }) {
+  const batches =
+    deviation.batch_nos.length > 0
+      ? deviation.batch_nos
+      : deviation.batch_no
+        ? [deviation.batch_no]
+        : [];
+  return (
+    <div className="space-y-6">
+      <Group title="Initiation">
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+          <Fact label="Title" wide>
+            {deviation.title}
+          </Fact>
+          <Fact label="Planned or unplanned">
+            {deviation.type === "planned" ? "Planned" : "Unplanned"}
+          </Fact>
+          <Fact label="When it happened">
+            {deviation.occurred_at ? (
+              formatDateTime(deviation.occurred_at)
+            ) : (
+              <Muted>Not recorded</Muted>
+            )}
+          </Fact>
+          <Fact label="Department">
+            {deviation.department_name ?? <Muted>—</Muted>}
+          </Fact>
+          <Fact label="Location">
+            {deviation.location ?? <Muted>—</Muted>}
+          </Fact>
+          <Fact label="Detected at">
+            {deviation.detection_point ?? deviation.origin ?? <Muted>—</Muted>}
+          </Fact>
+          <Fact label="Batches" mono>
+            {batches.length > 0 ? batches.join(", ") : <Muted>—</Muted>}
+          </Fact>
+          <Fact label="Products" wide>
+            {deviation.product_names.length > 0 ? (
+              deviation.product_names.join(", ")
+            ) : (
+              <Muted>—</Muted>
+            )}
+          </Fact>
+          <Fact label="What happened" wide>
+            {deviation.actual}
+          </Fact>
+          <Fact label="Immediate action" wide>
+            {deviation.immediate_action ?? <Muted>Not recorded</Muted>}
+          </Fact>
+          <Fact label="Batch on hold">
+            {deviation.hold_batch === null ? (
+              <Muted>Not asked</Muted>
+            ) : deviation.hold_batch ? (
+              "Yes"
+            ) : (
+              "No"
+            )}
+          </Fact>
+          <Fact label="Equipment">
+            {deviation.equipment_no ? (
+              <>
+                <span className="font-mono">{deviation.equipment_no}</span>
+                {deviation.equipment_name && ` · ${deviation.equipment_name}`}
+              </>
+            ) : (
+              <Muted>—</Muted>
+            )}
+          </Fact>
+          <Fact label="Reference document / SOP" mono>
+            {deviation.sop_number ?? <Muted>—</Muted>}
+          </Fact>
+          <Fact label="Procedure name">
+            {deviation.procedure_name ?? <Muted>—</Muted>}
+          </Fact>
+          <Fact label="Raised by">
+            {deviation.raised_by ?? <Muted>—</Muted>}
+          </Fact>
+        </dl>
+      </Group>
+      <Group title="Case settings">
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+          <Fact label="Priority">{priorityMeta(deviation.priority).label}</Fact>
+          <Fact label="Due date">{formatDate(deviation.sla_date)}</Fact>
+          <Fact label="Case owner">
+            {deviation.owner_name ?? <Muted>—</Muted>}
+          </Fact>
+          <Fact label="Supervisor">
+            {deviation.supervisor_name ?? <Muted>—</Muted>}
+          </Fact>
+        </dl>
+      </Group>
+    </div>
+  );
+}
+
+/** An NCR's or a complaint's Initiation tab — the original form. */
+function CaseInitiationTab({
   deviation,
   factoryId,
   readOnly,
@@ -932,7 +1100,7 @@ export function CloseOutTab({
           queryKey: pipelineKeys.all(factoryId),
         });
         toast.success(
-          `${deviation.deviation_no} closed. Batch ${deviation.batch_no} stays on hold until the next preparatory or production entry.`,
+          `${deviation.deviation_no} closed. ${deviation.batch_nos.length > 1 ? "Batches" : "Batch"} ${deviation.batch_nos.join(", ") || deviation.batch_no} ${deviation.batch_nos.length > 1 ? "stay" : "stays"} on hold until the next preparatory or production entry.`,
         );
       } else {
         toast.success(`${deviation.deviation_no} closed.`);

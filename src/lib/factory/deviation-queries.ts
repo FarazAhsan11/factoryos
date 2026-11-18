@@ -1,10 +1,12 @@
-import type {
-  ActionPlanValues,
-  CloseOutValues,
-  ContainmentValues,
-  InitiationValues,
-  InvestigationValues,
-  RiskValues,
+import {
+  parseBatches,
+  type ActionPlanValues,
+  type CloseOutValues,
+  type ContainmentValues,
+  type DeviationInitiationValues,
+  type InitiationValues,
+  type InvestigationValues,
+  type RiskValues,
 } from "@/app/factory/[slug]/deviations/schemas";
 import type { ActionStage } from "@/lib/factory/action-queries";
 import { createClient } from "@/lib/supabase/client";
@@ -309,6 +311,21 @@ export interface Deviation {
   capa_no: string | null;
   capa_status: "open" | "effective" | null;
   capa_verified_at: string | null;
+
+  /* ── A deviation's initiation (0062) ───────────────────────────────── */
+  occurred_at: string | null;
+  department_id: string | null;
+  department_name: string | null;
+  location: string | null;
+  /** "Detected at" — where it was found. */
+  detection_point: string | null;
+  /** Every batch on the case, in the order typed; `batch_no` is the first. */
+  batch_nos: string[];
+  product_ids: string[];
+  /** The products those batches resolve to, without repeats. */
+  product_names: string[];
+  /** Deviations only. Null on older cases and every other type. */
+  hold_batch: boolean | null;
 }
 
 const COLUMNS = `
@@ -331,7 +348,9 @@ const COLUMNS = `
   created_at, age_days, days_to_sla, is_overdue, is_quarantining,
   received_via, adverse_reaction,
   capa_needed, capa_not_needed_reason, capa_id, capa_no, capa_status, capa_verified_at,
-  root_cause_category, root_cause, rca_method
+  root_cause_category, root_cause, rca_method,
+  occurred_at, department_id, department_name, location, detection_point,
+  batch_nos, product_ids, product_names, hold_batch
 `;
 
 /**
@@ -468,6 +487,111 @@ export async function createDeviation(
 
   if (error) throw new Error(error.message);
   return (data as { deviation_no: string }).deviation_no;
+}
+
+/**
+ * `YYYY-MM-DDTHH:mm` (local, from `DateTimeField`) ↔ the stored timestamptz.
+ * Both directions go through the browser's own zone, which is the zone the
+ * person typing it is standing in.
+ */
+export function localToIso(local: string): string | null {
+  return local ? new Date(local).toISOString() : null;
+}
+
+export function isoToLocal(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/** A deviation's initiation columns (0062) — raised or edited, the same shape. */
+function deviationInitiationPatch(values: DeviationInitiationValues) {
+  return {
+    title: values.title.trim(),
+    occurred_at: localToIso(values.occurredAt),
+    department_id: values.departmentId || null,
+    location: text(values.location),
+    detection_point: text(values.detectionPoint),
+    // The trigger tidies and resolves the list, and mirrors its first into
+    // `batch_no` / `product_id`.
+    batch_nos: parseBatches(values.batches),
+    actual: values.actual.trim(),
+    immediate_action: text(values.immediateAction),
+    hold_batch: values.hold === "" ? null : values.hold === "yes",
+    equipment_no: text(values.equipmentNo),
+    procedure_name: text(values.procedureName),
+    sop_number: text(values.sopNumber),
+    priority: values.priority,
+    sla_date: text(values.slaDate),
+    owner_name: text(values.ownerName),
+    supervisor_name: text(values.supervisorName),
+  };
+}
+
+/** Raise a planned or unplanned deviation. Returns its id and number. */
+export async function raiseDeviation(
+  factoryId: string,
+  values: DeviationInitiationValues,
+  createdBy: string,
+  raisedBy: string,
+): Promise<{ id: string; deviation_no: string }> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("deviations")
+    .insert({
+      factory_id: factoryId,
+      type: values.type,
+      created_by: createdBy,
+      raised_by: text(raisedBy),
+      ...deviationInitiationPatch(values),
+    })
+    .select("id, deviation_no")
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data as { id: string; deviation_no: string };
+}
+
+/** The Initiation tab of a planned or unplanned deviation. */
+export function saveDeviationInitiation(
+  id: string,
+  values: DeviationInitiationValues,
+): Promise<void> {
+  // The type is part of the number and is not sent.
+  return patch(id, deviationInitiationPatch(values));
+}
+
+/** The form's values for an existing deviation. */
+export function deviationInitiationValues(
+  deviation: Deviation,
+): DeviationInitiationValues {
+  return {
+    type: deviation.type === "planned" ? "planned" : "unplanned",
+    title: deviation.title,
+    occurredAt: isoToLocal(deviation.occurred_at),
+    departmentId: deviation.department_id ?? "",
+    location: deviation.location ?? "",
+    detectionPoint: (deviation.detection_point ??
+      "") as DeviationInitiationValues["detectionPoint"],
+    batches: (deviation.batch_nos.length > 0
+      ? deviation.batch_nos
+      : deviation.batch_no
+        ? [deviation.batch_no]
+        : []
+    ).join(", "),
+    actual: deviation.actual,
+    immediateAction: deviation.immediate_action ?? "",
+    // An older case was never asked; it held nothing, so "No" is what it did.
+    hold: deviation.hold_batch ? "yes" : "no",
+    equipmentNo: deviation.equipment_no ?? "",
+    procedureName: deviation.procedure_name ?? "",
+    sopNumber: deviation.sop_number ?? "",
+    priority: deviation.priority,
+    slaDate: deviation.sla_date ?? "",
+    ownerName: deviation.owner_name ?? "",
+    supervisorName: deviation.supervisor_name ?? "",
+  };
 }
 
 async function patch(id: string, values: Record<string, unknown>) {
@@ -677,9 +801,10 @@ export function outstanding(deviation: Deviation): {
       what: "whether an injury or adverse reaction was reported",
     });
   }
-  if (!deviation.immediate_action_date || !deviation.immediate_action) {
+  if (!(deviation.immediate_action ?? "").trim()) {
     // On the initiation tab since the Containment tab was folded into it.
-    gaps.push({ tab: "initiation", what: "the immediate action and its date" });
+    // Its date is no longer demanded (0062).
+    gaps.push({ tab: "initiation", what: "the immediate action" });
   }
   if (
     deviation.likelihood === null ||

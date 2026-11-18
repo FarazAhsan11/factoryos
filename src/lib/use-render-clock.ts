@@ -49,6 +49,20 @@ export function useRenderClock<T extends string | number | boolean | null>(
   return useSyncExternalStore(subscribe, read, read);
 }
 
+/**
+ * `useRenderClock`, but rendered as `fallback` on the server and during
+ * hydration, then the real reading straight after. For a value finer than a
+ * day — a minute, a time of day — that the server (in its own zone, a moment
+ * earlier) would print differently from the browser, which would otherwise
+ * be a hydration mismatch.
+ */
+export function useClientClock<T extends string | number | boolean | null>(
+  read: () => T,
+  fallback: T,
+): T {
+  return useSyncExternalStore(subscribe, read, () => fallback);
+}
+
 /** Minutes since local midnight, right now — 14:05 is 845. */
 export function minutesNow(): number {
   const now = new Date();

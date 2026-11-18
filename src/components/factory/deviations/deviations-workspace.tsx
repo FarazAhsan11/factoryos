@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useDeferredValue, useMemo, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { Plus } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { CapaRegister } from "@/components/factory/capa/capa-register";
@@ -41,7 +43,9 @@ function haystack(d: Deviation): string {
   return [
     d.deviation_no,
     d.title,
+    d.batch_nos.join(" "),
     d.batch_no,
+    d.product_names.join(" "),
     d.product_name,
     d.product_code,
     d.customer_name,
@@ -78,18 +82,23 @@ const same = (a: string | null, b: string) =>
  */
 export function DeviationsWorkspace({
   factoryId,
+  slug,
   userId,
   viewerName,
   role,
 }: {
   factoryId: string;
+  slug: string;
   userId: string;
   /** The signed-in person's full name, for "My cases". */
   viewerName: string | null;
   role: FactoryRole;
 }) {
   const queryClient = useQueryClient();
-  const tab = resolveQualityTab(useSearchParams().get("tab"));
+  const searchParams = useSearchParams();
+  const tab = resolveQualityTab(searchParams.get("tab"));
+  // `?case=<id>` opens a case — where the raise page lands after raising.
+  const caseParam = searchParams.get("case");
   const screen = tab === "capa" ? null : CASE_SCREENS[tab];
   // Each screen keeps its own view: "Awaiting CAPA" picked on Deviations
   // must not open Customer complaints on an empty list.
@@ -182,14 +191,27 @@ export function DeviationsWorkspace({
 
   // Read out of the fetched list rather than held in state, so an open case
   // re-renders the moment one of its tabs is saved.
-  const open = deviations.find((d) => d.id === openId) ?? null;
+  const open = deviations.find((d) => d.id === (openId ?? caseParam)) ?? null;
 
   const dialog = (
     <DeviationDetailDialog
       deviation={open}
       factoryId={factoryId}
       role={role}
-      onClose={() => setOpenId(null)}
+      onClose={() => {
+        setOpenId(null);
+        // Drop `?case=` so closing it stays closed (and Back doesn't reopen).
+        if (caseParam) {
+          const next = new URLSearchParams(searchParams.toString());
+          next.delete("case");
+          const query = next.toString();
+          window.history.replaceState(
+            null,
+            "",
+            `${window.location.pathname}${query ? `?${query}` : ""}`,
+          );
+        }
+      }}
     />
   );
 
@@ -227,7 +249,18 @@ export function DeviationsWorkspace({
           <p className="mt-1 max-w-3xl text-sm text-ink-4">{screen.sub}</p>
         </div>
 
-        {canReview(role) && (
+        {/* A deviation is raised on its own page; a non-conformance and a
+            complaint still in the dialog. */}
+        {canReview(role) && tab === "deviations" && (
+          <Link
+            href={`/factory/${slug}/deviations/new`}
+            className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-3.5 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06]"
+          >
+            <Plus className="size-4" />
+            {screen.newLabel}
+          </Link>
+        )}
+        {canReview(role) && tab !== "deviations" && (
           <NewDeviationDialog
             // Keyed by screen, so a half-typed NCR never opens as a complaint.
             key={tab}

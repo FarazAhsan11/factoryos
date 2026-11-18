@@ -22,6 +22,7 @@ export default async function DeviationsPage({
     <div className="mx-auto w-full max-w-[1600px] lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
       <DeviationsWorkspace
         factoryId={factory.id}
+        slug={slug}
         userId={viewer.id}
         // "Raised by" on a new case and "My cases" — the name, or the login
         // when the profile has none.

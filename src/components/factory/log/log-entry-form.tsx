@@ -523,7 +523,7 @@ export function LogEntryForm({
     if (job.quarantine_no) {
       return {
         head: `Batch ${typed} is quarantined under ${job.quarantine_no}.`,
-        body: "Preparatory and production work can't be logged against it until QA closes the NCR. You can still log downtime against it.",
+        body: "Preparatory and production work can't be logged against it until QA closes the case. You can still log downtime against it.",
       };
     }
     // Rules 3 and 4 are production's alone (0054): preparatory work starts

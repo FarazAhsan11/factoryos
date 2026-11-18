@@ -207,9 +207,9 @@ export function JobDetailDialog({
         {job?.quarantine_no ? (
           <p className="mx-5 mt-3 flex shrink-0 items-start gap-2 rounded-xl border border-danger-line bg-danger-soft px-3.5 py-2.5 text-xs text-danger-deep">
             <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
-            Quarantined under {job.quarantine_no}. Preparatory and production
-            work can&apos;t be logged against this batch until QA closes the
-            NCR; downtime still can.
+            On hold under {job.quarantine_no}. Preparatory and production work
+            can&apos;t be logged against this batch until QA closes the case;
+            downtime still can.
           </p>
         ) : (
           job?.status === "hold" &&

@@ -170,8 +170,18 @@ function Body({
         <DialogDescription className="text-xs">
           {deviation.batch_no && (
             <>
-              <span className="font-mono">{deviation.batch_no}</span>
-              {deviation.product_name && ` · ${deviation.product_name}`}
+              <span className="font-mono">
+                {deviation.batch_nos.length > 0
+                  ? deviation.batch_nos.join(", ")
+                  : deviation.batch_no}
+              </span>
+              {(deviation.product_names.length > 0 ||
+                deviation.product_name) &&
+                ` · ${
+                  deviation.product_names.length > 0
+                    ? deviation.product_names.join(", ")
+                    : deviation.product_name
+                }`}
               {" · "}
             </>
           )}
@@ -182,7 +192,10 @@ function Body({
         {deviation.is_quarantining && (
           <p className="mt-1 flex items-start gap-2 rounded-xl border border-danger-line bg-danger-soft px-3 py-2 text-xs text-danger-deep">
             <Lock className="mt-0.5 size-3.5 shrink-0" />
-            Batch {deviation.batch_no} is on hold under this NCR. Preparatory
+            {deviation.batch_nos.length > 1 ? "Batches" : "Batch"}{" "}
+            {deviation.batch_nos.join(", ") || deviation.batch_no}{" "}
+            {deviation.batch_nos.length > 1 ? "are" : "is"} on hold under this
+            case. Preparatory
             and production work can&apos;t be logged against it until the case
             is closed; downtime still can.
           </p>

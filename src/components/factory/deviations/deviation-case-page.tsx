@@ -209,7 +209,7 @@ export function DeviationCasePage({
               </span>
             </HeadFact>
             <HeadFact label="Risk">{d.assessed_at ? (devRiskLabel(d) ?? "—") : "—"}</HeadFact>
-            <HeadFact label={d.assessed_at || !open ? "Due" : "Assess by"}>
+            <HeadFact label={!open ? "Closed" : d.assessed_at ? "Due" : "Assess by"}>
               {!open ? (
                 <span className="text-ink-4">{d.closed_at ? formatDay(d.closed_at) : "—"}</span>
               ) : d.assessed_at ? (

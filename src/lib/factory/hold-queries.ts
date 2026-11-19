@@ -44,7 +44,9 @@ export async function fetchHolds(deviationId: string): Promise<BatchHold[]> {
       "id, deviation_id, batch_no, product_id, status, placed_at, placed_by_name, decided_at, decided_by_name, reason",
     )
     .eq("deviation_id", deviationId)
-    .order("placed_at", { ascending: true });
+    .order("placed_at", { ascending: true })
+    // Holds placed together (at raise) keep a steady order.
+    .order("batch_no", { ascending: true });
   if (error) throw new Error(error.message);
   return (data ?? []) as BatchHold[];
 }

@@ -16,7 +16,9 @@ import {
 } from "@/components/factory/register-table";
 import {
   CASE_STAGES,
+  DEV_STAGE_DOT,
   RISK_TEXT,
+  devStage,
   devRiskLabel,
   isLegacyRisk,
   caseStage,
@@ -116,7 +118,13 @@ export function DeviationsTable({
       }
     >
       {deviations.map((d) => {
-        const stage = CASE_STAGES[caseStage(d)];
+        // A deviation reads its stage as its own page does (Awaiting
+        // assessment, Investigating, …); an NCR or complaint keeps the
+        // register's Open / Awaiting CAPA / Ready / Closed.
+        const devCase = d.type === "planned" || d.type === "unplanned";
+        const stage = devCase
+          ? { label: devStage(d), dot: DEV_STAGE_DOT[devStage(d)] }
+          : CASE_STAGES[caseStage(d)];
         const closed = d.status === "closed";
         const dueSoon =
           !closed &&

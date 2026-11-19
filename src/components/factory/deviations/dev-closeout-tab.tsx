@@ -188,7 +188,8 @@ export function DevCloseOutTab({
         </ul>
         {d.is_quarantining && open && (
           <p className="mt-3 rounded-xl border border-warn-line bg-warn-tint px-4 py-2.5 text-xs text-warn-ink">
-            The batch on hold stays held after the case closes, until its next
+            Release or reject each batch still on hold (Details → Batch holds)
+            before signing. A released batch&rsquo;s card comes off hold with its next
             preparatory or production entry in the shift log.
           </p>
         )}

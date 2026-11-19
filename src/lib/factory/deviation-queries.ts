@@ -931,6 +931,7 @@ export type DevStage =
   | "Awaiting approval"
   | "Actions"
   | "Awaiting CAPA"
+  | "Batches on hold"
   | "Ready to close"
   | "Awaiting 2nd signature"
   | "Closed";
@@ -955,6 +956,8 @@ export function devStage(d: Deviation): DevStage {
   }
   if (d.capa_needed === null || (d.capa_needed && !d.capa_id)) return "Actions";
   if (d.capa_needed && d.capa_status !== "effective") return "Awaiting CAPA";
+  // A batch still on hold is decided before the case closes (0069).
+  if (d.holds_on_hold > 0) return "Batches on hold";
   return d.close_first_signed_at ? "Awaiting 2nd signature" : "Ready to close";
 }
 
@@ -987,6 +990,11 @@ export function nextStep(d: Deviation): { text: string; tab: CaseSection } | nul
         text: `Waiting for ${d.capa_no ?? "the CAPA"} to be verified effective.`,
         tab: "actions",
       };
+    case "Batches on hold":
+      return {
+        text: "QA: release or reject each batch still on hold, then sign the close-out.",
+        tab: "details",
+      };
     case "Ready to close":
       return { text: "QA: sign the close-out.", tab: "closeout" };
     case "Awaiting 2nd signature":
@@ -1005,6 +1013,7 @@ export const DEV_STAGE_DOT: Record<DevStage, string> = {
   "Awaiting approval": "bg-violet",
   Actions: "bg-warn",
   "Awaiting CAPA": "bg-warn",
+  "Batches on hold": "bg-danger",
   "Ready to close": "bg-teal",
   "Awaiting 2nd signature": "bg-violet",
   Closed: "bg-ink-5",

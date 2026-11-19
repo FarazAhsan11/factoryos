@@ -271,7 +271,7 @@ export function DeviationInitiationFields({
           label="Put the batch on hold?"
           required
           error={errors.hold?.message}
-          hint="Yes holds the batch card and blocks preparatory and production work in the shift log until the case is closed. Downtime can still be logged."
+          hint="Yes holds each batch: its card goes On hold and the shift log blocks preparatory and production work until QA releases or rejects it on the case. Downtime can still be logged."
         >
           <Segmented
             control={control}

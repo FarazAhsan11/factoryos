@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -14,10 +14,12 @@ import {
   type DeviationInitiationValues,
 } from "@/app/factory/[slug]/deviations/schemas";
 import { DeviationInitiationFields } from "@/components/factory/deviations/deviation-initiation-fields";
+import { PendingAttachments } from "@/components/factory/deviations/pending-attachments";
 import {
   PRIMARY_BUTTON,
   SECONDARY_BUTTON,
 } from "@/components/factory/deviations/deviation-fields";
+import { uploadAttachment } from "@/lib/factory/attachment-queries";
 import { formatDateTime } from "@/lib/factory/dates";
 import {
   deviationKeys,
@@ -73,6 +75,7 @@ export function RaiseDeviationPage({
   const queryClient = useQueryClient();
   const listHref = `/factory/${slug}/deviations`;
   const raisedAt = useClientClock(nowLabel, "");
+  const [files, setFiles] = useState<File[]>([]);
 
   const form = useForm<DeviationInitiationValues>({
     resolver: zodResolver(deviationInitiationSchema),
@@ -106,7 +109,26 @@ export function RaiseDeviationPage({
           );
         }
       }
-      return raiseDeviation(factoryId, values, userId, viewerName);
+      const raised = await raiseDeviation(factoryId, values, userId, viewerName);
+
+      // The case exists now, so its files have somewhere to go. One that
+      // fails doesn't undo the raise — it is named, to be added on the case.
+      const failed: string[] = [];
+      for (const file of files) {
+        try {
+          await uploadAttachment({
+            factoryId,
+            deviationId: raised.id,
+            section: "details",
+            file,
+            uploadedBy: userId,
+            uploadedByName: viewerName,
+          });
+        } catch (e) {
+          failed.push((e as Error).message);
+        }
+      }
+      return { ...raised, failed };
     },
     onSuccess: async (raised, values) => {
       await queryClient.invalidateQueries({
@@ -123,6 +145,9 @@ export function RaiseDeviationPage({
       } else {
         toast.success(`${raised.deviation_no} raised.`);
       }
+      raised.failed.forEach((m) =>
+        toast.error(`Not attached — ${m} Add it on the case's Details tab.`),
+      );
       router.push(`${listHref}/${raised.id}`);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -164,6 +189,14 @@ export function RaiseDeviationPage({
         className="mt-5 rounded-2xl border border-line bg-surface p-5 shadow-soft sm:p-7"
       >
         <DeviationInitiationFields form={form} factoryId={factoryId} />
+
+        <div className="mt-7 border-t border-line-soft pt-6">
+          <PendingAttachments
+            files={files}
+            onChange={setFiles}
+            disabled={isSubmitting}
+          />
+        </div>
 
         <div className="mt-7 flex flex-wrap items-center gap-3 border-t border-line-soft pt-5">
           <button type="submit" disabled={isSubmitting} className={PRIMARY_BUTTON}>

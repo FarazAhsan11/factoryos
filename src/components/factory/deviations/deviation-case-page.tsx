@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Check, Loader2, Minus } from "lucide-react";
 
 import { AssessmentTab } from "@/components/factory/deviations/assessment-tab";
+import { BatchHolds } from "@/components/factory/deviations/batch-holds";
 import { CapaTab } from "@/components/factory/deviations/capa-tab";
 import { CaseAttachments } from "@/components/factory/deviations/case-attachments";
 import { DevCloseOutTab } from "@/components/factory/deviations/dev-closeout-tab";
@@ -18,6 +19,7 @@ import type { FactoryRole } from "@/lib/factory/context";
 import { addDays, formatDay } from "@/lib/factory/dates";
 import {
   DEV_STAGE_DOT,
+  devRiskLabel,
   devStage,
   deviationKeys,
   fetchDeviations,
@@ -25,6 +27,7 @@ import {
   type CaseSection,
   type Deviation,
 } from "@/lib/factory/deviation-queries";
+import { fetchHolds, holdKeys } from "@/lib/factory/hold-queries";
 import { cn } from "@/lib/utils";
 
 const SECTIONS: { id: CaseSection; label: string }[] = [
@@ -125,6 +128,11 @@ export function DeviationCasePage({
     queryKey: deviationKeys.all(factoryId),
     queryFn: () => fetchDeviations(factoryId),
   });
+  // The case's batch holds, for the banner (and the Details tab's section).
+  const { data: holds = [] } = useQuery({
+    queryKey: holdKeys.forCase(factoryId, caseId),
+    queryFn: () => fetchHolds(caseId),
+  });
   const listHref = `/factory/${slug}/deviations`;
   const d = deviations?.find((x) => x.id === caseId) ?? null;
 
@@ -159,6 +167,8 @@ export function DeviationCasePage({
   const next = nextStep(d);
   const batches = d.batch_nos.length > 0 ? d.batch_nos : d.batch_no ? [d.batch_no] : [];
   const assessBy = addDays(d.created_at.slice(0, 10), ASSESS_DAYS);
+  const onHold = holds.filter((h) => h.status === "on_hold").map((h) => h.batch_no);
+  const released = holds.filter((h) => h.status === "released").map((h) => h.batch_no);
 
   return (
     <div className="mx-auto w-full max-w-[1600px]">
@@ -198,7 +208,7 @@ export function DeviationCasePage({
                 {d.classification ?? "—"}
               </span>
             </HeadFact>
-            <HeadFact label="Risk score">{d.assessed_at ? (d.risk_score ?? "—") : "—"}</HeadFact>
+            <HeadFact label="Risk">{d.assessed_at ? (devRiskLabel(d) ?? "—") : "—"}</HeadFact>
             <HeadFact label={d.assessed_at || !open ? "Due" : "Assess by"}>
               {!open ? (
                 <span className="text-ink-4">{d.closed_at ? formatDay(d.closed_at) : "—"}</span>
@@ -215,13 +225,17 @@ export function DeviationCasePage({
         </header>
 
         <div className="space-y-3 px-5 pt-5 sm:px-7">
-          {d.is_quarantining && (
+          {open && onHold.length > 0 ? (
             <p className="rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-deep">
-              Batch {batches.join(", ")} on hold — preparatory and production work
-              is blocked in the shift log until this case is closed. Downtime can
-              still be logged.
+              Batch {onHold.join(", ")} on hold — preparatory and production work
+              is blocked in the shift log. QA can release it once the impact is
+              assessed (Details → Batch holds). Downtime can still be logged.
             </p>
-          )}
+          ) : open && released.length > 0 ? (
+            <p className="rounded-xl border border-teal-line bg-teal-soft px-4 py-3 text-sm text-teal-deep">
+              Batch {released.join(", ")} released by QA while the case stays open.
+            </p>
+          ) : null}
           {next && (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line-soft bg-sunken px-4 py-3 text-sm text-ink-3">
               <span>
@@ -243,7 +257,7 @@ export function DeviationCasePage({
         <div
           role="tablist"
           aria-label="Case sections"
-          className="scrollbar-slim mt-4 flex gap-6 overflow-x-auto border-b border-line px-5 sm:px-7"
+          className="scrollbar-slim mt-4 flex gap-6 overflow-x-auto overflow-y-hidden px-5 shadow-[inset_0_-1px_0_var(--color-line)] sm:px-7"
         >
           {SECTIONS.map(({ id, label }) => {
             const active = section === id;
@@ -256,7 +270,7 @@ export function DeviationCasePage({
                 aria-selected={active}
                 onClick={() => setSection(id)}
                 className={cn(
-                  "-mb-px inline-flex shrink-0 items-center gap-2 border-b-2 py-3 text-sm transition",
+                  "inline-flex shrink-0 items-center gap-2 border-b-2 py-3 text-sm transition",
                   active
                     ? "border-brand font-semibold text-ink"
                     : "border-transparent text-ink-4 hover:text-ink",
@@ -293,6 +307,14 @@ export function DeviationCasePage({
                 readOnly={!open || !reviewer}
               />
               <div className="border-t border-line-soft pt-6">
+                <BatchHolds
+                  deviation={d}
+                  factoryId={factoryId}
+                  canDecide={open && reviewer}
+                  viewerName={viewerName}
+                />
+              </div>
+              <div className="border-t border-line-soft pt-6">
                 <CaseAttachments
                   factoryId={factoryId}
                   deviationId={d.id}
@@ -308,6 +330,7 @@ export function DeviationCasePage({
             <AssessmentTab
               deviation={d}
               factoryId={factoryId}
+              slug={slug}
               canEdit={open && reviewer}
               viewerName={viewerName}
             />

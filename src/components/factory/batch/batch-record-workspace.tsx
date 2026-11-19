@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
   ClipboardList,
@@ -67,11 +68,13 @@ type Tab = "activity" | "issues" | "maintenance" | "deviations";
  */
 export function BatchRecordWorkspace({
   factoryId,
+  slug,
   userId,
   role,
   units,
 }: {
   factoryId: string;
+  slug: string;
   userId: string;
   /** Passed to the two detail dialogs, which decide what a viewer may drive. */
   role: FactoryRole;
@@ -88,6 +91,7 @@ export function BatchRecordWorkspace({
   // An id rather than a snapshot, so the dialog shows the record closed the
   // moment it is signed from here.
   const [openDeviationId, setOpenDeviationId] = useState<string | null>(null);
+  const router = useRouter();
 
   const batchNo = product?.batch_no ?? "";
 
@@ -340,7 +344,16 @@ export function BatchRecordWorkspace({
             ) : (
               <DeviationsTable
                 deviations={batchDeviations}
-                onOpen={setOpenDeviationId}
+                onOpen={(id) => {
+                  // A deviation is worked on its own page; an NCR or a
+                  // complaint in the case dialog, as on the register.
+                  const d = deviations.find((x) => x.id === id);
+                  if (d && (d.type === "planned" || d.type === "unplanned")) {
+                    router.push(`/factory/${slug}/deviations/${id}`);
+                  } else {
+                    setOpenDeviationId(id);
+                  }
+                }}
                 emptyTitle="No quality cases."
                 emptyBody={`No deviations or NCRs have been raised against ${product.batch_no}.`}
               />

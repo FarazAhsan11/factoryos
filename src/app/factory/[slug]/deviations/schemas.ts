@@ -41,16 +41,24 @@ export const ORIGINS = [
   "Other",
 ] as const;
 
-/** Mirrors `deviations_nc_category_known`. */
+/**
+ * What went wrong (the root cause is why) — the reference QMS's (qms-v5)
+ * categories for deviations and NCRs. Mirrors `deviations_nc_category_known`
+ * (0067).
+ */
 export const NC_CATEGORIES = [
-  "Raw material",
-  "Packaging",
-  "Labelling",
-  "Process",
+  "Formulation / batch formula",
+  "Dispensing / weighing",
+  "Manufacturing process",
   "Equipment",
-  "Documentation",
-  "Product quality",
-  "Storage & handling",
+  "Facility & utilities",
+  "Cleaning / line clearance",
+  "Environmental monitoring",
+  "Materials (raw / packaging)",
+  "Labelling & packaging",
+  "Laboratory testing (OOS / OOT)",
+  "Documentation & data integrity",
+  "Storage & distribution",
   "Other",
 ] as const;
 
@@ -550,10 +558,106 @@ export const CLASS_DUE_DAYS: Record<CaseClass, number> = {
 
 const yesNo = z.union([z.enum(["yes", "no"]), z.literal("")]);
 
+/* ── The risk, as the reference QMS scores it (0068) ── */
+
+/**
+ * Severity — the outcome for the product, not the cause. The key question is
+ * whether it was contained before release (3) or reached the market (4).
+ */
+export const DEV_SEVERITY = [
+  "No product impact — documentation or GMP procedure slip",
+  "Product within specification — process outside its normal limits or settings",
+  "Product out of specification, contained before release — rework, reprocess or reject",
+  "Defect may have reached the market — released or shipped product affected",
+  "Risk to patient safety — wrong product or strength, contamination, recall likely",
+] as const;
+
+/** An example of each severity, shown under the field once one is picked. */
+export const DEV_SEVERITY_EXAMPLES = [
+  "e.g. late or missing entry corrected, wrong form version, line clearance signed late",
+  "e.g. powder sticking to punches but tablets pass; hardness drifting near the limit; extra mixing time with passing results",
+  "e.g. hardness or weight out of specification at IPC; dented capsules above AQL; batch reworked or rejected",
+  "e.g. released batch later fails stability; wrong lot number found on shipped labels",
+  "e.g. two products mixed up; metal contamination; wrong active ingredient",
+] as const;
+
+/** Likelihood — how often has this happened? 1–3. */
+export const DEV_LIKELIHOOD = [
+  "First known occurrence",
+  "Happened before",
+  "Recurring",
+] as const;
+
+/** What each likelihood means, in previous cases. */
+export const DEV_LIKELIHOOD_HELP = [
+  "No previous case found in the last 24 months",
+  "1–3 previous cases in the last 24 months",
+  "4 or more previous cases, or 2 within 90 days",
+] as const;
+
+/** The search window for previous cases, and the "recurring fast" window. */
+export const PREVIOUS_WINDOW_MONTHS = 24;
+export const RECURRING_FAST_DAYS = 90;
+
+const DAY_MS = 86_400_000;
+
+/**
+ * The likelihood the picked previous cases suggest — the same rule as
+ * `deviations_assessment_guard`: 4 or more, or 2 raised within 90 days of
+ * this case, is 3 (recurring); any is 2; none is 1.
+ */
+export function suggestedLikelihood(
+  raisedAt: string,
+  previous: readonly { raisedAt: string }[],
+): 1 | 2 | 3 {
+  const from = new Date(raisedAt).getTime();
+  const fast = previous.filter(
+    (p) => Math.abs(new Date(p.raisedAt).getTime() - from) <= RECURRING_FAST_DAYS * DAY_MS,
+  ).length;
+  if (previous.length >= 4 || fast >= 2) return 3;
+  return previous.length > 0 ? 2 : 1;
+}
+
+/** Severity 1–2, 3–4, 5 → the risk table's row (0, 1, 2). */
+export function severityRow(severity: number): 0 | 1 | 2 {
+  return severity >= 5 ? 2 : severity >= 3 ? 1 : 0;
+}
+
+/** The risk table's rows, as the table labels them. */
+export const SEVERITY_ROWS = [
+  "1–2 · no product impact / within spec",
+  "3–4 · out of spec / may have reached market",
+  "5 · patient safety, mix-up, recall",
+] as const;
+
+/** Severity row × likelihood → class. */
+export const RISK_MATRIX: readonly (readonly CaseClass[])[] = [
+  ["Minor", "Minor", "Major"],
+  ["Major", "Major", "Critical"],
+  ["Critical", "Critical", "Critical"],
+];
+
+/**
+ * The class the scores propose — the same rule as the database. Any red flag
+ * is Critical; otherwise read from the table. Null until both are scored.
+ */
+export function proposedClass(v: {
+  redFlags: readonly string[];
+  severity: string;
+  likelihood: string;
+}): CaseClass | null {
+  if (v.redFlags.length > 0) return "Critical";
+  if (!v.severity || !v.likelihood) return null;
+  return RISK_MATRIX[severityRow(Number(v.severity))][Number(v.likelihood) - 1];
+}
+
 /**
  * The assessment as a draft: anything may be blank, so QA can save half of
  * it and come back. `assessmentSignSchema` is the same form, demanding what
  * the signature does.
+ *
+ * `raisedAt` and each previous case's `raisedAt` are carried so the
+ * suggested likelihood can be checked here; only the ids are saved.
  */
 export const assessmentSchema = z.object({
   category: z.union([z.enum(NC_CATEGORIES), z.literal("")]),
@@ -562,34 +666,17 @@ export const assessmentSchema = z.object({
   investigationNotRequiredReason: optional(1000),
   redFlags: z.array(z.enum(RED_FLAGS)),
   severity: score,
-  detection: score,
-  likelihood: score,
+  likelihood: z.union([z.enum(["1", "2", "3"]), z.literal("")]),
+  raisedAt: z.string(),
+  previousCases: z.array(z.object({ id: z.string().uuid(), raisedAt: z.string() })),
+  noPreviousFound: z.boolean(),
+  previousCasesExternal: optional(300),
   classification: z.union([z.enum(CLASSES), z.literal("")]),
   classificationReason: optional(1000),
   rationale: optional(1000),
 });
 
 export type AssessmentValues = z.infer<typeof assessmentSchema>;
-
-/**
- * The class the scores propose — the same rule as the database. Any red flag
- * is Critical; then High → Critical, Medium (or severity 4) → Major, else
- * Minor. Null until all three scores are in.
- */
-export function proposedClass(v: {
-  redFlags: readonly string[];
-  severity: string;
-  detection: string;
-  likelihood: string;
-}): CaseClass | null {
-  if (v.redFlags.length > 0) return "Critical";
-  if (!v.severity || !v.detection || !v.likelihood) return null;
-  const sev = Number(v.severity);
-  const n = sev * Number(v.detection) * Number(v.likelihood);
-  if (sev === 5 || n >= 60) return "Critical";
-  if (n >= 20 || sev === 4) return "Major";
-  return "Minor";
-}
 
 export const assessmentSignSchema = assessmentSchema.superRefine((v, ctx) => {
   const need = (path: keyof AssessmentValues, message: string) =>
@@ -606,8 +693,27 @@ export const assessmentSignSchema = assessmentSchema.superRefine((v, ctx) => {
     need("investigationNotRequiredReason", "Say why no investigation is needed.");
   }
   if (!v.severity) need("severity", "Score the severity.");
-  if (!v.detection) need("detection", "Which control would catch it?");
-  if (!v.likelihood) need("likelihood", "Score the likelihood.");
+  if (!v.likelihood) need("likelihood", "How often has this happened?");
+  if (
+    v.likelihood === "1" &&
+    v.previousCases.length === 0 &&
+    !v.noPreviousFound
+  ) {
+    need(
+      "likelihood",
+      "Tick \"Searched records — no previous case found\", or pick the previous cases.",
+    );
+  }
+  if (
+    (v.likelihood === "2" || v.likelihood === "3") &&
+    v.previousCases.length === 0 &&
+    !v.previousCasesExternal
+  ) {
+    need(
+      "likelihood",
+      "Pick the previous cases (or record the ones kept outside FactoryOS) as evidence.",
+    );
+  }
   if (!v.classification) need("classification", "Classify the case.");
   const proposed = proposedClass(v);
   if (
@@ -621,17 +727,26 @@ export const assessmentSignSchema = assessmentSchema.superRefine((v, ctx) => {
       `Say why it is ${v.classification}, not ${proposed}.`,
     );
   }
-  if (
-    (v.classification === "Critical" || v.classification === "Major") &&
-    v.rationale.length < 5
-  ) {
-    need("rationale", `A ${v.classification} case needs the rationale.`);
+  const suggested = suggestedLikelihood(v.raisedAt, v.previousCases);
+  if (v.rationale.length < 5) {
+    if (v.classification === "Critical" || v.classification === "Major") {
+      need("rationale", `A ${v.classification} case needs the rationale.`);
+    } else if (v.likelihood && Number(v.likelihood) < suggested) {
+      need(
+        "rationale",
+        `The picked cases suggest likelihood ${suggested} — explain the lower choice.`,
+      );
+    }
   }
 });
 
 /* ── A deviation's investigation (migration 0064) ─────────────────────── */
 
-/** Mirrors `deviations_checks_reviewed_known` — what the investigation looked at. */
+/**
+ * What the investigation usually looks at — the list the form offers (qms-v5).
+ * Since 0070 each ticked item carries what it showed, and other items may be
+ * added; the database no longer limits the list.
+ */
 export const CHECKS_REVIEWED = [
   "Batch record",
   "Equipment history",
@@ -665,7 +780,12 @@ export const DEV_RCA_METHODS = ["Simple review", ...RCA_METHODS] as const;
 export const devInvestigationSchema = z.object({
   otherBatches: optional(400),
   impact: optional(2000),
-  checksReviewed: z.array(z.enum(CHECKS_REVIEWED)),
+  reviewChecks: z.array(
+    z.object({
+      item: z.string().trim().min(1).max(120),
+      finding: optional(1000),
+    }),
+  ),
   findings: optional(4000),
   rootCauseCategories: z.array(z.enum(ROOT_CAUSE_6M)),
   humanProcedureClear: yesNo,
@@ -683,6 +803,13 @@ export const devInvestigationSubmitSchema = devInvestigationSchema.superRefine(
     const need = (path: keyof DevInvestigationValues, message: string) =>
       ctx.addIssue({ code: "custom", path: [path], message });
     if (v.impact.length < 5) need("impact", "Assess the impact on the product.");
+    const blank = v.reviewChecks.filter((c) => !c.finding).map((c) => c.item);
+    if (blank.length > 0) {
+      need(
+        "reviewChecks",
+        `Write what each reviewed item showed — ${blank.join(", ")} ${blank.length === 1 ? "has" : "have"} no finding yet.`,
+      );
+    }
     if (v.findings.length < 10) need("findings", "Record what the investigation found.");
     if (v.rootCauseCategories.length === 0) {
       need("rootCauseCategories", "Tick at least one category.");

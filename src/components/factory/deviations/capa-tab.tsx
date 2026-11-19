@@ -40,6 +40,7 @@ import {
 import { addDays, todayKey } from "@/lib/factory/dates";
 import {
   deviationKeys,
+  isLegacyRisk,
   linkCapa,
   saveCapaDecision,
   unlinkCapa,
@@ -175,8 +176,20 @@ function PathPicker({
         : null,
   );
 
+  // Likelihood 3 at the initial assessment (0068): recurring, so a CAPA.
+  const recurring =
+    (deviation.type === "planned" || deviation.type === "unplanned") &&
+    deviation.likelihood === 3 &&
+    !isLegacyRisk(deviation);
+
   return (
     <div className="space-y-5">
+      {recurring && (
+        <p className="rounded-xl border border-warn-line bg-warn-tint px-4 py-2.5 text-xs text-warn-ink">
+          Recurring problem (likelihood 3 at the initial assessment): a CAPA is
+          required.
+        </p>
+      )}
       <Group title="Resolution">
         <div role="radiogroup" className="grid gap-2 sm:grid-cols-3">
           {PATHS.map((p) => {

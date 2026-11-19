@@ -10,7 +10,6 @@ import {
   type FieldValues,
   type UseFormReturn,
 } from "react-hook-form";
-import { Lock } from "lucide-react";
 
 import {
   DETECTION_POINTS,
@@ -46,10 +45,9 @@ import { cn } from "@/lib/utils";
  *   Put the batch on hold?    Equipment
  *   Reference document / SOP  Procedure name
  *
- * Used by the raise page (`/deviations/new`) and by the case's Initiation
- * tab, so the two cannot drift. On the tab (`editing`) the type is fixed — it
- * is part of the number. Owner, category, class and due date are the initial
- * assessment's, on its own tab.
+ * Used by the raise page (`/deviations/new`). Once raised, the case's
+ * Details tab shows these answers read-only. Owner, category, class and due
+ * date are the initial assessment's, on its own tab.
  *
  * The **department** is the factory's own list (Configuration → Departments).
  * The **batches** are typed as one line and each is resolved from the product
@@ -59,12 +57,9 @@ import { cn } from "@/lib/utils";
 export function DeviationInitiationFields({
   form,
   factoryId,
-  editing,
 }: {
   form: UseFormReturn<DeviationInitiationValues>;
   factoryId: string;
-  /** An existing case: the type is locked. */
-  editing?: boolean;
 }) {
   const {
     register,
@@ -82,7 +77,6 @@ export function DeviationInitiationFields({
     queryFn: () => fetchEquipment(factoryId),
   });
 
-  const type = useWatch({ control, name: "type" });
   const departmentId = useWatch({ control, name: "departmentId" });
   const equipmentNo = useWatch({ control, name: "equipmentNo" });
   const hold = useWatch({ control, name: "hold" });
@@ -120,31 +114,17 @@ export function DeviationInitiationFields({
         <Field
           label="Planned or unplanned"
           required
-          note={editing ? "(fixed)" : undefined}
-          hint={
-            editing
-              ? "Part of the case — raise a new one to change it."
-              : "Planned deviations follow the same flow for now."
-          }
+          hint="Planned deviations follow the same flow for now."
         >
-          {editing ? (
-            <p
-              className={cn(CONTROL, "flex items-center gap-2 bg-sunken text-ink-3")}
-            >
-              <Lock className="size-3.5 shrink-0 text-ink-5" />
-              {type === "planned" ? "Planned" : "Unplanned"}
-            </p>
-          ) : (
-            <Segmented
-              control={control}
-              name="type"
-              label="Planned or unplanned"
-              options={[
-                { value: "unplanned", label: "Unplanned" },
-                { value: "planned", label: "Planned" },
-              ]}
-            />
-          )}
+          <Segmented
+            control={control}
+            name="type"
+            label="Planned or unplanned"
+            options={[
+              { value: "unplanned", label: "Unplanned" },
+              { value: "planned", label: "Planned" },
+            ]}
+          />
         </Field>
 
         <Field

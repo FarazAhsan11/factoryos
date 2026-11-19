@@ -42,6 +42,8 @@ import {
   submitDevInvestigation,
   type Deviation,
 } from "@/lib/factory/deviation-queries";
+import { fetchHolds, holdKeys, placeHolds } from "@/lib/factory/hold-queries";
+import { pipelineKeys } from "@/lib/factory/pipeline-queries";
 import { fetchProducts, productKeys } from "@/lib/factory/product-queries";
 import { useForm } from "@/lib/use-form";
 import { cn } from "@/lib/utils";
@@ -191,6 +193,12 @@ export function DevInvestigationTab({
         )}
         className="space-y-7"
       >
+        {/* Outside the fieldset: other batches turn up during the
+            investigation, and may need holding after it is submitted. */}
+        {canEdit && (
+          <HoldOtherBatches deviation={d} factoryId={factoryId} viewerName={viewerName} />
+        )}
+
         {/* Disabled as one, so a submitted or approved investigation reads as
             the same form rather than a second layout. */}
         <fieldset disabled={locked} className="min-w-0 space-y-7">
@@ -230,12 +238,7 @@ export function DevInvestigationTab({
           </Section>
 
           <Section title="What was reviewed">
-            <Field
-              label="Tick what the investigation looked at"
-              note="(optional)"
-            >
-              <Chips control={control} name="checksReviewed" options={CHECKS_REVIEWED} />
-            </Field>
+            <ReviewChecks control={control} error={errors.reviewChecks?.message} />
           </Section>
 
           <Section title="Root cause">
@@ -587,5 +590,208 @@ function Section({
       {title && <h3 className="mb-4 text-base font-semibold text-ink">{title}</h3>}
       {children}
     </section>
+  );
+}
+
+/**
+ * The other batches the investigation names (as saved) that are not on hold
+ * on this case — one click puts them on hold, as the reference QMS offers.
+ */
+function HoldOtherBatches({
+  deviation: d,
+  factoryId,
+  viewerName,
+}: {
+  deviation: Deviation;
+  factoryId: string;
+  viewerName: string;
+}) {
+  const queryClient = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const { data: holds = [] } = useQuery({
+    queryKey: holdKeys.forCase(factoryId, d.id),
+    queryFn: () => fetchHolds(d.id),
+  });
+  const decided = new Set(
+    holds
+      .filter((h) => h.status !== "released")
+      .map((h) => h.batch_no.toLowerCase()),
+  );
+  const unheld = d.other_batch_nos.filter((b) => !decided.has(b.toLowerCase()));
+  if (unheld.length === 0) return null;
+
+  async function hold() {
+    setBusy(true);
+    try {
+      const n = await placeHolds(d.id, unheld, viewerName);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: deviationKeys.all(factoryId) }),
+        queryClient.invalidateQueries({ queryKey: pipelineKeys.all(factoryId) }),
+      ]);
+      toast.success(n === 1 ? "Batch put on hold." : `${n} batches put on hold.`);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn-line bg-warn-tint px-4 py-3 text-sm text-warn-ink">
+      <span>
+        Other batches affected — <span className="font-mono">{unheld.join(", ")}</span>{" "}
+        {unheld.length === 1 ? "is" : "are"} not on hold.
+      </span>
+      <button
+        type="button"
+        onClick={hold}
+        disabled={busy}
+        className="inline-flex items-center gap-2 rounded-lg border border-warn-line bg-surface px-3 py-1.5 text-xs font-semibold text-warn-ink transition hover:border-warn disabled:opacity-60"
+      >
+        {busy && <Loader2 className="size-3.5 animate-spin" />}
+        Put {unheld.join(", ")} on hold
+      </button>
+    </div>
+  );
+}
+
+/**
+ * What was reviewed (qms-v5, 0070): tick each item the investigation looked
+ * at and write what it showed. The usual list comes first; "Add other item"
+ * names anything else, which then sits in the list like the rest. Submitting
+ * needs a finding beside every ticked item.
+ */
+function ReviewChecks({
+  control,
+  error,
+}: {
+  control: Control<DevInvestigationValues>;
+  error?: string;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [other, setOther] = useState("");
+  return (
+    <Controller
+      name="reviewChecks"
+      control={control}
+      render={({ field }) => {
+        const value = field.value ?? [];
+        const find = (item: string) =>
+          value.find((c) => c.item.toLowerCase() === item.toLowerCase());
+        const extra = value
+          .map((c) => c.item)
+          .filter((i) => !CHECKS_REVIEWED.some((x) => x.toLowerCase() === i.toLowerCase()));
+        const items = [...CHECKS_REVIEWED, ...extra];
+
+        const toggle = (item: string, on: boolean) =>
+          field.onChange(
+            on
+              ? [...value, { item, finding: "" }]
+              : value.filter((c) => c.item.toLowerCase() !== item.toLowerCase()),
+          );
+        const setFinding = (item: string, finding: string) =>
+          field.onChange(
+            value.map((c) =>
+              c.item.toLowerCase() === item.toLowerCase() ? { ...c, finding } : c,
+            ),
+          );
+        const addOther = () => {
+          const item = other.trim();
+          if (!item) return;
+          if (!find(item)) field.onChange([...value, { item, finding: "" }]);
+          setOther("");
+          setAdding(false);
+        };
+
+        return (
+          <div className="space-y-3">
+            <p className="text-xs text-ink-5">
+              Tick each item the investigation looked at, and write what it showed.
+            </p>
+            <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line">
+              {items.map((item) => {
+                const entry = find(item);
+                const missing = Boolean(error) && entry !== undefined && !entry.finding.trim();
+                return (
+                  <li
+                    key={item}
+                    className="grid items-center gap-x-4 gap-y-2 bg-surface px-3.5 py-2.5 md:grid-cols-[16rem_minmax(0,1fr)]"
+                  >
+                    <label className="flex cursor-pointer items-center gap-2 text-sm text-ink-2 has-[:disabled]:cursor-default">
+                      <input
+                        type="checkbox"
+                        checked={entry !== undefined}
+                        onChange={(e) => toggle(item, e.target.checked)}
+                        className="size-4 accent-brand"
+                      />
+                      {item}
+                    </label>
+                    {entry ? (
+                      <input
+                        value={entry.finding}
+                        onChange={(e) => setFinding(item, e.target.value)}
+                        onBlur={field.onBlur}
+                        placeholder="What did it show?"
+                        aria-label={`What ${item} showed`}
+                        aria-invalid={missing}
+                        maxLength={1000}
+                        className={cn(CONTROL, missing && "border-danger")}
+                      />
+                    ) : (
+                      <span className="hidden md:block" />
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+            {error && (
+              <p role="alert" className="text-xs font-medium text-danger-deep">
+                {error}
+              </p>
+            )}
+            {adding ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  autoFocus
+                  value={other}
+                  onChange={(e) => setOther(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addOther();
+                    }
+                  }}
+                  placeholder="What else did the investigation look at?"
+                  maxLength={120}
+                  aria-label="Other item reviewed"
+                  className={cn(CONTROL, "min-w-0 flex-1")}
+                />
+                <button type="button" onClick={addOther} className={SECONDARY_BUTTON}>
+                  Add
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAdding(false);
+                    setOther("");
+                  }}
+                  className="text-xs font-semibold text-ink-4 hover:text-ink"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAdding(true)}
+                className="inline-flex h-9 items-center rounded-lg border border-line bg-surface px-3.5 text-sm font-semibold text-ink-3 shadow-soft transition hover:border-brand hover:text-brand disabled:pointer-events-none disabled:opacity-60"
+              >
+                Add other item
+              </button>
+            )}
+          </div>
+        );
+      }}
+    />
   );
 }

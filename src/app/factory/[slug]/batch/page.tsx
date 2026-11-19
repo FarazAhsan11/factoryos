@@ -34,6 +34,7 @@ export default async function BatchRecordPage({
     <div className="mx-auto w-full max-w-6xl lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
       <BatchRecordWorkspace
         factoryId={factory.id}
+        slug={slug}
         userId={viewer.id}
         role={role}
         units={unitWords(factory)}

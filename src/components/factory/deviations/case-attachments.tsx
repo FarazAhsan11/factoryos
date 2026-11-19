@@ -22,9 +22,9 @@ import {
 } from "@/lib/factory/attachment-queries";
 import { formatDateTime } from "@/lib/factory/dates";
 
-const ACCEPT = Object.values(ATTACHMENT_TYPES).join(",");
+export const ACCEPT = Object.values(ATTACHMENT_TYPES).join(",");
 /** Per pick — a slip of the finger in a folder of four hundred photos. */
-const MAX_FILES = 10;
+export const MAX_FILES = 10;
 
 /**
  * The files attached to one section of a case — photos, CoAs, labels, a

@@ -17,6 +17,8 @@ import {
 import {
   CASE_STAGES,
   RISK_TEXT,
+  devRiskLabel,
+  isLegacyRisk,
   caseStage,
   dispositionMeta,
   priorityMeta,
@@ -164,7 +166,13 @@ export function DeviationsTable({
             </td>
 
             <td className={CELL}>
-              {d.risk_conclusion ? (
+              {/* A deviation scored on the risk table (0068) reads "S3 · L2"
+                  once assessed; everything else shows its Low / Medium / High. */}
+              {(d.type === "planned" || d.type === "unplanned") &&
+              d.assessed_at &&
+              !isLegacyRisk(d) ? (
+                <span className="font-mono text-ink-3">{devRiskLabel(d) ?? "—"}</span>
+              ) : d.risk_conclusion ? (
                 <span className={RISK_TEXT[d.risk_conclusion]}>
                   {d.risk_conclusion}
                 </span>

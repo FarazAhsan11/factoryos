@@ -363,6 +363,18 @@ export interface Deviation {
   /** A Critical case's first of two close-out signatures. */
   close_first_signed_at: string | null;
   close_first_signed_by_name: string | null;
+  /** The likelihood's evidence (0068): previous cases of the same problem. */
+  previous_case_ids: string[];
+  /** "Searched records — no previous case found", when ticked. */
+  no_previous_found_at: string | null;
+  no_previous_found_by_name: string | null;
+  /** Previous cases kept outside FactoryOS — an old system, a paper log. */
+  previous_cases_external: string | null;
+  /** A deviation's batch holds (0069): still on hold, and all of them. */
+  holds_on_hold: number;
+  holds_total: number;
+  /** What the investigation reviewed, and what each showed (0070). */
+  review_checks: { item: string; finding: string }[];
 }
 
 const COLUMNS = `
@@ -397,7 +409,9 @@ const COLUMNS = `
   investigation_return_reason, investigation_approved_at,
   investigation_approved_by_name,
   unresolved_risk, duplicate_of, cost_of_quality,
-  close_first_signed_at, close_first_signed_by_name
+  close_first_signed_at, close_first_signed_by_name,
+  previous_case_ids, no_previous_found_at, no_previous_found_by_name,
+  previous_cases_external, holds_on_hold, holds_total, review_checks
 `;
 
 /**
@@ -596,49 +610,20 @@ export async function raiseDeviation(
   return data as { id: string; deviation_no: string };
 }
 
-/** The Initiation tab of a planned or unplanned deviation. */
-export function saveDeviationInitiation(
-  id: string,
-  values: DeviationInitiationValues,
-): Promise<void> {
-  // The type is part of the number and is not sent.
-  return patch(id, deviationInitiationPatch(values));
-}
-
-/** The form's values for an existing deviation. */
-export function deviationInitiationValues(
-  deviation: Deviation,
-): DeviationInitiationValues {
-  return {
-    type: deviation.type === "planned" ? "planned" : "unplanned",
-    title: deviation.title,
-    occurredAt: isoToLocal(deviation.occurred_at),
-    departmentId: deviation.department_id ?? "",
-    location: deviation.location ?? "",
-    detectionPoint: (deviation.detection_point ??
-      "") as DeviationInitiationValues["detectionPoint"],
-    batches: (deviation.batch_nos.length > 0
-      ? deviation.batch_nos
-      : deviation.batch_no
-        ? [deviation.batch_no]
-        : []
-    ).join(", "),
-    actual: deviation.actual,
-    immediateAction: deviation.immediate_action ?? "",
-    // An older case was never asked; it held nothing, so "No" is what it did.
-    hold: deviation.hold_batch ? "yes" : "no",
-    equipmentNo: deviation.equipment_no ?? "",
-    procedureName: deviation.procedure_name ?? "",
-    sopNumber: deviation.sop_number ?? "",
-  };
-}
-
 /* ── The initial assessment (0063) ────────────────────────────────────── */
 
-export function assessmentValues(deviation: Deviation): AssessmentValues {
+/**
+ * The form's values for a deviation. `cases` is the cached case list, which
+ * gives each picked previous case its raise date.
+ */
+export function assessmentValues(
+  deviation: Deviation,
+  cases: readonly Deviation[],
+): AssessmentValues {
   const yn = (b: boolean | null) => (b === null ? "" : b ? "yes" : "no");
   const sc = (n: number | null) =>
     (n === null ? "" : String(n)) as AssessmentValues["severity"];
+  const raisedAt = new Map(cases.map((c) => [c.id, c.created_at]));
   return {
     category: (deviation.nc_category ?? "") as AssessmentValues["category"],
     ownerName: deviation.owner_name ?? "",
@@ -647,8 +632,18 @@ export function assessmentValues(deviation: Deviation): AssessmentValues {
       deviation.investigation_not_required_reason ?? "",
     redFlags: deviation.red_flags as AssessmentValues["redFlags"],
     severity: sc(deviation.severity),
-    detection: sc(deviation.detection),
-    likelihood: sc(deviation.likelihood),
+    // A draft from before 0068 may hold 4 or 5; the new scale stops at 3.
+    likelihood:
+      deviation.likelihood !== null && deviation.likelihood <= 3
+        ? (String(deviation.likelihood) as AssessmentValues["likelihood"])
+        : "",
+    raisedAt: deviation.created_at,
+    previousCases: deviation.previous_case_ids.map((id) => ({
+      id,
+      raisedAt: raisedAt.get(id) ?? deviation.created_at,
+    })),
+    noPreviousFound: deviation.no_previous_found_at !== null,
+    previousCasesExternal: deviation.previous_cases_external ?? "",
     classification: (deviation.classification ??
       "") as AssessmentValues["classification"],
     classificationReason: deviation.classification_reason ?? "",
@@ -656,8 +651,9 @@ export function assessmentValues(deviation: Deviation): AssessmentValues {
   };
 }
 
-function assessmentPatch(v: AssessmentValues) {
+function assessmentPatch(v: AssessmentValues, by: string) {
   const num = (s: string) => (s ? Number(s) : null);
+  const noneFound = v.noPreviousFound && v.previousCases.length === 0;
   return {
     nc_category: text(v.category),
     owner_name: text(v.ownerName),
@@ -669,8 +665,14 @@ function assessmentPatch(v: AssessmentValues) {
         : null,
     red_flags: v.redFlags,
     severity: num(v.severity),
-    detection: num(v.detection),
     likelihood: num(v.likelihood),
+    // Detection is not asked of a deviation since 0068.
+    detection: null,
+    previous_case_ids: v.previousCases.map((c) => c.id),
+    // The database keeps the first time it was ticked, and stamps it.
+    no_previous_found_at: noneFound ? new Date().toISOString() : null,
+    no_previous_found_by_name: noneFound ? by.trim() || null : null,
+    previous_cases_external: text(v.previousCasesExternal),
     classification: text(v.classification),
     classification_reason: text(v.classificationReason),
     risk_description: text(v.rationale),
@@ -678,8 +680,12 @@ function assessmentPatch(v: AssessmentValues) {
 }
 
 /** Save the assessment as it stands, unsigned. */
-export function saveAssessment(id: string, v: AssessmentValues): Promise<void> {
-  return patch(id, assessmentPatch(v));
+export function saveAssessment(
+  id: string,
+  v: AssessmentValues,
+  by: string,
+): Promise<void> {
+  return patch(id, assessmentPatch(v, by));
 }
 
 /**
@@ -692,7 +698,7 @@ export function signAssessment(
   signedBy: string,
 ): Promise<void> {
   return patch(id, {
-    ...assessmentPatch(v),
+    ...assessmentPatch(v, signedBy),
     assessed_at: new Date().toISOString(),
     assessed_by_name: signedBy.trim(),
   });
@@ -705,7 +711,10 @@ export function devInvestigationValues(d: Deviation): DevInvestigationValues {
   return {
     otherBatches: d.other_batch_nos.join(", "),
     impact: d.impact ?? "",
-    checksReviewed: d.checks_reviewed as DevInvestigationValues["checksReviewed"],
+    reviewChecks: d.review_checks.map((c) => ({
+      item: c.item,
+      finding: c.finding ?? "",
+    })),
     findings: d.investigation_findings ?? "",
     rootCauseCategories:
       d.root_cause_categories as DevInvestigationValues["rootCauseCategories"],
@@ -725,7 +734,10 @@ function devInvestigationPatch(v: DevInvestigationValues) {
   return {
     other_batch_nos: parseBatches(v.otherBatches),
     impact: text(v.impact),
-    checks_reviewed: v.checksReviewed,
+    review_checks: v.reviewChecks.map((c) => ({
+      item: c.item.trim(),
+      finding: c.finding.trim(),
+    })),
     investigation_findings: text(v.findings),
     root_cause_categories: v.rootCauseCategories,
     // Only asked when "Man (people)" is ticked; cleared when it is not.
@@ -856,6 +868,15 @@ export function devChecklist(d: Deviation): { label: string; done: boolean }[] {
       label: "Immediate action recorded",
       done: Boolean((d.immediate_action ?? "").trim()),
     },
+    // Only when the case has held a batch (0069).
+    ...(d.holds_total > 0
+      ? [
+          {
+            label: "Every batch hold released or rejected",
+            done: d.holds_on_hold === 0,
+          },
+        ]
+      : []),
     {
       label: "CAPA decision made",
       done:
@@ -881,6 +902,25 @@ export function devChecklist(d: Deviation): { label: string; done: boolean }[] {
     },
   );
   return list;
+}
+
+/* ── A deviation's risk (0068) ────────────────────────────────────────── */
+
+/**
+ * Whether a deviation was scored on the old scale — severity × likelihood ×
+ * detection, 1–125. Only assessments signed before 0068 carry a detection.
+ */
+export const isLegacyRisk = (d: Deviation) => d.detection !== null;
+
+/**
+ * A deviation's risk as the header and the register show it: "S3 · L2" —
+ * severity and likelihood, read against the table. A case scored on the
+ * old scale shows its 1–125 score.
+ */
+export function devRiskLabel(d: Deviation): string | null {
+  if (d.severity === null || d.likelihood === null) return null;
+  if (isLegacyRisk(d)) return d.risk_score === null ? null : String(d.risk_score);
+  return `S${d.severity} · L${d.likelihood}`;
 }
 
 /* ── A deviation's stage, as the reference QMS names it ───────────────── */

@@ -15,7 +15,10 @@ export type AuditAction =
   | "closeout_first_signed"
   | "closed"
   | "file_attached"
-  | "file_removed";
+  | "file_removed"
+  | "hold_placed"
+  | "batch_released"
+  | "batch_rejected";
 
 export interface AuditEntry {
   id: number;
@@ -59,6 +62,8 @@ export type FieldKind =
   | "capa"
   | "priority"
   | "disposition"
+  | "cases"
+  | "checks"
   | "mono";
 
 /** Each column a person can change, as the screens label it. */
@@ -106,6 +111,16 @@ export const FIELD_LABELS: Record<string, { label: string; kind: FieldKind }> = 
   severity: { label: "Severity", kind: "text" },
   detection: { label: "Detection (control)", kind: "text" },
   likelihood: { label: "Likelihood", kind: "text" },
+  previous_case_ids: { label: "Previous cases (likelihood evidence)", kind: "cases" },
+  no_previous_found_at: {
+    label: "Searched records — no previous case found",
+    kind: "datetime",
+  },
+  no_previous_found_by_name: { label: "No previous case found — by", kind: "text" },
+  previous_cases_external: {
+    label: "Previous cases outside FactoryOS",
+    kind: "text",
+  },
   financial_impact: { label: "Financial impact", kind: "bool" },
   classification: { label: "Classification", kind: "text" },
   classification_reason: { label: "Why this class", kind: "long" },
@@ -117,6 +132,7 @@ export const FIELD_LABELS: Record<string, { label: string; kind: FieldKind }> = 
   other_batch_nos: { label: "Other batches affected", kind: "mono" },
   impact: { label: "Product impact assessment", kind: "long" },
   checks_reviewed: { label: "What was reviewed", kind: "text" },
+  review_checks: { label: "What was reviewed", kind: "checks" },
   investigation_findings: { label: "Findings", kind: "long" },
   root_cause_categories: { label: "Root cause categories", kind: "text" },
   root_cause_category: { label: "Root cause category", kind: "text" },

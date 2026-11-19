@@ -14,14 +14,12 @@ import {
   actionPlanSchema,
   closeOutSchema,
   containmentSchema,
-  deviationInitiationSchema,
   initiationSchema,
   investigationSchema,
   riskSchema,
   type ActionPlanValues,
   type CloseOutValues,
   type ContainmentValues,
-  type DeviationInitiationValues,
   type InitiationValues,
   type InvestigationValues,
   type RiskValues,
@@ -44,20 +42,17 @@ import {
   YesNo,
   formatDate,
 } from "@/components/factory/deviations/deviation-fields";
-import { DeviationInitiationFields } from "@/components/factory/deviations/deviation-initiation-fields";
 import { InitiationFields } from "@/components/factory/deviations/initiation-fields";
 import {
   DISPOSITIONS,
   RISK_SCALES,
   RISK_TEXT,
   closeDeviation,
-  deviationInitiationValues,
   deviationKeys,
   outstanding,
   saveActionPlan,
   saveCloseOutPlan,
   saveContainment,
-  saveDeviationInitiation,
   saveInitiation,
   saveInvestigation,
   saveRisk,
@@ -114,14 +109,11 @@ export function InitiationTab({
   factoryId: string;
   readOnly: boolean;
 }) {
-  // A planned or unplanned deviation is initiated on the reference QMS's form
-  // (0062) — the raise page's fields; NCRs and complaints keep theirs.
+  // A planned or unplanned deviation is raised on the reference QMS's form
+  // (0062) and is a record from then on: its details are shown, never edited.
+  // NCRs and complaints keep their editable form.
   if (deviation.type === "planned" || deviation.type === "unplanned") {
-    return readOnly ? (
-      <DeviationInitiationFacts deviation={deviation} />
-    ) : (
-      <DeviationInitiationTab deviation={deviation} factoryId={factoryId} />
-    );
+    return <DeviationInitiationFacts deviation={deviation} />;
   }
   return (
     <CaseInitiationTab
@@ -129,45 +121,6 @@ export function InitiationTab({
       factoryId={factoryId}
       readOnly={readOnly}
     />
-  );
-}
-
-function DeviationInitiationTab({
-  deviation,
-  factoryId,
-}: {
-  deviation: Deviation;
-  factoryId: string;
-}) {
-  const queryClient = useQueryClient();
-  const form = useForm<DeviationInitiationValues>({
-    resolver: zodResolver(deviationInitiationSchema),
-    defaultValues: deviationInitiationValues(deviation),
-  });
-  const save = useTabSave<DeviationInitiationValues>(
-    factoryId,
-    async (values) => {
-      await saveDeviationInitiation(deviation.id, values);
-      // A hold switched on, or batches added to one, moves the board.
-      await queryClient.invalidateQueries({
-        queryKey: pipelineKeys.all(factoryId),
-      });
-    },
-    "Case details saved.",
-  );
-
-  return (
-    <form
-      noValidate
-      onSubmit={form.handleSubmit((v) => save.mutateAsync(v).catch(() => {}))}
-      className="space-y-6"
-    >
-      <DeviationInitiationFields form={form} factoryId={factoryId} editing />
-      <SaveBar pending={form.formState.isSubmitting}>
-        Corrections are saved straight onto the case. Switching the hold off
-        does not release a card already held — the next production entry does.
-      </SaveBar>
-    </form>
   );
 }
 

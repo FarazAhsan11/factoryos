@@ -2,15 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  ArrowRight,
-  Check,
-  FileText,
-  Loader2,
-  PenLine,
-  Signature,
-  Sparkles,
-} from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
 
 import {
   SECTION_LABELS,
@@ -23,7 +15,13 @@ import {
 } from "@/lib/factory/audit-queries";
 import { capaKeys, fetchCapas } from "@/lib/factory/capa-queries";
 import { formatDateTime, formatDay } from "@/lib/factory/dates";
-import { dispositionMeta, type Deviation, type NcrDisposition } from "@/lib/factory/deviation-queries";
+import {
+  deviationKeys,
+  dispositionMeta,
+  fetchDeviations,
+  type Deviation,
+  type NcrDisposition,
+} from "@/lib/factory/deviation-queries";
 import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
 import { cn } from "@/lib/utils";
 
@@ -44,6 +42,9 @@ const SIGNATURES: AuditAction[] = [
   "investigation_returned",
   "closeout_first_signed",
   "closed",
+  "hold_placed",
+  "batch_released",
+  "batch_rejected",
 ];
 
 function inFilter(e: AuditEntry, f: Filter): boolean {
@@ -55,13 +56,14 @@ function inFilter(e: AuditEntry, f: Filter): boolean {
 
 /**
  * A case's history: the timeline of its steps, then the audit trail — every
- * change the database recorded (0066), newest first, with who made it, when,
- * and the value before and after.
+ * change the database recorded (0066), newest first, as the reference QMS
+ * (qms-v5) lays it out: one row per change, When · Who · What · From · To ·
+ * Reason.
  *
- * One save is one entry: the rows a single update wrote (same moment, same
- * person) are grouped under one heading, with each field it changed beneath.
- * Long values are clipped to two lines with a "Show more", and the whole text
- * is also on hover; nothing runs off the screen.
+ * A list that changed is told item by item — "Reviewed item ticked",
+ * "Finding: Batch record", "Likelihood evidence: previous case added" —
+ * rather than as the whole list before and after. Long values are clipped to
+ * two lines with a "Show more", and the whole text is also on hover.
  */
 export function CaseHistory({
   deviation: d,
@@ -84,26 +86,31 @@ export function CaseHistory({
     queryKey: capaKeys.all(factoryId),
     queryFn: () => fetchCapas(factoryId),
   });
+  const { data: cases = [] } = useQuery({
+    queryKey: deviationKeys.all(factoryId),
+    queryFn: () => fetchDeviations(factoryId),
+  });
 
   const names = useMemo(
     () => ({
       department: new Map(departments.map((x) => [x.id, x.name])),
       capa: new Map(capas.map((c) => [c.id, c.capa_no])),
+      cases: new Map(cases.map((c) => [c.id, c.deviation_no])),
     }),
-    [departments, capas],
+    [departments, capas, cases],
   );
 
-  const groups = useMemo(() => {
-    const out: { key: string; at: string; who: string; rows: AuditEntry[] }[] = [];
-    for (const e of entries.filter((x) => inFilter(x, filter))) {
-      const who = e.actor_name ?? "Unknown";
-      const last = out[out.length - 1];
-      // One update writes all its rows at the same instant.
-      if (last && last.at === e.at && last.who === who) last.rows.push(e);
-      else out.push({ key: `${e.id}`, at: e.at, who, rows: [e] });
-    }
-    return out;
-  }, [entries, filter]);
+  const allRows = useMemo(
+    () => entries.flatMap((e) => trailRows(e, names)),
+    [entries, names],
+  );
+  const rows = useMemo(
+    () =>
+      entries
+        .filter((e) => inFilter(e, filter))
+        .flatMap((e) => trailRows(e, names)),
+    [entries, filter, names],
+  );
 
   const days = d.age_days;
 
@@ -124,7 +131,7 @@ export function CaseHistory({
           <h3 className="flex items-baseline gap-2 text-base font-semibold text-ink">
             Audit trail
             <span className="text-sm font-normal text-ink-4">
-              {entries.length} {entries.length === 1 ? "entry" : "entries"}
+              {allRows.length} {allRows.length === 1 ? "entry" : "entries"}
             </span>
           </h3>
           <div
@@ -158,16 +165,12 @@ export function CaseHistory({
           <p className="rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-deep">
             Could not load the audit trail: {(error as Error).message}
           </p>
-        ) : groups.length === 0 ? (
+        ) : rows.length === 0 ? (
           <p className="rounded-xl border border-dashed border-line-strong px-4 py-8 text-center text-sm text-ink-5">
             {entries.length === 0 ? "Nothing recorded yet." : "Nothing of this kind."}
           </p>
         ) : (
-          <ol className="relative space-y-3">
-            {groups.map((g) => (
-              <Group key={g.key} at={g.at} who={g.who} rows={g.rows} names={names} />
-            ))}
-          </ol>
+          <TrailTable rows={rows} />
         )}
       </section>
     </div>
@@ -238,126 +241,176 @@ function Timeline({
   );
 }
 
-/* ── One save ─────────────────────────────────────────────────────────── */
+/* ── The audit trail, one row per change ──────────────────────────────── */
 
-type Names = { department: Map<string, string>; capa: Map<string, string> };
+type Names = {
+  department: Map<string, string>;
+  capa: Map<string, string>;
+  cases: Map<string, string>;
+};
 
-function headline(rows: AuditEntry[]): { icon: typeof PenLine; text: string } {
-  const event = rows.find((r) => r.action !== "changed");
-  const changes = rows.filter((r) => r.action === "changed");
-  const changedText =
-    changes.length === 1
-      ? `changed ${fieldMeta(changes[0].field).label.toLowerCase()}`
-      : `changed ${changes.length} fields`;
-  if (!event) return { icon: PenLine, text: changedText };
-  const also = changes.length > 0 ? ` and ${changedText}` : "";
-  const section = (s: string | null) => SECTION_LABELS[s ?? ""] ?? "the case";
-  switch (event.action) {
-    case "raised":
-      return { icon: Sparkles, text: `raised the case${also}` };
-    case "assessment_signed":
-      return { icon: Signature, text: `signed the initial assessment${also}` };
-    case "investigation_submitted":
-      return { icon: Signature, text: `submitted the investigation for approval${also}` };
-    case "investigation_approved":
-      return { icon: Signature, text: `approved the investigation${also}` };
-    case "investigation_returned":
-      return { icon: Signature, text: `sent the investigation back${also}` };
-    case "closeout_first_signed":
-      return { icon: Signature, text: `signed the close-out — first of two${also}` };
-    case "closed":
-      return { icon: Signature, text: `closed the case${also}` };
-    case "file_attached":
-      return { icon: FileText, text: `attached a file to ${section(event.field)}` };
-    case "file_removed":
-      return { icon: FileText, text: `removed a file from ${section(event.field)}` };
-    default:
-      return { icon: PenLine, text: changedText };
+interface TrailRow {
+  key: string;
+  at: string;
+  who: string;
+  what: string;
+  from: string | null;
+  to: string | null;
+  reason: string | null;
+  mono?: boolean;
+}
+
+/** What each step or signature is called in the trail. */
+const EVENT_WHAT: Partial<Record<AuditAction, string>> = {
+  raised: "Raised",
+  assessment_signed: "Signed: Initial assessment approved",
+  investigation_submitted: "Investigation submitted for approval",
+  investigation_approved: "Signed: Investigation approved",
+  investigation_returned: "Investigation sent back",
+  closeout_first_signed: "Signed: Close-out — first of two signatures",
+  closed: "Signed: Case closed",
+  hold_placed: "Batch hold placed",
+  batch_released: "Signed: Batch released",
+  batch_rejected: "Signed: Batch rejected",
+};
+
+type ReviewCheck = { item: string; finding: string };
+
+/** `review_checks` as the trail stores it: its objects, comma-joined. */
+function parseChecks(raw: string | null): ReviewCheck[] {
+  if (!raw) return [];
+  try {
+    return JSON.parse(`[${raw}]`) as ReviewCheck[];
+  } catch {
+    return [];
   }
 }
 
-function Group({
-  at,
-  who,
-  rows,
-  names,
-}: {
-  at: string;
-  who: string;
-  rows: AuditEntry[];
-  names: Names;
-}) {
-  const { icon: Icon, text } = headline(rows);
-  const events = rows.filter((r) => r.action !== "changed");
-  const changes = rows.filter((r) => r.action === "changed");
+/** One audit entry as the trail's rows — a list change becomes one per item. */
+function trailRows(e: AuditEntry, names: Names): TrailRow[] {
+  const who = e.actor_name ?? "Unknown";
+  const row = (
+    n: number,
+    what: string,
+    from: string | null,
+    to: string | null,
+    mono = false,
+  ): TrailRow => ({ key: `${e.id}-${n}`, at: e.at, who, what, from, to, reason: e.reason, mono });
+  const section = SECTION_LABELS[e.field ?? ""] ?? "the case";
+
+  switch (e.action) {
+    case "changed":
+      break;
+    case "raised":
+      return [row(0, "Raised", null, null)];
+    case "file_attached":
+      return [row(0, `File attached — ${section}`, null, e.new_value)];
+    case "file_removed":
+      return [row(0, `File removed — ${section}`, e.old_value, null)];
+    case "hold_placed":
+      return [row(0, "Batch hold placed", null, e.new_value, true)];
+    case "batch_released":
+      return [row(0, "Signed: Batch released", "On hold", `${e.new_value} Released`)];
+    case "batch_rejected":
+      return [row(0, "Signed: Batch rejected", "On hold", `${e.new_value} Rejected`)];
+    default:
+      return [row(0, EVENT_WHAT[e.action] ?? e.action, e.old_value, e.new_value)];
+  }
+
+  const { label, kind } = fieldMeta(e.field);
+
+  // What was reviewed: ticked, unticked, and each finding written.
+  if (kind === "checks") {
+    const before = parseChecks(e.old_value);
+    const after = parseChecks(e.new_value);
+    const same = (x: ReviewCheck, y: ReviewCheck) =>
+      x.item.toLowerCase() === y.item.toLowerCase();
+    const out: TrailRow[] = [];
+    for (const c of after) {
+      const was = before.find((b) => same(b, c));
+      if (!was) out.push(row(out.length, "Reviewed item ticked", null, c.item));
+      const old = was?.finding ?? "";
+      if (old !== c.finding && (was || c.finding)) {
+        out.push(row(out.length, `Finding: ${c.item}`, old || null, c.finding || null));
+      }
+    }
+    for (const b of before) {
+      if (!after.some((c) => same(b, c))) {
+        out.push(row(out.length, "Reviewed item unticked", b.item, null));
+      }
+    }
+    return out;
+  }
+
+  // The likelihood's evidence: previous cases added and removed.
+  if (kind === "cases") {
+    const split = (raw: string | null) => (raw ? raw.split(", ") : []);
+    const before = split(e.old_value);
+    const after = split(e.new_value);
+    const no = (id: string) => names.cases.get(id) ?? "a case";
+    const out: TrailRow[] = [];
+    for (const id of after.filter((x) => !before.includes(x))) {
+      out.push(row(out.length, "Likelihood evidence: previous case added", null, no(id), true));
+    }
+    for (const id of before.filter((x) => !after.includes(x))) {
+      out.push(row(out.length, "Likelihood evidence: previous case removed", no(id), null, true));
+    }
+    return out;
+  }
+
+  return [
+    row(
+      0,
+      label,
+      display(kind, e.old_value, names),
+      display(kind, e.new_value, names),
+      kind === "mono",
+    ),
+  ];
+}
+
+function TrailTable({ rows }: { rows: TrailRow[] }) {
+  const TH = "px-3.5 py-2.5 text-left text-xs font-semibold text-ink-4";
+  const TD = "px-3.5 py-2.5 align-top";
   return (
-    <li className="min-w-0 rounded-xl border border-line bg-surface">
-      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1 px-4 py-3">
-        <p className="flex min-w-0 items-start gap-2.5 text-sm text-ink-3">
-          <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-brand-soft text-brand-deep">
-            <Icon className="size-3.5" />
-          </span>
-          <span className="min-w-0 break-words">
-            <span className="font-semibold text-ink">{who}</span> {text}
-          </span>
-        </p>
-        <time className="shrink-0 font-mono text-xs tabular-nums text-ink-4" dateTime={at}>
-          {formatDateTime(at)}
-        </time>
-      </div>
-
-      {events.some((e) => e.new_value || e.old_value || e.reason) && (
-        <div className="space-y-1.5 border-t border-line-soft px-4 py-2.5 pl-12.5">
-          {events.map((e) => (
-            <EventDetail key={e.id} e={e} />
+    <div className="scrollbar-slim overflow-x-auto rounded-xl border border-line">
+      <table className="w-full min-w-[56rem] text-sm">
+        <thead className="bg-sunken">
+          <tr>
+            <th className={TH}>When</th>
+            <th className={TH}>Who</th>
+            <th className={TH}>What</th>
+            <th className={TH}>From</th>
+            <th className={TH}>To</th>
+            <th className={TH}>Reason</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-line-soft bg-surface">
+          {rows.map((r) => (
+            <tr key={r.key}>
+              <td className={cn(TD, "whitespace-nowrap text-ink-3 tabular-nums")}>
+                <time dateTime={r.at}>{formatDateTime(r.at)}</time>
+              </td>
+              <td className={cn(TD, "whitespace-nowrap text-ink-2")}>{r.who}</td>
+              <td className={cn(TD, "min-w-[12rem] text-ink")}>{r.what}</td>
+              <td className={cn(TD, "max-w-[18rem] text-ink-4", r.mono && "font-mono")}>
+                {r.from && <Clamp text={r.from} />}
+              </td>
+              <td className={cn(TD, "max-w-[18rem] text-ink", r.mono && "font-mono")}>
+                {r.to && <Clamp text={r.to} />}
+              </td>
+              <td className={cn(TD, "max-w-[16rem] text-ink-4")}>
+                {r.reason && <Clamp text={r.reason} />}
+              </td>
+            </tr>
           ))}
-        </div>
-      )}
-
-      {changes.length > 0 && (
-        <dl className="divide-y divide-line-soft border-t border-line-soft">
-          {changes.map((c) => (
-            <Change key={c.id} entry={c} names={names} />
-          ))}
-        </dl>
-      )}
-    </li>
+        </tbody>
+      </table>
+    </div>
   );
 }
 
-function EventDetail({ e }: { e: AuditEntry }) {
-  const label =
-    e.action === "raised"
-      ? "Case"
-      : e.action === "assessment_signed"
-        ? "Class"
-        : e.action === "closed"
-          ? "Reason"
-          : e.action === "file_attached" || e.action === "file_removed"
-            ? "File"
-            : null;
-  const value = e.new_value ?? e.old_value;
-  return (
-    <>
-      {label && value && (
-        <p className="flex min-w-0 gap-2 text-xs">
-          <span className="shrink-0 text-ink-5">{label}</span>
-          <span className="min-w-0 truncate font-medium text-ink" title={value}>
-            {value}
-          </span>
-        </p>
-      )}
-      {e.reason && (
-        <div className="text-xs">
-          <span className="text-ink-5">Reason </span>
-          <Clamp text={e.reason} />
-        </div>
-      )}
-    </>
-  );
-}
-
-/* ── One field ────────────────────────────────────────────────────────── */
+/* ── One value ────────────────────────────────────────────────────────── */
 
 function display(kind: FieldKind, raw: string | null, names: Names): string | null {
   if (raw === null || raw === "") return null;
@@ -385,80 +438,6 @@ function display(kind: FieldKind, raw: string | null, names: Names): string | nu
     default:
       return raw;
   }
-}
-
-function Change({ entry, names }: { entry: AuditEntry; names: Names }) {
-  const { label, kind } = fieldMeta(entry.field);
-  const before = display(kind, entry.old_value, names);
-  const after = display(kind, entry.new_value, names);
-  // Paragraphs stack, before over after; short values sit on one line.
-  const stacked =
-    kind === "long" || (before?.length ?? 0) > 60 || (after?.length ?? 0) > 60;
-  const mono = kind === "mono";
-
-  return (
-    <div className="grid min-w-0 gap-x-4 gap-y-1.5 px-4 py-2.5 sm:grid-cols-[13rem_minmax(0,1fr)] sm:pl-12.5">
-      <dt className="truncate text-xs font-medium text-ink-4" title={label}>
-        {label}
-      </dt>
-      <dd className="min-w-0">
-        {stacked ? (
-          <div className="grid gap-1.5">
-            <Pill tone="old" value={before} mono={mono} block />
-            <Pill tone="new" value={after} mono={mono} block />
-          </div>
-        ) : (
-          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-            <Pill tone="old" value={before} mono={mono} />
-            <ArrowRight className="size-3.5 shrink-0 text-ink-5" aria-label="changed to" />
-            <Pill tone="new" value={after} mono={mono} />
-          </div>
-        )}
-      </dd>
-    </div>
-  );
-}
-
-function Pill({
-  tone,
-  value,
-  mono,
-  block,
-}: {
-  tone: "old" | "new";
-  value: string | null;
-  mono?: boolean;
-  block?: boolean;
-}) {
-  const shell = cn(
-    "min-w-0 rounded-lg px-2 py-1 text-xs",
-    tone === "old"
-      ? "bg-sunken-2 text-ink-4"
-      : "bg-teal-soft font-medium text-teal-deep",
-    mono && "font-mono",
-    block ? "block" : "inline-block max-w-full",
-  );
-  if (value === null) {
-    return (
-      <span className={cn(shell, "italic opacity-70")}>
-        {tone === "old" ? "empty" : "cleared"}
-      </span>
-    );
-  }
-  return (
-    <span className={shell}>
-      {block && (
-        <span className="mr-1.5 text-[0.625rem] font-bold tracking-wide uppercase opacity-60">
-          {tone === "old" ? "Before" : "After"}
-        </span>
-      )}
-      {block ? <Clamp text={value} /> : (
-        <span className="block truncate" title={value}>
-          {value}
-        </span>
-      )}
-    </span>
-  );
 }
 
 /**

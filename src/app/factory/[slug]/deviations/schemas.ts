@@ -394,107 +394,106 @@ export const resolveDirectSchema = z.object({
 
 export type ResolveDirectValues = z.infer<typeof resolveDirectSchema>;
 
-/** An action's status while it is being worked; closing is its own step. */
-export const ACTION_STATUSES = ["open", "in_progress"] as const;
+/* ── CAPA lifecycle (migration 0073): CAPA plan → Do → Effectiveness check ── */
 
 /**
- * Initiate a CAPA from a case — only its actions: each CA / PA with a target
- * (due) date, a status and an owner. The CAPA takes the case's title; its
- * reason, owner, dates and verification are filled in later from the
- * register. Rows with no description are dropped rather than refused — the
- * form opens with one CA and one PA row, and a case with only a corrective
- * action leaves the PA row blank — but at least one action is needed.
+ * Create a CAPA from a case — its title, owner and why, and optionally a
+ * first action. The rest of the plan is written on the CAPA's own page.
  */
-export const capaInitiateSchema = z.object({
-  actions: z
-    .array(
-      z.object({
-        kind: z.enum(["ca", "pa"]),
-        description: optional(2000),
-        owner: optional(80),
-        targetDate: date,
-        status: z.enum(ACTION_STATUSES),
-      }),
-    )
-    .refine((rows) => rows.some((r) => r.description.length > 0), {
-      message: "Add at least one corrective or preventive action.",
-    }),
+export const capaNewSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(3, "Give the CAPA a title — what it fixes, in a line.")
+    .max(160, "Keep the title under 160 characters."),
+  owner: z
+    .string()
+    .trim()
+    .min(1, "Name the CAPA owner.")
+    .max(80, "Keep the name under 80 characters."),
+  reason: z.enum(CAPA_REASONS, { error: "Say why a CAPA is needed." }),
+  firstKind: z.enum(["ca", "pa"]),
+  firstAction: optional(2000),
 });
 
-export type CapaInitiateValues = z.infer<typeof capaInitiateSchema>;
+export type CapaNewValues = z.infer<typeof capaNewSchema>;
 
-/** Raising a CAPA from a case — the title and its owner; the rest follows. */
-export const capaCreateSchema = z.object({
+/**
+ * The CAPA plan's own answers. Saved as they are — a plan is written over
+ * days — and checked as a whole when it is approved (`capas_guard`).
+ */
+export const capaPlanSchema = z.object({
   title: z
     .string()
     .trim()
     .min(3, "Give the CAPA a title — what it fixes, in a line.")
     .max(160, "Keep the title under 160 characters."),
   owner: optional(80),
-});
-
-export type CapaCreateValues = z.infer<typeof capaCreateSchema>;
-
-/** The CAPA's own header, editable while it is open. */
-export const capaHeaderSchema = capaCreateSchema.extend({
-  reason: z.union([z.enum(CAPA_REASONS), z.literal("")]),
-  targetDate: date,
   effectivenessCriteria: optional(1000),
+  checkMode: z.enum(["dated", "at_implementation"]),
   verifyBy: date,
+  checkWhy: optional(500),
+  checker: optional(80),
 });
 
-export type CapaHeaderValues = z.infer<typeof capaHeaderSchema>;
+export type CapaPlanValues = z.infer<typeof capaPlanSchema>;
 
-/**
- * One action on a CAPA — the five fields the old CA / PA tabs had, plus which
- * of the two it is. Closing it is a separate step (`capaActionCloseSchema`),
- * because a closed action is frozen.
- */
-export const capaActionSchema = z.object({
+/** One action on the plan — what, who and by when, and whether CA or PA. */
+export const capaPlanActionSchema = z.object({
   kind: z.enum(["ca", "pa"]),
   description: z
     .string()
     .trim()
-    .min(5, "Describe the action.")
+    .min(5, "Describe what will be done.")
     .max(2000, "Keep the description under 2000 characters."),
-  owner: optional(80),
-  targetDate: date,
-  status: z.enum(ACTION_STATUSES),
-});
-
-export type CapaActionValues = z.infer<typeof capaActionSchema>;
-
-export const capaActionCloseSchema = z.object({
-  closedDate: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick the date it was closed."),
-  closedBy: z
+  owner: z
     .string()
     .trim()
-    .min(1, "Closing an action needs a name against it.")
+    .min(1, "Say who does it.")
     .max(80, "Keep the name under 80 characters."),
+  targetDate: z
+    .string()
+    .trim()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Pick the due date."),
+  linkedRecord: optional(120),
 });
 
-export type CapaActionCloseValues = z.infer<typeof capaActionCloseSchema>;
+export type CapaPlanActionValues = z.infer<typeof capaPlanActionSchema>;
 
-/** Open → effective. `capas_guard` re-checks all of it, plus the actions. */
-export const capaVerifySchema = z.object({
-  effectivenessCriteria: z
+/** Marking an action done — the evidence, and any linked record. */
+export const capaDoneSchema = z.object({
+  evidence: z
     .string()
     .trim()
-    .min(5, "Say what would show the CAPA worked.")
-    .max(1000, "Keep the criteria under 1000 characters."),
-  verification: z
-    .string()
-    .trim()
-    .min(10, "Record the verification — what was checked and what it showed.")
-    .max(2000, "Keep the verification under 2000 characters."),
-  verifiedBy: z
-    .string()
-    .trim()
-    .min(1, "Verifying needs a name against it.")
-    .max(80, "Keep the name under 80 characters."),
+    .min(3, "Give the evidence — a document, record or work order.")
+    .max(500, "Keep the evidence under 500 characters."),
+  linkedRecord: optional(120),
 });
 
-export type CapaVerifyValues = z.infer<typeof capaVerifySchema>;
+export type CapaDoneValues = z.infer<typeof capaDoneSchema>;
+
+/**
+ * The effectiveness check. Built for the CAPA: checking before its date asks
+ * why. `record_capa_check` re-checks all of it.
+ */
+export function capaCheckSchema(early: boolean) {
+  return z
+    .object({
+      result: z.enum(["effective", "not_effective"]),
+      findings: z
+        .string()
+        .trim()
+        .min(10, "Say what you found — what you looked at and what it showed.")
+        .max(2000, "Keep it under 2000 characters."),
+      earlyReason: optional(500),
+    })
+    .refine((v) => !early || v.earlyReason.length >= 5, {
+      path: ["earlyReason"],
+      message: "Say why it is checked before its date.",
+    });
+}
+
+export type CapaCheckValues = z.infer<ReturnType<typeof capaCheckSchema>>;
 
 /* ── Tab 7 · Close out ────────────────────────────────────────────────── */
 

@@ -21,7 +21,10 @@ export type AuditAction =
   | "batch_rejected"
   | "extension_requested"
   | "extension_approved"
-  | "extension_rejected";
+  | "extension_rejected"
+  | "capa_plan_approved"
+  | "capa_effective"
+  | "capa_not_effective";
 
 export interface AuditEntry {
   id: number;

@@ -48,6 +48,9 @@ const SIGNATURES: AuditAction[] = [
   "extension_requested",
   "extension_approved",
   "extension_rejected",
+  "capa_plan_approved",
+  "capa_effective",
+  "capa_not_effective",
 ];
 
 function inFilter(e: AuditEntry, f: Filter): boolean {
@@ -283,6 +286,9 @@ const EVENT_WHAT: Partial<Record<AuditAction, string>> = {
   extension_requested: "Due date extension requested",
   extension_approved: "Signed: Due date extension approved",
   extension_rejected: "Signed: Due date extension rejected",
+  capa_plan_approved: "Signed: CAPA plan approved",
+  capa_effective: "Signed: CAPA verified effective",
+  capa_not_effective: "Signed: CAPA check — didn't work",
 };
 
 type ReviewCheck = { item: string; finding: string };

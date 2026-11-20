@@ -232,7 +232,7 @@ export function DeviationsWorkspace({
       <div className="flex flex-col lg:min-h-0 lg:flex-1">
         <CapaRegister
           factoryId={factoryId}
-          role={role}
+          slug={slug}
           onOpenCase={openCase}
         />
         {dialog}

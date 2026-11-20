@@ -1,10 +1,11 @@
 "use client";
 
 import { useDeferredValue, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { ClipboardCheck } from "lucide-react";
 
-import { CapaDetailDialog } from "@/components/factory/capa/capa-detail-dialog";
+import { CapaStepDots } from "@/components/factory/capa/capa-stepper";
 import { formatDate } from "@/components/factory/deviations/deviation-fields";
 import {
   CELL,
@@ -18,64 +19,57 @@ import {
   TH,
   Val,
 } from "@/components/factory/register-table";
-import type { FactoryRole } from "@/lib/factory/context";
 import {
-  CAPA_STATUS_LABELS,
   capaKeys,
+  capaNext,
   fetchCapas,
   type Capa,
-  type CapaStatus,
 } from "@/lib/factory/capa-queries";
+import { todayKey } from "@/lib/factory/dates";
 import { typeMeta } from "@/lib/factory/deviation-queries";
+import { useRenderClock } from "@/lib/use-render-clock";
 import { cn } from "@/lib/utils";
 
-type StatusFilter = CapaStatus | "all";
+type View = "open" | "plan" | "do" | "check" | "closed" | "all";
 
-const STATUS_FILTERS: { key: StatusFilter; label: string; hint: string }[] = [
-  { key: "open", label: "Open", hint: "Actions still being worked, or not yet verified" },
-  { key: "effective", label: "Effective", hint: "Verified and signed" },
-  { key: "all", label: "All", hint: "Every CAPA ever raised" },
+const VIEWS: { key: View; label: string; hint: string; test: (c: Capa) => boolean }[] = [
+  { key: "open", label: "All open", hint: "Every CAPA not yet closed", test: (c) => c.step !== "closed" },
+  { key: "plan", label: "Plans to approve", hint: "CAPA plan being written or waiting for approval", test: (c) => c.step === "plan" },
+  { key: "do", label: "Actions in progress", hint: "Plan approved, actions being done", test: (c) => c.step === "do" },
+  { key: "check", label: "Checks due", hint: "Every action done — the effectiveness check is next", test: (c) => c.step === "check" },
+  { key: "closed", label: "Closed", hint: "Checked and it worked", test: (c) => c.step === "closed" },
+  { key: "all", label: "All", hint: "Every CAPA ever raised", test: () => true },
 ];
 
 function haystack(c: Capa): string {
-  return [
-    c.capa_no,
-    c.title,
-    c.owner_name,
-    ...c.cases.map((k) => k.deviation_no),
-  ]
+  return [c.capa_no, c.title, c.owner_name, ...c.cases.map((k) => k.deviation_no)]
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
 }
 
 /**
- * The CAPA register — every corrective and preventive action plan.
- *
- * A CAPA is raised from a case's CAPA tab, never here: a plan with no problem
- * behind it is not a CAPA. One CAPA can cover several cases, so the cases are
- * a column of their own, and each opens its case.
+ * The CAPA register — every CAPA, by step: plans to approve, actions in
+ * progress, checks due, closed (qms-v6). Each opens its CAPA page. A CAPA is
+ * raised from a case's Actions tab, never here: a plan with no problem behind
+ * it is not a CAPA.
  */
 export function CapaRegister({
   factoryId,
-  role,
+  slug,
   onOpenCase,
 }: {
   factoryId: string;
-  role: FactoryRole;
+  slug: string;
   onOpenCase: (caseId: string) => void;
 }) {
-  const [status, setStatus] = useState<StatusFilter>("open");
+  const router = useRouter();
+  const today = useRenderClock(todayKey);
+  const [view, setView] = useState<View>("open");
   const [search, setSearch] = useState("");
-  const [openId, setOpenId] = useState<string | null>(null);
   const term = useDeferredValue(search).trim().toLowerCase();
 
-  const {
-    data: capas = [],
-    isPending,
-    isError,
-    error,
-  } = useQuery({
+  const { data: capas = [], isPending, isError, error } = useQuery({
     queryKey: capaKeys.all(factoryId),
     queryFn: () => fetchCapas(factoryId),
   });
@@ -84,39 +78,40 @@ export function CapaRegister({
     () => capas.filter((c) => !term || haystack(c).includes(term)),
     [capas, term],
   );
-  const counts = useMemo(
-    () => ({
-      open: narrowed.filter((c) => c.status === "open").length,
-      effective: narrowed.filter((c) => c.status === "effective").length,
-      all: narrowed.length,
-    }),
-    [narrowed],
-  );
-  const visible = useMemo(
-    () =>
-      status === "all" ? narrowed : narrowed.filter((c) => c.status === status),
-    [narrowed, status],
-  );
+  const visible = useMemo(() => {
+    const test = VIEWS.find((v) => v.key === view)!.test;
+    // Soonest "next" date first; nothing dated last.
+    return narrowed
+      .filter(test)
+      .sort((a, b) => (capaNext(a).date ?? "9999").localeCompare(capaNext(b).date ?? "9999"));
+  }, [narrowed, view]);
 
-  const open = capas.find((c) => c.id === openId) ?? null;
+  const checked = capas.filter((c) => c.check_count > 0);
+  const firstTime = checked.length
+    ? Math.round((checked.filter((c) => c.first_check_effective).length / checked.length) * 100)
+    : null;
 
   return (
     <>
       <div className="mb-4 shrink-0">
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">
-          CAPA register
-        </h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-ink">CAPA register</h1>
         <p className="mt-1 max-w-3xl text-sm text-ink-4">
-          Every corrective and preventive action plan. A CAPA is raised from a
-          case&apos;s CAPA tab, and one CAPA can cover several cases.
+          Every CAPA runs CAPA plan → Do → Effectiveness check. Create one from a case&apos;s
+          Actions tab.
+          {firstTime !== null && ` ${firstTime}% worked at the first check.`}
         </p>
       </div>
 
       <div className="mb-4 shrink-0">
         <RegisterViews
-          views={STATUS_FILTERS.map((f) => ({ ...f, count: counts[f.key] }))}
-          value={status}
-          onChange={setStatus}
+          views={VIEWS.map((v) => ({
+            key: v.key,
+            label: v.label,
+            hint: v.hint,
+            count: narrowed.filter(v.test).length,
+          }))}
+          value={view}
+          onChange={setView}
           label="CAPA views"
         />
       </div>
@@ -142,166 +137,86 @@ export function CapaRegister({
         ) : visible.length === 0 ? (
           <RegisterEmpty
             icon={ClipboardCheck}
-            title={
-              capas.length === 0
-                ? "No CAPAs yet."
-                : "Nothing matches those filters."
-            }
+            title={capas.length === 0 ? "No CAPAs yet." : "No CAPAs in this view."}
             body={
               capas.length === 0
-                ? "Raise one from a case's CAPA tab when the case needs one."
+                ? "Create one from a case's Actions tab when the case needs one."
                 : term
-                  ? "Try a different keyword, or clear the filter."
-                  : "Try another filter."
+                  ? "Try a different keyword, or clear the search."
+                  : "Try another view."
             }
           />
         ) : (
-          <CapaTable
-            capas={visible}
-            onOpen={setOpenId}
-            onOpenCase={onOpenCase}
-          />
+          <RegisterTable
+            plain
+            head={
+              <>
+                <th className={TH}>CAPA</th>
+                <th className={TH}>Title</th>
+                <th className={TH}>Step</th>
+                <th className={TH}>Next</th>
+                <th className={TH}>Owner</th>
+                <th className={TH}>Cases</th>
+              </>
+            }
+          >
+            {visible.map((c) => {
+              const next = capaNext(c);
+              const overdue = c.step !== "closed" && next.date !== null && next.date < today;
+              return (
+                <RegisterRow
+                  key={c.id}
+                  onOpen={() => router.push(`/factory/${slug}/deviations/capa/${c.id}`)}
+                >
+                  <td className={cn(CELL, "font-mono text-[0.78rem] font-medium text-brand")}>
+                    {c.capa_no}
+                  </td>
+                  <td className="max-w-[26rem] min-w-[14rem] px-3 py-3 align-middle text-[0.8125rem] font-medium text-ink">
+                    {c.title}
+                  </td>
+                  <td className={CELL}>
+                    <CapaStepDots step={c.step} />
+                  </td>
+                  <td className={cn(CELL, overdue && "font-semibold text-danger-deep")}>
+                    {next.text}
+                    {next.date && ` · ${formatDate(next.date)}`}
+                  </td>
+                  <td className={CELL}>
+                    <Val value={c.owner_name} />
+                  </td>
+                  <td className={CELL}>
+                    {c.cases.length === 0 ? (
+                      <span className="text-ink-6">—</span>
+                    ) : (
+                      <span className="flex flex-wrap gap-1">
+                        {c.cases.map((k) => (
+                          <button
+                            key={k.id}
+                            type="button"
+                            // The row opens the CAPA; a case number opens the case.
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenCase(k.id);
+                            }}
+                            onKeyDown={(e) => e.stopPropagation()}
+                            className={cn(
+                              "rounded-md px-1.5 py-0.5 font-mono text-[0.6875rem] font-semibold ring-1 ring-current/15 transition hover:brightness-95",
+                              typeMeta(k.type).pill,
+                            )}
+                          >
+                            {k.deviation_no}
+                          </button>
+                        ))}
+                      </span>
+                    )}
+                  </td>
+                </RegisterRow>
+              );
+            })}
+          </RegisterTable>
         )}
       </div>
       {!isPending && !isError && <RegisterFoot count={visible.length} />}
-
-      <CapaDetailDialog
-        capa={open}
-        factoryId={factoryId}
-        role={role}
-        onClose={() => setOpenId(null)}
-        onOpenCase={(caseId) => {
-          setOpenId(null);
-          onOpenCase(caseId);
-        }}
-      />
     </>
-  );
-}
-
-function CapaTable({
-  capas,
-  onOpen,
-  onOpenCase,
-}: {
-  capas: Capa[];
-  onOpen: (id: string) => void;
-  onOpenCase: (caseId: string) => void;
-}) {
-  return (
-    <RegisterTable
-      plain
-      head={
-        <>
-          <th className={TH}>CAPA no.</th>
-          <th className={TH}>Title</th>
-          <th className={TH}>Cases</th>
-          <th className={TH}>Status</th>
-          <th className={TH}>Owner</th>
-          <th className={TH}>Reason</th>
-          <th className={TH}>Target date</th>
-          <th className={TH}>Actions closed</th>
-          <th className={TH}>Overdue</th>
-          <th className={TH}>Verify by</th>
-          <th className={TH}>Raised</th>
-        </>
-      }
-    >
-      {capas.map((c) => {
-        const effective = c.status === "effective";
-        return (
-          <RegisterRow key={c.id} onOpen={() => onOpen(c.id)}>
-            <td
-              className={cn(
-                CELL,
-                "font-mono text-[0.78rem] font-medium text-brand",
-              )}
-            >
-              {c.capa_no}
-            </td>
-            <td className="max-w-[26rem] min-w-[14rem] px-3 py-3 align-middle text-[0.8125rem] font-medium text-ink">
-              {c.title}
-            </td>
-            <td className={CELL}>
-              {c.cases.length === 0 ? (
-                <span className="text-ink-6">—</span>
-              ) : (
-                <span className="flex flex-wrap gap-1">
-                  {c.cases.map((k) => (
-                    <button
-                      key={k.id}
-                      type="button"
-                      // The row opens the CAPA; a case number opens the case.
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onOpenCase(k.id);
-                      }}
-                      onKeyDown={(e) => e.stopPropagation()}
-                      className={cn(
-                        "rounded-md px-1.5 py-0.5 font-mono text-[0.6875rem] font-semibold ring-1 ring-current/15 transition hover:brightness-95",
-                        typeMeta(k.type).pill,
-                      )}
-                    >
-                      {k.deviation_no}
-                    </button>
-                  ))}
-                </span>
-              )}
-            </td>
-            <td className={CELL}>
-              <span className="inline-flex items-center gap-2">
-                <span
-                  aria-hidden
-                  className={cn(
-                    "size-1.5 shrink-0 rounded-full",
-                    effective ? "bg-teal" : "bg-brand",
-                  )}
-                />
-                {CAPA_STATUS_LABELS[c.status]}
-              </span>
-            </td>
-            <td className={CELL}>
-              <Val value={c.owner_name} />
-            </td>
-            <td className={CELL}>
-              <Val value={c.reason} />
-            </td>
-            <td
-              className={cn(
-                CELL,
-                "tabular-nums",
-                c.is_overdue && "font-semibold text-danger-deep",
-              )}
-            >
-              {formatDate(c.target_date)}
-            </td>
-            <td className={cn(CELL, "tabular-nums")}>
-              {c.actions_closed} of {c.action_count}
-            </td>
-            <td className={cn(CELL, "tabular-nums")}>
-              {c.actions_overdue > 0 ? (
-                <span className="font-semibold text-danger-deep">
-                  {c.actions_overdue}
-                </span>
-              ) : (
-                <span className="text-ink-6">—</span>
-              )}
-            </td>
-            <td
-              className={cn(
-                CELL,
-                "tabular-nums",
-                c.is_verify_overdue && "font-semibold text-danger-deep",
-              )}
-            >
-              {formatDate(c.verify_by)}
-            </td>
-            <td className={cn(CELL, "tabular-nums")}>
-              {formatDate(c.created_at.slice(0, 10))}
-            </td>
-          </RegisterRow>
-        );
-      })}
-    </RegisterTable>
   );
 }

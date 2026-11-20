@@ -4,13 +4,19 @@ import { useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Check, Loader2, Minus } from "lucide-react";
+import { CalendarClock, Check, Loader2, Minus, Printer } from "lucide-react";
 
 import { AssessmentTab } from "@/components/factory/deviations/assessment-tab";
 import { BatchHolds } from "@/components/factory/deviations/batch-holds";
 import { CapaTab } from "@/components/factory/deviations/capa-tab";
 import { CaseAttachments } from "@/components/factory/deviations/case-attachments";
 import { DevCloseOutTab } from "@/components/factory/deviations/dev-closeout-tab";
+import {
+  DueExtensions,
+  ExtendDueDialog,
+  canRequestExtension,
+  useExtensions,
+} from "@/components/factory/deviations/due-extensions";
 import { DevInvestigationTab } from "@/components/factory/deviations/dev-investigation-tab";
 import { CaseHistory } from "@/components/factory/deviations/case-history";
 import { InitiationTab } from "@/components/factory/deviations/deviation-tab-forms";
@@ -28,6 +34,7 @@ import {
   type Deviation,
 } from "@/lib/factory/deviation-queries";
 import { fetchHolds, holdKeys } from "@/lib/factory/hold-queries";
+import { useQualitySettings } from "@/lib/factory/quality-settings-queries";
 import { cn } from "@/lib/utils";
 
 const SECTIONS: { id: CaseSection; label: string }[] = [
@@ -38,9 +45,6 @@ const SECTIONS: { id: CaseSection; label: string }[] = [
   { id: "closeout", label: "Close-out" },
   { id: "history", label: "History" },
 ];
-
-/** Days QA has to sign the initial assessment, from raising. */
-const ASSESS_DAYS = 2;
 
 const CLASS_TEXT: Record<string, string> = {
   Minor: "text-teal-deep",
@@ -133,6 +137,10 @@ export function DeviationCasePage({
     queryKey: holdKeys.forCase(factoryId, caseId),
     queryFn: () => fetchHolds(caseId),
   });
+  const settings = useQualitySettings(factoryId);
+  // Due date extensions (0072), for the header, the banner and the button.
+  const { data: extensions = [] } = useExtensions(factoryId, caseId);
+  const [extending, setExtending] = useState(false);
   const listHref = `/factory/${slug}/deviations`;
   const d = deviations?.find((x) => x.id === caseId) ?? null;
 
@@ -163,68 +171,77 @@ export function DeviationCasePage({
 
   const reviewer = canReview(role);
   const open = d.status === "open";
-  const stage = devStage(d);
   const next = nextStep(d);
-  const batches = d.batch_nos.length > 0 ? d.batch_nos : d.batch_no ? [d.batch_no] : [];
-  const assessBy = addDays(d.created_at.slice(0, 10), ASSESS_DAYS);
   const onHold = holds.filter((h) => h.status === "on_hold").map((h) => h.batch_no);
   const released = holds.filter((h) => h.status === "released").map((h) => h.batch_no);
+  const pendingExtension = extensions.find((e) => e.status === "requested") ?? null;
 
   return (
     <div className="mx-auto w-full max-w-[1600px]">
-      <nav aria-label="Breadcrumb" className="text-sm text-ink-4">
-        <Link href={listHref} className="text-brand hover:underline">
-          Deviations
-        </Link>
-        <span className="mx-1.5 text-ink-5">/</span>
-        <span className="font-mono">{d.deviation_no}</span>
-      </nav>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <nav aria-label="Breadcrumb" className="text-sm text-ink-4">
+          <Link href={listHref} className="text-brand hover:underline">
+            Deviations
+          </Link>
+          <span className="mx-1.5 text-ink-5">/</span>
+          <span className="font-mono">{d.deviation_no}</span>
+        </nav>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+          {reviewer && canRequestExtension(d, extensions) && (
+            <button
+              type="button"
+              onClick={() => setExtending(true)}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-brand hover:underline"
+            >
+              <CalendarClock className="size-4" />
+              Extend due date
+            </button>
+          )}
+          <Link
+            href={`${listHref}/${d.id}/print`}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-brand hover:underline"
+          >
+            <Printer className="size-4" />
+            Print report
+          </Link>
+        </div>
+      </div>
+      <ExtendDueDialog
+        deviation={d}
+        factoryId={factoryId}
+        viewerName={viewerName}
+        open={extending}
+        onOpenChange={setExtending}
+      />
 
       <div className="mt-3 rounded-2xl border border-line bg-surface shadow-soft">
-        <header className="flex flex-wrap items-start justify-between gap-x-8 gap-y-4 px-5 pt-5 sm:px-7 sm:pt-6">
-          <div className="min-w-0 max-w-3xl">
-            <h1 className="text-xl font-semibold tracking-tight text-ink sm:text-2xl">
-              {d.title}
-            </h1>
-            <p className="mt-1.5 text-sm leading-relaxed text-ink-4">
-              <span className="font-mono">{d.deviation_no}</span> · Deviation ·{" "}
-              {d.type === "planned" ? "Planned" : "Unplanned"}
-              {d.raised_by && ` · raised by ${d.raised_by}`} on{" "}
-              {formatDay(d.created_at)}
-              {batches.length > 0 && ` · batch ${batches.join(", ")}`}
-              {d.product_names.length > 0 && ` · ${d.product_names.join(", ")}`}
-            </p>
-          </div>
-
-          <dl className="flex flex-wrap divide-x divide-line-soft">
-            <HeadFact label="Stage">
-              <span className="inline-flex items-center gap-1.5">
-                <span className={cn("size-2 rounded-full", DEV_STAGE_DOT[stage])} />
-                {stage}
-              </span>
-            </HeadFact>
-            <HeadFact label="Class">
-              <span className={d.classification ? CLASS_TEXT[d.classification] : undefined}>
-                {d.classification ?? "—"}
-              </span>
-            </HeadFact>
-            <HeadFact label="Risk">{d.assessed_at ? (devRiskLabel(d) ?? "—") : "—"}</HeadFact>
-            <HeadFact label={!open ? "Closed" : d.assessed_at ? "Due" : "Assess by"}>
-              {!open ? (
-                <span className="text-ink-4">{d.closed_at ? formatDay(d.closed_at) : "—"}</span>
-              ) : d.assessed_at ? (
-                <span className={cn(d.is_overdue && "text-danger-deep")}>
-                  {d.sla_date ? formatDay(d.sla_date) : "—"}
-                </span>
-              ) : (
-                formatDay(assessBy)
-              )}
-            </HeadFact>
-            <HeadFact label="Owner">{d.owner_name ?? "—"}</HeadFact>
-          </dl>
-        </header>
+        <CaseHeader
+          deviation={d}
+          assessDays={settings.assessDays}
+          extended={extensions.some((e) => e.status === "approved")}
+          className="px-5 pt-5 sm:px-7 sm:pt-6"
+        />
 
         <div className="space-y-3 px-5 pt-5 sm:px-7">
+          {open && pendingExtension && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn-line bg-warn-tint px-4 py-3 text-sm text-warn-ink">
+              <span>
+                Due date extension to{" "}
+                <span className="font-semibold">{formatDay(pendingExtension.to_date)}</span>{" "}
+                requested by {pendingExtension.requested_by_name ?? "—"} — waiting for
+                QA to approve or reject it.
+              </span>
+              {section !== "history" && (
+                <button
+                  type="button"
+                  onClick={() => setSection("history")}
+                  className="rounded-lg border border-warn-line bg-surface px-3 py-1.5 text-xs font-semibold text-warn-ink transition hover:border-warn"
+                >
+                  Go to History
+                </button>
+              )}
+            </div>
+          )}
           {open && onHold.length > 0 ? (
             <p className="rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-deep">
               Batch {onHold.join(", ")} on hold — preparatory and production work
@@ -366,11 +383,100 @@ export function DeviationCasePage({
             />
           )}
           {section === "history" && (
-            <CaseHistory deviation={d} factoryId={factoryId} />
+            <CaseHistory
+              deviation={d}
+              factoryId={factoryId}
+              extensions={
+                <DueExtensions
+                  deviation={d}
+                  factoryId={factoryId}
+                  canDecide={open && reviewer}
+                  viewerName={viewerName}
+                />
+              }
+            />
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * The case's title, what identifies it, and five facts — stage, class, risk,
+ * due (or closed) date and owner. Shared by the case page and its printed
+ * report, so the two always agree.
+ */
+export function CaseHeader({
+  deviation: d,
+  assessDays,
+  extended = false,
+  className,
+}: {
+  deviation: Deviation;
+  /** Days QA has to sign the initial assessment — Configuration → Quality settings. */
+  assessDays: number;
+  /** An approved due date extension moved the due date (0072). */
+  extended?: boolean;
+  className?: string;
+}) {
+  const open = d.status === "open";
+  const stage = devStage(d);
+  const batches = d.batch_nos.length > 0 ? d.batch_nos : d.batch_no ? [d.batch_no] : [];
+  const assessBy = addDays(d.created_at.slice(0, 10), assessDays);
+  return (
+    <header
+      className={cn(
+        "flex flex-wrap items-start justify-between gap-x-8 gap-y-4",
+        className,
+      )}
+    >
+      <div className="min-w-0 max-w-3xl">
+        <h1 className="text-xl font-semibold tracking-tight text-ink sm:text-2xl">
+          {d.title}
+        </h1>
+        <p className="mt-1.5 text-sm leading-relaxed text-ink-4">
+          <span className="font-mono">{d.deviation_no}</span> · Deviation ·{" "}
+          {d.type === "planned" ? "Planned" : "Unplanned"}
+          {d.raised_by && ` · raised by ${d.raised_by}`} on{" "}
+          {formatDay(d.created_at)}
+          {batches.length > 0 && ` · batch ${batches.join(", ")}`}
+          {d.product_names.length > 0 && ` · ${d.product_names.join(", ")}`}
+        </p>
+      </div>
+
+      <dl className="flex flex-wrap divide-x divide-line-soft">
+        <HeadFact label="Stage">
+          <span className="inline-flex items-center gap-1.5">
+            <span className={cn("size-2 rounded-full", DEV_STAGE_DOT[stage])} />
+            {stage}
+          </span>
+        </HeadFact>
+        <HeadFact label="Class">
+          <span className={d.classification ? CLASS_TEXT[d.classification] : undefined}>
+            {d.classification ?? "—"}
+          </span>
+        </HeadFact>
+        <HeadFact label="Risk">{d.assessed_at ? (devRiskLabel(d) ?? "—") : "—"}</HeadFact>
+        <HeadFact label={!open ? "Closed" : d.assessed_at ? "Due" : "Assess by"}>
+          {!open ? (
+            <span className="text-ink-4">{d.closed_at ? formatDay(d.closed_at) : "—"}</span>
+          ) : d.assessed_at ? (
+            <span className={cn(d.is_overdue && "text-danger-deep")}>
+              {d.sla_date ? formatDay(d.sla_date) : "—"}
+              {extended && (
+                <span className="ml-1 font-normal text-ink-5" title="Extended">
+                  (ext.)
+                </span>
+              )}
+            </span>
+          ) : (
+            formatDay(assessBy)
+          )}
+        </HeadFact>
+        <HeadFact label="Owner">{d.owner_name ?? "—"}</HeadFact>
+      </dl>
+    </header>
   );
 }
 

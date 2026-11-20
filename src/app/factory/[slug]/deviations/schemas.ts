@@ -549,13 +549,6 @@ export const RED_FLAGS = [
 export const CLASSES = ["Critical", "Major", "Minor"] as const;
 export type CaseClass = (typeof CLASSES)[number];
 
-/** Days from raising to the due date, by class — `deviations_assessment_guard`. */
-export const CLASS_DUE_DAYS: Record<CaseClass, number> = {
-  Critical: 15,
-  Major: 30,
-  Minor: 60,
-};
-
 const yesNo = z.union([z.enum(["yes", "no"]), z.literal("")]);
 
 /* ── The risk, as the reference QMS scores it (0068) ── */
@@ -890,3 +883,26 @@ export const devCloseOutSignSchema = devCloseOutSchema.superRefine((v, ctx) => {
     need("duplicateOf", "Which case does it duplicate?");
   }
 });
+
+/**
+ * Asking to extend a deviation's due date (migration 0072): a later date and
+ * the reason. Built from the current due date, so the date error names it;
+ * `request_due_extension` re-checks both.
+ */
+export function dueExtensionSchema(currentDue: string) {
+  return z.object({
+    toDate: z
+      .string()
+      .min(1, { error: "Pick the new due date." })
+      .refine((v) => v > currentDue, {
+        error: "Pick a date after the current due date.",
+      }),
+    reason: z
+      .string()
+      .trim()
+      .min(5, { error: "Give the reason more time is needed." })
+      .max(1000),
+  });
+}
+
+export type DueExtensionValues = z.infer<ReturnType<typeof dueExtensionSchema>>;

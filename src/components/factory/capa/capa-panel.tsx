@@ -258,7 +258,7 @@ function ActionRow({
           {kind.short}
         </Badge>
       </td>
-      <td className="max-w-[22rem] px-3 py-2.5 whitespace-pre-wrap text-ink">
+      <td className="max-w-[22rem] px-3 py-2.5 whitespace-pre-wrap wrap-anywhere text-ink">
         {action.description}
       </td>
       <td className="px-3 py-2.5 whitespace-nowrap">
@@ -502,7 +502,7 @@ function CloseActionForm({
     >
       <div>
         <p className="text-sm font-semibold text-ink">Close this action</p>
-        <p className="mt-0.5 line-clamp-2 text-xs text-ink-4">
+        <p className="mt-0.5 line-clamp-2 text-xs wrap-anywhere text-ink-4">
           {action.description}
         </p>
       </div>

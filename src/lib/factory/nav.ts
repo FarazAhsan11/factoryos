@@ -365,6 +365,13 @@ export const FACTORY_NAV: NavSection[] = [
             roles: MANAGER_UP,
             ready: true,
           },
+          // Due dates for deviations, NCRs and complaints, with a change log.
+          {
+            href: "/admin?tab=quality",
+            label: "Quality settings",
+            roles: MANAGER_UP,
+            ready: true,
+          },
           // Who can sign in, with their email and access. Manager and up may
           // see the list; only an admin may add, invite or remove.
           {

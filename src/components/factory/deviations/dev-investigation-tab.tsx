@@ -27,7 +27,9 @@ import { Segmented } from "@/components/factory/deviations/deviation-initiation-
 import {
   AREA,
   CONTROL,
+  Fact,
   Field,
+  Muted,
   PRIMARY_BUTTON,
   SECONDARY_BUTTON,
   SelectControl,
@@ -793,5 +795,94 @@ function ReviewChecks({
         );
       }}
     />
+  );
+}
+
+/**
+ * The investigation as text, for the printed report: every answer the form
+ * asks, "Not recorded" where there is none. A disabled form clips its
+ * textareas on paper, and a printed record should read as a record.
+ */
+export function InvestigationFacts({ deviation: d }: { deviation: Deviation }) {
+  const yn = (b: boolean | null) =>
+    b === null ? <Muted>Not answered</Muted> : b ? "Yes" : "No";
+  const human = d.root_cause_categories.includes("Man (people)");
+  return (
+    <div className="space-y-7">
+      {d.investigation_approved_at ? (
+        <p className="flex items-center gap-2 rounded-xl border border-teal-line bg-teal-soft px-4 py-3 text-sm text-teal-deep">
+          <CheckCircle2 className="size-4 shrink-0" />
+          Investigation approved by {d.investigation_approved_by_name} ·{" "}
+          {formatDateTime(d.investigation_approved_at)}
+        </p>
+      ) : d.investigation_submitted_at ? (
+        <p className="rounded-xl border border-brand-soft bg-brand-tint px-4 py-3 text-sm text-brand-deep">
+          Submitted for approval by {d.investigation_submitted_by_name} ·{" "}
+          {formatDateTime(d.investigation_submitted_at)} — not approved yet.
+        </p>
+      ) : (
+        <p className="rounded-xl border border-dashed border-line-strong px-4 py-3 text-sm text-ink-4">
+          Draft — not submitted for approval.
+          {d.investigation_returned_at &&
+            ` Last sent back by ${d.investigation_returned_by_name} · ${formatDateTime(d.investigation_returned_at)}: “${d.investigation_return_reason}”`}
+        </p>
+      )}
+
+      <Section title="Impact">
+        <dl className="grid gap-3">
+          <Fact label="Other batches affected" mono>
+            {d.other_batch_nos.length > 0 ? d.other_batch_nos.join(", ") : <Muted>None</Muted>}
+          </Fact>
+          <Fact label="Product impact assessment" wide>
+            {d.impact ?? <Muted>Not recorded</Muted>}
+          </Fact>
+        </dl>
+      </Section>
+
+      <Section title="What was reviewed">
+        {d.review_checks.length > 0 ? (
+          <dl className="grid gap-3">
+            {d.review_checks.map((c) => (
+              <Fact key={c.item} label={c.item} wide>
+                {c.finding.trim() ? c.finding : <Muted>No finding recorded</Muted>}
+              </Fact>
+            ))}
+          </dl>
+        ) : (
+          <Muted>Nothing recorded</Muted>
+        )}
+      </Section>
+
+      <Section title="Root cause">
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+          <Fact label="Findings" wide>
+            {d.investigation_findings ?? <Muted>Not recorded</Muted>}
+          </Fact>
+          <Fact label="Root cause categories" wide>
+            {d.root_cause_categories.length > 0 ? (
+              d.root_cause_categories.join(", ")
+            ) : (
+              <Muted>Not recorded</Muted>
+            )}
+          </Fact>
+          {human && (
+            <>
+              <Fact label="Procedure clear and correct">{yn(d.human_procedure_clear)}</Fact>
+              <Fact label="Person trained and assessed">{yn(d.human_trained)}</Fact>
+              <Fact label="Process or equipment could have prevented it">
+                {yn(d.human_preventable)}
+              </Fact>
+            </>
+          )}
+          <Fact label="Root cause" wide>
+            {d.root_cause ?? <Muted>Not recorded</Muted>}
+          </Fact>
+          <Fact label="Conclusion">
+            {d.root_cause_conclusion ?? <Muted>Not recorded</Muted>}
+          </Fact>
+          <Fact label="Method">{d.rca_method ?? <Muted>Not recorded</Muted>}</Fact>
+        </dl>
+      </Section>
+    </div>
   );
 }

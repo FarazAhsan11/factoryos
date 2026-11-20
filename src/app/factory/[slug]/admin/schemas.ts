@@ -520,3 +520,23 @@ export const updateEmployeeSchema = z
     message: "Nothing to update.",
   });
 export type UpdateEmployeeValues = z.infer<typeof updateEmployeeSchema>;
+
+/**
+ * Configuration → Quality settings (migration 0071). Whole days; the ranges
+ * are the table's checks, said here so the message names the field.
+ */
+const days = (max: number) =>
+  z
+    .number({ error: "Enter a number of days." })
+    .int({ error: "Whole days only." })
+    .min(1, { error: "At least 1 day." })
+    .max(max, { error: `At most ${max} days.` });
+
+export const qualitySettingsSchema = z.object({
+  dueCriticalDays: days(365),
+  dueMajorDays: days(365),
+  dueMinorDays: days(365),
+  assessDays: days(30),
+});
+
+export type QualitySettingsValues = z.infer<typeof qualitySettingsSchema>;

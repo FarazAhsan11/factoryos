@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Building2, Clock3, Cog, LayoutGrid, Wrench } from "lucide-react";
+import { Building2, Clock3, Cog, LayoutGrid, ShieldCheck, Wrench } from "lucide-react";
 
 import { PROCESS_CATEGORIES } from "@/app/factory/[slug]/log/schemas";
 import { CompanySettingsForm } from "@/components/factory/admin/company-settings-form";
 import { SetupListManager } from "@/components/factory/admin/setup-list-manager";
 import { HolidaysCard } from "@/components/factory/admin/holidays-card";
+import { QualitySettingsForm } from "@/components/factory/admin/quality-settings-form";
 import { ShiftTimesForm } from "@/components/factory/admin/shift-times-form";
 import { UsersPanel } from "@/components/factory/admin/users-panel";
 import { PanelHeader } from "@/components/factory/admin/settings-ui";
@@ -140,6 +141,15 @@ export function AdminWorkspace({
             <ShiftTimesForm factoryId={factory.id} canManage={canManage} />
             <HolidaysCard factoryId={factory.id} canManage={canManage} />
           </div>
+        </Panel>
+
+        <Panel active={tab === "quality"} lazy>
+          <PanelHeader
+            icon={ShieldCheck}
+            title="Quality settings"
+            description="Per factory. The days a deviation, NCR or complaint has to close, and the time QA has to assess it. Every change is logged at the bottom of this page."
+          />
+          <QualitySettingsForm factoryId={factory.id} canManage={canManage} />
         </Panel>
 
         {/* The logins. The panel draws its own header — its description

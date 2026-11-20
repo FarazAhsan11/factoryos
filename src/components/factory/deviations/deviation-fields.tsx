@@ -305,7 +305,7 @@ export function Fact({
         className={cn(
           "mt-0.5 text-[0.8125rem] text-ink",
           mono && "font-mono",
-          wide ? "break-words whitespace-pre-wrap" : "truncate",
+          wide ? "break-words whitespace-pre-wrap" : "truncate print:break-words print:whitespace-normal",
         )}
       >
         {children}

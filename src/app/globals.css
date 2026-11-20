@@ -377,3 +377,19 @@
     display: table-header-group;
   }
 }
+
+/**
+ * Print — a deviation's report (`DeviationReport`). A document read top to
+ * bottom, so portrait A4 rather than the shift report's landscape: a named
+ * page, which only the report's own box asks for.
+ */
+@media print {
+  .case-report {
+    page: case-report;
+  }
+}
+
+@page case-report {
+  size: A4 portrait;
+  margin: 14mm 12mm;
+}

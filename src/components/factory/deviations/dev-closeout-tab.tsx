@@ -16,7 +16,9 @@ import { Segmented } from "@/components/factory/deviations/deviation-initiation-
 import {
   AREA,
   CONTROL,
+  Fact,
   Field,
+  Muted,
   PRIMARY_BUTTON,
   SECONDARY_BUTTON,
   SelectControl,
@@ -169,7 +171,7 @@ export function DevCloseOutTab({
       <Section title="Before closing">
         <ul className="divide-y divide-line-soft">
           {items.map((item) => (
-            <li key={item.label} className="flex items-center gap-3 py-2.5 text-sm">
+            <li key={item.label} className="relative flex items-center gap-3 py-2.5 text-sm">
               <span
                 aria-hidden
                 className={cn(
@@ -337,6 +339,95 @@ export function DevCloseOutTab({
           </div>
         )}
       </form>
+    </div>
+  );
+}
+
+/**
+ * The close-out as text, for the printed report: the signatures, the
+ * checklist as it stands, and the answers — "Not recorded" where there are
+ * none.
+ */
+export function CloseOutFacts({ deviation: d }: { deviation: Deviation }) {
+  const open = d.status === "open";
+  const firstSigned = Boolean(d.close_first_signed_at);
+  const needed = signaturesNeeded(d);
+  return (
+    <div className="space-y-7">
+      {firstSigned || !open ? (
+        <div className="space-y-2">
+          {firstSigned && (
+            <Signature
+              text={`${needed === 2 ? "First signature" : "Signed"} by ${d.close_first_signed_by_name}`}
+              at={d.close_first_signed_at!}
+            />
+          )}
+          {!open && d.closed_at && (
+            <Signature
+              text={`${firstSigned ? "Second signature — closed" : "Closed"} by ${d.qa_sign_name}`}
+              at={d.closed_at}
+            />
+          )}
+        </div>
+      ) : (
+        <p className="rounded-xl border border-dashed border-line-strong px-4 py-3 text-sm text-ink-4">
+          Not signed — the case is open.
+          {needed === 2 && " Critical: two QA signatures are needed to close it."}
+        </p>
+      )}
+
+      <Section title="Before closing">
+        <ul className="divide-y divide-line-soft">
+          {devChecklist(d).map((item) => (
+            <li key={item.label} className="relative flex items-center gap-3 py-2 text-sm">
+              <span
+                aria-hidden
+                className={cn(
+                  "grid size-5 shrink-0 place-items-center rounded-full",
+                  item.done ? "bg-teal-soft text-teal-deep" : "border border-line-strong",
+                )}
+              >
+                {item.done && <Check className="size-3.5" />}
+              </span>
+              <span className={item.done ? "text-ink" : "text-ink-3"}>{item.label}</span>
+              <span className="sr-only">{item.done ? "done" : "not done"}</span>
+            </li>
+          ))}
+        </ul>
+      </Section>
+
+      <Section title="Close-out">
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+          <Fact label="Unresolved product or patient risk">
+            {d.unresolved_risk === null ? (
+              <Muted>Not answered</Muted>
+            ) : d.unresolved_risk ? (
+              "Yes"
+            ) : (
+              "No"
+            )}
+          </Fact>
+          <Fact label="Reason for closing">
+            {d.status_reason ?? <Muted>Not recorded</Muted>}
+          </Fact>
+          {d.status_reason === "Duplicate" ? (
+            <Fact label="Duplicate of" mono>
+              {d.duplicate_of ?? <Muted>—</Muted>}
+            </Fact>
+          ) : (
+            <Fact label="Cost of quality ($)">
+              {d.cost_of_quality !== null ? (
+                Number(d.cost_of_quality).toFixed(2)
+              ) : (
+                <Muted>Not recorded</Muted>
+              )}
+            </Fact>
+          )}
+          <Fact label="Close-out summary and residual risk" wide>
+            {d.closing_note ?? <Muted>Not recorded</Muted>}
+          </Fact>
+        </dl>
+      </Section>
     </div>
   );
 }

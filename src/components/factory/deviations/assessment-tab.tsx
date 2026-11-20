@@ -10,7 +10,6 @@ import { toast } from "sonner";
 
 import {
   CLASSES,
-  CLASS_DUE_DAYS,
   DEV_LIKELIHOOD,
   DEV_LIKELIHOOD_HELP,
   DEV_SEVERITY,
@@ -49,6 +48,7 @@ import {
   signAssessment,
   type Deviation,
 } from "@/lib/factory/deviation-queries";
+import { dueDaysFor, useQualitySettings } from "@/lib/factory/quality-settings-queries";
 import { useForm } from "@/lib/use-form";
 import { cn } from "@/lib/utils";
 
@@ -185,6 +185,7 @@ function AssessmentForm({
   viewerName: string;
 }) {
   const queryClient = useQueryClient();
+  const settings = useQualitySettings(factoryId);
   const form = useForm<AssessmentValues>({
     resolver: zodResolver(assessmentSignSchema),
     defaultValues: assessmentValues(deviation, cases),
@@ -205,9 +206,12 @@ function AssessmentForm({
     likelihood: values.likelihood ?? "",
   });
   const cls = values.classification;
-  const dueOn = cls
-    ? formatDay(addDays(deviation.created_at.slice(0, 10), CLASS_DUE_DAYS[cls]))
-    : null;
+  // What signing will set — the database reads the same settings (0071).
+  const dueDays = cls ? dueDaysFor(settings, cls) : null;
+  const dueOn =
+    dueDays !== null
+      ? formatDay(addDays(deviation.created_at.slice(0, 10), dueDays))
+      : null;
   const below = lik !== null && previous.length > 0 && lik < suggested;
   const rationaleRequired = cls === "Critical" || cls === "Major" || below;
 
@@ -508,7 +512,7 @@ function AssessmentForm({
             error={errors.classification?.message}
             hint={
               dueOn && cls
-                ? `Due ${CLASS_DUE_DAYS[cls]} days after raising: ${dueOn}.${cls === "Critical" ? " Close-out needs two QA signatures." : ""}`
+                ? `Due ${dueDays} days after raising: ${dueOn}.${cls === "Critical" ? " Close-out needs two QA signatures." : ""}`
                 : "Set by the table once severity and likelihood are chosen."
             }
           >

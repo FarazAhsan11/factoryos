@@ -34,6 +34,11 @@ import {
   type ProductListParams,
 } from "@/lib/factory/product-queries";
 import {
+  fetchQualitySettings,
+  fetchQualitySettingsLog,
+  qualitySettingsKeys,
+} from "@/lib/factory/quality-settings-queries";
+import {
   fetchSetupItems,
   setupKeys,
   type SetupTable,
@@ -176,6 +181,16 @@ const WARMERS: Record<string, Warm> = {
     void client.prefetchQuery({
       queryKey: shiftTimeKeys.all(factoryId),
       queryFn: () => fetchShiftTimes(factoryId),
+    });
+  },
+  "/admin?tab=quality": (client, factoryId) => {
+    void client.prefetchQuery({
+      queryKey: qualitySettingsKeys.all(factoryId),
+      queryFn: () => fetchQualitySettings(factoryId),
+    });
+    void client.prefetchQuery({
+      queryKey: qualitySettingsKeys.log(factoryId),
+      queryFn: () => fetchQualitySettingsLog(factoryId),
     });
   },
   "/admin?tab=users": (client, factoryId) => {

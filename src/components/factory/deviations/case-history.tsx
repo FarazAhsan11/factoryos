@@ -45,6 +45,9 @@ const SIGNATURES: AuditAction[] = [
   "hold_placed",
   "batch_released",
   "batch_rejected",
+  "extension_requested",
+  "extension_approved",
+  "extension_rejected",
 ];
 
 function inFilter(e: AuditEntry, f: Filter): boolean {
@@ -68,9 +71,12 @@ function inFilter(e: AuditEntry, f: Filter): boolean {
 export function CaseHistory({
   deviation: d,
   factoryId,
+  extensions,
 }: {
   deviation: Deviation;
   factoryId: string;
+  /** Due date extensions (0072) — between the timeline and the trail, as qms-v5. */
+  extensions?: React.ReactNode;
 }) {
   const [filter, setFilter] = useState<Filter>("all");
 
@@ -126,6 +132,8 @@ export function CaseHistory({
         <Timeline deviation={d} entries={entries} />
       </section>
 
+      {extensions && <div className="border-t border-line-soft pt-7 empty:hidden">{extensions}</div>}
+
       <section className="border-t border-line-soft pt-7">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h3 className="flex items-baseline gap-2 text-base font-semibold text-ink">
@@ -137,7 +145,7 @@ export function CaseHistory({
           <div
             role="radiogroup"
             aria-label="Show"
-            className="flex flex-wrap gap-1 rounded-xl border border-line bg-surface p-1"
+            className="flex flex-wrap gap-1 rounded-xl border border-line bg-surface p-1 print:hidden"
           >
             {FILTERS.map((f) => (
               <button
@@ -272,6 +280,9 @@ const EVENT_WHAT: Partial<Record<AuditAction, string>> = {
   hold_placed: "Batch hold placed",
   batch_released: "Signed: Batch released",
   batch_rejected: "Signed: Batch rejected",
+  extension_requested: "Due date extension requested",
+  extension_approved: "Signed: Due date extension approved",
+  extension_rejected: "Signed: Due date extension rejected",
 };
 
 type ReviewCheck = { item: string; finding: string };
@@ -313,6 +324,17 @@ function trailRows(e: AuditEntry, names: Names): TrailRow[] {
       return [row(0, "Signed: Batch released", "On hold", `${e.new_value} Released`)];
     case "batch_rejected":
       return [row(0, "Signed: Batch rejected", "On hold", `${e.new_value} Rejected`)];
+    case "extension_requested":
+    case "extension_approved":
+    case "extension_rejected":
+      return [
+        row(
+          0,
+          EVENT_WHAT[e.action]!,
+          e.old_value ? formatDay(e.old_value) : null,
+          e.new_value ? formatDay(e.new_value) : null,
+        ),
+      ];
     default:
       return [row(0, EVENT_WHAT[e.action] ?? e.action, e.old_value, e.new_value)];
   }
@@ -452,8 +474,8 @@ function Clamp({ text }: { text: string }) {
       <span
         title={open ? undefined : text}
         className={cn(
-          "break-words whitespace-pre-wrap",
-          !open && long && "line-clamp-2",
+          "whitespace-pre-wrap wrap-anywhere",
+          !open && long && "line-clamp-2 print:line-clamp-none",
         )}
       >
         {text}
@@ -462,7 +484,7 @@ function Clamp({ text }: { text: string }) {
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="mt-0.5 block text-[0.6875rem] font-semibold text-brand hover:underline"
+          className="mt-0.5 block text-[0.6875rem] font-semibold text-brand hover:underline print:hidden"
         >
           {open ? "Show less" : "Show more"}
         </button>

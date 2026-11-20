@@ -18,7 +18,10 @@ export type AuditAction =
   | "file_removed"
   | "hold_placed"
   | "batch_released"
-  | "batch_rejected";
+  | "batch_rejected"
+  | "extension_requested"
+  | "extension_approved"
+  | "extension_rejected";
 
 export interface AuditEntry {
   id: number;

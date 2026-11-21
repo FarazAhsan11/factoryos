@@ -164,13 +164,8 @@ export function DevInvestigationTab({
 
   return (
     <div className="space-y-7">
-      {approved ? (
-        <p className="flex items-center gap-2 rounded-xl border border-teal-line bg-teal-soft px-4 py-3 text-sm text-teal-deep">
-          <CheckCircle2 className="size-4 shrink-0" />
-          Investigation approved by {d.investigation_approved_by_name} ·{" "}
-          {formatDateTime(d.investigation_approved_at!)}
-        </p>
-      ) : submitted ? (
+      {/* Approved: the case page's Locked line says who approved it. */}
+      {approved ? null : submitted ? (
         <p className="rounded-xl border border-brand-soft bg-brand-tint px-4 py-3 text-sm text-brand-deep">
           Submitted for approval by {d.investigation_submitted_by_name} ·{" "}
           {formatDateTime(d.investigation_submitted_at!)}. Read-only while QA

@@ -352,6 +352,7 @@ export function DeviationCasePage({
           )}
           {section === "assessment" && (
             <AssessmentTab
+              hideSignature
               deviation={d}
               factoryId={factoryId}
               slug={slug}

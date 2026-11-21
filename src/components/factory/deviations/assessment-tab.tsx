@@ -143,6 +143,7 @@ export function AssessmentTab({
   slug,
   canEdit,
   viewerName,
+  hideSignature = false,
 }: {
   deviation: Deviation;
   factoryId: string;
@@ -150,6 +151,11 @@ export function AssessmentTab({
   /** Supervisor and up, on an open case. */
   canEdit: boolean;
   viewerName: string;
+  /**
+   * The case page says who signed in its Locked line above the tab, so the
+   * tab's own "signed by" line is left out there. The printed report keeps it.
+   */
+  hideSignature?: boolean;
 }) {
   // The case page has this list already; it is the cache, not a fetch.
   const { data: cases = [] } = useQuery({
@@ -158,7 +164,14 @@ export function AssessmentTab({
   });
 
   if (deviation.assessed_at || !canEdit) {
-    return <AssessmentFacts deviation={deviation} cases={cases} slug={slug} />;
+    return (
+      <AssessmentFacts
+        deviation={deviation}
+        cases={cases}
+        slug={slug}
+        hideSignature={hideSignature}
+      />
+    );
   }
   return (
     <AssessmentForm
@@ -891,21 +904,25 @@ function AssessmentFacts({
   deviation: d,
   cases,
   slug,
+  hideSignature = false,
 }: {
   deviation: Deviation;
   cases: Deviation[];
   slug: string;
+  hideSignature?: boolean;
 }) {
   const byId = new Map(cases.map((c) => [c.id, c]));
   const legacy = isLegacyRisk(d);
   return (
     <div className="space-y-7">
       {d.assessed_at ? (
+        !hideSignature && (
         <p className="flex items-center gap-2 rounded-xl border border-teal-line bg-teal-soft px-4 py-3 text-sm text-teal-deep">
           <CheckCircle2 className="size-4 shrink-0" />
           Initial assessment signed by {d.assessed_by_name} ·{" "}
           {formatDateTime(d.assessed_at)}
         </p>
+        )
       ) : (
         <p className="rounded-xl border border-dashed border-line-strong px-4 py-3 text-sm text-ink-4">
           Not assessed yet — a supervisor or QA signs the initial assessment.

@@ -32,6 +32,7 @@ import { CaseHistory } from "@/components/factory/deviations/case-history";
 import { InitiationTab } from "@/components/factory/deviations/deviation-tab-forms";
 import { canReview } from "@/lib/factory/action-queries";
 import type { FactoryRole } from "@/lib/factory/context";
+import { capaKeys, fetchCapas, stepLabel, type Capa } from "@/lib/factory/capa-queries";
 import { addDays, formatDateTime, formatDay } from "@/lib/factory/dates";
 import {
   DEV_STAGE_DOT,
@@ -87,7 +88,7 @@ function sectionState(d: Deviation, id: CaseSection): "ok" | "na" | "todo" | nul
       return d.investigation_approved_at ? "ok" : "todo";
     case "actions":
       return d.capa_needed === false ||
-        (d.capa_needed && d.capa_status === "effective")
+        (d.capa_needed && Boolean(d.capa_plan_approved_at))
         ? "ok"
         : "todo";
     case "closeout":
@@ -152,6 +153,11 @@ export function DeviationCasePage({
   // Due date extensions (0072), for the header, the banner and the button.
   const { data: extensions = [] } = useExtensions(factoryId, caseId);
   const [extending, setExtending] = useState(false);
+  // The linked CAPA's step, for the header (P3) — the register's cached list.
+  const { data: capas = [] } = useQuery({
+    queryKey: capaKeys.all(factoryId),
+    queryFn: () => fetchCapas(factoryId),
+  });
   const listHref = `/factory/${slug}/deviations`;
   const d = deviations?.find((x) => x.id === caseId) ?? null;
 
@@ -218,6 +224,8 @@ export function DeviationCasePage({
       <div className="mt-3 rounded-2xl border border-line bg-surface shadow-soft">
         <CaseHeader
           deviation={d}
+          capa={capas.find((c) => c.id === d.capa_id) ?? null}
+          capaHref={d.capa_id ? `/factory/${slug}/deviations/capa/${d.capa_id}` : undefined}
           assessDays={settings.assessDays}
           extended={extensions.some((e) => e.status === "approved")}
           onExtend={
@@ -507,12 +515,18 @@ function LockedBanner({
  */
 export function CaseHeader({
   deviation: d,
+  capa = null,
+  capaHref,
   assessDays,
   extended = false,
   onExtend,
   className,
 }: {
   deviation: Deviation;
+  /** The linked CAPA, for its step under its number (P3). */
+  capa?: Capa | null;
+  /** Where the CAPA number links; absent in print. */
+  capaHref?: string;
   /** Days QA has to sign the initial assessment — Configuration → Quality settings. */
   assessDays: number;
   /** An approved due date extension moved the due date (0072). */
@@ -589,12 +603,29 @@ export function CaseHeader({
             {stage}
           </span>
         </HeadFact>
-        <HeadFact label="Class">
-          <span className={d.classification ? CLASS_TEXT[d.classification] : undefined}>
-            {d.classification ?? "—"}
-          </span>
-        </HeadFact>
-        <HeadFact label="Risk">{d.assessed_at ? (devRiskLabel(d) ?? "—") : "—"}</HeadFact>
+        {/* Class, risk and owner come with the initial assessment — not
+            shown as "—" before it (P3). */}
+        {d.assessed_at && (
+          <>
+            <HeadFact label="Class">
+              <span className={d.classification ? CLASS_TEXT[d.classification] : undefined}>
+                {d.classification ?? "—"}
+              </span>
+            </HeadFact>
+            <HeadFact label="Risk">{devRiskLabel(d) ?? "—"}</HeadFact>
+          </>
+        )}
+        {d.capa_id && (
+          <HeadFact label={capa ? stepLabel(capa) : "CAPA"}>
+            {capaHref ? (
+              <Link href={capaHref} className="font-mono text-brand hover:underline">
+                {capa?.capa_no ?? d.capa_no}
+              </Link>
+            ) : (
+              <span className="font-mono">{capa?.capa_no ?? d.capa_no}</span>
+            )}
+          </HeadFact>
+        )}
         <HeadFact
           label={
             !open ? (
@@ -634,7 +665,7 @@ export function CaseHeader({
             formatDay(assessBy)
           )}
         </HeadFact>
-        <HeadFact label="Owner">{d.owner_name ?? "—"}</HeadFact>
+        {d.assessed_at && <HeadFact label="Owner">{d.owner_name ?? "—"}</HeadFact>}
       </dl>
     </header>
   );

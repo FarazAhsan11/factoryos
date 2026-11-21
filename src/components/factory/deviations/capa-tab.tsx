@@ -1,22 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller } from "react-hook-form";
-import { ArrowRight, Loader2, Plus } from "lucide-react";
+import { ArrowRight, Loader2, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 
 import {
   capaNotNeededSchema,
+  correctionRemoveSchema,
   correctionSchema,
   type CapaNotNeededValues,
+  type CorrectionRemoveValues,
   type CorrectionValues,
 } from "@/app/factory/[slug]/deviations/schemas";
 import { CapaPlanEditor } from "@/components/factory/capa/capa-plan-editor";
 import { CapaStepper } from "@/components/factory/capa/capa-stepper";
+import { WithdrawCapa } from "@/components/factory/capa/capa-withdraw";
 import { CaseAttachments } from "@/components/factory/deviations/case-attachments";
 import {
   AREA,
@@ -35,7 +38,9 @@ import {
   draftMissing,
   fetchCapaActions,
   fetchCapas,
+  liveFollowUps,
   newPlanDraft,
+  searchCapas,
   setCapaRootCause,
   stepLabel,
   type Capa,
@@ -46,6 +51,7 @@ import {
   correctionKeys,
   fetchCorrections,
   removeCorrection,
+  type Correction,
 } from "@/lib/factory/correction-queries";
 import { todayKey } from "@/lib/factory/dates";
 import {
@@ -106,8 +112,14 @@ export function CapaTab({
           done on the day can be recorded now.
         </p>
       )}
-      <Corrections deviation={d} factoryId={factoryId} canEdit={ed && Boolean(userId)} userId={userId ?? ""} />
-      <CapaSection deviation={d} factoryId={factoryId} canEdit={ed} />
+      <Corrections
+        deviation={d}
+        factoryId={factoryId}
+        canEdit={ed && Boolean(userId)}
+        userId={userId ?? ""}
+        viewerName={viewerName}
+      />
+      <CapaSection deviation={d} factoryId={factoryId} canEdit={ed} viewerName={viewerName} />
       {isDeviationType(d) && (
         <CaseAttachments
           factoryId={factoryId}
@@ -129,25 +141,20 @@ function Corrections({
   factoryId,
   canEdit,
   userId,
+  viewerName,
 }: {
   deviation: Deviation;
   factoryId: string;
   canEdit: boolean;
   userId: string;
+  viewerName: string;
 }) {
-  const queryClient = useQueryClient();
   const [adding, setAdding] = useState(false);
+  // The row whose "Reason for removing" is open.
+  const [removing, setRemoving] = useState<string | null>(null);
   const { data: rows = [], isPending } = useQuery({
     queryKey: correctionKeys.forCase(factoryId, d.id),
     queryFn: () => fetchCorrections(d.id),
-  });
-  const remove = useMutation({
-    mutationFn: (id: string) => removeCorrection(id),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: deviationKeys.all(factoryId) });
-      toast.success("Correction removed.");
-    },
-    onError: (e: Error) => toast.error(e.message),
   });
 
   return (
@@ -173,23 +180,16 @@ function Corrections({
             </thead>
             <tbody className="divide-y divide-line-soft bg-surface">
               {rows.map((r) => (
-                <tr key={r.id} className="align-top">
-                  <td className="px-3.5 py-2.5 whitespace-pre-wrap wrap-anywhere text-ink">{r.what}</td>
-                  <td className="px-3.5 py-2.5 text-ink-2">{r.who}</td>
-                  <td className="px-3.5 py-2.5 whitespace-nowrap text-ink-3">{formatDate(r.done_on)}</td>
-                  {canEdit && (
-                    <td className="px-3.5 py-2.5 text-right">
-                      <button
-                        type="button"
-                        disabled={remove.isPending}
-                        onClick={() => remove.mutate(r.id)}
-                        className="text-xs font-semibold text-brand hover:underline disabled:opacity-60"
-                      >
-                        Remove
-                      </button>
-                    </td>
-                  )}
-                </tr>
+                <CorrectionRow
+                  key={r.id}
+                  row={r}
+                  canEdit={canEdit}
+                  removing={removing === r.id}
+                  onRemove={() => setRemoving(r.id)}
+                  onDone={() => setRemoving(null)}
+                  factoryId={factoryId}
+                  viewerName={viewerName}
+                />
               ))}
             </tbody>
           </table>
@@ -214,6 +214,132 @@ function Corrections({
           </button>
         ))}
     </section>
+  );
+}
+
+/**
+ * One correction. A removed one stays on the list, struck through, with who
+ * removed it, when and why; Remove asks the reason in place (0075).
+ */
+function CorrectionRow({
+  row: r,
+  canEdit,
+  removing,
+  onRemove,
+  onDone,
+  factoryId,
+  viewerName,
+}: {
+  row: Correction;
+  canEdit: boolean;
+  removing: boolean;
+  onRemove: () => void;
+  onDone: () => void;
+  factoryId: string;
+  viewerName: string;
+}) {
+  const removed = r.removed_at !== null;
+  return (
+    <>
+      <tr className="align-top">
+        <td className="px-3.5 py-2.5 whitespace-pre-wrap wrap-anywhere">
+          {/* Only the correction is struck through, not the note under it. */}
+          <span className={removed ? "text-ink-5 line-through" : "text-ink"}>{r.what}</span>
+          {removed && (
+            <span className="mt-0.5 block text-xs text-ink-4">
+              Removed by {r.removed_by_name ?? "—"} on {formatDate(r.removed_at)} —{" "}
+              {r.removed_reason}
+            </span>
+          )}
+        </td>
+        <td className={cn("px-3.5 py-2.5", removed ? "text-ink-5 line-through" : "text-ink-2")}>{r.who}</td>
+        <td className={cn("px-3.5 py-2.5 whitespace-nowrap", removed ? "text-ink-5 line-through" : "text-ink-3")}>
+          {formatDate(r.done_on)}
+        </td>
+        {canEdit && (
+          <td className="px-3.5 py-2.5 text-right">
+            {!removed && !removing && (
+              <button
+                type="button"
+                onClick={onRemove}
+                className="text-xs font-semibold text-brand hover:underline"
+              >
+                Remove
+              </button>
+            )}
+          </td>
+        )}
+      </tr>
+      {removing && (
+        <tr>
+          <td colSpan={canEdit ? 4 : 3} className="bg-sunken px-3.5 py-3">
+            <RemoveCorrectionForm row={r} factoryId={factoryId} viewerName={viewerName} onDone={onDone} />
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+function RemoveCorrectionForm({
+  row,
+  factoryId,
+  viewerName,
+  onDone,
+}: {
+  row: Correction;
+  factoryId: string;
+  viewerName: string;
+  onDone: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const form = useForm<CorrectionRemoveValues>({
+    resolver: zodResolver(correctionRemoveSchema),
+    defaultValues: { reason: "" },
+  });
+  const errors = form.formState.errors;
+  const save = useMutation({
+    mutationFn: (v: CorrectionRemoveValues) => removeCorrection(row.id, v.reason, viewerName),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: deviationKeys.all(factoryId) });
+      toast.success("Correction removed.");
+      onDone();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <form
+      noValidate
+      onSubmit={form.handleSubmit((v) => save.mutateAsync(v).catch(() => {}))}
+      className="flex flex-wrap items-start gap-2"
+    >
+      <Field
+        label="Reason for removing"
+        htmlFor={`corr-rm-${row.id}`}
+        required
+        error={errors.reason?.message}
+        className="min-w-[16rem] flex-1"
+      >
+        <input
+          id={`corr-rm-${row.id}`}
+          autoFocus
+          placeholder="e.g. Entered on the wrong case"
+          aria-invalid={Boolean(errors.reason)}
+          className={CONTROL}
+          {...form.register("reason")}
+        />
+      </Field>
+      <div className="flex items-center gap-2 pt-6">
+        <button type="submit" disabled={save.isPending} className={PRIMARY_BUTTON}>
+          {save.isPending && <Loader2 className="size-4 animate-spin" />}
+          Remove
+        </button>
+        <button type="button" onClick={onDone} disabled={save.isPending} className={SECONDARY_BUTTON}>
+          Cancel
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -305,10 +431,12 @@ function CapaSection({
   deviation: d,
   factoryId,
   canEdit,
+  viewerName,
 }: {
   deviation: Deviation;
   factoryId: string;
   canEdit: boolean;
+  viewerName: string;
 }) {
   const { slug } = useParams<{ slug: string }>();
   const queryClient = useQueryClient();
@@ -317,6 +445,9 @@ function CapaSection({
     queryFn: () => fetchCapas(factoryId),
   });
   const linked = capas.find((c) => c.id === d.capa_id) ?? null;
+  // A CAPA is never left with no case (0075): while this is its only case,
+  // No is refused — before approval the CAPA is withdrawn instead.
+  const onlyCase = Boolean(linked) && linked!.cases.length <= 1;
   const recurring = isRecurring(d);
   const invPending =
     isDeviationType(d) &&
@@ -347,8 +478,8 @@ function CapaSection({
       <h3 className="text-base font-semibold text-ink">CAPA</h3>
       {invPending && (
         <p className="rounded-xl border border-warn-line bg-warn-tint px-4 py-2.5 text-sm text-warn-ink">
-          The investigation is not approved yet. Decide on a CAPA once QA has approved the root
-          cause — or, to start a CAPA now, enter its root cause in the New CAPA form.
+          The investigation is not approved yet. A CAPA can be drafted now, but its plan is
+          approved only once QA has approved the investigation&rsquo;s root cause.
         </p>
       )}
       {recurring && (
@@ -366,8 +497,9 @@ function CapaSection({
             // case too: the answer is fixed. Before that, No takes the case
             // off the CAPA.
             const locked = Boolean(d.capa_id) && !(linked && linked.step === "plan");
+            const soleNo = v === "no" && onlyCase && linked?.step === "plan";
             const disabled =
-              !canEdit || locked || sayYes.isPending || (v === "no" && recurring);
+              !canEdit || locked || sayYes.isPending || (v === "no" && recurring) || soleNo;
             return (
               <button
                 key={v}
@@ -378,7 +510,9 @@ function CapaSection({
                 title={
                   v === "no" && recurring
                     ? "A recurring problem needs a CAPA"
-                    : locked && linked
+                    : soleNo && linked
+                      ? `${linked.capa_no} was raised for this case only. Withdraw it first.`
+                      : locked && linked
                       ? `${linked.capa_no}'s plan is approved — the answer is fixed`
                       : undefined
                 }
@@ -411,7 +545,14 @@ function CapaSection({
       {answer === "yes" &&
         (d.capa_id ? (
           linked ? (
-            <LinkedCard capa={linked} deviation={d} slug={slug} canEdit={canEdit} factoryId={factoryId} />
+            <LinkedCard
+              capa={linked}
+              deviation={d}
+              slug={slug}
+              canEdit={canEdit}
+              factoryId={factoryId}
+              viewerName={viewerName}
+            />
           ) : isPending ? (
             <Loader2 className="size-5 animate-spin text-ink-5" />
           ) : (
@@ -699,7 +840,7 @@ function FollowUpNote({ capa, factoryId, slug }: { capa: Capa; factoryId: string
         .
       </span>{" "}
       It was verified effective
-      {capa.verified_at && ` on ${formatDate(capa.verified_at.slice(0, 10))}`}, but the problem
+      {capa.verified_at && ` on ${formatDate(capa.verified_at)}`}, but the problem
       came back.
       {actions.length > 0 && ` Its actions were: ${actions.map((a) => a.description).join("; ")}.`}{" "}
       Plan what will be different this time.
@@ -708,6 +849,9 @@ function FollowUpNote({ capa, factoryId, slug }: { capa: Capa; factoryId: string
 }
 
 /* ── Add to an existing CAPA ──────────────────────────────────────────── */
+
+/** How many CAPAs each list shows — the latest, or the best matches. */
+const LINK_LIMIT = 8;
 
 function LinkList({
   deviation: d,
@@ -721,14 +865,39 @@ function LinkList({
   deviation: Deviation;
   factoryId: string;
   slug: string;
+  /** Every CAPA (already cached) — to tell whether a follow-up is still open. */
   capas: Capa[];
   onFollowUp: (c: Capa) => void;
   onCancel: () => void;
   onLinked: () => void;
 }) {
   const queryClient = useQueryClient();
-  const openC = capas.filter((c) => c.step !== "closed");
-  const closedC = capas.filter((c) => c.step === "closed");
+
+  // Searched in the database (S2): the box keeps the typed text and commits
+  // it on a 300ms pause — in the change handler, not an effect.
+  const [typed, setTyped] = useState("");
+  const [query, setQuery] = useState("");
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function onType(value: string) {
+    setTyped(value);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setQuery(value.trim()), 300);
+  }
+
+  const openQ = useQuery({
+    queryKey: capaKeys.search(factoryId, query, false, LINK_LIMIT),
+    queryFn: () => searchCapas(factoryId, query, false, LINK_LIMIT),
+    placeholderData: (prev) => prev,
+  });
+  const closedQ = useQuery({
+    queryKey: capaKeys.search(factoryId, query, true, LINK_LIMIT),
+    queryFn: () => searchCapas(factoryId, query, true, LINK_LIMIT),
+    placeholderData: (prev) => prev,
+  });
+  const openC = openQ.data ?? [];
+  const closedC = closedQ.data ?? [];
+  const searching = openQ.isFetching || closedQ.isFetching;
+
   const link = useMutation({
     mutationFn: (c: Capa) => linkCapa(d.id, c.id),
     onSuccess: async (_, c) => {
@@ -739,7 +908,47 @@ function LinkList({
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const row = (c: Capa, button: React.ReactNode) => (
+  const small =
+    "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-xs font-semibold text-ink-3 shadow-soft transition hover:border-brand hover:text-brand disabled:opacity-60";
+
+  const addButton = (c: Capa, label = "Add this case") => (
+    <button type="button" disabled={link.isPending} onClick={() => link.mutate(c)} className={small}>
+      {link.isPending && link.variables?.id === c.id && <Loader2 className="size-3.5 animate-spin" />}
+      {label}
+    </button>
+  );
+
+  /**
+   * A closed CAPA's action. One that already has a follow-up points to the
+   * latest follow-up — adding the case there if it is still open — so a
+   * second, parallel follow-up is never started from the old CAPA.
+   */
+  const closedAction = (c: Capa) => {
+    // Search results are read on their own; drop withdrawn follow-ups here.
+    const latest = liveFollowUps(c, capas).at(-1);
+    if (!latest) {
+      return (
+        <button type="button" onClick={() => onFollowUp(c)} className={small}>
+          Start follow-up CAPA
+        </button>
+      );
+    }
+    const follow = capas.find((x) => x.id === latest.id);
+    const followOpen = follow && follow.step !== "closed" && follow.step !== "withdrawn";
+    return (
+      <span className="flex shrink-0 flex-wrap items-center gap-2">
+        <Link
+          href={`/factory/${slug}/deviations/capa/${latest.id}`}
+          className="text-xs font-semibold text-brand hover:underline"
+        >
+          Has follow-up {latest.capa_no} →
+        </Link>
+        {followOpen && addButton(follow, `Add to ${follow.capa_no}`)}
+      </span>
+    );
+  };
+
+  const row = (c: Capa, action: React.ReactNode) => (
     <li key={c.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
       <Link
         href={`/factory/${slug}/deviations/capa/${c.id}`}
@@ -751,17 +960,41 @@ function LinkList({
         <span className="text-ink">{c.title}</span>
         <span className="block text-xs text-ink-4">
           {stepLabel(c)} · {c.cases.map((k) => k.deviation_no).join(", ") || "no case"}
-          {c.recurred_by.length > 0 && ` · recurred ${c.recurred_by.length}×`}
+          {c.root_cause && ` · ${c.root_cause}`}
         </span>
       </span>
-      {button}
+      {action}
     </li>
   );
-  const small =
-    "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-xs font-semibold text-ink-3 shadow-soft transition hover:border-brand hover:text-brand disabled:opacity-60";
+
+  const hint = (shown: number) =>
+    query
+      ? shown === 0
+        ? `No match for “${query}”.`
+        : shown >= LINK_LIMIT
+          ? `The ${LINK_LIMIT} newest matches — type more to narrow it down.`
+          : null
+      : shown >= LINK_LIMIT
+        ? `The ${LINK_LIMIT} newest — search to find older ones.`
+        : null;
 
   return (
     <div className="space-y-5 rounded-2xl border border-line bg-surface p-4 sm:p-5">
+      <div className="relative max-w-xl">
+        <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-5" />
+        <input
+          type="search"
+          value={typed}
+          onChange={(e) => onType(e.target.value)}
+          placeholder="Search CAPA number, title, case, product or root cause"
+          aria-label="Search CAPAs"
+          className={cn(CONTROL, "pl-9")}
+        />
+        {searching && (
+          <Loader2 className="absolute top-1/2 right-3 size-4 -translate-y-1/2 animate-spin text-ink-5" />
+        )}
+      </div>
+
       <div className="space-y-2">
         <p className="flex flex-wrap items-baseline gap-x-2">
           <span className="text-sm font-semibold text-ink">Open CAPAs</span>
@@ -769,27 +1002,24 @@ function LinkList({
             This case joins the CAPA and shares its actions and effectiveness check.
           </span>
         </p>
-        {openC.length === 0 ? (
+        {openQ.isPending ? (
+          <Loader2 className="size-4 animate-spin text-ink-5" />
+        ) : openQ.isError ? (
+          <p className="text-sm text-danger-deep">{(openQ.error as Error).message}</p>
+        ) : openC.length === 0 && !query ? (
           <p className="text-sm text-ink-5">No open CAPAs.</p>
         ) : (
-          <ul className="divide-y divide-line-soft rounded-xl border border-line">
-            {openC.map((c) =>
-              row(
-                c,
-                <button
-                  type="button"
-                  disabled={link.isPending}
-                  onClick={() => link.mutate(c)}
-                  className={small}
-                >
-                  {link.isPending && link.variables?.id === c.id && <Loader2 className="size-3.5 animate-spin" />}
-                  Add this case
-                </button>,
-              ),
+          <>
+            {openC.length > 0 && (
+              <ul className="divide-y divide-line-soft rounded-xl border border-line">
+                {openC.map((c) => row(c, addButton(c)))}
+              </ul>
             )}
-          </ul>
+            {hint(openC.length) && <p className="text-xs text-ink-5">{hint(openC.length)}</p>}
+          </>
         )}
       </div>
+
       <div className="space-y-2">
         <p className="flex flex-wrap items-baseline gap-x-2">
           <span className="text-sm font-semibold text-ink">Closed CAPAs</span>
@@ -798,21 +1028,24 @@ function LinkList({
             records the recurrence.
           </span>
         </p>
-        {closedC.length === 0 ? (
+        {closedQ.isPending ? (
+          <Loader2 className="size-4 animate-spin text-ink-5" />
+        ) : closedQ.isError ? (
+          <p className="text-sm text-danger-deep">{(closedQ.error as Error).message}</p>
+        ) : closedC.length === 0 && !query ? (
           <p className="text-sm text-ink-5">No closed CAPAs.</p>
         ) : (
-          <ul className="divide-y divide-line-soft rounded-xl border border-line">
-            {closedC.map((c) =>
-              row(
-                c,
-                <button type="button" onClick={() => onFollowUp(c)} className={small}>
-                  Start follow-up CAPA
-                </button>,
-              ),
+          <>
+            {closedC.length > 0 && (
+              <ul className="divide-y divide-line-soft rounded-xl border border-line">
+                {closedC.map((c) => row(c, closedAction(c)))}
+              </ul>
             )}
-          </ul>
+            {hint(closedC.length) && <p className="text-xs text-ink-5">{hint(closedC.length)}</p>}
+          </>
         )}
       </div>
+
       <button type="button" onClick={onCancel} className={SECONDARY_BUTTON}>
         Cancel
       </button>
@@ -855,10 +1088,21 @@ function CapaRootCause({
   });
 
   if (hasApprovedRoot(d)) {
+    const drafted = capa.root_cause?.trim();
+    const norm = (t: string) => t.trim().toLowerCase().replace(/\s+/g, " ");
+    const drift = Boolean(drafted) && norm(drafted!) !== norm(d.root_cause ?? "");
     return (
-      <p className="text-sm text-ink-3">
-        <span className="text-ink-4">Root cause:</span> {d.root_cause}
-      </p>
+      <div className="space-y-1.5">
+        <p className="text-sm text-ink-3">
+          <span className="text-ink-4">Root cause:</span> {d.root_cause}
+        </p>
+        {drift && capa.step !== "closed" && capa.step !== "withdrawn" && (
+          <p className="rounded-lg border border-warn-line bg-warn-tint px-3 py-2 text-xs text-warn-ink">
+            <span className="font-semibold">Root cause changed since this plan was drafted.</span> It
+            was planned against &ldquo;{drafted}&rdquo;. Check the actions still fit.
+          </p>
+        )}
+      </div>
     );
   }
   if (!(canEdit && capa.step === "plan")) {
@@ -900,7 +1144,7 @@ function CapaRootCause({
       </div>
       <p className="text-[0.6875rem] text-ink-5">
         {d.root_cause?.trim()
-          ? "The investigation's root cause is not approved yet — this is the one the CAPA works on."
+          ? "Draft — the investigation's root cause is not approved yet. The plan is approved once it is."
           : "No investigation root cause is recorded on this case yet."}
         {!capa.root_cause && value.trim() && " Not saved yet."}
       </p>
@@ -920,12 +1164,14 @@ function LinkedCard({
   slug,
   canEdit,
   factoryId,
+  viewerName,
 }: {
   capa: Capa;
   deviation: Deviation;
   slug: string;
   canEdit: boolean;
   factoryId: string;
+  viewerName: string;
 }) {
   const queryClient = useQueryClient();
   const today = useRenderClock(todayKey);
@@ -1001,7 +1247,17 @@ function LinkedCard({
           </div>
         )}
       </div>
-      <p className="text-xs text-ink-5">This case waits until the CAPA is verified effective.</p>
+      {canEdit && capa.step === "plan" && capa.cases.length <= 1 && (
+        <div className="space-y-1">
+          <p className="text-xs text-ink-4">
+            {capa.capa_no} was raised for this case only — to answer No, withdraw it first.
+          </p>
+          <WithdrawCapa capa={capa} factoryId={factoryId} viewerName={viewerName} />
+        </div>
+      )}
+      <p className="text-xs text-ink-5">
+        This case can close once the CAPA plan is approved. Effectiveness is tracked on the CAPA.
+      </p>
     </div>
   );
 }

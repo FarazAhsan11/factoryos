@@ -47,9 +47,22 @@ const MONTHS = [
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-/** "2026-08-14" (or a timestamp starting with it) → "14 Aug 2026". */
+/**
+ * The local calendar day of a value: a plain `YYYY-MM-DD` as it is, a
+ * timestamp (`2026-11-21T19:20:00+00:00`) as the viewer's own day. Never
+ * `.slice(0, 10)` a timestamp — that is its UTC day, a day out either side
+ * of midnight for anyone not on UTC (a 00:20 entry in Lahore read as
+ * yesterday).
+ */
+export function localDay(iso: string): string {
+  if (iso.length <= 10) return iso;
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? iso.slice(0, 10) : todayKey(date);
+}
+
+/** "2026-08-14", or a timestamp (read as its local day) → "14 Aug 2026". */
 export function formatDay(iso: string): string {
-  const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
+  const [y, m, d] = localDay(iso).split("-").map(Number);
   if (!y || !m || !d) return iso;
   return `${d} ${MONTHS[m - 1]} ${y}`;
 }

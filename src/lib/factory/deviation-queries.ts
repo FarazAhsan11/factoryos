@@ -312,7 +312,7 @@ export interface Deviation {
   capa_not_needed_reason: string | null;
   capa_id: string | null;
   capa_no: string | null;
-  capa_status: "open" | "effective" | null;
+  capa_status: "open" | "effective" | "withdrawn" | null;
   capa_verified_at: string | null;
 
   /* ── A deviation's initiation (0062) ───────────────────────────────── */
@@ -375,6 +375,10 @@ export interface Deviation {
   holds_total: number;
   /** What the investigation reviewed, and what each showed (0070). */
   review_checks: { item: string; finding: string }[];
+  /** When the linked CAPA's plan was approved — the case closes on it (0075). */
+  capa_plan_approved_at: string | null;
+  /** How many cases the linked CAPA covers, this one included (0075). */
+  capa_case_count: number | null;
 }
 
 const COLUMNS = `
@@ -411,7 +415,8 @@ const COLUMNS = `
   unresolved_risk, duplicate_of, cost_of_quality,
   close_first_signed_at, close_first_signed_by_name,
   previous_case_ids, no_previous_found_at, no_previous_found_by_name,
-  previous_cases_external, holds_on_hold, holds_total, review_checks
+  previous_cases_external, holds_on_hold, holds_total, review_checks,
+  capa_plan_approved_at, capa_case_count
 `;
 
 /**
@@ -854,12 +859,19 @@ export function closeDevCase(
 export const signaturesNeeded = (d: Deviation) =>
   d.classification === "Critical" ? 2 : 1;
 
+/** One line of the close-out checklist; `here` — a field of the close-out form itself. */
+export interface ChecklistItem {
+  label: string;
+  done: boolean;
+  here?: boolean;
+}
+
 /**
  * The close-out checklist, as the reference QMS draws it — each item and
  * whether it is done. The sign button waits for every one.
  */
-export function devChecklist(d: Deviation): { label: string; done: boolean }[] {
-  const list: { label: string; done: boolean }[] = [
+export function devChecklist(d: Deviation): ChecklistItem[] {
+  const list: ChecklistItem[] = [
     { label: "Initial assessment signed", done: Boolean(d.assessed_at) },
     d.investigation_required === false
       ? { label: "Investigation not required (reason recorded)", done: true }
@@ -885,15 +897,20 @@ export function devChecklist(d: Deviation): { label: string; done: boolean }[] {
         (d.capa_needed === true && Boolean(d.capa_id)),
     },
   ];
+  // The case closes once its CAPA's plan is approved; the CAPA's
+  // effectiveness is tracked on the CAPA, on its own dates (0075).
   if (d.capa_needed) {
     list.push({
-      label: `${d.capa_no ?? "CAPA"} verified effective`,
-      done: d.capa_status === "effective",
+      label: `${d.capa_no ?? "CAPA"} plan approved`,
+      done: Boolean(d.capa_plan_approved_at),
     });
   }
+  // The close-out's own fields: checked when it is signed, beside each field,
+  // not listed again above them (P1).
   list.push(
-    { label: "No unresolved product or patient risk", done: d.unresolved_risk === false },
+    { label: "No unresolved product or patient risk", done: d.unresolved_risk === false, here: true },
     {
+      here: true,
       label: "Close-out summary and reason",
       done:
         (d.closing_note ?? "").trim().length >= 10 &&
@@ -902,6 +919,34 @@ export function devChecklist(d: Deviation): { label: string; done: boolean }[] {
     },
   );
   return list;
+}
+
+/* ── The root cause a CAPA works on (0075) ─────────────────────────────── */
+
+/** A deviation (planned / unplanned), not an NCR or a complaint. */
+export const isDeviationCase = (d: Pick<Deviation, "type">) =>
+  d.type === "planned" || d.type === "unplanned";
+
+/**
+ * The case's root cause once it counts: a deviation's after QA has approved
+ * its investigation; an NCR's or complaint's as written. Otherwise null.
+ */
+export function approvedRootCause(d: Deviation): string | null {
+  const root = d.root_cause?.trim();
+  if (!root) return null;
+  return d.investigation_approved_at !== null || !isDeviationCase(d) ? root : null;
+}
+
+/**
+ * Whether a CAPA covering this case must wait for its investigation before
+ * the plan is approved — the rule `capas_guard` applies.
+ */
+export function investigationPending(d: Deviation): boolean {
+  return (
+    isDeviationCase(d) &&
+    d.investigation_required !== false &&
+    d.investigation_approved_at === null
+  );
 }
 
 /* ── A deviation's risk (0068) ────────────────────────────────────────── */
@@ -955,7 +1000,8 @@ export function devStage(d: Deviation): DevStage {
     return d.investigation_submitted_at ? "Awaiting approval" : "Investigating";
   }
   if (d.capa_needed === null || (d.capa_needed && !d.capa_id)) return "Actions";
-  if (d.capa_needed && d.capa_status !== "effective") return "Awaiting CAPA";
+  // Waiting for the CAPA's plan to be approved (0075) — not its effectiveness.
+  if (d.capa_needed && !d.capa_plan_approved_at) return "Awaiting CAPA";
   // A batch still on hold is decided before the case closes (0069).
   if (d.holds_on_hold > 0) return "Batches on hold";
   return d.close_first_signed_at ? "Awaiting 2nd signature" : "Ready to close";
@@ -987,7 +1033,7 @@ export function nextStep(d: Deviation): { text: string; tab: CaseSection } | nul
       };
     case "Awaiting CAPA":
       return {
-        text: `Waiting for ${d.capa_no ?? "the CAPA"} to be verified effective.`,
+        text: `Waiting for ${d.capa_no ?? "the CAPA"}'s plan to be approved.`,
         tab: "actions",
       };
     case "Batches on hold":
@@ -1158,15 +1204,15 @@ export const CASE_STAGES: Record<
 /**
  * Where an open case stands, read from what it already holds — not a second
  * status column. It still has one gate, Open → Closed; this only says what
- * it is waiting on: its CAPA to be verified, nothing (ready to close), or the
- * work itself.
+ * it is waiting on: its CAPA's plan to be approved, nothing (ready to close),
+ * or the work itself.
  */
 export function caseStage(deviation: Deviation): CaseStage {
   if (deviation.status === "closed") return "closed";
   if (
     deviation.capa_needed &&
     deviation.capa_id &&
-    deviation.capa_status !== "effective"
+    !deviation.capa_plan_approved_at
   ) {
     return "awaiting_capa";
   }
@@ -1264,10 +1310,10 @@ export function outstanding(deviation: Deviation): {
     });
   } else if (deviation.capa_needed && !deviation.capa_id) {
     gaps.push({ tab: "capa", what: "a linked CAPA" });
-  } else if (deviation.capa_needed && deviation.capa_status !== "effective") {
+  } else if (deviation.capa_needed && !deviation.capa_plan_approved_at) {
     gaps.push({
       tab: "capa",
-      what: `${deviation.capa_no} to be verified as effective`,
+      what: `${deviation.capa_no}'s plan to be approved`,
     });
   }
   return gaps;

@@ -23,6 +23,7 @@ import {
   RegisterViews,
 } from "@/components/factory/register-table";
 import { canReview } from "@/lib/factory/action-queries";
+import { capaKeys, fetchCapas } from "@/lib/factory/capa-queries";
 import type { FactoryRole } from "@/lib/factory/context";
 import {
   DEVIATION_TYPES,
@@ -131,6 +132,11 @@ export function DeviationsWorkspace({
   } = useQuery({
     queryKey: deviationKeys.all(factoryId),
     queryFn: () => fetchDeviations(factoryId),
+  });
+  // Each case's CAPA step, for the CAPA column (P3).
+  const { data: capas = [] } = useQuery({
+    queryKey: capaKeys.all(factoryId),
+    queryFn: () => fetchCapas(factoryId),
   });
 
   const refresh = useCallback(
@@ -361,6 +367,7 @@ export function DeviationsWorkspace({
             deviations={visible}
             onOpen={openCase}
             columns={columns}
+            capas={capas}
             emptyTitle={
               onScreen.length === 0
                 ? `No ${screen.heading.toLowerCase()} yet.`

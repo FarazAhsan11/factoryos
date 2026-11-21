@@ -13,8 +13,10 @@ import {
   type CapaCheckValues,
 } from "@/app/factory/[slug]/deviations/schemas";
 import { CapaActionTable } from "@/components/factory/capa/capa-action-table";
+import { CapaFiles, PickFiles, useCapaFiles } from "@/components/factory/capa/capa-files";
 import { CapaPlanEditor, PlanGroupHead } from "@/components/factory/capa/capa-plan-editor";
 import { CapaStepper } from "@/components/factory/capa/capa-stepper";
+import { WithdrawCapa } from "@/components/factory/capa/capa-withdraw";
 import {
   AREA,
   CONTROL,
@@ -25,6 +27,7 @@ import {
 } from "@/components/factory/deviations/deviation-fields";
 import { DateField } from "@/components/ui/date-picker";
 import { canReview } from "@/lib/factory/action-queries";
+import { deleteCapaFile, uploadCapaFiles } from "@/lib/factory/capa-attachment-queries";
 import {
   approveCapaPlan,
   capaKeys,
@@ -50,7 +53,12 @@ import {
 } from "@/lib/factory/capa-queries";
 import type { FactoryRole } from "@/lib/factory/context";
 import { addDays, formatDateTime, todayKey } from "@/lib/factory/dates";
-import { deviationKeys, fetchDeviations } from "@/lib/factory/deviation-queries";
+import {
+  approvedRootCause,
+  deviationKeys,
+  fetchDeviations,
+  investigationPending,
+} from "@/lib/factory/deviation-queries";
 import { useForm } from "@/lib/use-form";
 import { useRenderClock } from "@/lib/use-render-clock";
 import { cn } from "@/lib/utils";
@@ -78,7 +86,7 @@ type StepState = "done" | "cur" | "later";
  * cause; then the three steps one under another — Plan (written, then
  * approved), Implement (each action marked done with its evidence) and
  * Verify (effective, or not effective with the next check date). Files and
- * history fold away underneath.
+ * history fold away underneath. A CAPA still in Plan can be withdrawn (0075).
  */
 export function CapaPage({
   factoryId,
@@ -86,12 +94,14 @@ export function CapaPage({
   capaId,
   role,
   viewerName,
+  userId,
 }: {
   factoryId: string;
   slug: string;
   capaId: string;
   role: FactoryRole;
   viewerName: string;
+  userId: string;
 }) {
   const today = useRenderClock(todayKey);
   const { data: capas, isPending, isError, error } = useQuery({
@@ -143,16 +153,28 @@ export function CapaPage({
   const reviewer = canReview(role);
   const idx = STEP_INDEX[capa.step];
   const closed = capa.step === "closed";
+  const withdrawn = capa.step === "withdrawn";
+  // Neither is edited again.
+  const frozen = closed || withdrawn;
   const state = (i: number): StepState => (i < idx ? "done" : i === idx ? "cur" : "later");
   const next = capaNext(capa);
   const done = actions.filter((a) => a.closed_date).length;
   const total = actions.length;
   const lastCheck = checks.at(-1) ?? null;
-  const roots = capa.cases.map((k) => ({
-    k,
-    root: cases.find((d) => d.id === k.id)?.root_cause ?? null,
-  }));
-  const nextOverdue = !closed && next.date !== null && next.date < today;
+  const caseRows = capa.cases.map((k) => ({ k, d: cases.find((x) => x.id === k.id) ?? null }));
+  const roots = caseRows.map(({ k, d }) => ({ k, root: d?.root_cause ?? null }));
+  // One root cause, the case's (0075): an approved one wins over the CAPA's
+  // draft, and the plan waits for every pending investigation.
+  const approvedRoots = caseRows
+    .map(({ k, d }) => ({ k, root: d ? approvedRootCause(d) : null }))
+    .filter((r): r is { k: CapaCase; root: string } => r.root !== null);
+  const pendingInv = caseRows.filter(({ d }) => d && investigationPending(d)).map(({ k }) => k.deviation_no);
+  const norm = (t: string) => t.trim().toLowerCase().replace(/\s+/g, " ");
+  const rootDrift =
+    approvedRoots.length > 0 &&
+    Boolean(capa.root_cause?.trim()) &&
+    !approvedRoots.some((r) => norm(r.root) === norm(capa.root_cause!));
+  const nextOverdue = !frozen && next.date !== null && next.date < today;
 
   return (
     <div className="mx-auto w-full max-w-[1200px]">
@@ -167,7 +189,7 @@ export function CapaPage({
       <div className="mt-3 rounded-2xl border border-line bg-surface shadow-soft">
         <header className="grid gap-x-10 gap-y-4 px-5 pt-5 sm:px-7 sm:pt-6 lg:grid-cols-[minmax(0,1fr)_auto]">
           <div className="min-w-0">
-            <CapaTitle capa={capa} canRename={reviewer && !closed} factoryId={factoryId} />
+            <CapaTitle capa={capa} canRename={reviewer && !frozen} factoryId={factoryId} />
             <p className="mt-1.5 flex flex-wrap items-center gap-x-1 text-sm leading-relaxed text-ink-4">
               <span className="font-mono">{capa.capa_no}</span>
               <span>· from</span>
@@ -182,7 +204,7 @@ export function CapaPage({
                     </span>
                   ))}
               <span>
-                · raised by {capa.created_by_name ?? "—"} on {formatDate(capa.created_at.slice(0, 10))}
+                · raised by {capa.created_by_name ?? "—"} on {formatDate(capa.created_at)}
               </span>
             </p>
             {(capa.recurrence_of || capa.recurred_by.length > 0) && (
@@ -212,9 +234,11 @@ export function CapaPage({
                 ))}
               </div>
             )}
-            <div className="mt-4">
-              <CapaStepper step={capa.step} />
-            </div>
+            {!withdrawn && (
+              <div className="mt-4">
+                <CapaStepper step={capa.step} />
+              </div>
+            )}
           </div>
           <div className="min-w-[9rem] lg:text-right">
             {next.date ? (
@@ -236,10 +260,27 @@ export function CapaPage({
         <div className="space-y-4 px-5 py-6 sm:px-7">
           <p className="rounded-xl border border-line-soft bg-sunken px-4 py-3 text-sm text-ink-3">
             <span className="text-ink-4">Root cause:</span>{" "}
-            {capa.root_cause ? (
+            {approvedRoots.length > 0 ? (
+              approvedRoots.map(({ k, root }, i) => (
+                <span key={k.id}>
+                  {i > 0 && " · "}
+                  <Link href={caseHref(slug, k)} className="font-mono text-brand hover:underline">
+                    {k.deviation_no}
+                  </Link>{" "}
+                  {root}
+                </span>
+              ))
+            ) : capa.root_cause ? (
               <>
-                {capa.root_cause}{" "}
-                <span className="text-ink-5">· {capa.cases.map((k) => k.deviation_no).join(", ")}</span>
+                {capa.root_cause}
+                {/* A withdrawn CAPA has no case left to name. */}
+                {capa.cases.length > 0 && (
+                  <span className="text-ink-5">
+                    {" "}
+                    · {capa.cases.map((k) => k.deviation_no).join(", ")}
+                    {pendingInv.length > 0 && " — draft: the investigation is not approved yet"}
+                  </span>
+                )}
               </>
             ) : roots.length === 0 ? (
               "No linked case"
@@ -256,19 +297,36 @@ export function CapaPage({
             )}
           </p>
 
+          {rootDrift && !frozen && (
+            <p className="rounded-xl border border-warn-line bg-warn-tint px-4 py-2.5 text-sm text-warn-ink">
+              <span className="font-semibold">Root cause changed since this plan was drafted.</span> It
+              was planned against “{capa.root_cause}”. Check the actions still fit.
+            </p>
+          )}
+
+          {withdrawn && (
+            <p className="rounded-xl border border-line bg-sunken-2 px-4 py-3 text-sm text-ink-3">
+              <span className="font-semibold text-ink">Withdrawn</span> by {capa.withdrawn_by_name} on{" "}
+              {formatDate(capa.withdrawn_at)} — {capa.withdraw_reason}. Kept as a
+              record; its cases went back to “Is a CAPA required?”.
+            </p>
+          )}
+
           {closed && (
             <p className="flex items-start gap-2 rounded-xl border border-teal-line bg-teal-soft px-4 py-3 text-sm text-teal-deep">
               <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
               <span>
                 Closed — effective. {lastCheck?.findings ?? capa.verification} (
                 {lastCheck?.checked_by_name ?? capa.verified_by_name},{" "}
-                {formatDate((lastCheck?.checked_at ?? capa.verified_at ?? "").slice(0, 10))})
+                {formatDate(lastCheck?.checked_at ?? capa.verified_at ?? null)})
               </span>
             </p>
           )}
 
-          <StepSection n={0} title="Plan" state={state(0)}>
-            {capa.step === "plan" ? (
+          <StepSection n={0} title="Plan" state={withdrawn ? "later" : state(0)}>
+            {withdrawn ? (
+              <PlanReadOnly capa={capa} actions={actions} factoryId={factoryId} viewerName={viewerName} userId={userId} today={today} note="Withdrawn before approval." />
+            ) : capa.step === "plan" ? (
               reviewer ? (
                 actionsPending ? (
                   <Loader2 className="size-5 animate-spin text-ink-5" />
@@ -279,19 +337,19 @@ export function CapaPage({
                     capa={capa}
                     actions={actions}
                     factoryId={factoryId}
-                   
+                    pendingInv={pendingInv}
                     viewerName={viewerName}
                     today={today}
                   />
                 )
               ) : (
-                <PlanReadOnly capa={capa} actions={actions} factoryId={factoryId} viewerName={viewerName} today={today} />
+                <PlanReadOnly capa={capa} actions={actions} factoryId={factoryId} viewerName={viewerName} userId={userId} today={today} />
               )
             ) : (
               <p className="flex flex-wrap items-center gap-1.5 text-sm text-teal-deep">
                 <Check className="size-4" />
                 Approved by {capa.plan_approved_by_name} on{" "}
-                {formatDate((capa.plan_approved_at ?? "").slice(0, 10))}
+                {formatDate(capa.plan_approved_at)}
                 {capa.plan_approval_note && (
                   <span className="text-ink-3"> — “{capa.plan_approval_note}”</span>
                 )}
@@ -299,6 +357,7 @@ export function CapaPage({
             )}
           </StepSection>
 
+          {!withdrawn && (
           <StepSection
             n={1}
             title="Implement"
@@ -339,17 +398,19 @@ export function CapaPage({
                     kind={kind}
                     mode="impl"
                     factoryId={factoryId}
-                   
                     canDo={reviewer && !closed}
                     canAdd={reviewer && !closed}
                     viewerName={viewerName}
+                    userId={userId}
                     today={today}
                   />
                 ))}
               </div>
             )}
           </StepSection>
+          )}
 
+          {!withdrawn && (
           <StepSection
             n={2}
             title="Verify"
@@ -369,12 +430,20 @@ export function CapaPage({
                 factoryId={factoryId}
                 canCheck={reviewer && capa.step === "check"}
                 viewerName={viewerName}
+                userId={userId}
                 today={today}
               />
             )}
           </StepSection>
+          )}
 
-          <CapaHistoryFold factoryId={factoryId} capaId={capa.id} />
+          <FilesAndHistory
+            factoryId={factoryId}
+            capaId={capa.id}
+            userId={userId}
+            userName={viewerName}
+            canAttach={reviewer && !frozen}
+          />
         </div>
       </div>
     </div>
@@ -519,12 +588,15 @@ function PlanStep({
   capa,
   actions,
   factoryId,
+  pendingInv,
   viewerName,
   today,
 }: {
   capa: Capa;
   actions: CapaAction[];
   factoryId: string;
+  /** Cases whose investigation must be approved first (0075). */
+  pendingInv: string[];
   viewerName: string;
   today: string;
 }) {
@@ -533,7 +605,10 @@ function PlanStep({
   const [draft, setDraft] = useState<PlanDraft>(saved);
   const [note, setNote] = useState("");
   const changed = draftChanged(draft, saved);
-  const missing = draftMissing(draft);
+  const missing = [
+    ...draftMissing(draft),
+    ...(pendingInv.length > 0 ? [`investigation approved on ${pendingInv.join(", ")}`] : []),
+  ];
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: deviationKeys.all(factoryId) });
 
@@ -618,6 +693,13 @@ function PlanStep({
             </div>
           </>
         )}
+        {pendingInv.length > 0 && (
+          <p className="text-[0.8125rem] text-ink-4">
+            The plan is approved against the case&rsquo;s approved root cause — save it now, approve
+            it once QA has approved the investigation.
+          </p>
+        )}
+        <WithdrawCapa capa={capa} factoryId={factoryId} viewerName={viewerName} />
       </div>
     </div>
   );
@@ -629,13 +711,17 @@ function PlanReadOnly({
   actions,
   factoryId,
   viewerName,
+  userId,
   today,
+  note = "Waiting for a QA approver.",
 }: {
   capa: Capa;
   actions: CapaAction[];
   factoryId: string;
   viewerName: string;
+  userId: string;
   today: string;
+  note?: string;
 }) {
   return (
     <div className="space-y-5">
@@ -647,10 +733,10 @@ function PlanReadOnly({
           kind={kind}
           mode="ro"
           factoryId={factoryId}
-         
           canDo={false}
           canAdd={false}
           viewerName={viewerName}
+          userId={userId}
           today={today}
         />
       ))}
@@ -658,7 +744,7 @@ function PlanReadOnly({
         <PlanGroupHead title="Effectiveness check" />
         <CheckFacts capa={capa} />
       </section>
-      <p className="text-[0.8125rem] text-ink-4">Waiting for a QA approver.</p>
+      <p className="text-[0.8125rem] text-ink-4">{note}</p>
     </div>
   );
 }
@@ -688,6 +774,7 @@ function VerifyStep({
   factoryId,
   canCheck,
   viewerName,
+  userId,
   today,
 }: {
   capa: Capa;
@@ -695,6 +782,7 @@ function VerifyStep({
   factoryId: string;
   canCheck: boolean;
   viewerName: string;
+  userId: string;
   today: string;
 }) {
   const [verifying, setVerifying] = useState(false);
@@ -749,6 +837,7 @@ function VerifyStep({
           early={n !== null && n > 0}
           factoryId={factoryId}
           viewerName={viewerName}
+          userId={userId}
           today={today}
           onDone={() => setVerifying(false)}
         />
@@ -797,6 +886,7 @@ function VerifyForm({
   early,
   factoryId,
   viewerName,
+  userId,
   today,
   onDone,
 }: {
@@ -804,10 +894,12 @@ function VerifyForm({
   early: boolean;
   factoryId: string;
   viewerName: string;
+  userId: string;
   today: string;
   onDone: () => void;
 }) {
   const queryClient = useQueryClient();
+  const [files, setFiles] = useState<File[]>([]);
   const form = useForm<CapaCheckValues>({
     resolver: zodResolver(capaCheckSchema),
     defaultValues: { result: "effective", findings: "", nextCheck: addDays(today, 90) },
@@ -816,18 +908,32 @@ function VerifyForm({
   const result = useWatch({ control: form.control, name: "result" });
 
   const save = useMutation({
-    mutationFn: (v: CapaCheckValues) => {
+    mutationFn: async (v: CapaCheckValues) => {
       const norm = (s: string | null) => (s ?? "").trim().toLowerCase();
       if (norm(viewerName) && norm(viewerName) === norm(capa.created_by_name)) {
         toast.warning(`You raised ${capa.capa_no} — the check should normally be someone else's.`);
       }
-      return recordCapaCheck(
-        capa.id,
-        v.result === "effective",
-        v.findings,
-        v.result === "effective" ? null : v.nextCheck,
-        viewerName,
-      );
+      // The files first, while the CAPA is still open (Effective closes it);
+      // if the check is refused they are removed again.
+      const uploaded = await uploadCapaFiles(files, {
+        factoryId,
+        capaId: capa.id,
+        section: "check",
+        uploadedBy: userId,
+        uploadedByName: viewerName,
+      });
+      try {
+        await recordCapaCheck(
+          capa.id,
+          v.result === "effective",
+          v.findings,
+          v.result === "effective" ? null : v.nextCheck,
+          viewerName,
+        );
+      } catch (e) {
+        await Promise.all(uploaded.map((f) => deleteCapaFile(f).catch(() => {})));
+        throw e;
+      }
     },
     onSuccess: async (_, v) => {
       await queryClient.invalidateQueries({ queryKey: deviationKeys.all(factoryId) });
@@ -905,6 +1011,12 @@ function VerifyForm({
           {...form.register("findings")}
         />
       </Field>
+      <PickFiles
+        files={files}
+        onChange={setFiles}
+        disabled={save.isPending}
+        label="Evidence file — a trend report, audit or record"
+      />
       {result === "not_effective" && (
         <Field
           label="Next effectiveness check due"
@@ -940,12 +1052,26 @@ function VerifyForm({
 
 /* ── Files and history ────────────────────────────────────────────────── */
 
-function CapaHistoryFold({ factoryId, capaId }: { factoryId: string; capaId: string }) {
+/** The CAPA's files (0075) above its history, folded away. */
+function FilesAndHistory({
+  factoryId,
+  capaId,
+  userId,
+  userName,
+  canAttach,
+}: {
+  factoryId: string;
+  capaId: string;
+  userId: string;
+  userName: string;
+  canAttach: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const { data: entries = [] } = useQuery({
     queryKey: capaKeys.audit(factoryId, capaId),
     queryFn: () => fetchCapaAudit(capaId),
   });
+  const { data: files = [] } = useCapaFiles(factoryId, capaId);
   return (
     <section className="rounded-2xl border border-line bg-surface">
       <button
@@ -955,16 +1081,30 @@ function CapaHistoryFold({ factoryId, capaId }: { factoryId: string; capaId: str
         className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-semibold text-ink sm:px-5"
       >
         <span>
-          History{" "}
+          Files and history{" "}
           <span className="font-normal text-ink-4">
-            · {entries.length} {entries.length === 1 ? "entry" : "entries"}
+            · {files.length} {files.length === 1 ? "file" : "files"} · {entries.length}{" "}
+            {entries.length === 1 ? "entry" : "entries"}
           </span>
         </span>
         <ChevronDown className={cn("size-4 text-ink-4 transition", open && "rotate-180")} />
       </button>
       {open && (
-        <div className="border-t border-line-soft px-4 py-4 sm:px-5">
-          <CapaHistory entries={entries} />
+        <div className="space-y-5 border-t border-line-soft px-4 py-4 sm:px-5">
+          <div className="space-y-2.5">
+            <p className="text-sm font-semibold text-ink">Files</p>
+            <CapaFiles
+              factoryId={factoryId}
+              capaId={capaId}
+              userId={userId}
+              userName={userName}
+              canAttach={canAttach}
+            />
+          </div>
+          <div className="space-y-2.5">
+            <p className="text-sm font-semibold text-ink">History</p>
+            <CapaHistory entries={entries} />
+          </div>
         </div>
       )}
     </section>
@@ -982,6 +1122,12 @@ const FIELD_LABEL: Record<string, string> = {
   check_why: "Reason to verify on completion",
   verify_by: "Check due",
   checker_name: "Verifier",
+};
+
+const FILE_SECTION: Record<string, string> = {
+  capa: "CAPA",
+  action: "action evidence",
+  check: "effectiveness check",
 };
 
 const CHECK_MODE_LABEL: Record<string, string> = {
@@ -1029,6 +1175,12 @@ function historyRow(e: CapaAuditEntry): { what: string; from: string | null; to:
       return { what: "Case added", from: null, to: e.new_value };
     case "case_unlinked":
       return { what: "Case removed", from: e.old_value, to: null };
+    case "withdrawn":
+      return { what: "Signed: CAPA withdrawn", from: null, to: null };
+    case "file_attached":
+      return { what: `File attached${e.field ? ` — ${FILE_SECTION[e.field] ?? e.field}` : ""}`, from: null, to: e.new_value };
+    case "file_removed":
+      return { what: `File removed${e.field ? ` — ${FILE_SECTION[e.field] ?? e.field}` : ""}`, from: e.old_value, to: null };
     default:
       return { what: e.action, from: e.old_value, to: e.new_value };
   }

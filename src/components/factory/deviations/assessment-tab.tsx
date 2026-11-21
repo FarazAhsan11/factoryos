@@ -308,7 +308,7 @@ function AssessmentForm({
         it into the quality system and sets the due date.
       </p>
 
-      <Section title="Classification">
+      <Section title="Category and owner">
         <div className="grid gap-x-6 gap-y-5 md:grid-cols-2">
           <Field label="Category" htmlFor="as-category" required error={errors.category?.message}>
             <SelectControl
@@ -928,7 +928,7 @@ function AssessmentFacts({
           Not assessed yet — a supervisor or QA signs the initial assessment.
         </p>
       )}
-      <Section title="Classification">
+      <Section title="Category and owner">
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
           <Fact label="Category">{d.nc_category ?? <Muted>—</Muted>}</Fact>
           <Fact label="Case owner">{d.owner_name ?? <Muted>—</Muted>}</Fact>

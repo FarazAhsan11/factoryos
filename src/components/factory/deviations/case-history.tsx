@@ -217,7 +217,7 @@ function Timeline({
     },
     d.capa_needed === false
       ? { label: "CAPA", at: null, note: "Not needed" }
-      : { label: "CAPA verified effective", at: d.capa_verified_at },
+      : { label: "CAPA plan approved", at: d.capa_plan_approved_at },
     { label: "Closed", at: d.closed_at },
   ];
   return (
@@ -291,6 +291,7 @@ const EVENT_WHAT: Partial<Record<AuditAction, string>> = {
   capa_not_effective: "Signed: CAPA verified not effective",
   correction_added: "Correction added",
   correction_removed: "Correction removed",
+  capa_withdrawn: "Signed: CAPA withdrawn",
 };
 
 type ReviewCheck = { item: string; finding: string };

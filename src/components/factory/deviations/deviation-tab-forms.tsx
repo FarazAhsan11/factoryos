@@ -1107,7 +1107,7 @@ export function CloseOutTab({
     >
       <Intro
         title="Close the case"
-        body="The close-out is the only gate: it needs the containment action, the risk assessment, the investigation findings and the CAPA decision — a CAPA verified as effective, or a reason none is needed. Once closed, the case cannot be edited."
+        body="The close-out is the only gate: it needs the containment action, the risk assessment, the investigation findings and the CAPA decision — a CAPA whose plan is approved, or a reason none is needed. Once closed, the case cannot be edited."
       />
 
       {/* What the database will refuse the close for, named by its tab, so

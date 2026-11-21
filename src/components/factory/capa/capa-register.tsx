@@ -30,14 +30,15 @@ import { typeMeta } from "@/lib/factory/deviation-queries";
 import { useRenderClock } from "@/lib/use-render-clock";
 import { cn } from "@/lib/utils";
 
-type View = "open" | "plan" | "do" | "check" | "closed" | "all";
+type View = "open" | "plan" | "do" | "check" | "closed" | "withdrawn" | "all";
 
 const VIEWS: { key: View; label: string; hint: string; test: (c: Capa) => boolean }[] = [
-  { key: "open", label: "All open", hint: "Every CAPA not yet closed", test: (c) => c.step !== "closed" },
+  { key: "open", label: "All open", hint: "Every CAPA not yet closed", test: (c) => c.step !== "closed" && c.step !== "withdrawn" },
   { key: "plan", label: "Awaiting approval", hint: "Plan being written or waiting for approval", test: (c) => c.step === "plan" },
   { key: "do", label: "Implementing", hint: "Plan approved, actions being done", test: (c) => c.step === "do" },
   { key: "check", label: "Verification due", hint: "Every action done — the effectiveness check is next", test: (c) => c.step === "check" },
   { key: "closed", label: "Closed", hint: "Verified effective", test: (c) => c.step === "closed" },
+  { key: "withdrawn", label: "Withdrawn", hint: "Withdrawn before the plan was approved", test: (c) => c.step === "withdrawn" },
   { key: "all", label: "All", hint: "Every CAPA ever raised", test: () => true },
 ];
 
@@ -163,7 +164,7 @@ export function CapaRegister({
           >
             {visible.map((c) => {
               const next = capaNext(c);
-              const overdue = c.step !== "closed" && next.date !== null && next.date < today;
+              const overdue = c.step !== "closed" && c.step !== "withdrawn" && next.date !== null && next.date < today;
               return (
                 <RegisterRow
                   key={c.id}

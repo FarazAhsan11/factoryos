@@ -147,6 +147,7 @@ export function DeviationReport({
         </p>
         <CaseHeader
           deviation={d}
+          capa={(capas.data ?? []).find((c) => c.id === d.capa_id) ?? null}
           assessDays={settings.assessDays}
           extended={(extensions.data ?? []).some((e) => e.status === "approved")}
           className="mt-3"

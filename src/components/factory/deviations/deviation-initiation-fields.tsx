@@ -64,7 +64,6 @@ export function DeviationInitiationFields({
   const {
     register,
     control,
-    setValue,
     formState: { errors },
   } = form;
 
@@ -248,23 +247,11 @@ export function DeviationInitiationFields({
           <textarea
             id="dev-immediate"
             rows={3}
-            placeholder="What was done straight away, or “None needed”"
+            placeholder="What was done straight away"
             aria-invalid={Boolean(errors.immediateAction)}
             className={AREA}
             {...register("immediateAction")}
           />
-          <button
-            type="button"
-            onClick={() =>
-              setValue("immediateAction", "None needed", {
-                shouldDirty: true,
-                shouldValidate: form.formState.isSubmitted,
-              })
-            }
-            className="text-xs font-semibold text-brand hover:underline"
-          >
-            None needed
-          </button>
         </Field>
 
         <Field

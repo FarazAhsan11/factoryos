@@ -27,6 +27,7 @@ export default async function CapaRoute({
       capaId={capaId}
       role={role}
       viewerName={viewer.fullName ?? viewer.email}
+      userId={viewer.id}
     />
   );
 }

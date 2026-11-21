@@ -39,16 +39,16 @@ import { useForm } from "@/lib/use-form";
 import { cn } from "@/lib/utils";
 
 /**
- * A deviation's close-out, as the reference QMS lays it out (qms-v4): the
- * checklist of everything closing needs, then the close-out itself — any
+ * A deviation's close-out, as the reference QMS lays it out (qms-v4): what
+ * must be done in the other tabs first, then the close-out itself — any
  * unresolved risk, the summary and residual risk, the reason (and what it
  * duplicates, or the cost of quality) — and the signature. A Critical case
  * takes two: the first leaves it open with the close-out fixed, a second QA
  * approver closes it.
  *
- * The checklist reads the saved case, with this form's own answers laid over
- * it as they are typed, so the button lights up the moment the last box is
- * filled. The database re-checks all of it.
+ * The list shows only the other tabs' items; the close-out's own fields are
+ * checked when it is signed, with the error beside each field. The text by
+ * Sign names whatever is still open. The database re-checks all of it.
  */
 export function DevCloseOutTab({
   deviation: d,
@@ -77,22 +77,12 @@ export function DevCloseOutTab({
   const needed = signaturesNeeded(d);
 
   const risk = useWatch({ control, name: "unresolvedRisk" });
-  const summary = useWatch({ control, name: "summary" });
   const reason = useWatch({ control, name: "reason" });
-  const duplicateOf = useWatch({ control, name: "duplicateOf" });
 
-  const items = devChecklist(
-    locked
-      ? d
-      : {
-          ...d,
-          unresolved_risk: risk === "" ? null : risk === "yes",
-          closing_note: summary ?? "",
-          status_reason: reason || null,
-          duplicate_of: duplicateOf ?? "",
-        },
-  );
-  const ready = items.every((i) => i.done);
+  // The other tabs' items only; this form's fields are checked on Sign (P1).
+  const items = devChecklist(d).filter((i) => !i.here);
+  const stillOpen = items.filter((i) => !i.done);
+  const ready = stillOpen.length === 0;
 
   const refresh = () =>
     queryClient.invalidateQueries({ queryKey: deviationKeys.all(factoryId) });
@@ -168,7 +158,7 @@ export function DevCloseOutTab({
         </div>
       )}
 
-      <Section title="Before closing">
+      <Section title="Done in the other tabs">
         <ul className="divide-y divide-line-soft">
           {items.map((item) => (
             <li key={item.label} className="relative flex items-center gap-3 py-2.5 text-sm">
@@ -325,10 +315,7 @@ export function DevCloseOutTab({
             )}
             <span className="text-[0.8125rem] text-ink-4">
               {!ready
-                ? `Still needed: ${items
-                    .filter((i) => !i.done)
-                    .map((i) => i.label)
-                    .join(", ")}.`
+                ? `Still open: ${stillOpen.map((i) => i.label).join(", ")}.`
                 : needed === 2
                   ? firstSigned
                     ? "Critical: one more QA signature."
@@ -376,9 +363,11 @@ export function CloseOutFacts({ deviation: d }: { deviation: Deviation }) {
         </p>
       )}
 
-      <Section title="Before closing">
+      <Section title="Done in the other tabs">
         <ul className="divide-y divide-line-soft">
-          {devChecklist(d).map((item) => (
+          {devChecklist(d)
+            .filter((i) => !i.here)
+            .map((item) => (
             <li key={item.label} className="relative flex items-center gap-3 py-2 text-sm">
               <span
                 aria-hidden

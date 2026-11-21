@@ -13,6 +13,7 @@ import {
   type CapaActionAddValues,
   type CapaDoneValues,
 } from "@/app/factory/[slug]/deviations/schemas";
+import { CapaFileLink, PickFiles, useCapaFiles } from "@/components/factory/capa/capa-files";
 import { PlanGroupHead } from "@/components/factory/capa/capa-plan-editor";
 import {
   AREA,
@@ -23,7 +24,12 @@ import {
   formatDate,
 } from "@/components/factory/deviations/deviation-fields";
 import { DateField } from "@/components/ui/date-picker";
-import { addDays } from "@/lib/factory/dates";
+import {
+  deleteCapaFile,
+  uploadCapaFiles,
+  type CapaFile,
+} from "@/lib/factory/capa-attachment-queries";
+import { addDays, localDay } from "@/lib/factory/dates";
 import {
   addCapaAction,
   markCapaActionDone,
@@ -48,7 +54,8 @@ const HEAD: Record<CapaActionKind, { title: string; sub: string; word: string }>
  * One kind of the CAPA's actions as a table — read-only (an approved plan),
  * or with the Done column (Implement): ✓ and the date when done, with the
  * completion evidence under the row, or **Mark done**, which opens the
- * evidence form in place. More actions may be added after approval.
+ * evidence form in place — the date it was done and any file with it. More
+ * actions may be added after approval.
  */
 export function CapaActionTable({
   capa,
@@ -59,6 +66,7 @@ export function CapaActionTable({
   canDo,
   canAdd,
   viewerName,
+  userId,
   today,
 }: {
   capa: Capa;
@@ -69,9 +77,11 @@ export function CapaActionTable({
   canDo: boolean;
   canAdd: boolean;
   viewerName: string;
+  userId: string;
   today: string;
 }) {
   const [doing, setDoing] = useState<string | null>(null);
+  const { data: files = [] } = useCapaFiles(factoryId, capa.id);
   const [adding, setAdding] = useState(false);
   const rows = actions.filter((a) => a.kind === kind);
   const head = HEAD[kind];
@@ -106,12 +116,15 @@ export function CapaActionTable({
                     done={done}
                     overdue={overdue}
                     evidence={evidence}
-                    canDo={canDo && impl && capa.step !== "plan" && capa.step !== "closed"}
+                    canDo={canDo && impl && (capa.step === "do" || capa.step === "check")}
                     doing={doing === a.id}
                     onStart={() => setDoing(a.id)}
                     onStop={() => setDoing(null)}
+                    files={files.filter((f) => f.action_id === a.id)}
+                    capa={capa}
                     factoryId={factoryId}
                     viewerName={viewerName}
+                    userId={userId}
                     today={today}
                   />
                 );
@@ -154,8 +167,11 @@ function ActionRows({
   doing,
   onStart,
   onStop,
+  files,
+  capa,
   factoryId,
   viewerName,
+  userId,
   today,
 }: {
   a: CapaAction;
@@ -167,15 +183,24 @@ function ActionRows({
   doing: boolean;
   onStart: () => void;
   onStop: () => void;
+  /** This action's evidence files. */
+  files: CapaFile[];
+  capa: Capa;
   factoryId: string;
   viewerName: string;
+  userId: string;
   today: string;
 }) {
   const [more, setMore] = useState(false);
   const long = evidence.length > 140 || evidence.split("\n").length > 2;
   return (
     <>
-      <tr className={cn("align-top", !(done && evidence) && !doing && "border-b border-line-soft last:border-b-0")}>
+      <tr
+        className={cn(
+          "align-top",
+          !(done && (evidence || files.length > 0)) && !doing && "border-b border-line-soft last:border-b-0",
+        )}
+      >
         <td className="px-3.5 py-2.5 wrap-anywhere text-ink">{a.description}</td>
         <td className="px-3.5 py-2.5 text-ink-2">{a.owner_name ?? "—"}</td>
         <td className={cn("px-3.5 py-2.5 whitespace-nowrap", overdue ? "font-semibold text-danger-deep" : "text-ink-3")}>
@@ -207,7 +232,7 @@ function ActionRows({
           </td>
         )}
       </tr>
-      {impl && done && evidence && (
+      {impl && done && (evidence || files.length > 0) && (
         <tr className="border-b border-line-soft last:border-b-0">
           <td colSpan={4} className="bg-sunken/60 px-3.5 pt-1 pb-2.5">
             <p className="text-[0.6875rem] font-semibold tracking-wide text-ink-5 uppercase">
@@ -225,13 +250,28 @@ function ActionRows({
                 {more ? "Show less" : "Show more"}
               </button>
             )}
+            {files.length > 0 && (
+              <p className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                {files.map((f) => (
+                  <CapaFileLink key={f.id} file={f} />
+                ))}
+              </p>
+            )}
           </td>
         </tr>
       )}
       {doing && (
         <tr className="border-b border-line-soft last:border-b-0">
           <td colSpan={4} className="bg-sunken px-3.5 py-3">
-            <DoneForm action={a} factoryId={factoryId} viewerName={viewerName} today={today} onDone={onStop} />
+            <DoneForm
+              action={a}
+              capa={capa}
+              factoryId={factoryId}
+              viewerName={viewerName}
+              userId={userId}
+              today={today}
+              onDone={onStop}
+            />
           </td>
         </tr>
       )}
@@ -241,25 +281,53 @@ function ActionRows({
 
 function DoneForm({
   action,
+  capa,
   factoryId,
   viewerName,
+  userId,
   today,
   onDone,
 }: {
   action: CapaAction;
+  capa: Capa;
   factoryId: string;
   viewerName: string;
+  userId: string;
   today: string;
   onDone: () => void;
 }) {
   const queryClient = useQueryClient();
+  const [files, setFiles] = useState<File[]>([]);
+  // Not before the CAPA was raised, not after today.
+  const raised = localDay(capa.created_at);
   const form = useForm<CapaDoneValues>({
     resolver: zodResolver(capaDoneSchema),
-    defaultValues: { evidence: "", linkedRecord: "" },
+    defaultValues: { evidence: "", linkedRecord: "", doneOn: today },
   });
   const errors = form.formState.errors;
   const save = useMutation({
-    mutationFn: (v: CapaDoneValues) => markCapaActionDone(action.id, v, today, viewerName),
+    mutationFn: async (v: CapaDoneValues) => {
+      if (v.doneOn > today) throw new Error("The date done cannot be in the future.");
+      if (v.doneOn < raised) {
+        throw new Error(`The date done cannot be before ${capa.capa_no} was raised.`);
+      }
+      // The files first, while the action is still open: if marking it done
+      // is refused, they are removed again.
+      const uploaded = await uploadCapaFiles(files, {
+        factoryId,
+        capaId: capa.id,
+        section: "action",
+        actionId: action.id,
+        uploadedBy: userId,
+        uploadedByName: viewerName,
+      });
+      try {
+        await markCapaActionDone(action.id, v, viewerName);
+      } catch (e) {
+        await Promise.all(uploaded.map((f) => deleteCapaFile(f).catch(() => {})));
+        throw e;
+      }
+    },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: deviationKeys.all(factoryId) });
       toast.success("Action done.");
@@ -285,14 +353,34 @@ function DoneForm({
           {...form.register("evidence")}
         />
       </Field>
-      <Field label="Linked record" htmlFor="cd-link" note="(optional)" error={errors.linkedRecord?.message}>
-        <input
-          id="cd-link"
-          placeholder="Change control or training record"
-          className={cn(CONTROL, "font-mono")}
-          {...form.register("linkedRecord")}
-        />
-      </Field>
+      <div className="space-y-3">
+        <Field label="Date done" required error={errors.doneOn?.message}>
+          <Controller
+            name="doneOn"
+            control={form.control}
+            render={({ field }) => (
+              <DateField
+                value={field.value}
+                onChange={field.onChange}
+                min={raised}
+                max={today}
+                ariaLabel="Date done"
+              />
+            )}
+          />
+        </Field>
+        <Field label="Linked record" htmlFor="cd-link" note="(optional)" error={errors.linkedRecord?.message}>
+          <input
+            id="cd-link"
+            placeholder="Change control or training record"
+            className={cn(CONTROL, "font-mono")}
+            {...form.register("linkedRecord")}
+          />
+        </Field>
+      </div>
+      <div className="sm:col-span-2">
+        <PickFiles files={files} onChange={setFiles} disabled={save.isPending} />
+      </div>
       <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
         <button type="submit" disabled={save.isPending} className={PRIMARY_BUTTON}>
           {save.isPending && <Loader2 className="size-4 animate-spin" />}
@@ -301,7 +389,7 @@ function DoneForm({
         <button type="button" onClick={onDone} disabled={save.isPending} className={SECONDARY_BUTTON}>
           Cancel
         </button>
-        <span className="text-xs text-ink-4">Done today, by {viewerName}.</span>
+        <span className="text-xs text-ink-4">Recorded by {viewerName}.</span>
       </div>
     </form>
   );

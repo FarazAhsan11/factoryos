@@ -2,6 +2,8 @@
 
 import { FileWarning, Lock } from "lucide-react";
 
+import { stepLabel, type Capa } from "@/lib/factory/capa-queries";
+
 import {
   Badge,
   formatDate,
@@ -80,8 +82,11 @@ export function DeviationsTable({
   emptyTitle,
   emptyBody,
   columns = DEFAULT_SHOWN,
+  capas = [],
 }: {
   deviations: Deviation[];
+  /** The factory's CAPAs, for each case's CAPA step in the CAPA column (P3). */
+  capas?: Capa[];
   onOpen: (id: string) => void;
   emptyTitle: string;
   emptyBody: string;
@@ -95,6 +100,7 @@ export function DeviationsTable({
   }
 
   const extra = OPTIONAL_COLUMNS.filter((c) => columns.includes(c.key));
+  const capaStep = new Map(capas.map((c) => [c.id, stepLabel(c)]));
 
   return (
     <RegisterTable
@@ -203,7 +209,7 @@ export function DeviationsTable({
             >
               {closed ? (
                 <span className="text-ink-5">
-                  {d.closed_at ? formatDate(d.closed_at.slice(0, 10)) : "—"}
+                  {d.closed_at ? formatDate(d.closed_at) : "—"}
                 </span>
               ) : (
                 formatDate(d.sla_date)
@@ -211,7 +217,12 @@ export function DeviationsTable({
             </td>
 
             {extra.map((c) => (
-              <ExtraCell key={c.key} column={c.key} d={d} />
+              <ExtraCell
+                key={c.key}
+                column={c.key}
+                d={d}
+                capaStep={d.capa_id ? (capaStep.get(d.capa_id) ?? null) : null}
+              />
             ))}
           </RegisterRow>
         );
@@ -220,20 +231,33 @@ export function DeviationsTable({
   );
 }
 
-function ExtraCell({ column, d }: { column: CaseColumn; d: Deviation }) {
+function ExtraCell({
+  column,
+  d,
+  capaStep,
+}: {
+  column: CaseColumn;
+  d: Deviation;
+  capaStep: string | null;
+}) {
   const dash = <span className="text-ink-6">—</span>;
   switch (column) {
     case "capa":
       return (
         <td className={cn(CELL, "font-mono text-[0.78rem]")}>
           {d.capa_no ? (
-            <span
-              className={
-                d.capa_status === "effective" ? "text-teal-deep" : "text-brand"
-              }
-            >
-              {d.capa_no}
-            </span>
+            <>
+              <span
+                className={
+                  d.capa_status === "effective" ? "text-teal-deep" : "text-brand"
+                }
+              >
+                {d.capa_no}
+              </span>
+              {capaStep && (
+                <span className="block font-sans text-[0.6875rem] text-ink-5">{capaStep}</span>
+              )}
+            </>
           ) : d.capa_needed === false ? (
             <span className="font-sans text-ink-5">Not needed</span>
           ) : (
@@ -340,7 +364,7 @@ function ExtraCell({ column, d }: { column: CaseColumn; d: Deviation }) {
     case "raised":
       return (
         <td className={cn(CELL, "tabular-nums")}>
-          {formatDate(d.created_at.slice(0, 10))}
+          {formatDate(d.created_at)}
         </td>
       );
     case "age":

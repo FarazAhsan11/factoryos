@@ -6,6 +6,7 @@ import type {
   DeviationStatus,
   DeviationType,
 } from "@/lib/factory/deviation-queries";
+import { localDay } from "@/lib/factory/dates";
 import { createClient } from "@/lib/supabase/client";
 
 /**
@@ -26,14 +27,16 @@ import { createClient } from "@/lib/supabase/client";
  *
  * The database names the steps plan / do / check / closed; the screens say
  * Plan / Implement / Verify / Closed. The step is derived by
- * `capas_expanded`, never stored. Browser-direct under RLS; `capas_guard`,
+ * `capas_expanded`, never stored. A CAPA still in Plan can be withdrawn
+ * (0075): kept as a record, read-only, out of the working views. Browser-direct under RLS; `capas_guard`,
  * `capa_actions_guard`, `create_capa_plan` and `record_capa_check` own the
  * rules, and the database writes the history (`capa_audit`).
  */
 
-export type CapaStatus = "open" | "effective";
+export type CapaStatus = "open" | "effective" | "withdrawn";
 export type CapaActionKind = "ca" | "pa";
-export type CapaStep = "plan" | "do" | "check" | "closed";
+/** `withdrawn`: dropped while still in Plan (0075) — kept, read-only. */
+export type CapaStep = "plan" | "do" | "check" | "closed" | "withdrawn";
 export type CheckMode = "dated" | "at_implementation";
 
 /** The steps as the stepper names them. */
@@ -48,6 +51,8 @@ export const STEP_INDEX: Record<CapaStep, number> = {
   do: 1,
   check: 2,
   closed: 3,
+  // Never got past Plan.
+  withdrawn: 0,
 };
 
 /** A case the CAPA covers, as the view aggregates it. */
@@ -109,6 +114,11 @@ export interface Capa {
   created_by_name: string | null;
   /** Everyone who owns an action, A–Z. */
   action_owners: string[];
+
+  /* ── 0075 ──────────────────────────────────────────────────────────── */
+  withdrawn_at: string | null;
+  withdrawn_by_name: string | null;
+  withdraw_reason: string | null;
 }
 
 export interface CapaAction {
@@ -155,7 +165,8 @@ const COLUMNS = `
   check_mode, check_why, checker_name, plan_approved_at, plan_approved_by_name,
   plan_approval_note, reopened, step, next_due, last_due, last_done,
   check_count, first_check_effective,
-  recurrence_of, recurrence_of_no, recurred_by, created_by_name, action_owners
+  recurrence_of, recurrence_of_no, recurred_by, created_by_name, action_owners,
+  withdrawn_at, withdrawn_by_name, withdraw_reason
 `;
 
 const ACTION_COLUMNS = `
@@ -172,6 +183,8 @@ export const capaKeys = {
     ["deviations", factoryId, "capas", capaId, "checks"] as const,
   audit: (factoryId: string, capaId: string) =>
     ["deviations", factoryId, "capas", capaId, "audit"] as const,
+  search: (factoryId: string, query: string, closed: boolean, limit: number) =>
+    ["deviations", factoryId, "capas", "search", query, closed, limit] as const,
 };
 
 /** Every CAPA for the factory, newest first. */
@@ -184,7 +197,50 @@ export async function fetchCapas(factoryId: string): Promise<Capa[]> {
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(error.message);
-  return (data ?? []) as unknown as Capa[];
+  const all = (data ?? []) as unknown as Capa[];
+  return all.map((c) => ({ ...c, recurred_by: liveFollowUps(c, all) }));
+}
+
+/**
+ * A CAPA's follow-ups that still stand. One withdrawn before its plan was
+ * approved (0075) was raised in error — the problem is not counted as
+ * recurred, and a new follow-up may be started.
+ */
+export function liveFollowUps(c: Capa, all: Capa[]): Capa["recurred_by"] {
+  const withdrawn = new Set(all.filter((x) => x.status === "withdrawn").map((x) => x.id));
+  return c.recurred_by.filter((r) => !withdrawn.has(r.id));
+}
+
+/**
+ * CAPAs to add a case to (S2, `search_capas`): open or closed, matching the
+ * search on CAPA number, title, root cause, or a case's number, title, root
+ * cause or product — newest first, at most `limit`. A blank search gives the
+ * latest few. Searched in the database, so it stays quick with hundreds.
+ */
+export async function searchCapas(
+  factoryId: string,
+  query: string,
+  closed: boolean,
+  limit: number,
+): Promise<Capa[]> {
+  const supabase = createClient();
+  const { data: ids, error } = await supabase.rpc("search_capas", {
+    p_factory: factoryId,
+    p_query: query.trim(),
+    p_closed: closed,
+    p_limit: limit,
+  });
+  if (error) throw new Error(error.message);
+  const order = ((ids ?? []) as { id: string }[]).map((r) => r.id);
+  if (order.length === 0) return [];
+
+  const { data, error: readError } = await supabase
+    .from("capas_expanded")
+    .select(COLUMNS)
+    .in("id", order);
+  if (readError) throw new Error(readError.message);
+  const byId = new Map(((data ?? []) as unknown as Capa[]).map((c) => [c.id, c]));
+  return order.map((id) => byId.get(id)).filter((c): c is Capa => Boolean(c));
 }
 
 /** One CAPA's actions, in the order they were raised. */
@@ -444,18 +500,21 @@ export async function addCapaAction(
   if (error) throw new Error(error.message);
 }
 
-/** Mark an action done — today, by the signed-in person, with its evidence. */
+/**
+ * Mark an action done — on the date it was done (0075: not after today, not
+ * before the CAPA was raised), by the signed-in person, with its evidence.
+ * When it was recorded stays on the history.
+ */
 export async function markCapaActionDone(
   id: string,
   values: CapaDoneValues,
-  doneOn: string,
   byName: string,
 ): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase
     .from("capa_actions")
     .update({
-      closed_date: doneOn,
+      closed_date: values.doneOn,
       closed_by_name: byName,
       evidence: values.evidence.trim(),
       linked_record: values.linkedRecord.trim() || null,
@@ -483,6 +542,20 @@ export async function recordCapaCheck(
   if (error) throw new Error(error.message);
 }
 
+/**
+ * Withdraw a CAPA still in Plan (0075) — kept as a record, read-only; its
+ * open cases go back to "Is a CAPA required?" undecided.
+ */
+export async function withdrawCapa(capaId: string, reason: string, byName: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc("withdraw_capa", {
+    p_capa: capaId,
+    p_reason: reason.trim(),
+    p_by_name: byName,
+  });
+  if (error) throw new Error(error.message);
+}
+
 /* ── Display ──────────────────────────────────────────────────────────── */
 
 /** Where the CAPA stands, in a few words — v8's status. */
@@ -494,6 +567,8 @@ export function stepLabel(c: Capa): string {
       return c.reopened ? "Not effective — new actions" : "Implementing";
     case "check":
       return "Verification due";
+    case "withdrawn":
+      return "Withdrawn";
     default:
       return "Closed — effective";
   }
@@ -512,8 +587,10 @@ export function capaNext(c: Capa): { text: string; date: string | null } {
       return c.check_mode === "at_implementation"
         ? { text: "Verify on completion", date: null }
         : { text: "Effectiveness check due", date: c.verify_by };
+    case "withdrawn":
+      return { text: "Withdrawn", date: c.withdrawn_at ? localDay(c.withdrawn_at) : null };
     default:
-      return { text: "Closed — effective", date: c.verified_at?.slice(0, 10) ?? null };
+      return { text: "Closed — effective", date: c.verified_at ? localDay(c.verified_at) : null };
   }
 }
 

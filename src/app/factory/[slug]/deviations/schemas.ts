@@ -413,6 +413,17 @@ export const correctionSchema = z.object({
 
 export type CorrectionValues = z.infer<typeof correctionSchema>;
 
+/** Removing a correction — why (0075; EU GMP Annex 11 §9). */
+export const correctionRemoveSchema = z.object({
+  reason: z
+    .string()
+    .trim()
+    .min(5, "Say why it is removed — at least a few words.")
+    .max(500, "Keep it under 500 characters."),
+});
+
+export type CorrectionRemoveValues = z.infer<typeof correctionRemoveSchema>;
+
 /** An action added once the plan is approved (Implement). */
 export const capaActionAddSchema = z.object({
   description: z
@@ -441,9 +452,26 @@ export const capaDoneSchema = z.object({
     .min(3, "Add the completion evidence — what was done and where it is recorded.")
     .max(1000, "Keep the evidence under 1000 characters."),
   linkedRecord: optional(120),
+  // The date it was done, not the day it is recorded (0075). The form keeps
+  // it between the CAPA's raise date and today; the guard re-checks both.
+  doneOn: z
+    .string()
+    .trim()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Pick the date it was done."),
 });
 
 export type CapaDoneValues = z.infer<typeof capaDoneSchema>;
+
+/** Withdraw a CAPA still in Plan — why (0075). */
+export const capaWithdrawSchema = z.object({
+  reason: z
+    .string()
+    .trim()
+    .min(10, "Say why the CAPA is withdrawn — at least a sentence.")
+    .max(1000, "Keep it under 1000 characters."),
+});
+
+export type CapaWithdrawValues = z.infer<typeof capaWithdrawSchema>;
 
 /**
  * Verify effectiveness — Effective closes the CAPA; Not effective needs the

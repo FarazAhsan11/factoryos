@@ -372,9 +372,9 @@ export function Aging({ deviation }: { deviation: Deviation }) {
         />
         {deviation.capa_needed !== false && (
           <Step
-            label="CAPA verified effective"
-            at={formatStamp(deviation.capa_verified_at)}
-            done={deviation.capa_status === "effective"}
+            label="CAPA plan approved"
+            at={formatStamp(deviation.capa_plan_approved_at)}
+            done={Boolean(deviation.capa_plan_approved_at)}
           />
         )}
         <Step

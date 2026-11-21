@@ -37,7 +37,8 @@ export interface Attachment {
   created_at: string;
 }
 
-const BUCKET = "case-files";
+/** Case files and CAPA files share it (0064, 0075). */
+export const BUCKET = "case-files";
 
 /** Under the deviations prefix, so any Quality save refreshes it too. */
 export const attachmentKeys = {
@@ -83,7 +84,7 @@ export function attachmentProblem(file: File): string | null {
 }
 
 /** The MIME type the bucket will see, or null if it is not allowed. */
-function mimeOf(file: File): string | null {
+export function mimeOf(file: File): string | null {
   if (file.type && ATTACHMENT_TYPES[file.type]) return file.type;
   const ext = file.name.toLowerCase().match(/\.[a-z0-9]+$/)?.[0];
   if (!ext) return null;
@@ -94,7 +95,7 @@ function mimeOf(file: File): string | null {
 }
 
 /** A name safe for a Storage key: letters, digits, dot, dash, underscore. */
-function safeName(name: string): string {
+export function safeName(name: string): string {
   const cleaned = name
     .normalize("NFKD")
     .replace(/[^\w.-]+/g, "_")

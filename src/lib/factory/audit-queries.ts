@@ -26,7 +26,8 @@ export type AuditAction =
   | "capa_effective"
   | "capa_not_effective"
   | "correction_added"
-  | "correction_removed";
+  | "correction_removed"
+  | "capa_withdrawn";
 
 export interface AuditEntry {
   id: number;

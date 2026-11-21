@@ -66,6 +66,8 @@ export function CapaStepper({ step, small }: { step: CapaStep; small?: boolean }
 /** Four dots and where the CAPA stands — the register's Status column. */
 export function CapaStepDots({ capa }: { capa: Capa }) {
   const at = STEP_INDEX[capa.step];
+  // Withdrawn before approval: no step reached, shown greyed.
+  const off = capa.step === "withdrawn";
   return (
     <span
       className="inline-flex items-center gap-2 whitespace-nowrap"
@@ -77,7 +79,9 @@ export function CapaStepDots({ capa }: { capa: Capa }) {
             key={k}
             className={cn(
               "block size-1.5 rounded-full",
-              k < at || (k === 3 && at === 3)
+              off
+                ? "bg-line-strong"
+                : k < at || (k === 3 && at === 3)
                 ? "bg-teal"
                 : k === at
                   ? "bg-brand"
@@ -86,7 +90,7 @@ export function CapaStepDots({ capa }: { capa: Capa }) {
           />
         ))}
       </span>
-      <span className={cn(capa.step === "closed" ? "text-ink-4" : "text-ink")}>
+      <span className={cn(capa.step === "closed" || off ? "text-ink-4" : "text-ink")}>
         {stepLabel(capa)}
       </span>
     </span>

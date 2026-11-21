@@ -212,6 +212,12 @@ function AssessmentForm({
     dueDays !== null
       ? formatDay(addDays(deviation.created_at.slice(0, 10), dueDays))
       : null;
+  const dueText =
+    dueOn && cls
+      ? `Due ${dueDays} days after raising: ${dueOn}.${cls === "Critical" ? " Close-out needs two QA signatures." : ""}`
+      : "";
+  // QA asked to pick the class themselves (the "Change" link).
+  const [changingClass, setChangingClass] = useState(false);
   const below = lik !== null && previous.length > 0 && lik < suggested;
   const rationaleRequired = cls === "Critical" || cls === "Major" || below;
 
@@ -506,23 +512,58 @@ function AssessmentForm({
         </div>
 
         <div className="mt-6 grid gap-x-6 gap-y-5 md:grid-cols-2">
-          <Field
-            label="Classification"
-            required
-            error={errors.classification?.message}
-            hint={
-              dueOn && cls
-                ? `Due ${dueDays} days after raising: ${dueOn}.${cls === "Critical" ? " Close-out needs two QA signatures." : ""}`
-                : "Set by the table once severity and likelihood are chosen."
-            }
-          >
-            <Segmented
-              control={control}
-              name="classification"
+          {changingClass || (cls && proposed && cls !== proposed) ? (
+            <Field
               label="Classification"
-              options={CLASSES.map((c) => ({ value: c, label: c }))}
-            />
-          </Field>
+              required
+              error={errors.classification?.message}
+              hint={
+                dueOn && cls
+                  ? `${dueText}${proposed ? ` The table says ${proposed}.` : ""}`
+                  : "Set by the table once severity and likelihood are chosen."
+              }
+            >
+              <Segmented
+                control={control}
+                name="classification"
+                label="Classification"
+                options={CLASSES.map((c) => ({ value: c, label: c }))}
+              />
+            </Field>
+          ) : (
+            // The table's answer as a result, not three buttons that look like
+            // a choice (qms-v8) — Change opens them.
+            <div className="md:col-span-2">
+              <p className="text-xs font-medium text-ink-3">
+                Classification<span className="ml-0.5 text-danger">*</span>
+              </p>
+              {cls ? (
+                <p className="mt-1.5 flex flex-wrap items-baseline gap-x-2.5 gap-y-1 text-sm">
+                  <b className={cn("text-base font-semibold", CLASS_TEXT[cls])}>{cls}</b>
+                  <span className="text-ink-4">
+                    {cls === proposed ? "from the table" : "set by QA"}
+                    {dueText && ` · ${dueText}`}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setChangingClass(true)}
+                    className="font-medium text-brand hover:underline"
+                  >
+                    Change
+                  </button>
+                </p>
+              ) : (
+                <p className="mt-1.5 text-sm text-ink-5">
+                  Set by the table once severity and likelihood are chosen.
+                </p>
+              )}
+              {errors.classification?.message && (
+                <p role="alert" className="mt-1 text-[0.7188rem] text-danger">
+                  {errors.classification.message}
+                </p>
+              )}
+            </div>
+          )}
           {cls && proposed && cls !== proposed ? (
             <Field
               label={`Why ${cls}, not ${proposed}`}
@@ -537,9 +578,9 @@ function AssessmentForm({
                 {...register("classificationReason")}
               />
             </Field>
-          ) : (
+          ) : changingClass ? (
             <div />
-          )}
+          ) : null}
           <Field
             label="Rationale"
             htmlFor="as-rationale"

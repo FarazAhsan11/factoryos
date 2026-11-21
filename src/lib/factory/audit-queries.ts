@@ -24,7 +24,9 @@ export type AuditAction =
   | "extension_rejected"
   | "capa_plan_approved"
   | "capa_effective"
-  | "capa_not_effective";
+  | "capa_not_effective"
+  | "correction_added"
+  | "correction_removed";
 
 export interface AuditEntry {
   id: number;
@@ -150,7 +152,7 @@ export const FIELD_LABELS: Record<string, { label: string; kind: FieldKind }> = 
   },
   root_cause: { label: "Root cause", kind: "long" },
   root_cause_conclusion: { label: "Root cause conclusion", kind: "text" },
-  rca_method: { label: "Method", kind: "text" },
+  rca_method: { label: "Analysis tool", kind: "text" },
 
   // Actions
   capa_needed: { label: "CAPA needed", kind: "bool" },

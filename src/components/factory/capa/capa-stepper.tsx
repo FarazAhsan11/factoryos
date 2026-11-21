@@ -2,16 +2,17 @@ import { Check } from "lucide-react";
 
 import {
   CAPA_STEPS,
-  CAPA_STEP_LABEL,
   STEP_INDEX,
+  stepLabel,
+  type Capa,
   type CapaStep,
 } from "@/lib/factory/capa-queries";
 import { cn } from "@/lib/utils";
 
 /**
- * CAPA plan → Do → Effectiveness check → Closed, with the current step
- * marked — the reference QMS's stepper (qms-v6), on the CAPA page and the
- * case's Actions tab.
+ * Plan → Implement → Verify → Closed, with the current step marked — the
+ * reference QMS's stepper (qms-v8), on the CAPA page and the case's Actions
+ * tab.
  */
 export function CapaStepper({ step, small }: { step: CapaStep; small?: boolean }) {
   const at = STEP_INDEX[step];
@@ -62,11 +63,14 @@ export function CapaStepper({ step, small }: { step: CapaStep; small?: boolean }
   );
 }
 
-/** Four dots and the step's name — the register's Step column. */
-export function CapaStepDots({ step }: { step: CapaStep }) {
-  const at = STEP_INDEX[step];
+/** Four dots and where the CAPA stands — the register's Status column. */
+export function CapaStepDots({ capa }: { capa: Capa }) {
+  const at = STEP_INDEX[capa.step];
   return (
-    <span className="inline-flex items-center gap-2 whitespace-nowrap">
+    <span
+      className="inline-flex items-center gap-2 whitespace-nowrap"
+      title="Plan → Implement → Verify → Closed"
+    >
       <span aria-hidden className="inline-flex gap-1">
         {[0, 1, 2, 3].map((k) => (
           <i
@@ -82,8 +86,8 @@ export function CapaStepDots({ step }: { step: CapaStep }) {
           />
         ))}
       </span>
-      <span className={cn(step === "closed" ? "text-ink-4" : "text-ink")}>
-        {step === "closed" ? "Closed" : `${at + 1} · ${CAPA_STEP_LABEL[step]}`}
+      <span className={cn(capa.step === "closed" ? "text-ink-4" : "text-ink")}>
+        {stepLabel(capa)}
       </span>
     </span>
   );

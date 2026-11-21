@@ -22,6 +22,7 @@ import {
   parseBatches,
   type DevInvestigationValues,
 } from "@/app/factory/[slug]/deviations/schemas";
+import { DecisionForm } from "@/components/factory/deviations/batch-holds";
 import { CaseAttachments } from "@/components/factory/deviations/case-attachments";
 import { Segmented } from "@/components/factory/deviations/deviation-initiation-fields";
 import {
@@ -34,7 +35,7 @@ import {
   SECONDARY_BUTTON,
   SelectControl,
 } from "@/components/factory/deviations/deviation-fields";
-import { formatDateTime } from "@/lib/factory/dates";
+import { formatDateTime, formatDay } from "@/lib/factory/dates";
 import {
   approveDevInvestigation,
   deviationKeys,
@@ -44,7 +45,13 @@ import {
   submitDevInvestigation,
   type Deviation,
 } from "@/lib/factory/deviation-queries";
-import { fetchHolds, holdKeys, placeHolds } from "@/lib/factory/hold-queries";
+import {
+  HOLD_STATUS_LABEL,
+  decideHold,
+  fetchHolds,
+  holdKeys,
+  placeHolds,
+} from "@/lib/factory/hold-queries";
 import { pipelineKeys } from "@/lib/factory/pipeline-queries";
 import { fetchProducts, productKeys } from "@/lib/factory/product-queries";
 import { useForm } from "@/lib/use-form";
@@ -195,17 +202,10 @@ export function DevInvestigationTab({
         )}
         className="space-y-7"
       >
-        {/* Outside the fieldset: other batches turn up during the
-            investigation, and may need holding after it is submitted. */}
-        {canEdit && (
-          <HoldOtherBatches deviation={d} factoryId={factoryId} viewerName={viewerName} />
-        )}
-
-        {/* Disabled as one, so a submitted or approved investigation reads as
-            the same form rather than a second layout. */}
-        <fieldset disabled={locked} className="min-w-0 space-y-7">
-          <Section title="Impact">
-            <div className="grid gap-x-6 gap-y-5 md:grid-cols-2">
+        <Section title="Impact">
+          <div className="grid gap-x-6 gap-y-5 md:grid-cols-2">
+            {/* Disabled with the rest of the form once submitted or approved. */}
+            <fieldset disabled={locked} className="min-w-0">
               <Field
                 label="Other batches affected"
                 htmlFor="inv-other"
@@ -217,16 +217,26 @@ export function DevInvestigationTab({
                   className={cn(CONTROL, "font-mono")}
                   {...register("otherBatches")}
                 />
-                <OtherBatches factoryId={factoryId} control={control} />
               </Field>
-              <div />
+            </fieldset>
+            <div className="hidden md:block" />
+            {/* Outside the fieldset: a batch may need holding, releasing or
+                rejecting after the investigation is submitted. */}
+            <OtherBatchHolds
+              deviation={d}
+              factoryId={factoryId}
+              control={control}
+              canHold={canEdit}
+              viewerName={viewerName}
+              className="md:col-span-2"
+            />
+            <fieldset disabled={locked} className="min-w-0 md:col-span-2">
               <Field
                 label="Product impact assessment"
                 htmlFor="inv-impact"
                 required
                 error={errors.impact?.message}
-                hint="Quality, safety, efficacy, regulatory compliance, other batches."
-                className="md:col-span-2"
+                hint="Quality, safety, efficacy, regulatory compliance, other batches. Needed before QA can release a held batch."
               >
                 <textarea
                   id="inv-impact"
@@ -236,8 +246,13 @@ export function DevInvestigationTab({
                   {...register("impact")}
                 />
               </Field>
-            </div>
-          </Section>
+            </fieldset>
+          </div>
+        </Section>
+
+        {/* Disabled as one, so a submitted or approved investigation reads as
+            the same form rather than a second layout. */}
+        <fieldset disabled={locked} className="min-w-0 space-y-7">
 
           <Section title="What was reviewed">
             <ReviewChecks control={control} error={errors.reviewChecks?.message} />
@@ -364,7 +379,7 @@ export function DevInvestigationTab({
                 />
               </Field>
               <Field
-                label="Method"
+                label="Analysis tool"
                 htmlFor="inv-method"
                 required
                 error={errors.method?.message}
@@ -484,48 +499,249 @@ export function DevInvestigationTab({
   );
 }
 
-/** Each "other batch", resolved from the register like the case's own. */
-function OtherBatches({
+/**
+ * Each "other batch affected", as it is typed — resolved from the register,
+ * and asked about one at a time: **put it on hold?** A hold placed here is the
+ * same hold as one placed at raise (`place_batch_holds`, 0069): it is listed
+ * on Details → Batch holds too, and released or rejected the same way, with
+ * the same rules — here or there.
+ *
+ * "No" is remembered only while the page is open; the batch then reads "Not
+ * on hold" with a link to hold it later.
+ */
+function OtherBatchHolds({
+  deviation: d,
   factoryId,
   control,
+  canHold,
+  viewerName,
+  className,
 }: {
+  deviation: Deviation;
   factoryId: string;
   control: Control<DevInvestigationValues>;
+  /** Supervisor and up, on an open case. */
+  canHold: boolean;
+  viewerName: string;
+  className?: string;
 }) {
+  const queryClient = useQueryClient();
   const typed = useWatch({ control, name: "otherBatches" });
   const { data: products = [] } = useQuery({
     queryKey: productKeys.all(factoryId),
     queryFn: () => fetchProducts(factoryId),
   });
+  const { data: holds = [] } = useQuery({
+    queryKey: holdKeys.forCase(factoryId, d.id),
+    queryFn: () => fetchHolds(d.id),
+  });
+  const [declined, setDeclined] = useState<string[]>([]);
+  const [placing, setPlacing] = useState<string | null>(null);
+  const [deciding, setDeciding] = useState<{
+    id: string;
+    decision: "released" | "rejected";
+  } | null>(null);
+
   const rows = useMemo(() => {
-    const by = new Map(products.map((p) => [p.batch_no.toLowerCase(), p]));
-    return parseBatches(typed ?? "").map((b) => ({
-      batch: b,
-      product: by.get(b.toLowerCase()) ?? null,
-    }));
-  }, [products, typed]);
+    const byBatch = new Map(products.map((p) => [p.batch_no.toLowerCase(), p]));
+    return parseBatches(typed ?? "").map((batch) => {
+      const key = batch.toLowerCase();
+      const mine = holds.filter((h) => h.batch_no.toLowerCase() === key);
+      // A live hold first; otherwise the latest decision.
+      const hold =
+        mine.find((h) => h.status === "on_hold") ?? mine[mine.length - 1] ?? null;
+      return { batch, key, product: byBatch.get(key) ?? null, hold };
+    });
+  }, [products, holds, typed]);
+
   if (rows.length === 0) return null;
+
+  // Holds move the board's cards, the case header and its stage with them.
+  const refresh = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: deviationKeys.all(factoryId) }),
+      queryClient.invalidateQueries({ queryKey: pipelineKeys.all(factoryId) }),
+    ]);
+
+  async function hold(batch: string) {
+    setPlacing(batch);
+    try {
+      await placeHolds(d.id, [batch], viewerName);
+      await refresh();
+      toast.success(`Batch ${batch} put on hold.`);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setPlacing(null);
+    }
+  }
+
+  function startDecision(id: string, decision: "released" | "rejected") {
+    // The database checks the saved impact, not what is typed.
+    if (
+      decision === "released" &&
+      d.investigation_required !== false &&
+      !(d.impact ?? "").trim()
+    ) {
+      toast.error(
+        "Write the product impact assessment and save the draft before releasing a batch.",
+      );
+      return;
+    }
+    setDeciding({ id, decision });
+  }
+
+  const investigationPending =
+    d.investigation_required !== false && !d.investigation_approved_at;
+
   return (
-    <ul className="space-y-1">
-      {rows.map(({ batch, product }) => (
-        <li
-          key={batch}
-          className={cn(
-            "flex flex-wrap items-baseline gap-x-2 rounded-lg border px-2.5 py-1.5 text-[0.7188rem]",
-            product
-              ? "border-brand-soft bg-brand-tint text-ink-3"
-              : "border-warn-line bg-warn-tint text-warn-ink",
-          )}
-        >
-          <span className="font-mono font-semibold text-ink">{batch}</span>
-          {product ? (
-            <span className="font-medium text-ink">{product.name}</span>
-          ) : (
-            <span>Not in the batch register — saved as typed.</span>
-          )}
-        </li>
-      ))}
-    </ul>
+    <div className={cn("space-y-2", className)}>
+      <ul className="space-y-2">
+        {rows.map(({ batch, key, product, hold: h }) => {
+          const asking = canHold && product && !h && !declined.includes(key);
+          return (
+            <li
+              key={key}
+              className={cn(
+                "rounded-xl border px-3.5 py-2.5 text-sm",
+                asking
+                  ? "border-warn-line bg-warn-tint"
+                  : h?.status === "on_hold"
+                    ? "border-danger-line bg-danger-soft"
+                    : "border-line bg-surface",
+              )}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                <span className="min-w-0">
+                  <span className="font-mono font-semibold text-ink">{batch}</span>
+                  {product ? (
+                    <span className="ml-2 text-ink-3">{product.name}</span>
+                  ) : (
+                    <span className="ml-2 text-warn-ink">
+                      Not in the batch register — saved as typed; it cannot be put on hold.
+                    </span>
+                  )}
+                </span>
+
+                {product && (
+                  <span className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs">
+                    {asking ? (
+                      <>
+                        <span className="font-semibold text-warn-ink">
+                          Put this batch on hold?
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => hold(batch)}
+                          disabled={placing !== null}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-warn-line bg-surface px-3 py-1.5 font-semibold text-warn-ink transition hover:border-warn disabled:opacity-60"
+                        >
+                          {placing === batch && <Loader2 className="size-3.5 animate-spin" />}
+                          Yes, put on hold
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeclined((list) => [...list, key])}
+                          disabled={placing !== null}
+                          className="rounded-lg border border-line bg-surface px-3 py-1.5 font-semibold text-ink-3 transition hover:border-line-strong disabled:opacity-60"
+                        >
+                          No
+                        </button>
+                      </>
+                    ) : !h ? (
+                      <>
+                        <span className="text-ink-4">Not on hold</span>
+                        {canHold && (
+                          <button
+                            type="button"
+                            onClick={() => hold(batch)}
+                            disabled={placing !== null}
+                            className="inline-flex items-center gap-1 font-semibold text-brand hover:underline disabled:opacity-60"
+                          >
+                            {placing === batch && <Loader2 className="size-3.5 animate-spin" />}
+                            Put on hold
+                          </button>
+                        )}
+                      </>
+                    ) : h.status === "on_hold" ? (
+                      <>
+                        <span className="font-semibold text-danger-deep">
+                          On hold
+                          <span className="font-normal text-ink-4">
+                            {" "}· {h.placed_by_name ?? "—"} · {formatDay(h.placed_at)}
+                          </span>
+                        </span>
+                        {canHold && deciding?.id !== h.id && (
+                          <span>
+                            <button
+                              type="button"
+                              onClick={() => startDecision(h.id, "released")}
+                              className="font-semibold text-brand hover:underline"
+                            >
+                              Release
+                            </button>
+                            <span className="mx-1.5 text-ink-5">·</span>
+                            <button
+                              type="button"
+                              onClick={() => startDecision(h.id, "rejected")}
+                              className="font-semibold text-danger-deep hover:underline"
+                            >
+                              Reject
+                            </button>
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <span
+                        className={cn(
+                          "font-semibold",
+                          h.status === "released" ? "text-teal-deep" : "text-ink-3",
+                        )}
+                        title={h.reason ?? undefined}
+                      >
+                        {HOLD_STATUS_LABEL[h.status]}
+                        <span className="font-normal text-ink-4">
+                          {" "}· {h.decided_by_name ?? "—"}
+                          {h.decided_at && ` · ${formatDay(h.decided_at)}`}
+                        </span>
+                      </span>
+                    )}
+                  </span>
+                )}
+              </div>
+
+              {h && deciding?.id === h.id && (
+                <div className="mt-3 border-t border-line-soft pt-3">
+                  <DecisionForm
+                    batch={h.batch_no}
+                    decision={deciding.decision}
+                    warn={
+                      deciding.decision === "released" && investigationPending
+                        ? "The investigation is not approved yet."
+                        : null
+                    }
+                    onCancel={() => setDeciding(null)}
+                    onDecide={async (reason) => {
+                      await decideHold(h.id, deciding.decision, reason, viewerName);
+                      await refresh();
+                      toast.success(
+                        `Batch ${h.batch_no} ${deciding.decision === "released" ? "released" : "rejected"}.`,
+                      );
+                      setDeciding(null);
+                    }}
+                  />
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      <p className="text-[0.6875rem] text-ink-5">
+        A held batch is blocked in the shift log for preparatory and production
+        work. Holds are also listed on Details → Batch holds, and released or
+        rejected the same way there.
+      </p>
+    </div>
   );
 }
 
@@ -592,68 +808,6 @@ function Section({
       {title && <h3 className="mb-4 text-base font-semibold text-ink">{title}</h3>}
       {children}
     </section>
-  );
-}
-
-/**
- * The other batches the investigation names (as saved) that are not on hold
- * on this case — one click puts them on hold, as the reference QMS offers.
- */
-function HoldOtherBatches({
-  deviation: d,
-  factoryId,
-  viewerName,
-}: {
-  deviation: Deviation;
-  factoryId: string;
-  viewerName: string;
-}) {
-  const queryClient = useQueryClient();
-  const [busy, setBusy] = useState(false);
-  const { data: holds = [] } = useQuery({
-    queryKey: holdKeys.forCase(factoryId, d.id),
-    queryFn: () => fetchHolds(d.id),
-  });
-  const decided = new Set(
-    holds
-      .filter((h) => h.status !== "released")
-      .map((h) => h.batch_no.toLowerCase()),
-  );
-  const unheld = d.other_batch_nos.filter((b) => !decided.has(b.toLowerCase()));
-  if (unheld.length === 0) return null;
-
-  async function hold() {
-    setBusy(true);
-    try {
-      const n = await placeHolds(d.id, unheld, viewerName);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: deviationKeys.all(factoryId) }),
-        queryClient.invalidateQueries({ queryKey: pipelineKeys.all(factoryId) }),
-      ]);
-      toast.success(n === 1 ? "Batch put on hold." : `${n} batches put on hold.`);
-    } catch (e) {
-      toast.error((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn-line bg-warn-tint px-4 py-3 text-sm text-warn-ink">
-      <span>
-        Other batches affected — <span className="font-mono">{unheld.join(", ")}</span>{" "}
-        {unheld.length === 1 ? "is" : "are"} not on hold.
-      </span>
-      <button
-        type="button"
-        onClick={hold}
-        disabled={busy}
-        className="inline-flex items-center gap-2 rounded-lg border border-warn-line bg-surface px-3 py-1.5 text-xs font-semibold text-warn-ink transition hover:border-warn disabled:opacity-60"
-      >
-        {busy && <Loader2 className="size-3.5 animate-spin" />}
-        Put {unheld.join(", ")} on hold
-      </button>
-    </div>
   );
 }
 
@@ -880,7 +1034,7 @@ export function InvestigationFacts({ deviation: d }: { deviation: Deviation }) {
           <Fact label="Conclusion">
             {d.root_cause_conclusion ?? <Muted>Not recorded</Muted>}
           </Fact>
-          <Fact label="Method">{d.rca_method ?? <Muted>Not recorded</Muted>}</Fact>
+          <Fact label="Analysis tool">{d.rca_method ?? <Muted>Not recorded</Muted>}</Fact>
         </dl>
       </Section>
     </div>

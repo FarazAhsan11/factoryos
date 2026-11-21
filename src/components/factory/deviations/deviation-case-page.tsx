@@ -4,7 +4,17 @@ import { useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarClock, Check, Loader2, Minus, Printer } from "lucide-react";
+import {
+  Building2,
+  Check,
+  Clock,
+  Loader2,
+  Lock,
+  Minus,
+  Package,
+  Printer,
+  UserRound,
+} from "lucide-react";
 
 import { AssessmentTab } from "@/components/factory/deviations/assessment-tab";
 import { BatchHolds } from "@/components/factory/deviations/batch-holds";
@@ -22,7 +32,7 @@ import { CaseHistory } from "@/components/factory/deviations/case-history";
 import { InitiationTab } from "@/components/factory/deviations/deviation-tab-forms";
 import { canReview } from "@/lib/factory/action-queries";
 import type { FactoryRole } from "@/lib/factory/context";
-import { addDays, formatDay } from "@/lib/factory/dates";
+import { addDays, formatDateTime, formatDay } from "@/lib/factory/dates";
 import {
   DEV_STAGE_DOT,
   devRiskLabel,
@@ -30,6 +40,7 @@ import {
   deviationKeys,
   fetchDeviations,
   nextStep,
+  typeMeta,
   type CaseSection,
   type Deviation,
 } from "@/lib/factory/deviation-queries";
@@ -187,16 +198,6 @@ export function DeviationCasePage({
           <span className="font-mono">{d.deviation_no}</span>
         </nav>
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-          {reviewer && canRequestExtension(d, extensions) && (
-            <button
-              type="button"
-              onClick={() => setExtending(true)}
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-brand hover:underline"
-            >
-              <CalendarClock className="size-4" />
-              Extend due date
-            </button>
-          )}
           <Link
             href={`${listHref}/${d.id}/print`}
             className="inline-flex items-center gap-1.5 text-sm font-medium text-brand hover:underline"
@@ -219,6 +220,11 @@ export function DeviationCasePage({
           deviation={d}
           assessDays={settings.assessDays}
           extended={extensions.some((e) => e.status === "approved")}
+          onExtend={
+            reviewer && canRequestExtension(d, extensions)
+              ? () => setExtending(true)
+              : undefined
+          }
           className="px-5 pt-5 sm:px-7 sm:pt-6"
         />
 
@@ -316,6 +322,7 @@ export function DeviationCasePage({
         </div>
 
         <div className="px-5 py-6 sm:px-7">
+          <LockedBanner deviation={d} section={section} className="mb-6" />
           {section === "details" && (
             <div className="space-y-8">
               <InitiationTab
@@ -372,6 +379,8 @@ export function DeviationCasePage({
               deviation={d}
               factoryId={factoryId}
               readOnly={!open || !reviewer}
+              viewerName={viewerName}
+              userId={userId}
             />
           )}
           {section === "closeout" && (
@@ -403,6 +412,94 @@ export function DeviationCasePage({
 }
 
 /**
+ * What locked a section — the signature that fixed it, by whom and when — or
+ * null while it can still be edited.
+ */
+function lockOf(
+  d: Deviation,
+  section: CaseSection,
+): { what: string; by: string | null; at: string } | null {
+  switch (section) {
+    case "details":
+    case "assessment":
+      return d.assessed_at
+        ? {
+            what: section === "details" ? "signed with the initial assessment" : "signed",
+            by: d.assessed_by_name,
+            at: d.assessed_at,
+          }
+        : null;
+    case "investigation":
+      return d.investigation_approved_at
+        ? {
+            what: "approved",
+            by: d.investigation_approved_by_name,
+            at: d.investigation_approved_at,
+          }
+        : null;
+    case "closeout":
+      if (d.status === "closed" && d.closed_at) {
+        return { what: "closed", by: d.qa_sign_name, at: d.closed_at };
+      }
+      return d.close_first_signed_at
+        ? {
+            what: "first signature",
+            by: d.close_first_signed_by_name,
+            at: d.close_first_signed_at,
+          }
+        : null;
+    default:
+      return null;
+  }
+}
+
+/**
+ * "Locked — signed … by M. Lee on 20 Nov 2026, 01:57." above a signed
+ * section.
+ *
+ * Placeholder: "Correct this section" does nothing yet. It marks where a
+ * correction with a reason (a new version of the section, kept in the audit
+ * trail) will start.
+ */
+function LockedBanner({
+  deviation,
+  section,
+  className,
+}: {
+  deviation: Deviation;
+  section: CaseSection;
+  className?: string;
+}) {
+  const lock = lockOf(deviation, section);
+  if (!lock) return null;
+  return (
+    <div
+      className={cn(
+        "flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line-soft bg-sunken px-4 py-3 text-sm text-ink-3",
+        className,
+      )}
+    >
+      <span className="inline-flex items-start gap-2">
+        <Lock aria-hidden className="mt-0.5 size-4 shrink-0 text-warn-deep" />
+        <span>
+          <span className="font-semibold text-ink">Locked</span> — {lock.what}
+          {lock.by && ` by ${lock.by}`} on {formatDateTime(lock.at)}. To fix a
+          mistake, correct it with a reason.
+        </span>
+      </span>
+      <button
+        type="button"
+        aria-disabled
+        title="Coming soon"
+        className="cursor-not-allowed rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink-3"
+      >
+        Correct this section
+      </button>
+    </div>
+  );
+}
+
+/**
  * The case's title, what identifies it, and five facts — stage, class, risk,
  * due (or closed) date and owner. Shared by the case page and its printed
  * report, so the two always agree.
@@ -411,6 +508,7 @@ export function CaseHeader({
   deviation: d,
   assessDays,
   extended = false,
+  onExtend,
   className,
 }: {
   deviation: Deviation;
@@ -418,34 +516,72 @@ export function CaseHeader({
   assessDays: number;
   /** An approved due date extension moved the due date (0072). */
   extended?: boolean;
+  /** Shows "Extend" under the due date; absent when it cannot be asked (or in print). */
+  onExtend?: () => void;
   className?: string;
 }) {
   const open = d.status === "open";
   const stage = devStage(d);
   const batches = d.batch_nos.length > 0 ? d.batch_nos : d.batch_no ? [d.batch_no] : [];
   const assessBy = addDays(d.created_at.slice(0, 10), assessDays);
+  const type = typeMeta(d.type);
   return (
     <header
       className={cn(
-        "flex flex-wrap items-start justify-between gap-x-8 gap-y-4",
+        "grid gap-x-10 gap-y-5 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start",
         className,
       )}
     >
-      <div className="min-w-0 max-w-3xl">
-        <h1 className="text-xl font-semibold tracking-tight text-ink sm:text-2xl">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-md border border-line bg-sunken px-2 py-0.5 font-mono text-xs font-medium text-ink-3">
+            {d.deviation_no}
+          </span>
+          <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", type.pill)}>
+            {type.short} deviation
+          </span>
+          {!open && (
+            <span className="rounded-full bg-sunken-2 px-2 py-0.5 text-xs font-semibold text-ink-4">
+              Closed
+            </span>
+          )}
+        </div>
+        <h1 className="mt-2 text-xl font-semibold tracking-tight break-words text-ink sm:text-2xl">
           {d.title}
         </h1>
-        <p className="mt-1.5 text-sm leading-relaxed text-ink-4">
-          <span className="font-mono">{d.deviation_no}</span> · Deviation ·{" "}
-          {d.type === "planned" ? "Planned" : "Unplanned"}
-          {d.raised_by && ` · raised by ${d.raised_by}`} on{" "}
-          {formatDay(d.created_at)}
-          {batches.length > 0 && ` · batch ${batches.join(", ")}`}
-          {d.product_names.length > 0 && ` · ${d.product_names.join(", ")}`}
-        </p>
+        <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-ink-4">
+          <MetaItem icon={UserRound} label="Raised by">
+            {d.raised_by ?? "—"}
+            {/* The raise date only when it differs from when it happened —
+                found on the night shift, raised next morning. */}
+            {(!d.occurred_at ||
+              formatDay(d.occurred_at) !== formatDay(d.created_at)) && (
+              <span className="text-ink-5"> · raised {formatDay(d.created_at)}</span>
+            )}
+          </MetaItem>
+          {d.occurred_at && (
+            <MetaItem icon={Clock} label="Happened">
+              {formatDay(d.occurred_at)}
+            </MetaItem>
+          )}
+          {d.department_name && (
+            <MetaItem icon={Building2} label="Department">
+              {d.department_name}
+              {d.location && <span className="text-ink-5"> · {d.location}</span>}
+            </MetaItem>
+          )}
+          {batches.length > 0 && (
+            <MetaItem icon={Package} label={batches.length > 1 ? "Batches" : "Batch"}>
+              <span className="font-mono text-ink-3">{batches.join(", ")}</span>
+              {d.product_names.length > 0 && (
+                <span className="text-ink-5"> · {d.product_names.join(", ")}</span>
+              )}
+            </MetaItem>
+          )}
+        </ul>
       </div>
 
-      <dl className="flex flex-wrap divide-x divide-line-soft">
+      <dl className="flex flex-wrap gap-y-3 divide-x divide-line-soft xl:flex-nowrap xl:justify-end">
         <HeadFact label="Stage">
           <span className="inline-flex items-center gap-1.5">
             <span className={cn("size-2 rounded-full", DEV_STAGE_DOT[stage])} />
@@ -458,7 +594,30 @@ export function CaseHeader({
           </span>
         </HeadFact>
         <HeadFact label="Risk">{d.assessed_at ? (devRiskLabel(d) ?? "—") : "—"}</HeadFact>
-        <HeadFact label={!open ? "Closed" : d.assessed_at ? "Due" : "Assess by"}>
+        <HeadFact
+          label={
+            !open ? (
+              "Closed"
+            ) : d.assessed_at ? (
+              onExtend ? (
+                <>
+                  Due ·{" "}
+                  <button
+                    type="button"
+                    onClick={onExtend}
+                    className="font-medium text-brand hover:underline"
+                  >
+                    Extend
+                  </button>
+                </>
+              ) : (
+                "Due"
+              )
+            ) : (
+              "Assess by"
+            )
+          }
+        >
           {!open ? (
             <span className="text-ink-4">{d.closed_at ? formatDay(d.closed_at) : "—"}</span>
           ) : d.assessed_at ? (
@@ -480,11 +639,29 @@ export function CaseHeader({
   );
 }
 
+function MetaItem({
+  icon: Icon,
+  label,
+  children,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <li className="inline-flex min-w-0 items-center gap-1.5">
+      <Icon aria-hidden className="size-3.5 shrink-0 text-ink-5" />
+      <span className="sr-only">{label}: </span>
+      <span className="min-w-0">{children}</span>
+    </li>
+  );
+}
+
 function HeadFact({
   label,
   children,
 }: {
-  label: string;
+  label: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (

@@ -99,10 +99,14 @@ export function FactorySidebar({
   const [livePath, liveQuery] = pendingHref
     ? pendingHref.split("?")
     : [pathname, searchParams.toString()];
-  const liveTab = new URLSearchParams(liveQuery ?? "").get("tab");
   // "/factory/acme/pipeline/…" → "/pipeline"; the overview is "".
   const rest = livePath.startsWith(base) ? livePath.slice(base.length) : "";
   const section = rest ? `/${rest.split("/")[1]}` : "";
+  // A CAPA's own page (/deviations/capa/…) belongs to the CAPA register, not
+  // to Deviations — the first link for its path.
+  const liveTab = rest.startsWith("/deviations/capa/")
+    ? "capa"
+    : new URLSearchParams(liveQuery ?? "").get("tab");
 
   const sections = navForRole(role, units);
   const active = activeHrefs(sections, section, liveTab);

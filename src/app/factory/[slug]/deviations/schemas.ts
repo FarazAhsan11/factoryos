@@ -380,120 +380,91 @@ export const CAPA_REASONS = [
 ] as const;
 
 
-/**
- * Resolve directly — a correction and no CAPA. Stored as the case's "reason
- * no CAPA is needed", which is what the close-out reads.
- */
-export const resolveDirectSchema = z.object({
-  correction: z
+/* ── The case's Actions tab and the CAPA (qms-v8, migration 0074) ───── */
+
+/** "Is a CAPA required?" No — why the corrections are enough. */
+export const capaNotNeededSchema = z.object({
+  reason: z
     .string()
     .trim()
-    .min(10, "Say what was done to correct it, and why no CAPA is needed.")
+    .min(10, "Say why the corrections are enough — at least a sentence.")
     .max(1000, "Keep it under 1000 characters."),
 });
 
-export type ResolveDirectValues = z.infer<typeof resolveDirectSchema>;
+export type CapaNotNeededValues = z.infer<typeof capaNotNeededSchema>;
 
-/* ── CAPA lifecycle (migration 0073): CAPA plan → Do → Effectiveness check ── */
-
-/**
- * Create a CAPA from a case — its title, owner and why, and optionally a
- * first action. The rest of the plan is written on the CAPA's own page.
- */
-export const capaNewSchema = z.object({
-  title: z
+/** A correction — what was done to fix this case, who did it, and when. */
+export const correctionSchema = z.object({
+  what: z
     .string()
     .trim()
-    .min(3, "Give the CAPA a title — what it fixes, in a line.")
-    .max(160, "Keep the title under 160 characters."),
-  owner: z
+    .min(3, "Describe what was done.")
+    .max(1000, "Keep it under 1000 characters."),
+  who: z
     .string()
     .trim()
-    .min(1, "Name the CAPA owner.")
+    .min(1, "Say who did it.")
     .max(80, "Keep the name under 80 characters."),
-  reason: z.enum(CAPA_REASONS, { error: "Say why a CAPA is needed." }),
-  firstKind: z.enum(["ca", "pa"]),
-  firstAction: optional(2000),
-});
-
-export type CapaNewValues = z.infer<typeof capaNewSchema>;
-
-/**
- * The CAPA plan's own answers. Saved as they are — a plan is written over
- * days — and checked as a whole when it is approved (`capas_guard`).
- */
-export const capaPlanSchema = z.object({
-  title: z
+  doneOn: z
     .string()
     .trim()
-    .min(3, "Give the CAPA a title — what it fixes, in a line.")
-    .max(160, "Keep the title under 160 characters."),
-  owner: optional(80),
-  effectivenessCriteria: optional(1000),
-  checkMode: z.enum(["dated", "at_implementation"]),
-  verifyBy: date,
-  checkWhy: optional(500),
-  checker: optional(80),
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Pick the date it was done."),
 });
 
-export type CapaPlanValues = z.infer<typeof capaPlanSchema>;
+export type CorrectionValues = z.infer<typeof correctionSchema>;
 
-/** One action on the plan — what, who and by when, and whether CA or PA. */
-export const capaPlanActionSchema = z.object({
-  kind: z.enum(["ca", "pa"]),
+/** An action added once the plan is approved (Implement). */
+export const capaActionAddSchema = z.object({
   description: z
     .string()
     .trim()
-    .min(5, "Describe what will be done.")
+    .min(3, "Describe the action.")
     .max(2000, "Keep the description under 2000 characters."),
   owner: z
     .string()
     .trim()
-    .min(1, "Say who does it.")
+    .min(1, "Choose the owner.")
     .max(80, "Keep the name under 80 characters."),
   targetDate: z
     .string()
     .trim()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Pick the due date."),
-  linkedRecord: optional(120),
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Pick the target date."),
 });
 
-export type CapaPlanActionValues = z.infer<typeof capaPlanActionSchema>;
+export type CapaActionAddValues = z.infer<typeof capaActionAddSchema>;
 
-/** Marking an action done — the evidence, and any linked record. */
+/** Marking an action done — the completion evidence, and any linked record. */
 export const capaDoneSchema = z.object({
   evidence: z
     .string()
     .trim()
-    .min(3, "Give the evidence — a document, record or work order.")
-    .max(500, "Keep the evidence under 500 characters."),
+    .min(3, "Add the completion evidence — what was done and where it is recorded.")
+    .max(1000, "Keep the evidence under 1000 characters."),
   linkedRecord: optional(120),
 });
 
 export type CapaDoneValues = z.infer<typeof capaDoneSchema>;
 
 /**
- * The effectiveness check. Built for the CAPA: checking before its date asks
- * why. `record_capa_check` re-checks all of it.
+ * Verify effectiveness — Effective closes the CAPA; Not effective needs the
+ * date the check is repeated on. `record_capa_check` re-checks all of it.
  */
-export function capaCheckSchema(early: boolean) {
-  return z
-    .object({
-      result: z.enum(["effective", "not_effective"]),
-      findings: z
-        .string()
-        .trim()
-        .min(10, "Say what you found — what you looked at and what it showed.")
-        .max(2000, "Keep it under 2000 characters."),
-      earlyReason: optional(500),
-    })
-    .refine((v) => !early || v.earlyReason.length >= 5, {
-      path: ["earlyReason"],
-      message: "Say why it is checked before its date.",
-    });
-}
+export const capaCheckSchema = z
+  .object({
+    result: z.enum(["effective", "not_effective"]),
+    findings: z
+      .string()
+      .trim()
+      .min(10, "Add the findings — what you checked and what you found.")
+      .max(2000, "Keep it under 2000 characters."),
+    nextCheck: z.string().trim(),
+  })
+  .refine((v) => v.result === "effective" || /^\d{4}-\d{2}-\d{2}$/.test(v.nextCheck), {
+    path: ["nextCheck"],
+    message: "Set the next check date.",
+  });
 
-export type CapaCheckValues = z.infer<ReturnType<typeof capaCheckSchema>>;
+export type CapaCheckValues = z.infer<typeof capaCheckSchema>;
 
 /* ── Tab 7 · Close out ────────────────────────────────────────────────── */
 
@@ -813,7 +784,7 @@ export const devInvestigationSubmitSchema = devInvestigationSchema.superRefine(
     }
     if (v.rootCause.length < 5) need("rootCause", "State the root cause.");
     if (!v.conclusion) need("conclusion", "Confirmed, probable or not confirmed?");
-    if (!v.method) need("method", "Name the method.");
+    if (!v.method) need("method", "Choose the analysis tool.");
   },
 );
 

@@ -247,7 +247,8 @@ function HoldRow({
   );
 }
 
-function DecisionForm({
+/** Release or reject one held batch, with the reason — also used on the Investigation tab. */
+export function DecisionForm({
   batch,
   decision,
   warn,

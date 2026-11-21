@@ -288,7 +288,9 @@ const EVENT_WHAT: Partial<Record<AuditAction, string>> = {
   extension_rejected: "Signed: Due date extension rejected",
   capa_plan_approved: "Signed: CAPA plan approved",
   capa_effective: "Signed: CAPA verified effective",
-  capa_not_effective: "Signed: CAPA check — didn't work",
+  capa_not_effective: "Signed: CAPA verified not effective",
+  correction_added: "Correction added",
+  correction_removed: "Correction removed",
 };
 
 type ReviewCheck = { item: string; finding: string };
@@ -326,6 +328,10 @@ function trailRows(e: AuditEntry, names: Names): TrailRow[] {
       return [row(0, `File removed — ${section}`, e.old_value, null)];
     case "hold_placed":
       return [row(0, "Batch hold placed", null, e.new_value, true)];
+    case "correction_added":
+      return [row(0, "Correction added", null, e.new_value)];
+    case "correction_removed":
+      return [row(0, "Correction removed", e.old_value, null)];
     case "batch_released":
       return [row(0, "Signed: Batch released", "On hold", `${e.new_value} Released`)];
     case "batch_rejected":

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { ClipboardCheck } from "lucide-react";
 
+import { caseHref } from "@/components/factory/capa/capa-page";
 import { CapaStepDots } from "@/components/factory/capa/capa-stepper";
 import { formatDate } from "@/components/factory/deviations/deviation-fields";
 import {
@@ -17,7 +18,6 @@ import {
   RegisterTable,
   RegisterViews,
   TH,
-  Val,
 } from "@/components/factory/register-table";
 import {
   capaKeys,
@@ -34,25 +34,26 @@ type View = "open" | "plan" | "do" | "check" | "closed" | "all";
 
 const VIEWS: { key: View; label: string; hint: string; test: (c: Capa) => boolean }[] = [
   { key: "open", label: "All open", hint: "Every CAPA not yet closed", test: (c) => c.step !== "closed" },
-  { key: "plan", label: "Plans to approve", hint: "CAPA plan being written or waiting for approval", test: (c) => c.step === "plan" },
-  { key: "do", label: "Actions in progress", hint: "Plan approved, actions being done", test: (c) => c.step === "do" },
-  { key: "check", label: "Checks due", hint: "Every action done — the effectiveness check is next", test: (c) => c.step === "check" },
-  { key: "closed", label: "Closed", hint: "Checked and it worked", test: (c) => c.step === "closed" },
+  { key: "plan", label: "Awaiting approval", hint: "Plan being written or waiting for approval", test: (c) => c.step === "plan" },
+  { key: "do", label: "Implementing", hint: "Plan approved, actions being done", test: (c) => c.step === "do" },
+  { key: "check", label: "Verification due", hint: "Every action done — the effectiveness check is next", test: (c) => c.step === "check" },
+  { key: "closed", label: "Closed", hint: "Verified effective", test: (c) => c.step === "closed" },
   { key: "all", label: "All", hint: "Every CAPA ever raised", test: () => true },
 ];
 
 function haystack(c: Capa): string {
-  return [c.capa_no, c.title, c.owner_name, ...c.cases.map((k) => k.deviation_no)]
+  return [c.capa_no, c.title, ...c.action_owners, ...c.cases.map((k) => k.deviation_no)]
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
 }
 
 /**
- * The CAPA register — every CAPA, by step: plans to approve, actions in
- * progress, checks due, closed (qms-v6). Each opens its CAPA page. A CAPA is
- * raised from a case's Actions tab, never here: a plan with no problem behind
- * it is not a CAPA.
+ * The CAPA register (qms-v8) — every CAPA by where it stands: awaiting
+ * approval, implementing, verification due, closed. Columns: CAPA, title
+ * (with Follow-up / Recurred), status, what is due next, the action owners
+ * and the cases. A row opens the CAPA page. A CAPA is raised from a case's
+ * Actions tab, never here: a plan with no problem behind it is not a CAPA.
  */
 export function CapaRegister({
   factoryId,
@@ -96,9 +97,9 @@ export function CapaRegister({
       <div className="mb-4 shrink-0">
         <h1 className="text-2xl font-semibold tracking-tight text-ink">CAPA register</h1>
         <p className="mt-1 max-w-3xl text-sm text-ink-4">
-          Every CAPA runs CAPA plan → Do → Effectiveness check. Create one from a case&apos;s
+          Each CAPA moves Plan → Implement → Verify → Closed. Raise one from a case&apos;s
           Actions tab.
-          {firstTime !== null && ` ${firstTime}% worked at the first check.`}
+          {firstTime !== null && ` ${firstTime}% were effective at the first check.`}
         </p>
       </div>
 
@@ -121,7 +122,7 @@ export function CapaRegister({
           <RegisterSearch
             value={search}
             onChange={setSearch}
-            placeholder="Search CAPA no., title, owner, case no.…"
+            placeholder="Search CAPA no., title, action owner, case no.…"
             label="Search CAPAs"
           />
         </div>
@@ -153,9 +154,9 @@ export function CapaRegister({
               <>
                 <th className={TH}>CAPA</th>
                 <th className={TH}>Title</th>
-                <th className={TH}>Step</th>
+                <th className={TH}>Status</th>
                 <th className={TH}>Next</th>
-                <th className={TH}>Owner</th>
+                <th className={TH}>Action owners</th>
                 <th className={TH}>Cases</th>
               </>
             }
@@ -173,16 +174,29 @@ export function CapaRegister({
                   </td>
                   <td className="max-w-[26rem] min-w-[14rem] px-3 py-3 align-middle text-[0.8125rem] font-medium text-ink">
                     {c.title}
+                    {c.recurrence_of && (
+                      <span className="ml-2 rounded-full bg-warn-soft px-2 py-0.5 text-[0.6875rem] font-semibold whitespace-nowrap text-warn-deep">
+                        Follow-up
+                      </span>
+                    )}
+                    {c.recurred_by.length > 0 && (
+                      <span className="ml-2 rounded-full bg-danger-soft px-2 py-0.5 text-[0.6875rem] font-semibold whitespace-nowrap text-danger-deep">
+                        Recurred
+                      </span>
+                    )}
                   </td>
                   <td className={CELL}>
-                    <CapaStepDots step={c.step} />
+                    <CapaStepDots capa={c} />
                   </td>
-                  <td className={cn(CELL, overdue && "font-semibold text-danger-deep")}>
-                    {next.text}
-                    {next.date && ` · ${formatDate(next.date)}`}
+                  <td className={cn(CELL, overdue && "font-semibold text-danger-deep")} title={next.text}>
+                    {next.date ? formatDate(next.date) : <span className="text-ink-6">—</span>}
                   </td>
-                  <td className={CELL}>
-                    <Val value={c.owner_name} />
+                  <td className="max-w-[16rem] px-3 py-3 align-middle text-[0.8125rem] text-ink-2">
+                    {c.action_owners.length > 0 ? (
+                      c.action_owners.join(", ")
+                    ) : (
+                      <span className="text-ink-6">—</span>
+                    )}
                   </td>
                   <td className={CELL}>
                     {c.cases.length === 0 ? (
@@ -196,7 +210,13 @@ export function CapaRegister({
                             // The row opens the CAPA; a case number opens the case.
                             onClick={(e) => {
                               e.stopPropagation();
-                              onOpenCase(k.id);
+                              // A deviation opens on its page; an NCR or a
+                              // complaint in its dialog, on this screen.
+                              if (k.type === "planned" || k.type === "unplanned") {
+                                router.push(caseHref(slug, k));
+                              } else {
+                                onOpenCase(k.id);
+                              }
                             }}
                             onKeyDown={(e) => e.stopPropagation()}
                             className={cn(

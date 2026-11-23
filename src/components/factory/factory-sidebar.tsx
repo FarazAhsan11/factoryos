@@ -109,7 +109,12 @@ export function FactorySidebar({
   const liveParams = new URLSearchParams(liveQuery ?? "");
   const liveTab = rest.startsWith("/deviations/capa/")
     ? "capa"
-    : (liveParams.get("tab") ?? (liveParams.get("type") === "ncr" ? "ncr" : null));
+    : (liveParams.get("tab") ??
+      (liveParams.get("type") === "ncr"
+        ? "ncr"
+        : liveParams.get("type") === "complaint"
+          ? "complaints"
+          : null));
 
   const sections = navForRole(role, units);
   const active = activeHrefs(sections, section, liveTab);

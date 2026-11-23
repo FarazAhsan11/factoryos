@@ -58,6 +58,7 @@ import { useForm } from "@/lib/use-form";
 import { cn } from "@/lib/utils";
 import { NotACaseButton } from "@/components/factory/deviations/ncr-not-a-case";
 import { LAB_CHECK, NCR_CHECKS, isMaterialItem, requiredChecks } from "@/lib/factory/ncr";
+import { COMPLAINT_CHECKS, SCOPES, complaintRequiredChecks } from "@/lib/factory/complaint";
 
 /**
  * A deviation's investigation, as the reference QMS lays it out (qms-v4):
@@ -109,8 +110,14 @@ export function DevInvestigationTab({
   const material = ncr && isMaterialItem(d.nc_item);
   const labRequired = ncr && d.detection_point === "QC testing";
   const labCheck = useWatch({ control, name: "labCheck" });
-  const checkItems: readonly string[] = ncr ? NCR_CHECKS : CHECKS_REVIEWED;
-  const mustCover = requiredChecks(d);
+  const complaint = d.type === "complaint";
+  const scope = useWatch({ control, name: "scope" });
+  const checkItems: readonly string[] = complaint
+    ? COMPLAINT_CHECKS
+    : ncr
+      ? NCR_CHECKS
+      : CHECKS_REVIEWED;
+  const mustCover = complaint ? complaintRequiredChecks(d) : requiredChecks(d);
 
   const refresh = () =>
     queryClient.invalidateQueries({ queryKey: deviationKeys.all(factoryId) });
@@ -257,53 +264,128 @@ export function DevInvestigationTab({
           </Section>
         )}
 
-        <Section title="Impact">
-          <div className="grid gap-x-6 gap-y-5 md:grid-cols-2">
-            {/* Disabled with the rest of the form once submitted or approved. */}
-            <fieldset disabled={locked} className="min-w-0">
-              <Field
-                label={material ? "Other batches made with this lot" : "Other batches affected"}
-                htmlFor="inv-other"
-                note="(optional)"
-              >
-                <input
-                  id="inv-other"
-                  placeholder="e.g. 46690, 46691 — or leave blank if none"
-                  className={cn(CONTROL, "font-mono")}
-                  {...register("otherBatches")}
-                />
-              </Field>
-            </fieldset>
-            <div className="hidden md:block" />
-            {/* Outside the fieldset: a batch may need holding, releasing or
-                rejecting after the investigation is submitted. */}
-            <OtherBatchHolds
-              deviation={d}
-              factoryId={factoryId}
-              control={control}
-              canHold={canEdit}
-              viewerName={viewerName}
-              className="md:col-span-2"
-            />
-            <fieldset disabled={locked} className="min-w-0 md:col-span-2">
-              <Field
-                label="Product impact assessment"
-                htmlFor="inv-impact"
-                required
-                error={errors.impact?.message}
-                hint="Quality, safety, efficacy, regulatory compliance, other batches. Needed before QA can release a held batch."
-              >
-                <textarea
-                  id="inv-impact"
-                  rows={3}
-                  placeholder="Quality, safety, efficacy, regulatory compliance, other batches"
-                  className={AREA}
-                  {...register("impact")}
-                />
-              </Field>
-            </fieldset>
-          </div>
-        </Section>
+        {complaint ? (
+          <>
+            <Section title="Result">
+              <fieldset disabled={locked} className="grid min-w-0 gap-x-6 gap-y-5 md:grid-cols-2">
+                <Field
+                  label="Complaint confirmed?"
+                  required
+                  error={errors.conclusion?.message}
+                  hint="The headline result, used for trending: justified (confirmed) and not justified complaints."
+                >
+                  <Segmented
+                    control={control}
+                    name="conclusion"
+                    label="Complaint confirmed?"
+                    options={RC_CONCLUSIONS.map((c) => ({ value: c, label: c }))}
+                  />
+                </Field>
+              </fieldset>
+            </Section>
+            <Section title="Scope">
+              <div className="grid gap-x-6 gap-y-5 md:grid-cols-2">
+                <fieldset disabled={locked} className="min-w-0">
+                  <Field
+                    label="How far does the problem go?"
+                    required
+                    error={errors.scope?.message}
+                    hint={
+                      scope && scope !== "Isolated unit(s)"
+                        ? "Batch-wide: check the market action on the Actions tab."
+                        : "The product is already on the market, so the question is how many units or batches share the problem."
+                    }
+                  >
+                    <Segmented
+                      control={control}
+                      name="scope"
+                      label="How far does the problem go?"
+                      className="flex-wrap"
+                      options={SCOPES.map((x) => ({ value: x, label: x }))}
+                    />
+                  </Field>
+                </fieldset>
+                {scope === "Other batches too" ? (
+                  <fieldset disabled={locked} className="min-w-0">
+                    <Field
+                      label="Other batches affected"
+                      htmlFor="inv-other"
+                      required
+                      error={errors.otherBatches?.message}
+                    >
+                      <input
+                        id="inv-other"
+                        placeholder="e.g. 46651, 46652"
+                        className={cn(CONTROL, "font-mono")}
+                        {...register("otherBatches")}
+                      />
+                    </Field>
+                  </fieldset>
+                ) : (
+                  <div className="hidden md:block" />
+                )}
+                {scope === "Other batches too" && (
+                  <OtherBatchHolds
+                    deviation={d}
+                    factoryId={factoryId}
+                    control={control}
+                    canHold={canEdit}
+                    viewerName={viewerName}
+                    className="md:col-span-2"
+                  />
+                )}
+              </div>
+            </Section>
+          </>
+        ) : (
+          <Section title="Impact">
+            <div className="grid gap-x-6 gap-y-5 md:grid-cols-2">
+              {/* Disabled with the rest of the form once submitted or approved. */}
+              <fieldset disabled={locked} className="min-w-0">
+                <Field
+                  label={material ? "Other batches made with this lot" : "Other batches affected"}
+                  htmlFor="inv-other"
+                  note="(optional)"
+                >
+                  <input
+                    id="inv-other"
+                    placeholder="e.g. 46690, 46691 — or leave blank if none"
+                    className={cn(CONTROL, "font-mono")}
+                    {...register("otherBatches")}
+                  />
+                </Field>
+              </fieldset>
+              <div className="hidden md:block" />
+              {/* Outside the fieldset: a batch may need holding, releasing or
+                  rejecting after the investigation is submitted. */}
+              <OtherBatchHolds
+                deviation={d}
+                factoryId={factoryId}
+                control={control}
+                canHold={canEdit}
+                viewerName={viewerName}
+                className="md:col-span-2"
+              />
+              <fieldset disabled={locked} className="min-w-0 md:col-span-2">
+                <Field
+                  label="Product impact assessment"
+                  htmlFor="inv-impact"
+                  required
+                  error={errors.impact?.message}
+                  hint="Quality, safety, efficacy, regulatory compliance, other batches. Needed before QA can release a held batch."
+                >
+                  <textarea
+                    id="inv-impact"
+                    rows={3}
+                    placeholder="Quality, safety, efficacy, regulatory compliance, other batches"
+                    className={AREA}
+                    {...register("impact")}
+                  />
+                </Field>
+              </fieldset>
+            </div>
+          </Section>
+        )}
 
         {/* Disabled as one, so a submitted or approved investigation reads as
             the same form rather than a second layout. */}
@@ -426,18 +508,20 @@ export function DevInvestigationTab({
                 />
               </Field>
 
-              <Field
-                label="Root cause conclusion"
-                required
-                error={errors.conclusion?.message}
-              >
-                <Segmented
-                  control={control}
-                  name="conclusion"
+              {!complaint && (
+                <Field
                   label="Root cause conclusion"
-                  options={RC_CONCLUSIONS.map((c) => ({ value: c, label: c }))}
-                />
-              </Field>
+                  required
+                  error={errors.conclusion?.message}
+                >
+                  <Segmented
+                    control={control}
+                    name="conclusion"
+                    label="Root cause conclusion"
+                    options={RC_CONCLUSIONS.map((c) => ({ value: c, label: c }))}
+                  />
+                </Field>
+              )}
               <Field
                 label="Analysis tool"
                 htmlFor="inv-method"
@@ -1070,6 +1154,23 @@ export function InvestigationFacts({ deviation: d }: { deviation: Deviation }) {
         </Section>
       )}
 
+      {d.type === "complaint" && (
+        <Section title="Result and scope">
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+            <Fact label="Complaint confirmed?">
+              {d.root_cause_conclusion ?? <Muted>Not recorded</Muted>}
+            </Fact>
+            <Fact label="Scope">{d.scope ?? <Muted>Not recorded</Muted>}</Fact>
+            {d.other_batch_nos.length > 0 && (
+              <Fact label="Other batches affected" mono>
+                {d.other_batch_nos.join(", ")}
+              </Fact>
+            )}
+          </dl>
+        </Section>
+      )}
+
+      {d.type !== "complaint" && (
       <Section title="Impact">
         <dl className="grid gap-3">
           <Fact
@@ -1087,6 +1188,7 @@ export function InvestigationFacts({ deviation: d }: { deviation: Deviation }) {
           </Fact>
         </dl>
       </Section>
+      )}
 
       <Section title="What was reviewed">
         {d.review_checks.length > 0 ? (

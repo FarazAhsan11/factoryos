@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
   Building2,
@@ -31,6 +31,7 @@ import { DevInvestigationTab } from "@/components/factory/deviations/dev-investi
 import { CaseHistory } from "@/components/factory/deviations/case-history";
 import { InitiationTab } from "@/components/factory/deviations/deviation-tab-forms";
 import { NcrCompleteDetails } from "@/components/factory/deviations/ncr-complete-details";
+import { ComplaintCommunication } from "@/components/factory/deviations/complaint-details";
 import { canReview } from "@/lib/factory/action-queries";
 import type { FactoryRole } from "@/lib/factory/context";
 import { capaKeys, fetchCapas, stepLabel, type Capa } from "@/lib/factory/capa-queries";
@@ -78,6 +79,11 @@ function resolveSection(value: string | null): CaseSection {
 function sectionState(d: Deviation, id: CaseSection): "ok" | "na" | "todo" | null {
   switch (id) {
     case "details":
+      if (d.type === "complaint") {
+        return d.received_on && d.received_via && d.complainant && d.sponsor && d.sample
+          ? "ok"
+          : "todo";
+      }
       if (d.type === "ncr") {
         return d.occurred_at &&
           d.department_id &&
@@ -193,9 +199,6 @@ export function DeviationCasePage({
   // A deviation, or an NCR raised on the qms-v12 form (0076). An NCR raised
   // before, and a complaint, open in the case dialog on the register — a
   // link here sends them on to it.
-  if (d && d.type === "complaint") {
-    return <LegacyRedirect href={`${listHref}?tab=complaints&case=${d.id}`} />;
-  }
   if (!d) {
     return (
       <div className="rounded-2xl border border-dashed border-line-strong px-4 py-16 text-center">
@@ -209,7 +212,9 @@ export function DeviationCasePage({
 
   const ncr = d.type === "ncr";
   const material = ncr && isMaterialItem(d.nc_item);
-  const registerHref = ncr ? `${listHref}?tab=ncr` : listHref;
+  const complaint = d.type === "complaint";
+  const tabParam = ncr ? "?tab=ncr" : complaint ? "?tab=complaints" : "";
+  const registerHref = `${listHref}${tabParam}`;
 
   const reviewer = canReview(role);
   const open = d.status === "open";
@@ -228,14 +233,14 @@ export function DeviationCasePage({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <nav aria-label="Breadcrumb" className="text-sm text-ink-4">
           <Link href={registerHref} className="text-brand hover:underline">
-            {ncr ? "Non-conformances" : "Deviations"}
+            {ncr ? "Non-conformances" : complaint ? "Customer complaints" : "Deviations"}
           </Link>
           <span className="mx-1.5 text-ink-5">/</span>
           <span className="font-mono">{d.deviation_no}</span>
         </nav>
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
           <Link
-            href={`${listHref}/${d.id}/print${ncr ? "?tab=ncr" : ""}`}
+            href={`${listHref}/${d.id}/print${tabParam}`}
             className="inline-flex items-center gap-1.5 text-sm font-medium text-brand hover:underline"
           >
             <Printer className="size-4" />
@@ -257,6 +262,7 @@ export function DeviationCasePage({
           capa={capas.find((c) => c.id === d.capa_id) ?? null}
           capaHref={d.capa_id ? `/factory/${slug}/deviations/capa/${d.capa_id}` : undefined}
           assessDays={settings.assessDays}
+          ackDays={settings.ackDays}
           extended={extensions.some((e) => e.status === "approved")}
           onExtend={
             reviewer && canRequestExtension(d, extensions)
@@ -371,6 +377,14 @@ export function DeviationCasePage({
           <LockedBanner deviation={d} section={section} className="mb-6" />
           {section === "details" && (
             <div className="space-y-8">
+              {complaint && (
+                <ComplaintCommunication
+                  deviation={d}
+                  factoryId={factoryId}
+                  canEdit={open && reviewer}
+                  viewerName={viewerName}
+                />
+              )}
               {reviewer && ncrNeedsDetails(d) ? (
                 <NcrCompleteDetails deviation={d} factoryId={factoryId} viewerName={viewerName} />
               ) : (
@@ -438,7 +452,7 @@ export function DeviationCasePage({
             <div className="space-y-3">
               <p className="flex items-center gap-2 rounded-xl border border-teal-line bg-teal-soft px-4 py-3 text-sm text-teal-deep">
                 <Check className="size-4 shrink-0" />
-                Closed — not a non-conformance, by {d.qa_sign_name ?? "—"}
+                {d.status_reason ?? "Closed — not a case"} — closed by {d.qa_sign_name ?? "—"}
                 {d.closed_at && ` · ${formatDateTime(d.closed_at)}`}
               </p>
               <p className="rounded-xl border border-line-soft bg-sunken px-4 py-3 text-sm text-ink-3">
@@ -470,19 +484,6 @@ export function DeviationCasePage({
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-/** An older NCR or a complaint: on to its case dialog on the register. */
-function LegacyRedirect({ href }: { href: string }) {
-  const router = useRouter();
-  useEffect(() => {
-    router.replace(href);
-  }, [router, href]);
-  return (
-    <div className="grid place-items-center py-24">
-      <Loader2 className="size-6 animate-spin text-ink-5" />
     </div>
   );
 }
@@ -585,6 +586,7 @@ export function CaseHeader({
   capa = null,
   capaHref,
   assessDays,
+  ackDays = 2,
   extended = false,
   onExtend,
   className,
@@ -596,6 +598,8 @@ export function CaseHeader({
   capaHref?: string;
   /** Days QA has to sign the initial assessment — Configuration → Quality settings. */
   assessDays: number;
+  /** Days to acknowledge a complaint — Configuration → Quality settings (0079). */
+  ackDays?: number;
   /** An approved due date extension moved the due date (0072). */
   extended?: boolean;
   /** Shows "Extend" under the due date; absent when it cannot be asked (or in print). */
@@ -605,7 +609,9 @@ export function CaseHeader({
   const open = d.status === "open";
   const stage = devStage(d);
   const batches = d.batch_nos.length > 0 ? d.batch_nos : d.batch_no ? [d.batch_no] : [];
-  const assessBy = addDays(d.created_at.slice(0, 10), assessDays);
+  // A complaint counts from the day it was received (0079).
+  const start = d.type === "complaint" && d.received_on ? d.received_on : d.created_at.slice(0, 10);
+  const assessBy = addDays(start, assessDays);
   const type = typeMeta(d.type);
   return (
     <header
@@ -620,7 +626,11 @@ export function CaseHeader({
             {d.deviation_no}
           </span>
           <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", type.pill)}>
-            {d.type === "ncr" ? "Non-conformance" : `${type.short} deviation`}
+            {d.type === "ncr"
+              ? "Non-conformance"
+              : d.type === "complaint"
+                ? "Customer complaint"
+                : `${type.short} deviation`}
           </span>
           {d.type === "ncr" && d.nc_item && (
             <span className="rounded-full bg-sunken-2 px-2 py-0.5 text-xs font-semibold text-ink-3">
@@ -649,6 +659,19 @@ export function CaseHeader({
           {d.occurred_at && (
             <MetaItem icon={Clock} label={d.type === "ncr" ? "Found" : "Happened"}>
               {formatDay(d.occurred_at)}
+            </MetaItem>
+          )}
+          {d.type === "complaint" && d.received_on && (
+            <MetaItem icon={Clock} label="Received">
+              received {formatDay(d.received_on)}
+              {d.complainant && (
+                <span className="text-ink-5"> from {d.complainant.toLowerCase()}</span>
+              )}
+            </MetaItem>
+          )}
+          {d.type === "complaint" && d.batch_nos.length === 0 && d.product_label && (
+            <MetaItem icon={Package} label="Product">
+              {d.product_label}
             </MetaItem>
           )}
           {d.material_code && (
@@ -754,6 +777,12 @@ export function CaseHeader({
           )}
         </HeadFact>
         {d.assessed_at && <HeadFact label="Owner">{d.owner_name ?? "—"}</HeadFact>}
+        {/* A complaint's acknowledgement is due from day one (0079). */}
+        {d.type === "complaint" && open && !d.ack_on && (
+          <HeadFact label="Acknowledge by">
+            <span className="text-warn-deep">{formatDay(addDays(start, ackDays))}</span>
+          </HeadFact>
+        )}
       </dl>
     </header>
   );

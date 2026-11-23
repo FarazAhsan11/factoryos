@@ -78,7 +78,8 @@ export function DeviationReport({
   const extensions = useExtensions(factoryId, caseId);
   const d = deviations?.find((x) => x.id === caseId) ?? null;
   const caseHref = `/factory/${slug}/deviations/${caseId}`;
-  const caseLink = (t: string) => (t === "ncr" ? `${caseHref}?tab=ncr` : caseHref);
+  const caseLink = (t: string) =>
+    t === "ncr" ? `${caseHref}?tab=ncr` : t === "complaint" ? `${caseHref}?tab=complaints` : caseHref;
 
   // The document title is the PDF's default file name.
   const docTitle = d ? `${d.deviation_no} — ${d.title}` : null;
@@ -145,7 +146,12 @@ export function DeviationReport({
 
       <article className="mt-3 rounded-2xl border border-line bg-surface p-5 shadow-soft sm:p-8 print:mt-0 print:rounded-none print:border-0 print:p-0 print:shadow-none">
         <p className="text-[0.6875rem] font-bold tracking-[0.09em] text-ink-4 uppercase">
-          {factoryName} · {d.type === "ncr" ? "Non-conformance report" : "Deviation report"}
+          {factoryName} ·{" "}
+          {d.type === "ncr"
+            ? "Non-conformance report"
+            : d.type === "complaint"
+              ? "Customer complaint report"
+              : "Deviation report"}
         </p>
         <CaseHeader
           deviation={d}

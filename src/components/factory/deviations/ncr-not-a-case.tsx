@@ -41,6 +41,7 @@ export function NotACaseButton({
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const what = d.type === "complaint" ? "quality complaint" : "non-conformance";
 
   async function submit() {
     const parsed = notACaseSchema.safeParse({ reason });
@@ -56,7 +57,7 @@ export function NotACaseButton({
         queryClient.invalidateQueries({ queryKey: holdKeys.forCase(factoryId, d.id) }),
         queryClient.invalidateQueries({ queryKey: pipelineKeys.all(factoryId) }),
       ]);
-      toast.success(`${d.deviation_no} closed — not a non-conformance.`);
+      toast.success(`${d.deviation_no} closed — not a ${what}.`);
       setOpen(false);
     } catch (e) {
       toast.error((e as Error).message);
@@ -76,7 +77,7 @@ export function NotACaseButton({
   return (
     <div className="w-full space-y-2.5 rounded-xl border border-line bg-sunken p-3.5">
       <label htmlFor={`not-case-${d.id}`} className="block text-sm font-semibold text-ink-2">
-        Why is this not a non-conformance?
+        Why is this not a {what}?
       </label>
       <textarea
         id={`not-case-${d.id}`}
@@ -86,7 +87,11 @@ export function NotACaseButton({
           setReason(e.target.value);
           if (error) setError(null);
         }}
-        placeholder="e.g. Raised in error; duplicate of NCR-2026-011; lab error found (OOS-2026-017)"
+        placeholder={
+          d.type === "complaint"
+            ? "e.g. Product enquiry, answered by email; delivery or pricing question"
+            : "e.g. Raised in error; duplicate of NCR-2026-011; lab error found (OOS-2026-017)"
+        }
         aria-invalid={Boolean(error)}
         className={AREA}
       />
@@ -102,7 +107,7 @@ export function NotACaseButton({
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={submit} disabled={busy} className={PRIMARY_BUTTON}>
           {busy && <Loader2 className="size-4 animate-spin" />}
-          Close as not a non-conformance
+          Close as not a {what}
         </button>
         <button
           type="button"

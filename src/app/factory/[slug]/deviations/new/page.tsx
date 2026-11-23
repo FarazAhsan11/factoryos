@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { RaiseDeviationPage } from "@/components/factory/deviations/raise-deviation-page";
 import { RaiseNcrPage } from "@/components/factory/deviations/raise-ncr-page";
+import { RaiseComplaintPage } from "@/components/factory/deviations/raise-complaint-page";
 import { canReview } from "@/lib/factory/action-queries";
 import { getFactoryContext } from "@/lib/factory/context";
 
@@ -27,7 +28,20 @@ export default async function NewDeviationPage({
   const { factory, role, viewer } = await getFactoryContext(slug);
 
   if (!canReview(role)) {
-    redirect(`/factory/${slug}/deviations${type === "ncr" ? "?tab=ncr" : ""}`);
+    redirect(
+      `/factory/${slug}/deviations${type === "ncr" ? "?tab=ncr" : type === "complaint" ? "?tab=complaints" : ""}`,
+    );
+  }
+
+  if (type === "complaint") {
+    return (
+      <RaiseComplaintPage
+        factoryId={factory.id}
+        slug={slug}
+        userId={viewer.id}
+        viewerName={viewer.fullName ?? viewer.email}
+      />
+    );
   }
 
   if (type === "ncr") {

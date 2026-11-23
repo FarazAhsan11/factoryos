@@ -1,5 +1,6 @@
 "use client";
 
+import { RESOLUTIONS } from "@/lib/factory/complaint";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -16,6 +17,7 @@ import { Segmented } from "@/components/factory/deviations/deviation-initiation-
 import {
   AREA,
   CONTROL,
+  DateControl,
   Fact,
   Field,
   Muted,
@@ -200,6 +202,48 @@ export function DevCloseOutTab({
         )}
         className="space-y-6"
       >
+        {d.type === "complaint" && (
+          <Section title="Final reply to the complainant">
+            <fieldset disabled={locked} className="min-w-0">
+              <div className="grid gap-x-6 gap-y-5 md:grid-cols-2">
+                <Field
+                  label="Final reply"
+                  htmlFor="co-reply"
+                  required
+                  error={errors.finalReply?.message}
+                  className="md:col-span-2"
+                  hint={
+                    d.investigation_required !== false && !d.investigation_approved_at
+                      ? "Send it once the investigation is approved."
+                      : undefined
+                  }
+                >
+                  <textarea
+                    id="co-reply"
+                    rows={3}
+                    placeholder="What the complainant was told: what was found and what was done"
+                    className={AREA}
+                    {...register("finalReply")}
+                  />
+                </Field>
+                <Field label="Sent on" htmlFor="co-reply-on" required error={errors.replySentOn?.message}>
+                  <DateControl control={control} name="replySentOn" id="co-reply-on" />
+                </Field>
+                <Field label="Resolution offered" htmlFor="co-resolution" note="(optional)">
+                  <SelectControl
+                    control={control}
+                    name="resolution"
+                    id="co-resolution"
+                    placeholder="Select…"
+                    clearable
+                    options={RESOLUTIONS.map((r) => ({ value: r, label: r }))}
+                  />
+                </Field>
+              </div>
+            </fieldset>
+          </Section>
+        )}
+
         <Section title="Close-out">
           <fieldset disabled={locked} className="min-w-0">
             <div className="grid gap-x-6 gap-y-5 md:grid-cols-2">

@@ -43,6 +43,7 @@ import {
   formatDate,
 } from "@/components/factory/deviations/deviation-fields";
 import { InitiationFields } from "@/components/factory/deviations/initiation-fields";
+import { ComplaintInitiationFacts } from "@/components/factory/deviations/complaint-details";
 import {
   DISPOSITIONS,
   RISK_SCALES,
@@ -115,6 +116,10 @@ export function InitiationTab({
   // NCRs and complaints keep their editable form.
   if (deviation.type === "planned" || deviation.type === "unplanned") {
     return <DeviationInitiationFacts deviation={deviation} />;
+  }
+  // So is a complaint (0079).
+  if (deviation.type === "complaint") {
+    return <ComplaintInitiationFacts deviation={deviation} />;
   }
   // So is every NCR — raised on the qms-v12 form (0076), or brought onto it (0078).
   if (deviation.type === "ncr") {

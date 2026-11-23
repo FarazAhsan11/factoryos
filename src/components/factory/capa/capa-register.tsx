@@ -59,11 +59,9 @@ function haystack(c: Capa): string {
 export function CapaRegister({
   factoryId,
   slug,
-  onOpenCase,
 }: {
   factoryId: string;
   slug: string;
-  onOpenCase: (caseId: string) => void;
 }) {
   const router = useRouter();
   const today = useRenderClock(todayKey);
@@ -211,13 +209,8 @@ export function CapaRegister({
                             // The row opens the CAPA; a case number opens the case.
                             onClick={(e) => {
                               e.stopPropagation();
-                              // A deviation opens on its page; an NCR or a
-                              // complaint in its dialog, on this screen.
-                              if (k.type !== "complaint") {
-                                router.push(caseHref(slug, k));
-                              } else {
-                                onOpenCase(k.id);
-                              }
+                              // Every case opens on its own page.
+                              router.push(caseHref(slug, k));
                             }}
                             onKeyDown={(e) => e.stopPropagation()}
                             className={cn(

@@ -70,7 +70,7 @@ export function caseHref(slug: string, k: Pick<CapaCase, "id" | "type">): string
   }
   // An NCR's page; an older NCR is sent on from there to its dialog.
   if (k.type === "ncr") return `/factory/${slug}/deviations/${k.id}?tab=ncr`;
-  return `/factory/${slug}/deviations?tab=complaints&case=${k.id}`;
+  return `/factory/${slug}/deviations/${k.id}?tab=complaints`;
 }
 
 /** Whole days from `today` to `date` (both `YYYY-MM-DD`). */

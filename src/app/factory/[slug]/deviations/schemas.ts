@@ -1,6 +1,22 @@
 import { z } from "zod";
 
 import {
+  COMPLAINANTS,
+  COMPLAINT_CATEGORIES,
+  COMPLAINT_CHANNELS,
+  COMPLAINT_RED_FLAGS,
+  COUNTRIES,
+  MARKET_ACTIONS,
+  RECALL_CLASSES,
+  RECALL_LEVELS,
+  REPORT_TYPES,
+  RESOLUTIONS,
+  SAMPLE_STATES,
+  SCOPES,
+  STOCK_AFFECTED,
+} from "@/lib/factory/complaint";
+
+import {
   LAB_CHECK,
   NCR_CATEGORIES,
   NCR_DETECTION_POINTS,
@@ -754,13 +770,20 @@ export function proposedClass(v: {
  */
 export const assessmentSchema = z.object({
   /** A deviation's category, or an NCR's defect type (0077). */
-  category: z.union([z.enum(NC_CATEGORIES), z.enum(NCR_CATEGORIES), z.literal("")]),
+  category: z.union([
+    z.enum(NC_CATEGORIES),
+    z.enum(NCR_CATEGORIES),
+    z.enum(COMPLAINT_CATEGORIES),
+    z.literal(""),
+  ]),
   /** An NCR's "Other" defect, described. */
   categoryOther: optional(160),
   ownerName: optional(80),
   investigationRequired: yesNo,
   investigationNotRequiredReason: optional(1000),
-  redFlags: z.array(z.union([z.enum(RED_FLAGS), z.enum(NCR_RED_FLAGS)])),
+  redFlags: z.array(
+    z.union([z.enum(RED_FLAGS), z.enum(NCR_RED_FLAGS), z.enum(COMPLAINT_RED_FLAGS)]),
+  ),
   severity: score,
   likelihood: z.union([z.enum(["1", "2", "3"]), z.literal("")]),
   raisedAt: z.string(),
@@ -774,6 +797,22 @@ export const assessmentSchema = z.object({
   ncr: z.boolean(),
   /** Context, not saved: an NCR found after receipt — the investigation cannot be skipped. */
   forcedInvestigation: z.boolean(),
+
+  /* ── A complaint's assessment (0079) ── */
+  /** Context, not saved: the case is a complaint. */
+  complaint: z.boolean(),
+  /** Context, not saved: the complaint reports an adverse reaction. */
+  adverse: z.boolean(),
+  /** The investigating department, when an investigation is required. */
+  departmentId: z.string(),
+  stockAffected: z.union([z.enum(STOCK_AFFECTED), z.literal("")]),
+  sponsorNotifiedOn: z.string(),
+  reportable: yesNo,
+  reportReason: optional(1000),
+  reportType: z.union([z.enum(REPORT_TYPES), z.literal("")]),
+  reportDue: z.string(),
+  reportedOn: z.string(),
+  reportRef: optional(80),
 });
 
 export type AssessmentValues = z.infer<typeof assessmentSchema>;
@@ -782,8 +821,26 @@ export const assessmentSignSchema = assessmentSchema.superRefine((v, ctx) => {
   const need = (path: keyof AssessmentValues, message: string) =>
     ctx.addIssue({ code: "custom", path: [path], message });
   if (!v.category) need("category", v.ncr ? "Choose the defect type." : "Choose the category.");
-  if (v.ncr && v.category === "Other" && v.categoryOther.length < 2) {
-    need("categoryOther", "Describe the defect.");
+  if ((v.ncr || v.complaint) && v.category === "Other" && v.categoryOther.length < 2) {
+    need("categoryOther", v.complaint ? "Describe the complaint type." : "Describe the defect.");
+  }
+  if (v.complaint) {
+    if (v.investigationRequired === "yes" && !v.departmentId) {
+      need("departmentId", "Which department investigates?");
+    }
+    if (!v.stockAffected) need("stockAffected", "Could released stock be affected?");
+    const triggered =
+      v.adverse || v.redFlags.length > 0 || v.category === "Suspected counterfeit or tampering";
+    if (triggered) {
+      if (!v.reportable) need("reportable", "Is a report to the regulator needed?");
+      if (v.reportable === "no" && v.reportReason.length < 2) {
+        need("reportReason", "Say why no report is needed.");
+      }
+      if (v.reportable === "yes") {
+        if (!v.reportType) need("reportType", "Choose the report type.");
+        if (!v.reportDue) need("reportDue", "When is the report due?");
+      }
+    }
   }
   if (v.forcedInvestigation && v.investigationRequired !== "yes") {
     need(
@@ -910,6 +967,10 @@ export const devInvestigationSchema = z.object({
   labRequired: z.boolean(),
   /** Context, not saved: the items the investigation must cover. */
   requiredChecks: z.array(z.string()),
+  /** A complaint's scope instead of a product impact assessment (0079). */
+  scope: z.union([z.enum(SCOPES), z.literal("")]),
+  /** Context, not saved: the case is a complaint. */
+  complaint: z.boolean(),
 });
 
 export type DevInvestigationValues = z.infer<typeof devInvestigationSchema>;
@@ -932,7 +993,14 @@ export const devInvestigationSubmitSchema = devInvestigationSchema.superRefine(
     if (notCovered.length > 0) {
       need("reviewChecks", `Also review: ${notCovered.join(", ")}.`);
     }
-    if (v.impact.length < 5) need("impact", "Assess the impact on the product.");
+    if (v.complaint) {
+      if (!v.scope) need("scope", "How far does the problem go?");
+      if (v.scope === "Other batches too" && !v.otherBatches) {
+        need("otherBatches", "Name the other batches affected.");
+      }
+    } else if (v.impact.length < 5) {
+      need("impact", "Assess the impact on the product.");
+    }
     const blank = v.reviewChecks.filter((c) => !c.finding).map((c) => c.item);
     if (blank.length > 0 && notCovered.length === 0) {
       need(
@@ -950,10 +1018,110 @@ export const devInvestigationSubmitSchema = devInvestigationSchema.superRefine(
       if (!v.humanPreventable) need("humanPreventable", "Answer this.");
     }
     if (v.rootCause.length < 5) need("rootCause", "State the root cause.");
-    if (!v.conclusion) need("conclusion", "Confirmed, probable or not confirmed?");
+    if (!v.conclusion) {
+      need("conclusion", v.complaint ? "Is the complaint confirmed?" : "Confirmed, probable or not confirmed?");
+    }
     if (!v.method) need("method", "Choose the analysis tool.");
   },
 );
+
+/* ── A customer complaint (migration 0079) ─────────────────────────────── */
+
+/**
+ * Raising a complaint — the page at `/deviations/new?type=complaint`, the
+ * reference QMS's complaint form (qms-v12 "v11"): title; date received and
+ * via; complainant and contact; market; batch(es), or the product when the
+ * batch is unknown; brand owner; who the sponsor is and the ARTG (asked here
+ * for now); expiry and units affected; the description; an adverse reaction
+ * (what, and whether serious); the complaint sample; immediate action.
+ * `deviations_complaint_guard` says the same.
+ */
+export const complaintInitiationSchema = z
+  .object({
+    title: z
+      .string()
+      .trim()
+      .min(3, "Give the complaint a title — what it is, in a line.")
+      .max(160, "Keep the title under 160 characters."),
+    receivedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "When was it received?"),
+    receivedVia: z.union([z.enum(COMPLAINT_CHANNELS), z.literal("")]),
+    complainant: z.union([z.enum(COMPLAINANTS), z.literal("")]),
+    contact: optional(160),
+    country: z.enum(COUNTRIES),
+    batches: optional(400),
+    productLabel: optional(160),
+    customerName: optional(160),
+    sponsor: z.union([z.enum(["us", "customer"]), z.literal("")]),
+    artg: optional(60),
+    expiry: optional(20),
+    unitsAffected: optional(120),
+    actual: z
+      .string()
+      .trim()
+      .min(10, "Describe the complaint — what they found, how many, when.")
+      .max(2000, "Keep it under 2000 characters."),
+    adverse: z.union([z.enum(["yes", "no"]), z.literal("")]),
+    adverseWhat: optional(1000),
+    serious: z.union([z.enum(["yes", "no"]), z.literal("")]),
+    sample: z.union([z.enum(SAMPLE_STATES), z.literal("")]),
+    sampleReceivedOn: z.string(),
+    immediateAction: optional(2000),
+  })
+  .superRefine((v, ctx) => {
+    const need = (path: keyof typeof v, message: string) =>
+      ctx.addIssue({ code: "custom", path: [path], message });
+    if (!v.receivedVia) need("receivedVia", "How was it received?");
+    if (!v.complainant) need("complainant", "Who made the complaint?");
+    if (parseBatches(v.batches).length === 0 && !v.productLabel) {
+      need("productLabel", "Needed when the batch is unknown.");
+    }
+    if (!v.sponsor) need("sponsor", "Who is the sponsor?");
+    if (!v.adverse) need("adverse", "Was an injury or adverse reaction reported?");
+    if (v.adverse === "yes") {
+      if (!v.adverseWhat) need("adverseWhat", "What reaction, and when?");
+      if (!v.serious) need("serious", "Is it serious?");
+    }
+    if (!v.sample) need("sample", "Is there a complaint sample?");
+    if (v.sample === "Received" && !v.sampleReceivedOn) {
+      need("sampleReceivedOn", "When was the sample received?");
+    }
+    // Read in validation, not in render — a submit is an event.
+    const today = new Date();
+    const p = (n: number) => String(n).padStart(2, "0");
+    const todayKey = `${today.getFullYear()}-${p(today.getMonth() + 1)}-${p(today.getDate())}`;
+    if (v.receivedOn && v.receivedOn > todayKey) {
+      need("receivedOn", "The date received can't be in the future.");
+    }
+  });
+
+export type ComplaintInitiationValues = z.infer<typeof complaintInitiationSchema>;
+
+/** "Mark acknowledged": how — and, when late, why. */
+export const ackSchema = z.object({
+  how: optional(400),
+});
+
+/** The market action — first on a complaint's Actions tab. */
+export const marketActionSchema = z
+  .object({
+    market: z.union([z.enum(MARKET_ACTIONS), z.literal("")]),
+    recallClass: z.union([z.enum(RECALL_CLASSES), z.literal("")]),
+    recallLevel: z.union([z.enum(RECALL_LEVELS), z.literal("")]),
+    recallRef: optional(80),
+    why: optional(2000),
+  })
+  .superRefine((v, ctx) => {
+    const need = (path: keyof typeof v, message: string) =>
+      ctx.addIssue({ code: "custom", path: [path], message });
+    if (!v.market) need("market", "Choose the market action.");
+    if (v.market === "Recall") {
+      if (!v.recallClass) need("recallClass", "Which recall class?");
+      if (!v.recallLevel) need("recallLevel", "Which recall level?");
+    }
+    if (v.why.length < 2) need("why", "Give the decision and its rationale.");
+  });
+
+export type MarketActionValues = z.infer<typeof marketActionSchema>;
 
 /* ── A non-conformance's actions (migration 0077) ─────────────────────── */
 
@@ -1047,7 +1215,7 @@ export const notACaseSchema = z.object({
   reason: z
     .string()
     .trim()
-    .min(5, "Say why this is not a non-conformance.")
+    .min(5, "Say why — at least a few words.")
     .max(1000, "Keep it under 1000 characters."),
 });
 
@@ -1085,6 +1253,12 @@ export const DEV_CLOSE_REASONS = [
 
 /** The close-out as a draft; `devCloseOutSignSchema` demands the signature's. */
 export const devCloseOutSchema = z.object({
+  /** A complaint's final reply to the complainant (0079). */
+  finalReply: optional(2000),
+  replySentOn: z.string(),
+  resolution: z.union([z.enum(RESOLUTIONS), z.literal("")]),
+  /** Context, not saved: the case is a complaint. */
+  complaint: z.boolean(),
   unresolvedRisk: yesNo,
   summary: optional(2000),
   reason: z.union([z.enum(DEV_CLOSE_REASONS), z.literal("")]),
@@ -1099,6 +1273,14 @@ export const devCloseOutSchema = z.object({
 export type DevCloseOutValues = z.infer<typeof devCloseOutSchema>;
 
 export const devCloseOutSignSchema = devCloseOutSchema.superRefine((v, ctx) => {
+  if (v.complaint) {
+    if (v.finalReply.length < 2) {
+      ctx.addIssue({ code: "custom", path: ["finalReply"], message: "What was the complainant told?" });
+    }
+    if (!v.replySentOn) {
+      ctx.addIssue({ code: "custom", path: ["replySentOn"], message: "When was the reply sent?" });
+    }
+  }
   const need = (path: keyof DevCloseOutValues, message: string) =>
     ctx.addIssue({ code: "custom", path: [path], message });
   if (v.unresolvedRisk === "") {

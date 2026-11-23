@@ -58,17 +58,43 @@ import {
   isMaterialItem,
 } from "@/lib/factory/ncr";
 import { NotACaseButton } from "@/components/factory/deviations/ncr-not-a-case";
+import {
+  ComplaintReportingFacts,
+  ComplaintReportingFields,
+} from "@/components/factory/deviations/complaint-reporting";
+import {
+  COMPLAINT_CATEGORIES,
+  COMPLAINT_LIKELIHOOD,
+  COMPLAINT_LIKELIHOOD_HELP,
+  COMPLAINT_RED_FLAGS,
+  COMPLAINT_SEVERITY,
+  COMPLAINT_SEVERITY_EXAMPLES,
+  COMPLAINT_SEVERITY_ROWS,
+} from "@/lib/factory/complaint";
+import { fetchSetupItems, setupKeys } from "@/lib/factory/setup-queries";
 import { dueDaysFor, useQualitySettings } from "@/lib/factory/quality-settings-queries";
 import { useForm } from "@/lib/use-form";
 import { cn } from "@/lib/utils";
 
-/** The severity wording, the examples and the table's rows — a deviation's or an NCR's. */
-function scaleFor(ncr: boolean) {
-  const labels: readonly string[] = ncr ? NCR_SEVERITY : DEV_SEVERITY;
+/** The severity and likelihood wording, the examples and the table's rows — by case type. */
+function scaleFor(type: string) {
+  const ncr = type === "ncr";
+  const complaint = type === "complaint";
+  const labels: readonly string[] = complaint ? COMPLAINT_SEVERITY : ncr ? NCR_SEVERITY : DEV_SEVERITY;
   return {
     labels,
-    examples: (ncr ? NCR_SEVERITY_EXAMPLES : DEV_SEVERITY_EXAMPLES) as readonly string[],
-    rows: (ncr ? NCR_SEVERITY_ROWS : SEVERITY_ROWS) as readonly string[],
+    examples: (complaint
+      ? COMPLAINT_SEVERITY_EXAMPLES
+      : ncr
+        ? NCR_SEVERITY_EXAMPLES
+        : DEV_SEVERITY_EXAMPLES) as readonly string[],
+    rows: (complaint
+      ? COMPLAINT_SEVERITY_ROWS
+      : ncr
+        ? NCR_SEVERITY_ROWS
+        : SEVERITY_ROWS) as readonly string[],
+    likelihood: (complaint ? COMPLAINT_LIKELIHOOD : DEV_LIKELIHOOD) as readonly string[],
+    likelihoodHelp: (complaint ? COMPLAINT_LIKELIHOOD_HELP : DEV_LIKELIHOOD_HELP) as readonly string[],
     options: labels.map((label, i) => ({ value: String(i + 1), label: `${i + 1} — ${label}` })),
   };
 }
@@ -117,7 +143,7 @@ function caseHref(slug: string, c: Deviation): string {
   }
   // An NCR's page sends an older one on to its dialog.
   if (c.type === "ncr") return `/factory/${slug}/deviations/${c.id}?tab=ncr`;
-  return `/factory/${slug}/deviations?tab=complaints&case=${c.id}`;
+  return `/factory/${slug}/deviations/${c.id}?tab=complaints`;
 }
 
 /** What the previous-case search looks through. */
@@ -191,6 +217,8 @@ export function AssessmentTab({
         cases={cases}
         slug={slug}
         hideSignature={hideSignature}
+        factoryId={factoryId}
+        canEdit={canEdit}
       />
     );
   }
@@ -230,9 +258,19 @@ function AssessmentForm({
 
   const values = useWatch({ control }) as AssessmentValues;
   const ncr = deviation.type === "ncr";
+  const complaint = deviation.type === "complaint";
   const forced = forcedInvestigation(deviation);
-  const scale = scaleFor(ncr);
-  const flagList: readonly string[] = ncr ? NCR_RED_FLAGS : RED_FLAGS;
+  const scale = scaleFor(deviation.type);
+  const flagList: readonly string[] = complaint
+    ? COMPLAINT_RED_FLAGS
+    : ncr
+      ? NCR_RED_FLAGS
+      : RED_FLAGS;
+  const { data: departments = [] } = useQuery({
+    queryKey: setupKeys.all("factory_departments", factoryId),
+    queryFn: () => fetchSetupItems("factory_departments", factoryId),
+    enabled: complaint,
+  });
   const flags = values.redFlags ?? [];
   const sev = values.severity ? Number(values.severity) : null;
   const lik = values.likelihood ? Number(values.likelihood) : null;
@@ -347,12 +385,14 @@ function AssessmentForm({
               id="as-category"
               placeholder="Select…"
               invalid={Boolean(errors.category)}
-              options={(ncr ? NCR_CATEGORIES : NC_CATEGORIES).map((c) => ({ value: c, label: c }))}
+              options={(complaint ? COMPLAINT_CATEGORIES : ncr ? NCR_CATEGORIES : NC_CATEGORIES).map(
+                (c) => ({ value: c, label: c }),
+              )}
             />
           </Field>
-          {ncr && values.category === "Other" && (
+          {(ncr || complaint) && values.category === "Other" && (
             <Field
-              label="Describe the defect"
+              label={complaint ? "Describe the complaint type" : "Describe the defect"}
               htmlFor="as-category-other"
               required
               error={errors.categoryOther?.message}
@@ -399,7 +439,27 @@ function AssessmentForm({
               />
             )}
           </Field>
-          {values.investigationRequired === "no" ? (
+          {complaint && values.investigationRequired === "yes" ? (
+            <Field
+              label="Investigating department"
+              htmlFor="as-inv-dept"
+              required
+              error={errors.departmentId?.message}
+            >
+              <SelectControl
+                control={control}
+                name="departmentId"
+                id="as-inv-dept"
+                placeholder="Select…"
+                searchPlaceholder="Department…"
+                emptyMessage="No departments."
+                invalid={Boolean(errors.departmentId)}
+                options={departments
+                  .filter((x) => x.active || x.id === values.departmentId)
+                  .map((x) => ({ value: x.id, label: x.name }))}
+              />
+            </Field>
+          ) : values.investigationRequired === "no" ? (
             <Field
               label="Why not"
               htmlFor="as-inv-why"
@@ -410,9 +470,11 @@ function AssessmentForm({
                 id="as-inv-why"
                 rows={2}
                 placeholder={
-                  ncr
-                    ? "e.g. CoA typo only — material tested and meets specification"
-                    : "e.g. Documentation slip, corrected at the time"
+                  complaint
+                    ? "e.g. Known transit damage; same as CMP-2026-002"
+                    : ncr
+                      ? "e.g. CoA typo only — material tested and meets specification"
+                      : "e.g. Documentation slip, corrected at the time"
                 }
                 className={AREA}
                 {...register("investigationNotRequiredReason")}
@@ -479,6 +541,11 @@ function AssessmentForm({
       {ncr && isMaterialItem(deviation.nc_item) && (
         <SupplierHistory form={form} deviation={deviation} cases={cases} slug={slug} />
       )}
+      {complaint && (
+        <Section title="Market impact and reporting">
+          <ComplaintReportingFields form={form} deviation={deviation} factoryId={factoryId} />
+        </Section>
+      )}
 
       <Section title="Risk">
         <div className="grid gap-y-5">
@@ -490,9 +557,13 @@ function AssessmentForm({
             hint={
               flags.length > 0
                 ? "Set to 5 by the red flag above. Untick the red flag to change it."
-                : sev
-                  ? scale.examples[sev - 1]
-                  : "Pick the outcome for the product, not the cause. The key question: was it contained before release (3) or did it reach the market (4)?"
+                : complaint && deviation.adverse_reaction
+                  ? deviation.adverse_serious
+                    ? "A serious adverse reaction was reported."
+                    : "A non-serious adverse reaction was reported — consider severity 4 or 5."
+                  : sev
+                    ? scale.examples[sev - 1]
+                    : "Pick the outcome for the product, not the cause. The key question: was it contained before release (3) or did it reach the market (4)?"
             }
           >
             <Controller
@@ -514,12 +585,16 @@ function AssessmentForm({
           </Field>
 
           <Field
-            label="Likelihood — how often has this happened?"
+            label={
+              complaint
+                ? "Likelihood — how often has this been complained about?"
+                : "Likelihood — how often has this happened?"
+            }
             required
             error={errors.likelihood?.message}
             hint={
               lik
-                ? DEV_LIKELIHOOD_HELP[lik - 1]
+                ? scale.likelihoodHelp[lik - 1]
                 : "Search below for previous cases first, then pick."
             }
           >
@@ -533,7 +608,7 @@ function AssessmentForm({
                   aria-invalid={Boolean(fieldState.error)}
                   className="grid gap-2 sm:grid-cols-3"
                 >
-                  {DEV_LIKELIHOOD.map((label, i) => {
+                  {scale.likelihood.map((label, i) => {
                     const value = String(i + 1);
                     const active = field.value === value;
                     return (
@@ -584,7 +659,12 @@ function AssessmentForm({
         </div>
 
         <div className="mt-6">
-          <RiskMatrix severity={sev} likelihood={lik} rows={scale.rows} />
+          <RiskMatrix
+            severity={sev}
+            likelihood={lik}
+            rows={scale.rows}
+            likelihoodLabels={scale.likelihood}
+          />
         </div>
 
         <div className="mt-6 grid gap-x-6 gap-y-5 md:grid-cols-2">
@@ -697,11 +777,12 @@ function AssessmentForm({
         <span className="text-[0.8125rem] text-ink-4">
           Signed as {viewerName || "you"}
         </span>
-        {ncr && (
+        {(ncr || complaint) && (
           <NotACaseButton
             deviation={deviation}
             factoryId={factoryId}
             viewerName={viewerName}
+            label={complaint ? "Close — not a quality complaint" : undefined}
           />
         )}
       </div>
@@ -1024,11 +1105,14 @@ function RiskMatrix({
   severity,
   likelihood,
   rows = SEVERITY_ROWS,
+  likelihoodLabels = DEV_LIKELIHOOD,
 }: {
   severity: number | null;
   likelihood: number | null;
-  /** The rows' labels — a deviation's or an NCR's wording. */
+  /** The rows' labels — by case type. */
   rows?: readonly string[];
+  /** The columns' labels — a complaint's "first complaint of this kind"… */
+  likelihoodLabels?: readonly string[];
 }) {
   const row = severity ? severityRow(severity) : null;
   return (
@@ -1037,7 +1121,7 @@ function RiskMatrix({
         <thead>
           <tr>
             <th className="px-3 py-2 text-left text-xs font-semibold text-ink-4">Severity</th>
-            {DEV_LIKELIHOOD.map((label, i) => (
+            {likelihoodLabels.map((label, i) => (
               <th key={label} className="px-3 py-2 text-left text-xs font-semibold text-ink-4">
                 Likelihood {i + 1}
                 <span className="block font-normal text-ink-5">{label}</span>
@@ -1078,16 +1162,22 @@ function AssessmentFacts({
   cases,
   slug,
   hideSignature = false,
+  factoryId,
+  canEdit = false,
 }: {
   deviation: Deviation;
   cases: Deviation[];
   slug: string;
   hideSignature?: boolean;
+  factoryId: string;
+  /** Supervisor and up, on an open case — a complaint's later dates stay editable. */
+  canEdit?: boolean;
 }) {
   const byId = new Map(cases.map((c) => [c.id, c]));
   const legacy = isLegacyRisk(d);
   const ncr = d.type === "ncr";
-  const scale = scaleFor(ncr);
+  const complaint = d.type === "complaint";
+  const scale = scaleFor(d.type);
   return (
     <div className="space-y-7">
       {d.assessed_at ? (
@@ -1125,11 +1215,21 @@ function AssessmentFacts({
               {d.investigation_not_required_reason}
             </Fact>
           )}
+          {complaint && d.investigation_required && (
+            <Fact label="Investigating department">
+              {d.department_name ?? <Muted>—</Muted>}
+            </Fact>
+          )}
           <Fact label="Red flags" wide>
             {d.red_flags.length > 0 ? d.red_flags.join(", ") : <Muted>None</Muted>}
           </Fact>
         </dl>
       </Section>
+      {complaint && (
+        <Section title="Market impact and reporting">
+          <ComplaintReportingFacts deviation={d} factoryId={factoryId} canEdit={canEdit} />
+        </Section>
+      )}
       <Section title="Risk">
         {legacy ? (
           <LegacyRisk d={d} />
@@ -1145,7 +1245,7 @@ function AssessmentFacts({
               </Fact>
               <Fact label="Likelihood" wide>
                 {d.likelihood ? (
-                  `${d.likelihood} — ${DEV_LIKELIHOOD[d.likelihood - 1] ?? ""}`
+                  `${d.likelihood} — ${scale.likelihood[d.likelihood - 1] ?? ""}`
                 ) : (
                   <Muted>—</Muted>
                 )}
@@ -1170,7 +1270,12 @@ function AssessmentFacts({
               )}
             </dl>
             <div className="mt-5">
-              <RiskMatrix severity={d.severity} likelihood={d.likelihood} rows={scale.rows} />
+              <RiskMatrix
+                severity={d.severity}
+                likelihood={d.likelihood}
+                rows={scale.rows}
+                likelihoodLabels={scale.likelihood}
+              />
             </div>
             <div className="mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line lg:grid-cols-3">
               <Out label="Risk (severity · likelihood)">

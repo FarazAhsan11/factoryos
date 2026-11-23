@@ -164,6 +164,50 @@ export function QualitySettingsForm({
           </Field>
         </div>
 
+        <div className="border-t border-line-soft pt-5">
+          <h3 className="text-sm font-semibold text-ink">Customer complaints</h3>
+          <p className="mt-0.5 text-xs text-ink-5">
+            Counted from the date a complaint was received.
+          </p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field
+            label="Complaint acknowledgement — days"
+            hint="Default 2. Shown as “Acknowledge by” on the complaint."
+            error={errors.ackDays?.message}
+          >
+            {dayInput("ackDays", 30)}
+          </Field>
+          <Field
+            label="Other complaints — days to notify the sponsor"
+            hint="Default 3"
+            error={errors.notifyDays?.message}
+          >
+            {dayInput("notifyDays", 30)}
+          </Field>
+          <Field
+            label="Complaint with an adverse reaction or red flag — days to notify the sponsor"
+            hint="Default 1, as in most quality agreements"
+            error={errors.notifyUrgentDays?.message}
+          >
+            {dayInput("notifyUrgentDays", 30)}
+          </Field>
+          <Field
+            label="TGA report, serious adverse event — days"
+            hint="Default 15 days after receipt"
+            error={errors.tgaSeriousDays?.message}
+          >
+            {dayInput("tgaSeriousDays", 90)}
+          </Field>
+          <Field
+            label="TGA report, other — days"
+            hint="Default 30 days after receipt"
+            error={errors.tgaOtherDays?.message}
+          >
+            {dayInput("tgaOtherDays", 90)}
+          </Field>
+        </div>
+
         {error && (
           <p
             role="alert"

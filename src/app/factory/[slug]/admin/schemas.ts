@@ -537,6 +537,11 @@ export const qualitySettingsSchema = z.object({
   dueMajorDays: days(365),
   dueMinorDays: days(365),
   assessDays: days(30),
+  ackDays: days(30),
+  notifyDays: days(30),
+  notifyUrgentDays: days(30),
+  tgaSeriousDays: days(90),
+  tgaOtherDays: days(90),
 });
 
 export type QualitySettingsValues = z.infer<typeof qualitySettingsSchema>;

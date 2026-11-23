@@ -354,6 +354,8 @@ export function BatchRecordWorkspace({
                     router.push(`/factory/${slug}/deviations/${id}`);
                   } else if (d && d.type === "ncr") {
                     router.push(`/factory/${slug}/deviations/${id}?tab=ncr`);
+                  } else if (d && d.type === "complaint") {
+                    router.push(`/factory/${slug}/deviations/${id}?tab=complaints`);
                   } else {
                     setOpenDeviationId(id);
                   }

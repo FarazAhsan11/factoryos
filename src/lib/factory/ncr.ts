@@ -87,7 +87,10 @@ export function parseLots(text: string): string[] {
  * asks the same with `is_qms_case()`.
  */
 export const isQmsCase = (d: { type: string; nc_item?: string | null }) =>
-  d.type === "planned" || d.type === "unplanned" || (d.type === "ncr" && d.nc_item != null);
+  d.type === "planned" ||
+  d.type === "unplanned" ||
+  d.type === "complaint" ||
+  (d.type === "ncr" && d.nc_item != null);
 
 /* ── Assessment (qms-v12) ─────────────────────────────────────────────── */
 

@@ -209,6 +209,8 @@ export function DeviationsWorkspace({
       router.push(`/factory/${slug}/deviations/${id}`);
     } else if (d && d.type === "ncr") {
       router.push(`/factory/${slug}/deviations/${id}?tab=ncr`);
+    } else if (d && d.type === "complaint") {
+      router.push(`/factory/${slug}/deviations/${id}?tab=complaints`);
     } else {
       setOpenId(id);
     }
@@ -239,11 +241,7 @@ export function DeviationsWorkspace({
   if (!screen) {
     return (
       <div className="flex flex-col lg:min-h-0 lg:flex-1">
-        <CapaRegister
-          factoryId={factoryId}
-          slug={slug}
-          onOpenCase={openCase}
-        />
+        <CapaRegister factoryId={factoryId} slug={slug} />
         {dialog}
       </div>
     );
@@ -272,16 +270,16 @@ export function DeviationsWorkspace({
 
         {/* A deviation and a non-conformance are raised on their own page; a
             complaint still in the dialog. */}
-        {canReview(role) && (tab === "deviations" || tab === "ncr") && (
+        {canReview(role) && (tab === "deviations" || tab === "ncr" || tab === "complaints") && (
           <Link
-            href={`/factory/${slug}/deviations/new${tab === "ncr" ? "?type=ncr" : ""}`}
+            href={`/factory/${slug}/deviations/new${tab === "ncr" ? "?type=ncr" : tab === "complaints" ? "?type=complaint" : ""}`}
             className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-3.5 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06]"
           >
             <Plus className="size-4" />
             {screen.newLabel}
           </Link>
         )}
-        {canReview(role) && tab !== "deviations" && tab !== "ncr" && (
+        {canReview(role) && tab !== "deviations" && tab !== "ncr" && tab !== "complaints" && (
           <NewDeviationDialog
             // Keyed by screen, so a half-typed NCR never opens as a complaint.
             key={tab}

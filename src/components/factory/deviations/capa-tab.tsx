@@ -64,6 +64,7 @@ import {
 } from "@/lib/factory/deviation-queries";
 import { isQmsCase } from "@/lib/factory/ncr";
 import { NcrActions } from "@/components/factory/deviations/ncr-actions";
+import { ComplaintMarketAction } from "@/components/factory/deviations/complaint-market";
 import { useWorkers } from "@/lib/factory/worker-queries";
 import { useForm } from "@/lib/use-form";
 import { useRenderClock } from "@/lib/use-render-clock";
@@ -117,6 +118,9 @@ export function CapaTab({
           {d.investigation_required !== false && " and the investigation approval"}. Corrections
           done on the day can be recorded now.
         </p>
+      )}
+      {d.type === "complaint" && (
+        <ComplaintMarketAction deviation={d} factoryId={factoryId} canEdit={ed} />
       )}
       {ncr && (
         <NcrActions

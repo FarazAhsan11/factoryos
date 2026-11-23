@@ -18,6 +18,12 @@ export interface QualitySettings {
   dueMajorDays: number;
   dueMinorDays: number;
   assessDays: number;
+  /** Complaints (0079): days to acknowledge, to notify the sponsor, to report to the TGA. */
+  ackDays: number;
+  notifyDays: number;
+  notifyUrgentDays: number;
+  tgaSeriousDays: number;
+  tgaOtherDays: number;
 }
 
 export const DEFAULT_QUALITY_SETTINGS: QualitySettings = {
@@ -25,6 +31,11 @@ export const DEFAULT_QUALITY_SETTINGS: QualitySettings = {
   dueMajorDays: 30,
   dueMinorDays: 60,
   assessDays: 2,
+  ackDays: 2,
+  notifyDays: 3,
+  notifyUrgentDays: 1,
+  tgaSeriousDays: 15,
+  tgaOtherDays: 30,
 };
 
 export interface QualitySettingsChange {
@@ -59,7 +70,9 @@ export async function fetchQualitySettings(
   const supabase = createClient();
   const { data, error } = await supabase
     .from("factory_quality_settings")
-    .select("due_critical_days, due_major_days, due_minor_days, assess_days")
+    .select(
+      "due_critical_days, due_major_days, due_minor_days, assess_days, ack_days, notify_days, notify_urgent_days, tga_serious_days, tga_other_days",
+    )
     .eq("factory_id", factoryId)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -69,6 +82,11 @@ export async function fetchQualitySettings(
     dueMajorDays: data.due_major_days,
     dueMinorDays: data.due_minor_days,
     assessDays: data.assess_days,
+    ackDays: data.ack_days,
+    notifyDays: data.notify_days,
+    notifyUrgentDays: data.notify_urgent_days,
+    tgaSeriousDays: data.tga_serious_days,
+    tgaOtherDays: data.tga_other_days,
   };
 }
 
@@ -84,6 +102,11 @@ export async function saveQualitySettings(
       due_major_days: values.dueMajorDays,
       due_minor_days: values.dueMinorDays,
       assess_days: values.assessDays,
+      ack_days: values.ackDays,
+      notify_days: values.notifyDays,
+      notify_urgent_days: values.notifyUrgentDays,
+      tga_serious_days: values.tgaSeriousDays,
+      tga_other_days: values.tgaOtherDays,
     },
     { onConflict: "factory_id" },
   );

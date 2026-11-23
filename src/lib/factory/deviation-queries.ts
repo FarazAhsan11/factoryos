@@ -4,6 +4,8 @@ import {
   type CloseOutValues,
   type ContainmentValues,
   type AssessmentValues,
+  type ComplaintInitiationValues,
+  type MarketActionValues,
   type DeviationInitiationValues,
   type DevCloseOutValues,
   type DevInvestigationValues,
@@ -16,6 +18,7 @@ import {
   type RiskValues,
 } from "@/app/factory/[slug]/deviations/schemas";
 import type { ActionStage } from "@/lib/factory/action-queries";
+import { complaintRequiredChecks } from "@/lib/factory/complaint";
 import {
   NCR_DETECTION_POINTS,
   dispositionLabel,
@@ -31,6 +34,7 @@ import {
   type SuppliedBy,
 } from "@/lib/factory/ncr";
 import { createClient } from "@/lib/supabase/client";
+import { regulatorOf, reportTriggered } from "@/lib/factory/complaint";
 
 /**
  * Deviations & NCRs — the QMS case (migrations 0044, 0045).
@@ -447,6 +451,43 @@ export interface Deviation {
   customer_notify_reason: string | null;
   /** Closed as not a non-conformance — why. */
   not_case_reason: string | null;
+
+  /* ── A customer complaint (0079) ───────────────────────────────────── */
+  /** Due dates, the sponsor notification and the acknowledgement count from it. */
+  received_on: string | null;
+  complainant: string | null;
+  complainant_contact: string | null;
+  country: string | null;
+  /** The product, when the batch is unknown. */
+  product_label: string | null;
+  /** Who the sponsor is — asked on the complaint for now. */
+  sponsor: "us" | "customer" | null;
+  artg_no: string | null;
+  expiry: string | null;
+  adverse_what: string | null;
+  adverse_serious: boolean | null;
+  sample: "Received" | "Requested" | "Not available" | null;
+  sample_received_on: string | null;
+  ack_on: string | null;
+  ack_by_name: string | null;
+  ack_how: string | null;
+  stock_affected: "No" | "Yes" | "Unknown" | null;
+  sponsor_notified_on: string | null;
+  reportable: boolean | null;
+  report_reason: string | null;
+  report_type: "Serious adverse reaction" | "Other report" | null;
+  report_due: string | null;
+  reported_on: string | null;
+  report_ref: string | null;
+  scope: "Isolated unit(s)" | "Whole batch" | "Other batches too" | null;
+  market_action: string | null;
+  market_why: string | null;
+  recall_class: string | null;
+  recall_level: string | null;
+  recall_ref: string | null;
+  final_reply: string | null;
+  reply_sent_on: string | null;
+  resolution: "None" | "Replacement" | "Credit or refund" | null;
 }
 
 const COLUMNS = `
@@ -494,7 +535,13 @@ const COLUMNS = `
   return_ref, supplier_notified_on, supplier_claim, scar_requested,
   scar_not_reason, scar_ref, scar_due, scar_reply_on, scar_accepted,
   tightened_inspection, tightened_lots, customer_notify, customer_notified_on,
-  customer_notify_reason, not_case_reason
+  customer_notify_reason, not_case_reason,
+  received_on, complainant, complainant_contact, country, product_label,
+  sponsor, artg_no, expiry, adverse_what, adverse_serious, sample,
+  sample_received_on, ack_on, ack_by_name, ack_how, stock_affected,
+  sponsor_notified_on, reportable, report_reason, report_type, report_due,
+  reported_on, report_ref, scope, market_action, market_why, recall_class,
+  recall_level, recall_ref, final_reply, reply_sent_on, resolution
 `;
 
 /**
@@ -856,6 +903,17 @@ export function assessmentValues(
     rationale: deviation.risk_description ?? "",
     ncr: deviation.type === "ncr",
     forcedInvestigation: forcedInvestigation(deviation),
+    complaint: deviation.type === "complaint",
+    adverse: deviation.adverse_reaction === true,
+    departmentId: deviation.department_id ?? "",
+    stockAffected: deviation.stock_affected ?? "",
+    sponsorNotifiedOn: deviation.sponsor_notified_on ?? "",
+    reportable: yn(deviation.reportable),
+    reportReason: deviation.report_reason ?? "",
+    reportType: deviation.report_type ?? "",
+    reportDue: deviation.report_due ?? "",
+    reportedOn: deviation.reported_on ?? "",
+    reportRef: deviation.report_ref ?? "",
   };
 }
 
@@ -864,8 +922,23 @@ function assessmentPatch(v: AssessmentValues, by: string) {
   const noneFound = v.noPreviousFound && v.previousCases.length === 0;
   return {
     nc_category: text(v.category),
-    // Only an NCR's "Other" defect is described.
-    category_other: v.ncr && v.category === "Other" ? text(v.categoryOther) : null,
+    // Only an NCR's or a complaint's "Other" is described.
+    category_other:
+      (v.ncr || v.complaint) && v.category === "Other" ? text(v.categoryOther) : null,
+    // A complaint's market impact and reporting (0079).
+    ...(v.complaint
+      ? {
+          department_id: v.investigationRequired === "yes" ? v.departmentId || null : null,
+          stock_affected: v.stockAffected || null,
+          sponsor_notified_on: v.sponsorNotifiedOn || null,
+          reportable: v.reportable === "" ? null : v.reportable === "yes",
+          report_reason: v.reportable === "no" ? text(v.reportReason) : null,
+          report_type: v.reportable === "yes" ? v.reportType || null : null,
+          report_due: v.reportable === "yes" ? v.reportDue || null : null,
+          reported_on: v.reportable === "yes" ? v.reportedOn || null : null,
+          report_ref: v.reportable === "yes" ? text(v.reportRef) : null,
+        }
+      : {}),
     owner_name: text(v.ownerName),
     investigation_required: v.forcedInvestigation
       ? true
@@ -941,7 +1014,9 @@ export function devInvestigationValues(d: Deviation): DevInvestigationValues {
     labCheck: d.lab_check ?? "",
     labRef: d.lab_ref ?? "",
     labRequired: d.type === "ncr" && d.detection_point === "QC testing",
-    requiredChecks: requiredChecks(d),
+    requiredChecks: d.type === "complaint" ? complaintRequiredChecks(d) : requiredChecks(d),
+    scope: d.scope ?? "",
+    complaint: d.type === "complaint",
   };
 }
 
@@ -968,6 +1043,8 @@ function devInvestigationPatch(v: DevInvestigationValues) {
     ...(v.labRequired
       ? { lab_check: v.labCheck || null, lab_ref: text(v.labRef) }
       : {}),
+    // A complaint is scoped, not impact-assessed (0079).
+    ...(v.complaint ? { scope: v.scope || null } : {}),
   };
 }
 
@@ -1023,6 +1100,10 @@ export function devCloseOutValues(d: Deviation): DevCloseOutValues {
       : "") as DevCloseOutValues["reason"],
     duplicateOf: d.duplicate_of ?? "",
     cost: d.cost_of_quality === null ? "" : String(d.cost_of_quality),
+    finalReply: d.final_reply ?? "",
+    replySentOn: d.reply_sent_on ?? "",
+    resolution: d.resolution ?? "",
+    complaint: d.type === "complaint",
   };
 }
 
@@ -1035,6 +1116,14 @@ function devCloseOutPatch(v: DevCloseOutValues) {
     duplicate_of: v.reason === "Duplicate" ? text(v.duplicateOf) : null,
     cost_of_quality:
       v.reason !== "Duplicate" && v.cost ? Number(v.cost) : null,
+    // A complaint's final reply (0079).
+    ...(v.complaint
+      ? {
+          final_reply: text(v.finalReply),
+          reply_sent_on: v.replySentOn || null,
+          resolution: v.resolution || null,
+        }
+      : {}),
   };
 }
 
@@ -1070,6 +1159,148 @@ export function closeDevCase(
     qa_sign_name: by.trim(),
   });
 }
+
+/* ── A customer complaint (0079) ───────────────────────────────────────── */
+
+/** Raise a complaint. A serious reaction is made a red flag by the database. */
+export async function raiseComplaint(
+  factoryId: string,
+  values: ComplaintInitiationValues,
+  createdBy: string,
+  raisedBy: string,
+): Promise<{ id: string; deviation_no: string }> {
+  const adverse = values.adverse === "yes";
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("deviations")
+    .insert({
+      factory_id: factoryId,
+      type: "complaint",
+      created_by: createdBy,
+      raised_by: text(raisedBy),
+      title: values.title.trim(),
+      received_on: values.receivedOn,
+      received_via: values.receivedVia || null,
+      complainant: values.complainant || null,
+      complainant_contact: text(values.contact),
+      country: values.country,
+      batch_nos: parseBatches(values.batches),
+      product_label: text(values.productLabel),
+      customer_name: text(values.customerName),
+      sponsor: values.sponsor || null,
+      artg_no: text(values.artg),
+      expiry: text(values.expiry),
+      qty_affected: text(values.unitsAffected),
+      actual: values.actual.trim(),
+      adverse_reaction: adverse,
+      adverse_what: adverse ? text(values.adverseWhat) : null,
+      adverse_serious: adverse ? values.serious === "yes" : null,
+      sample: values.sample || null,
+      sample_received_on:
+        values.sample === "Received" ? values.sampleReceivedOn || null : null,
+      immediate_action: text(values.immediateAction),
+    })
+    .select("id, deviation_no")
+    .single();
+  if (error) throw new Error(error.message);
+  return data as { id: string; deviation_no: string };
+}
+
+/** "Mark acknowledged" — today, by whom, and how (with why, when late). */
+export function acknowledgeComplaint(id: string, how: string, by: string): Promise<void> {
+  const t = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return patch(id, {
+    ack_on: `${t.getFullYear()}-${p(t.getMonth() + 1)}-${p(t.getDate())}`,
+    ack_by_name: by.trim(),
+    ack_how: text(how),
+  });
+}
+
+/** A requested complaint sample, marked received today. */
+export function markSampleReceived(id: string): Promise<void> {
+  const t = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return patch(id, {
+    sample: "Received",
+    sample_received_on: `${t.getFullYear()}-${p(t.getMonth() + 1)}-${p(t.getDate())}`,
+  });
+}
+
+export function marketActionValues(d: Deviation): MarketActionValues {
+  return {
+    market: (d.market_action ?? "") as MarketActionValues["market"],
+    recallClass: (d.recall_class ?? "") as MarketActionValues["recallClass"],
+    recallLevel: (d.recall_level ?? "") as MarketActionValues["recallLevel"],
+    recallRef: d.recall_ref ?? "",
+    why: d.market_why ?? "",
+  };
+}
+
+export function saveMarketAction(id: string, v: MarketActionValues): Promise<void> {
+  const recall = v.market === "Recall";
+  return patch(id, {
+    market_action: v.market || null,
+    recall_class: recall ? v.recallClass || null : null,
+    recall_level: recall ? v.recallLevel || null : null,
+    recall_ref: recall ? text(v.recallRef) : null,
+    market_why: text(v.why),
+  });
+}
+
+/** The sponsor notified, or a regulator report made — dates set on the Assessment after it is signed. */
+export function saveComplaintReporting(
+  id: string,
+  v: { sponsorNotifiedOn: string; reportedOn: string; reportRef: string },
+): Promise<void> {
+  return patch(id, {
+    sponsor_notified_on: v.sponsorNotifiedOn || null,
+    reported_on: v.reportedOn || null,
+    report_ref: text(v.reportRef),
+  });
+}
+
+/** `YYYY-MM-DD` plus days. */
+function plusDays(day: string, days: number): string {
+  const d = new Date(`${day}T00:00:00`);
+  d.setDate(d.getDate() + days);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+/** The day the complaint counts from: received, else raised. */
+export const complaintStart = (d: Deviation) => d.received_on ?? d.created_at.slice(0, 10);
+
+/** Acknowledge by: received + the settings' days. */
+export const ackDue = (d: Deviation, ackDays: number) => plusDays(complaintStart(d), ackDays);
+
+/** Notify the sponsor by: received + 1 day if urgent, else the settings' days. */
+export const notifyDue = (d: Deviation, days: { urgent: number; other: number }) =>
+  plusDays(
+    complaintStart(d),
+    d.adverse_reaction === true || d.red_flags.length > 0 ? days.urgent : days.other,
+  );
+
+/** The report's due date for a type: received + the settings' days. */
+export const reportDueFor = (
+  d: Deviation,
+  type: string,
+  days: { serious: number; other: number },
+) => plusDays(complaintStart(d), type === "Serious adverse reaction" ? days.serious : days.other);
+
+/** The sponsor is told by us — the customer is the sponsor. */
+export const viaSponsor = (d: Deviation) => d.type === "complaint" && d.sponsor === "customer";
+
+/** The market action, with its rationale (and a recall's class and level). */
+export const marketDone = (d: Deviation) =>
+  Boolean(d.market_action && (d.market_why ?? "").trim()) &&
+  (d.market_action !== "Recall" || Boolean(d.recall_class && d.recall_level));
+
+/** The regulator: TGA, Medsafe… */
+export const regulatorFor = (d: Deviation) => regulatorOf(d.country);
+
+/** A complaint whose assessment decided a regulator report is needed. */
+export const reportNeeded = (d: Deviation) => d.reportable === true && reportTriggered(d);
 
 /* ── A non-conformance's actions (0077) ───────────────────────────────── */
 
@@ -1215,10 +1446,9 @@ export async function closeNcrNotACase(id: string, reason: string, by: string): 
 
 /** May it still be closed as not a non-conformance? */
 export const canCloseNotACase = (d: Deviation) =>
-  d.type === "ncr" &&
-  d.nc_item !== null &&
   d.status === "open" &&
-  (!d.assessed_at || d.lab_check === "No");
+  ((d.type === "ncr" && d.nc_item !== null && (!d.assessed_at || d.lab_check === "No")) ||
+    (d.type === "complaint" && !d.assessed_at));
 
 /** The disposition's own fields are complete — `ncr_disposition_missing()` as a yes / no. */
 function dispositionComplete(d: Deviation): boolean {
@@ -1277,7 +1507,9 @@ export const customerDone = (d: Deviation) =>
 
 /** An NCR's actions besides the CAPA decision, done — a deviation has none. */
 export const typeActsDone = (d: Deviation) =>
-  d.type !== "ncr" || (dispositionDone(d) && supplierDone(d) && customerDone(d));
+  d.type === "complaint"
+    ? marketDone(d) && Boolean(d.ack_on)
+    : d.type !== "ncr" || (dispositionDone(d) && supplierDone(d) && customerDone(d));
 
 /** What an NCR's Actions still need, in words — "disposition, supplier reply". */
 export function actsMissing(d: Deviation): string[] {
@@ -1299,6 +1531,10 @@ export function actsMissing(d: Deviation): string[] {
       );
     }
     if (!customerDone(d)) m.push("customer notification");
+  }
+  if (d.type === "complaint") {
+    if (!marketDone(d)) m.push("market action");
+    if (!d.ack_on) m.push("acknowledgement");
   }
   return m;
 }
@@ -1324,10 +1560,15 @@ export function devChecklist(d: Deviation): ChecklistItem[] {
     d.investigation_required === false
       ? { label: "Investigation not required (reason recorded)", done: true }
       : { label: "Investigation approved", done: Boolean(d.investigation_approved_at) },
-    {
-      label: "Immediate action recorded",
-      done: Boolean((d.immediate_action ?? "").trim()),
-    },
+    // A complaint's immediate action is optional (0079).
+    ...(d.type === "complaint"
+      ? []
+      : [
+          {
+            label: "Immediate action recorded",
+            done: Boolean((d.immediate_action ?? "").trim()),
+          },
+        ]),
     // Only when the case has held a batch (0069).
     ...(d.holds_total > 0
       ? [
@@ -1351,6 +1592,28 @@ export function devChecklist(d: Deviation): ChecklistItem[] {
     list.push({
       label: `${d.capa_no ?? "CAPA"} plan approved`,
       done: Boolean(d.capa_plan_approved_at),
+    });
+  }
+  // A complaint's communication, notification, report and market action (0079).
+  if (d.type === "complaint") {
+    list.push({ label: "Complainant acknowledged", done: Boolean(d.ack_on) });
+    if (viaSponsor(d)) {
+      list.push({
+        label: `Sponsor (${d.customer_name || "customer"}) notified`,
+        done: Boolean(d.sponsor_notified_on),
+      });
+    }
+    if (reportNeeded(d)) {
+      list.push({
+        label: `Reported to the ${regulatorFor(d)}`,
+        done: Boolean(d.reported_on),
+      });
+    }
+    list.push({ label: "Market action decided, with rationale", done: marketDone(d) });
+    list.push({
+      label: "Final reply sent",
+      done: Boolean((d.final_reply ?? "").trim() && d.reply_sent_on),
+      here: true,
     });
   }
   // A non-conformance's own actions (0077).
@@ -1468,7 +1731,10 @@ const isDeviation = (d: Deviation) => isQmsCase(d);
 /** Read from what the case holds — never stored. */
 export function devStage(d: Deviation): DevStage {
   if (d.status === "closed") {
-    return d.status_reason === "Not a non-conformance" ? "Closed — not a case" : "Closed";
+    return d.status_reason === "Not a non-conformance" ||
+      d.status_reason === "Not a quality complaint"
+      ? "Closed — not a case"
+      : "Closed";
   }
   if (!d.assessed_at) return "Awaiting assessment";
   if (d.investigation_required !== false && !d.investigation_approved_at) {
@@ -1506,7 +1772,7 @@ export function nextStep(d: Deviation): { text: string; tab: CaseSection } | nul
     case "Actions":
       return {
         text:
-          d.type === "ncr"
+          d.type === "ncr" || d.type === "complaint"
             ? `${owner}: still to do — ${actsMissing(d).join(", ")}.`
             : `${owner}: decide on a CAPA, or resolve directly.`,
         tab: "actions",

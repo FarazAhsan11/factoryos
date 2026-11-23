@@ -216,6 +216,7 @@ export function DeviationInitiationFields({
           <BatchesResolved
             factoryId={factoryId}
             control={control}
+            name="batches"
             holding={hold === "yes"}
           />
         </Field>
@@ -325,16 +326,22 @@ export function DeviationInitiationFields({
  * saved as typed — unless the batch is going on hold, which holds nothing on
  * a typo, so then it is shown as the error the database will raise.
  */
-function BatchesResolved({
+export function BatchesResolved<T extends FieldValues>({
   factoryId,
   control,
+  name,
   holding,
+  emptyHint = "One or more. Products are filled from the batch register.",
 }: {
   factoryId: string;
-  control: Control<DeviationInitiationValues>;
+  control: Control<T>;
+  /** The one-line batches field to read. */
+  name: FieldPath<T>;
   holding: boolean;
+  /** Said under the field while nothing is typed. */
+  emptyHint?: string;
 }) {
-  const typed = useWatch({ control, name: "batches" });
+  const typed = useWatch({ control, name }) as string | undefined;
   const { data: products = [] } = useQuery({
     queryKey: productKeys.all(factoryId),
     queryFn: () => fetchProducts(factoryId),
@@ -350,9 +357,7 @@ function BatchesResolved({
 
   if (rows.length === 0) {
     return (
-      <p className="text-[0.6875rem] leading-snug text-ink-5">
-        One or more. Products are filled from the batch register.
-      </p>
+      <p className="text-[0.6875rem] leading-snug text-ink-5">{emptyHint}</p>
     );
   }
 
@@ -400,11 +405,13 @@ export function Segmented<T extends FieldValues>({
   name,
   label,
   options,
+  className,
 }: {
   control: Control<T>;
   name: FieldPath<T>;
   label: string;
   options: { value: string; label: string }[];
+  className?: string;
 }) {
   return (
     <Controller
@@ -418,6 +425,7 @@ export function Segmented<T extends FieldValues>({
           className={cn(
             "inline-flex rounded-xl border bg-surface p-0.5 shadow-[0_1px_2px_rgb(20_22_43/0.04)]",
             fieldState.error ? "border-danger" : "border-line",
+            className,
           )}
         >
           {options.map((o) => {

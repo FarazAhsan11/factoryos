@@ -33,6 +33,7 @@ import {
   type Deviation,
   type DeviationType,
 } from "@/lib/factory/deviation-queries";
+
 import { CASE_SCREENS, resolveQualityTab } from "@/lib/factory/quality-tabs";
 import { cn } from "@/lib/utils";
 
@@ -200,12 +201,14 @@ export function DeviationsWorkspace({
   // re-renders the moment one of its tabs is saved.
   const open = deviations.find((d) => d.id === (openId ?? caseParam)) ?? null;
 
-  // A planned or unplanned deviation opens as its own page; an NCR or a
-  // complaint still in the case dialog.
+  // A deviation and a non-conformance open as their own page; a complaint
+  // still in the case dialog.
   const openCase = (id: string) => {
     const d = deviations.find((x) => x.id === id);
     if (d && (d.type === "planned" || d.type === "unplanned")) {
       router.push(`/factory/${slug}/deviations/${id}`);
+    } else if (d && d.type === "ncr") {
+      router.push(`/factory/${slug}/deviations/${id}?tab=ncr`);
     } else {
       setOpenId(id);
     }
@@ -267,18 +270,18 @@ export function DeviationsWorkspace({
           <p className="mt-1 max-w-3xl text-sm text-ink-4">{screen.sub}</p>
         </div>
 
-        {/* A deviation is raised on its own page; a non-conformance and a
+        {/* A deviation and a non-conformance are raised on their own page; a
             complaint still in the dialog. */}
-        {canReview(role) && tab === "deviations" && (
+        {canReview(role) && (tab === "deviations" || tab === "ncr") && (
           <Link
-            href={`/factory/${slug}/deviations/new`}
+            href={`/factory/${slug}/deviations/new${tab === "ncr" ? "?type=ncr" : ""}`}
             className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-3.5 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06]"
           >
             <Plus className="size-4" />
             {screen.newLabel}
           </Link>
         )}
-        {canReview(role) && tab !== "deviations" && (
+        {canReview(role) && tab !== "deviations" && tab !== "ncr" && (
           <NewDeviationDialog
             // Keyed by screen, so a half-typed NCR never opens as a complaint.
             key={tab}

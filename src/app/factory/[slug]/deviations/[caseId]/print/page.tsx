@@ -4,7 +4,7 @@ import { DeviationReport } from "@/components/factory/deviations/deviation-repor
 import { getFactoryContext } from "@/lib/factory/context";
 
 export const metadata: Metadata = {
-  title: "Deviation report · FactoryOS",
+  title: "Case report · FactoryOS",
 };
 
 /**

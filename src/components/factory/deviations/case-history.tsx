@@ -1,5 +1,6 @@
 "use client";
 
+import { dispositionLabel } from "@/lib/factory/ncr";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Check, Loader2 } from "lucide-react";
@@ -43,8 +44,14 @@ const SIGNATURES: AuditAction[] = [
   "closeout_first_signed",
   "closed",
   "hold_placed",
+  "quarantine_placed",
   "batch_released",
   "batch_rejected",
+  "lot_released",
+  "lot_rejected",
+  "hold_restored",
+  "disposition_signed",
+  "disposition_reopened",
   "extension_requested",
   "extension_approved",
   "extension_rejected",
@@ -281,8 +288,15 @@ const EVENT_WHAT: Partial<Record<AuditAction, string>> = {
   closeout_first_signed: "Signed: Close-out — first of two signatures",
   closed: "Signed: Case closed",
   hold_placed: "Batch hold placed",
+  quarantine_placed: "Quarantine placed",
   batch_released: "Signed: Batch released",
   batch_rejected: "Signed: Batch rejected",
+  lot_released: "Signed: Lot released",
+  lot_rejected: "Signed: Lot rejected",
+  hold_restored: "Back on hold — disposition changed",
+  disposition_signed: "Signed: Disposition",
+  disposition_reopened: "Disposition reopened",
+  converted: "Moved onto the non-conformance form (qms-v12)",
   extension_requested: "Due date extension requested",
   extension_approved: "Signed: Due date extension approved",
   extension_rejected: "Signed: Due date extension rejected",
@@ -329,6 +343,20 @@ function trailRows(e: AuditEntry, names: Names): TrailRow[] {
       return [row(0, `File removed — ${section}`, e.old_value, null)];
     case "hold_placed":
       return [row(0, "Batch hold placed", null, e.new_value, true)];
+    case "quarantine_placed":
+      return [row(0, "Quarantine placed", null, `Lot ${e.new_value}`, true)];
+    case "lot_released":
+      return [row(0, "Signed: Lot released", "Quarantine", `${e.new_value} Released`)];
+    case "lot_rejected":
+      return [row(0, "Signed: Lot rejected", "Quarantine", `${e.new_value} Rejected`)];
+    case "hold_restored":
+      return [row(0, "Back on hold — disposition changed", e.old_value, `${e.new_value} On hold`)];
+    case "disposition_signed":
+      return [row(0, "Signed: Disposition", null, e.new_value)];
+    case "disposition_reopened":
+      return [row(0, "Disposition reopened", e.old_value, null)];
+    case "converted":
+      return [row(0, "Moved onto the non-conformance form (qms-v12)", null, e.new_value)];
     case "correction_added":
       return [row(0, "Correction added", null, e.new_value)];
     case "correction_removed":
@@ -470,6 +498,12 @@ function display(kind: FieldKind, raw: string | null, names: Names): string | nu
       return raw.charAt(0).toUpperCase() + raw.slice(1);
     case "disposition":
       return dispositionMeta(raw as NcrDisposition).label;
+    case "ncrDisposition":
+      return dispositionLabel(raw) ?? raw;
+    case "concession":
+      return raw === "customer" ? "Approved by the customer" : "Not needed — our own material";
+    case "customerNotify":
+      return raw === "yes" ? "Yes" : "Not needed";
     default:
       return raw;
   }

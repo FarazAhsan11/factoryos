@@ -104,9 +104,12 @@ export function FactorySidebar({
   const section = rest ? `/${rest.split("/")[1]}` : "";
   // A CAPA's own page (/deviations/capa/…) belongs to the CAPA register, not
   // to Deviations — the first link for its path.
+  // An NCR's raise page (`?type=ncr`) belongs to Non-conformances; its case
+  // page carries `?tab=ncr` for the same reason.
+  const liveParams = new URLSearchParams(liveQuery ?? "");
   const liveTab = rest.startsWith("/deviations/capa/")
     ? "capa"
-    : new URLSearchParams(liveQuery ?? "").get("tab");
+    : (liveParams.get("tab") ?? (liveParams.get("type") === "ncr" ? "ncr" : null));
 
   const sections = navForRole(role, units);
   const active = activeHrefs(sections, section, liveTab);

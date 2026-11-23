@@ -1,5 +1,18 @@
 import { z } from "zod";
 
+import {
+  LAB_CHECK,
+  NCR_CATEGORIES,
+  NCR_DETECTION_POINTS,
+  NCR_RED_FLAGS,
+  NC_ITEMS,
+  batchRequired,
+  isMaterialItem,
+  isProductItem,
+  parseLots,
+  partyWord,
+} from "@/lib/factory/ncr";
+
 /**
  * Deviations & NCRs — the QMS case, as seven forms over one row.
  *
@@ -284,6 +297,95 @@ export const deviationInitiationSchema = z
 export type DeviationInitiationValues = z.infer<
   typeof deviationInitiationSchema
 >;
+
+/* ── A non-conformance's initiation (migration 0076) ──────────────────── */
+
+/**
+ * Raising a non-conformance — the page at `/deviations/new?type=ncr`, the
+ * reference QMS's NCR form (qms-v12). "What is non-conforming?" decides the
+ * rest: a material asks who supplied it, its code, the supplier (or
+ * customer), the lot(s) and quantity, and the batch it was found in when it
+ * was found after receipt; bulk or finished product asks its batches and
+ * quantity; other asks what it is. Requirement and description are both
+ * required (an NCR is a failed requirement). Quarantine starts at Yes; No
+ * needs a reason. `deviations_ncr_initiation_guard` says the same.
+ */
+export const ncrInitiationSchema = z
+  .object({
+    ncItem: z.enum(NC_ITEMS),
+    ncItemOther: optional(160),
+    title: z
+      .string()
+      .trim()
+      .min(3, "Give the non-conformance a title — what it is, in a line.")
+      .max(160, "Keep the title under 160 characters."),
+    suppliedBy: z.enum(["supplier", "customer"]),
+    materialCode: optional(60),
+    supplierName: optional(120),
+    /** Typed as one line; `parseLots` reads it. */
+    lots: optional(400),
+    qtyAffected: optional(120),
+    /** Typed as one line; `parseBatches` reads it. */
+    batches: optional(400),
+    detectionPoint: z.union([z.enum(NCR_DETECTION_POINTS), z.literal("")]),
+    occurredAt: dateTime.refine((v) => v !== "", "When was it found?"),
+    departmentId: z.string().min(1, "Which department found it?"),
+    location: optional(120),
+    specification: z
+      .string()
+      .trim()
+      .min(3, "Give the requirement or specification — spec and limit.")
+      .max(2000, "Keep it under 2000 characters."),
+    actual: z
+      .string()
+      .trim()
+      .min(10, "Describe the non-conformance — what was found against the limit.")
+      .max(2000, "Keep it under 2000 characters."),
+    immediateAction: z
+      .string()
+      .trim()
+      .min(2, "Say what was done straight away, or “None needed”.")
+      .max(2000, "Keep it under 2000 characters."),
+    hold: z.enum(["yes", "no"]),
+    holdNotReason: optional(400),
+    equipmentNo: optional(40),
+    sopNumber: optional(60),
+  })
+  .superRefine((v, ctx) => {
+    const need = (path: keyof typeof v, message: string) =>
+      ctx.addIssue({ code: "custom", path: [path], message });
+    const material = isMaterialItem(v.ncItem);
+    const product = isProductItem(v.ncItem);
+    const party = partyWord(v.suppliedBy);
+
+    if (v.ncItem === "Other" && !v.ncItemOther) need("ncItemOther", "What is it?");
+    if (material) {
+      if (!v.materialCode) need("materialCode", "Give the material code.");
+      if (!v.supplierName) need("supplierName", `Name the ${party}.`);
+      if (parseLots(v.lots).length === 0) need("lots", `Give the ${party} lot number(s).`);
+      if (!v.qtyAffected) need("qtyAffected", "Give the quantity affected.");
+      if (batchRequired(v.ncItem, v.detectionPoint) && parseBatches(v.batches).length === 0) {
+        need("batches", `Found during ${v.detectionPoint.toLowerCase()}, so the batch is known.`);
+      }
+    }
+    if (product) {
+      if (parseBatches(v.batches).length === 0) need("batches", "Give the batches affected.");
+      if (!v.qtyAffected) need("qtyAffected", "Give the quantity affected.");
+    }
+    if (v.detectionPoint === "") need("detectionPoint", "Where was it detected?");
+    if (v.hold === "no" && !v.holdNotReason) {
+      need(
+        "holdNotReason",
+        material ? "Say why the lot is not quarantined." : "Say why the batch is not put on hold.",
+      );
+    }
+    // Read in validation, not in render — a submit is an event.
+    if (v.occurredAt && new Date(v.occurredAt).getTime() > Date.now() + 5 * 60_000) {
+      need("occurredAt", "The date found can't be in the future.");
+    }
+  });
+
+export type NcrInitiationValues = z.infer<typeof ncrInitiationSchema>;
 
 /* ── Tab 2 · Immediate / containment action ───────────────────────────── */
 
@@ -651,11 +753,14 @@ export function proposedClass(v: {
  * suggested likelihood can be checked here; only the ids are saved.
  */
 export const assessmentSchema = z.object({
-  category: z.union([z.enum(NC_CATEGORIES), z.literal("")]),
+  /** A deviation's category, or an NCR's defect type (0077). */
+  category: z.union([z.enum(NC_CATEGORIES), z.enum(NCR_CATEGORIES), z.literal("")]),
+  /** An NCR's "Other" defect, described. */
+  categoryOther: optional(160),
   ownerName: optional(80),
   investigationRequired: yesNo,
   investigationNotRequiredReason: optional(1000),
-  redFlags: z.array(z.enum(RED_FLAGS)),
+  redFlags: z.array(z.union([z.enum(RED_FLAGS), z.enum(NCR_RED_FLAGS)])),
   severity: score,
   likelihood: z.union([z.enum(["1", "2", "3"]), z.literal("")]),
   raisedAt: z.string(),
@@ -665,6 +770,10 @@ export const assessmentSchema = z.object({
   classification: z.union([z.enum(CLASSES), z.literal("")]),
   classificationReason: optional(1000),
   rationale: optional(1000),
+  /** Context, not saved: the case is an NCR. */
+  ncr: z.boolean(),
+  /** Context, not saved: an NCR found after receipt — the investigation cannot be skipped. */
+  forcedInvestigation: z.boolean(),
 });
 
 export type AssessmentValues = z.infer<typeof assessmentSchema>;
@@ -672,7 +781,16 @@ export type AssessmentValues = z.infer<typeof assessmentSchema>;
 export const assessmentSignSchema = assessmentSchema.superRefine((v, ctx) => {
   const need = (path: keyof AssessmentValues, message: string) =>
     ctx.addIssue({ code: "custom", path: [path], message });
-  if (!v.category) need("category", "Choose the category.");
+  if (!v.category) need("category", v.ncr ? "Choose the defect type." : "Choose the category.");
+  if (v.ncr && v.category === "Other" && v.categoryOther.length < 2) {
+    need("categoryOther", "Describe the defect.");
+  }
+  if (v.forcedInvestigation && v.investigationRequired !== "yes") {
+    need(
+      "investigationRequired",
+      "Required: found after receipt, so batches may already contain the material.",
+    );
+  }
   if (!v.ownerName) need("ownerName", "Name the case owner.");
   if (!v.investigationRequired) {
     need("investigationRequired", "Is an investigation required?");
@@ -785,6 +903,13 @@ export const devInvestigationSchema = z.object({
   rootCause: optional(2000),
   conclusion: z.union([z.enum(RC_CONCLUSIONS), z.literal("")]),
   method: z.union([z.enum(DEV_RCA_METHODS), z.literal("")]),
+  /** An NCR found at QC testing (0077): lab error ruled out? */
+  labCheck: z.union([z.enum(LAB_CHECK), z.literal("")]),
+  labRef: optional(80),
+  /** Context, not saved: the laboratory check is asked. */
+  labRequired: z.boolean(),
+  /** Context, not saved: the items the investigation must cover. */
+  requiredChecks: z.array(z.string()),
 });
 
 export type DevInvestigationValues = z.infer<typeof devInvestigationSchema>;
@@ -793,9 +918,23 @@ export const devInvestigationSubmitSchema = devInvestigationSchema.superRefine(
   (v, ctx) => {
     const need = (path: keyof DevInvestigationValues, message: string) =>
       ctx.addIssue({ code: "custom", path: [path], message });
+    if (v.labRequired) {
+      if (!v.labCheck) need("labCheck", "Was a lab error ruled out?");
+      else if (v.labCheck === "No") {
+        need("labCheck", "A lab error was found: close the case as not a non-conformance.");
+      } else if (v.labCheck === "In progress") {
+        need("labCheck", "Finish the lab investigation first.");
+      }
+      if (!v.labRef) need("labRef", "Give the lab investigation reference.");
+    }
+    const ticked = new Set(v.reviewChecks.map((c) => c.item.toLowerCase()));
+    const notCovered = v.requiredChecks.filter((r) => !ticked.has(r.toLowerCase()));
+    if (notCovered.length > 0) {
+      need("reviewChecks", `Also review: ${notCovered.join(", ")}.`);
+    }
     if (v.impact.length < 5) need("impact", "Assess the impact on the product.");
     const blank = v.reviewChecks.filter((c) => !c.finding).map((c) => c.item);
-    if (blank.length > 0) {
+    if (blank.length > 0 && notCovered.length === 0) {
       need(
         "reviewChecks",
         `Write what each reviewed item showed — ${blank.join(", ")} ${blank.length === 1 ? "has" : "have"} no finding yet.`,
@@ -815,6 +954,104 @@ export const devInvestigationSubmitSchema = devInvestigationSchema.superRefine(
     if (!v.method) need("method", "Choose the analysis tool.");
   },
 );
+
+/* ── A non-conformance's actions (migration 0077) ─────────────────────── */
+
+/**
+ * The disposition — QA's decision on the non-conforming material or product,
+ * and what that decision needs. `ncrDispositionSignSchema` demands it all,
+ * as `ncr_disposition_missing()` does before `sign_ncr_disposition`.
+ */
+export const ncrDispositionSchema = z.object({
+  disposition: z.union([
+    z.enum(["use_as_is", "sort", "rework", "destroy", "return"]),
+    z.literal(""),
+  ]),
+  concessionScope: optional(300),
+  dispositionReason: optional(1000),
+  concession: z.union([z.enum(["not_needed", "customer"]), z.literal("")]),
+  concessionRef: optional(200),
+  sortRef: optional(200),
+  sortAccepted: optional(80),
+  sortRejected: optional(80),
+  reworkInstruction: optional(300),
+  retest: z.union([z.enum(["Pass", "Fail"]), z.literal("")]),
+});
+
+export type NcrDispositionValues = z.infer<typeof ncrDispositionSchema>;
+
+export const ncrDispositionSignSchema = ncrDispositionSchema.superRefine((v, ctx) => {
+  const need = (path: keyof NcrDispositionValues, message: string) =>
+    ctx.addIssue({ code: "custom", path: [path], message });
+  if (!v.disposition) need("disposition", "Choose the disposition.");
+  if (v.disposition === "use_as_is") {
+    if (!v.concessionScope) need("concessionScope", "Which lot and how much.");
+    if (!v.dispositionReason) need("dispositionReason", "Say why it can be used as is.");
+    if (!v.concession) need("concession", "Is a customer concession needed?");
+    if (v.concession === "customer" && !v.concessionRef) {
+      need("concessionRef", "Give the customer's approval reference.");
+    }
+  }
+  if (v.disposition === "sort") {
+    if (!v.sortRef) need("sortRef", "Give the sorting record.");
+    if (!v.sortAccepted) need("sortAccepted", "How many were accepted?");
+    if (!v.sortRejected) need("sortRejected", "How many were rejected?");
+  }
+  if (v.disposition === "rework") {
+    if (!v.reworkInstruction) need("reworkInstruction", "Give the rework instruction.");
+    if (v.retest === "Fail") {
+      need("retest", "The re-test failed — choose Reject or Return to supplier.");
+    } else if (v.retest !== "Pass") {
+      need("retest", "Record the re-test result.");
+    }
+  }
+});
+
+/** "" or `YYYY-MM-DD`. */
+const day = z
+  .string()
+  .trim()
+  .regex(/^(\d{4}-\d{2}-\d{2})?$/, "Pick a date.");
+
+/**
+ * A material's supplier (or, client-supplied, customer) follow-up. Saved as
+ * it is filled; closing needs it complete (`ncr_supplier_missing()`).
+ */
+export const ncrSupplierSchema = z
+  .object({
+    notifiedOn: day,
+    claim: optional(200),
+    scar: yesNo,
+    scarNotReason: optional(400),
+    scarRef: optional(80),
+    scarDue: day,
+    scarReplyOn: day,
+    scarAccepted: yesNo,
+    tightened: yesNo,
+    tightenedLots: optional(80),
+  });
+
+export type NcrSupplierValues = z.infer<typeof ncrSupplierSchema>;
+
+/** A finished-product NCR: the customer (brand owner) told, or why not. */
+export const ncrCustomerSchema = z.object({
+  notify: z.union([z.enum(["yes", "not_needed"]), z.literal("")]),
+  notifiedOn: day,
+  reason: optional(400),
+});
+
+export type NcrCustomerValues = z.infer<typeof ncrCustomerSchema>;
+
+/** Closing an NCR as not a non-conformance — the reason. */
+export const notACaseSchema = z.object({
+  reason: z
+    .string()
+    .trim()
+    .min(5, "Say why this is not a non-conformance.")
+    .max(1000, "Keep it under 1000 characters."),
+});
+
+export type NotACaseValues = z.infer<typeof notACaseSchema>;
 
 /* ── Attachments (migration 0064) ─────────────────────────────────────── */
 

@@ -105,7 +105,7 @@ export function PendingAttachments({
         <span className="text-xs text-ink-5">
           Optional · PDF, images, Word, Excel, CSV or text · up to{" "}
           {formatBytes(ATTACHMENT_MAX_BYTES)} each, {MAX_FILES} in all · uploaded
-          when the deviation is raised
+          when the case is raised
         </span>
       </div>
     </section>

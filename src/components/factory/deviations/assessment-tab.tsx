@@ -48,14 +48,30 @@ import {
   signAssessment,
   type Deviation,
 } from "@/lib/factory/deviation-queries";
+import {
+  NCR_CATEGORIES,
+  NCR_RED_FLAGS,
+  NCR_SEVERITY,
+  NCR_SEVERITY_EXAMPLES,
+  NCR_SEVERITY_ROWS,
+  forcedInvestigation,
+  isMaterialItem,
+} from "@/lib/factory/ncr";
+import { NotACaseButton } from "@/components/factory/deviations/ncr-not-a-case";
 import { dueDaysFor, useQualitySettings } from "@/lib/factory/quality-settings-queries";
 import { useForm } from "@/lib/use-form";
 import { cn } from "@/lib/utils";
 
-const SEVERITY_OPTIONS = DEV_SEVERITY.map((label, i) => ({
-  value: String(i + 1),
-  label: `${i + 1} — ${label}`,
-}));
+/** The severity wording, the examples and the table's rows — a deviation's or an NCR's. */
+function scaleFor(ncr: boolean) {
+  const labels: readonly string[] = ncr ? NCR_SEVERITY : DEV_SEVERITY;
+  return {
+    labels,
+    examples: (ncr ? NCR_SEVERITY_EXAMPLES : DEV_SEVERITY_EXAMPLES) as readonly string[],
+    rows: (ncr ? NCR_SEVERITY_ROWS : SEVERITY_ROWS) as readonly string[],
+    options: labels.map((label, i) => ({ value: String(i + 1), label: `${i + 1} — ${label}` })),
+  };
+}
 
 /** The severity and detection scales of an assessment signed before 0068. */
 const LEGACY_SEVERITY = [
@@ -99,7 +115,9 @@ function caseHref(slug: string, c: Deviation): string {
   if (c.type === "planned" || c.type === "unplanned") {
     return `/factory/${slug}/deviations/${c.id}`;
   }
-  return `/factory/${slug}/deviations?tab=${c.type === "ncr" ? "ncr" : "complaints"}&case=${c.id}`;
+  // An NCR's page sends an older one on to its dialog.
+  if (c.type === "ncr") return `/factory/${slug}/deviations/${c.id}?tab=ncr`;
+  return `/factory/${slug}/deviations?tab=complaints&case=${c.id}`;
 }
 
 /** What the previous-case search looks through. */
@@ -114,6 +132,9 @@ function haystack(c: Deviation): string {
     c.batch_no,
     c.raw_material_code,
     c.raw_material_name,
+    c.material_code,
+    c.supplier_lots.join(" "),
+    c.supplier_name,
     c.equipment_no,
     c.equipment_name,
     c.root_cause,
@@ -208,6 +229,10 @@ function AssessmentForm({
   const [saving, setSaving] = useState(false);
 
   const values = useWatch({ control }) as AssessmentValues;
+  const ncr = deviation.type === "ncr";
+  const forced = forcedInvestigation(deviation);
+  const scale = scaleFor(ncr);
+  const flagList: readonly string[] = ncr ? NCR_RED_FLAGS : RED_FLAGS;
   const flags = values.redFlags ?? [];
   const sev = values.severity ? Number(values.severity) : null;
   const lik = values.likelihood ? Number(values.likelihood) : null;
@@ -310,16 +335,37 @@ function AssessmentForm({
 
       <Section title="Category and owner">
         <div className="grid gap-x-6 gap-y-5 md:grid-cols-2">
-          <Field label="Category" htmlFor="as-category" required error={errors.category?.message}>
+          <Field
+            label={ncr ? "Defect type" : "Category"}
+            htmlFor="as-category"
+            required
+            error={errors.category?.message}
+          >
             <SelectControl
               control={control}
               name="category"
               id="as-category"
               placeholder="Select…"
               invalid={Boolean(errors.category)}
-              options={NC_CATEGORIES.map((c) => ({ value: c, label: c }))}
+              options={(ncr ? NCR_CATEGORIES : NC_CATEGORIES).map((c) => ({ value: c, label: c }))}
             />
           </Field>
+          {ncr && values.category === "Other" && (
+            <Field
+              label="Describe the defect"
+              htmlFor="as-category-other"
+              required
+              error={errors.categoryOther?.message}
+            >
+              <input
+                id="as-category-other"
+                placeholder="e.g. Wrong pallet configuration"
+                aria-invalid={Boolean(errors.categoryOther)}
+                className={CONTROL}
+                {...register("categoryOther")}
+              />
+            </Field>
+          )}
           <Field label="Case owner" htmlFor="as-owner" required error={errors.ownerName?.message}>
             <input
               id="as-owner"
@@ -333,16 +379,25 @@ function AssessmentForm({
             label="Investigation required?"
             required
             error={errors.investigationRequired?.message}
+            hint={
+              forced
+                ? "Required: found after receipt, so batches may already contain the material."
+                : undefined
+            }
           >
-            <Segmented
-              control={control}
-              name="investigationRequired"
-              label="Investigation required?"
-              options={[
-                { value: "yes", label: "Yes" },
-                { value: "no", label: "No" },
-              ]}
-            />
+            {forced ? (
+              <p className="flex h-9 items-center text-sm font-semibold text-ink">Yes</p>
+            ) : (
+              <Segmented
+                control={control}
+                name="investigationRequired"
+                label="Investigation required?"
+                options={[
+                  { value: "yes", label: "Yes" },
+                  { value: "no", label: "No" },
+                ]}
+              />
+            )}
           </Field>
           {values.investigationRequired === "no" ? (
             <Field
@@ -354,7 +409,11 @@ function AssessmentForm({
               <textarea
                 id="as-inv-why"
                 rows={2}
-                placeholder="e.g. Documentation slip, corrected at the time"
+                placeholder={
+                  ncr
+                    ? "e.g. CoA typo only — material tested and meets specification"
+                    : "e.g. Documentation slip, corrected at the time"
+                }
                 className={AREA}
                 {...register("investigationNotRequiredReason")}
               />
@@ -372,8 +431,8 @@ function AssessmentForm({
             control={control}
             render={({ field }) => (
               <div className="flex flex-wrap gap-2">
-                {RED_FLAGS.map((f) => {
-                  const on = field.value.includes(f);
+                {flagList.map((f) => {
+                  const on = (field.value as readonly string[]).includes(f);
                   return (
                     <label
                       key={f}
@@ -390,7 +449,7 @@ function AssessmentForm({
                         onChange={() => {
                           const next = on
                             ? field.value.filter((x) => x !== f)
-                            : [...field.value, f];
+                            : [...field.value, f as (typeof field.value)[number]];
                           field.onChange(next);
                           // A red flag is severity 5 — the database says so too.
                           if (next.length > 0) {
@@ -417,6 +476,10 @@ function AssessmentForm({
         )}
       </Section>
 
+      {ncr && isMaterialItem(deviation.nc_item) && (
+        <SupplierHistory form={form} deviation={deviation} cases={cases} slug={slug} />
+      )}
+
       <Section title="Risk">
         <div className="grid gap-y-5">
           <Field
@@ -428,7 +491,7 @@ function AssessmentForm({
               flags.length > 0
                 ? "Set to 5 by the red flag above. Untick the red flag to change it."
                 : sev
-                  ? DEV_SEVERITY_EXAMPLES[sev - 1]
+                  ? scale.examples[sev - 1]
                   : "Pick the outcome for the product, not the cause. The key question: was it contained before release (3) or did it reach the market (4)?"
             }
           >
@@ -444,7 +507,7 @@ function AssessmentForm({
                   disabled={flags.length > 0}
                   placeholder="Select…"
                   ariaInvalid={Boolean(errors.severity)}
-                  options={SEVERITY_OPTIONS}
+                  options={scale.options}
                 />
               )}
             />
@@ -521,7 +584,7 @@ function AssessmentForm({
         </div>
 
         <div className="mt-6">
-          <RiskMatrix severity={sev} likelihood={lik} />
+          <RiskMatrix severity={sev} likelihood={lik} rows={scale.rows} />
         </div>
 
         <div className="mt-6 grid gap-x-6 gap-y-5 md:grid-cols-2">
@@ -634,6 +697,13 @@ function AssessmentForm({
         <span className="text-[0.8125rem] text-ink-4">
           Signed as {viewerName || "you"}
         </span>
+        {ncr && (
+          <NotACaseButton
+            deviation={deviation}
+            factoryId={factoryId}
+            viewerName={viewerName}
+          />
+        )}
       </div>
     </form>
   );
@@ -816,6 +886,106 @@ function LikelihoodEvidence({
   );
 }
 
+/**
+ * Supplier history (qms-v12): the other NCRs for the same supplier or the same
+ * material in the last 24 months, each with "Same problem" to add it to the
+ * likelihood evidence below.
+ */
+function SupplierHistory({
+  form,
+  deviation: d,
+  cases,
+  slug,
+}: {
+  form: UseFormReturn<AssessmentValues>;
+  deviation: Deviation;
+  cases: Deviation[];
+  slug: string;
+}) {
+  const { control, setValue, getValues, formState } = form;
+  const previous = useWatch({ control, name: "previousCases" });
+  const picked = new Set(previous.map((p) => p.id));
+  const from = new Date(d.created_at).getTime();
+  const same = (a: string | null, b: string | null) =>
+    Boolean(a && b && a.trim().toLowerCase() === b.trim().toLowerCase());
+  const rows = cases
+    .filter(
+      (c) =>
+        c.id !== d.id &&
+        c.type === "ncr" &&
+        (same(c.supplier_name, d.supplier_name) || same(c.material_code, d.material_code)) &&
+        Math.abs(from - new Date(c.created_at).getTime()) <=
+          PREVIOUS_WINDOW_MONTHS * 30.4 * DAY_MS,
+    )
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+
+  function pick(c: Deviation) {
+    const opts = { shouldDirty: true, shouldValidate: formState.isSubmitted };
+    const next = [...getValues("previousCases"), { id: c.id, raisedAt: c.created_at }];
+    setValue("previousCases", next, opts);
+    setValue("noPreviousFound", false, opts);
+    const suggested = suggestedLikelihood(d.created_at, next);
+    if (Number(getValues("likelihood") || 0) < suggested) {
+      setValue("likelihood", String(suggested) as AssessmentValues["likelihood"], opts);
+    }
+  }
+
+  return (
+    <Section title="Supplier history">
+      <p className="-mt-2 mb-3 text-sm text-ink-4">
+        {[d.supplier_name, d.material_code].filter(Boolean).join(" · ")} · last{" "}
+        {PREVIOUS_WINDOW_MONTHS} months
+      </p>
+      {rows.length === 0 ? (
+        <p className="text-sm text-ink-5">No other NCRs for this supplier or material.</p>
+      ) : (
+        <>
+          <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line">
+            {rows.map((c) => (
+              <li
+                key={c.id}
+                className="flex items-center justify-between gap-4 bg-surface px-3.5 py-2.5"
+              >
+                <span className="min-w-0 text-sm text-ink-2">
+                  <Link
+                    href={caseHref(slug, c)}
+                    target="_blank"
+                    rel="noopener"
+                    className="mr-2 font-mono text-brand hover:underline"
+                  >
+                    {c.deviation_no}
+                  </Link>
+                  {c.title}
+                  <span className="block text-xs text-ink-5">
+                    {c.supplier_name ?? "—"} · {c.material_code ?? "—"} · lot{" "}
+                    {c.supplier_lots.length > 0 ? c.supplier_lots.join(", ") : "—"} ·{" "}
+                    {formatDay(c.created_at)}
+                  </span>
+                </span>
+                {picked.has(c.id) ? (
+                  <span className="shrink-0 text-xs text-ink-5">Picked as previous case</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => pick(c)}
+                    className="shrink-0 rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink-3 transition hover:border-brand hover:text-brand"
+                  >
+                    Same problem
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-[0.6875rem] text-ink-5">
+            Same supplier or same material. “Same problem” adds it to the
+            likelihood evidence below.
+          </p>
+        </>
+      )}
+    </Section>
+  );
+}
+
 /** A case as one line: number (opens it in a new tab), title, products, date. */
 function CaseLine({
   c,
@@ -853,9 +1023,12 @@ function CaseLine({
 function RiskMatrix({
   severity,
   likelihood,
+  rows = SEVERITY_ROWS,
 }: {
   severity: number | null;
   likelihood: number | null;
+  /** The rows' labels — a deviation's or an NCR's wording. */
+  rows?: readonly string[];
 }) {
   const row = severity ? severityRow(severity) : null;
   return (
@@ -873,7 +1046,7 @@ function RiskMatrix({
           </tr>
         </thead>
         <tbody>
-          {SEVERITY_ROWS.map((label, r) => (
+          {rows.map((label, r) => (
             <tr key={label}>
               <td className="px-3 py-2 text-xs text-ink-3">{label}</td>
               {RISK_MATRIX[r].map((cls, l) => {
@@ -913,6 +1086,8 @@ function AssessmentFacts({
 }) {
   const byId = new Map(cases.map((c) => [c.id, c]));
   const legacy = isLegacyRisk(d);
+  const ncr = d.type === "ncr";
+  const scale = scaleFor(ncr);
   return (
     <div className="space-y-7">
       {d.assessed_at ? (
@@ -930,7 +1105,11 @@ function AssessmentFacts({
       )}
       <Section title="Category and owner">
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
-          <Fact label="Category">{d.nc_category ?? <Muted>—</Muted>}</Fact>
+          <Fact label={ncr ? "Defect type" : "Category"}>
+            {d.nc_category === "Other" && d.category_other
+              ? `Other — ${d.category_other}`
+              : (d.nc_category ?? <Muted>—</Muted>)}
+          </Fact>
           <Fact label="Case owner">{d.owner_name ?? <Muted>—</Muted>}</Fact>
           <Fact label="Investigation required">
             {d.investigation_required === null ? (
@@ -959,7 +1138,7 @@ function AssessmentFacts({
             <dl className="grid gap-3">
               <Fact label="Severity" wide>
                 {d.severity ? (
-                  `${d.severity} — ${DEV_SEVERITY[d.severity - 1]}`
+                  `${d.severity} — ${scale.labels[d.severity - 1]}`
                 ) : (
                   <Muted>—</Muted>
                 )}
@@ -991,7 +1170,7 @@ function AssessmentFacts({
               )}
             </dl>
             <div className="mt-5">
-              <RiskMatrix severity={d.severity} likelihood={d.likelihood} />
+              <RiskMatrix severity={d.severity} likelihood={d.likelihood} rows={scale.rows} />
             </div>
             <div className="mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line lg:grid-cols-3">
               <Out label="Risk (severity · likelihood)">

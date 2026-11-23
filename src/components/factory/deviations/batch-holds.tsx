@@ -13,12 +13,14 @@ import {
 } from "@/components/factory/deviations/deviation-fields";
 import { formatDateTime, formatDay } from "@/lib/factory/dates";
 import { deviationKeys, type Deviation } from "@/lib/factory/deviation-queries";
+import { isMaterialItem, parseLots } from "@/lib/factory/ncr";
 import {
   HOLD_STATUS_LABEL,
   decideHold,
   fetchHolds,
   holdKeys,
   placeHolds,
+  placeLots,
   type BatchHold,
 } from "@/lib/factory/hold-queries";
 import { pipelineKeys } from "@/lib/factory/pipeline-queries";
@@ -44,6 +46,11 @@ export function splitBatches(text: string): string[] {
  * why it is safe while the case stays open, or **reject** it — once the
  * impact is assessed. More batches can be put on hold while the case is open.
  * The case cannot close while one is still on hold.
+ *
+ * On a raw or packaging material NCR (0076) it is the **lot quarantine**: each
+ * supplier lot on its own row, labelled "Quarantine — do not use" and
+ * released or rejected only by the disposition (Actions); the batch the
+ * material was found in is held beside it and decided here as usual.
  */
 export function BatchHolds({
   deviation: d,
@@ -75,6 +82,9 @@ export function BatchHolds({
       queryClient.invalidateQueries({ queryKey: pipelineKeys.all(factoryId) }),
     ]);
 
+  // A material NCR quarantines lots; everything else holds batches.
+  const material = d.type === "ncr" && isMaterialItem(d.nc_item);
+
   const needsImpact =
     d.investigation_required !== false && !(d.impact ?? "").trim();
 
@@ -90,18 +100,24 @@ export function BatchHolds({
 
   return (
     <section className="space-y-3">
-      <h3 className="text-base font-semibold text-ink">Batch holds</h3>
+      <h3 className="text-base font-semibold text-ink">
+        {material ? "Lot quarantine" : "Batch holds"}
+      </h3>
 
       {isPending ? (
         <Loader2 className="size-4 animate-spin text-ink-5" />
       ) : holds.length === 0 ? (
-        <p className="text-sm text-ink-5">No batches on hold.</p>
+        <p className="text-sm text-ink-5">
+          {material ? "No lots in quarantine." : "No batches on hold."}
+        </p>
       ) : (
         <div className="scrollbar-slim overflow-x-auto rounded-xl border border-line">
           <table className="w-full min-w-[40rem] text-sm">
             <thead className="bg-sunken text-left text-xs text-ink-4">
               <tr>
-                <th className="px-3.5 py-2 font-semibold">Batch</th>
+                <th className="px-3.5 py-2 font-semibold">
+                  {material ? "Lot / batch" : "Batch"}
+                </th>
                 <th className="px-3.5 py-2 font-semibold">Status</th>
                 <th className="px-3.5 py-2 font-semibold">Placed</th>
                 <th className="px-3.5 py-2 font-semibold">Decision</th>
@@ -113,6 +129,7 @@ export function BatchHolds({
                 <HoldRow
                   key={h.id}
                   hold={h}
+                  labelKind={material}
                   canDecide={canDecide}
                   deciding={deciding?.id === h.id ? deciding.decision : null}
                   onStart={(decision) => startDecision(h, decision)}
@@ -138,16 +155,25 @@ export function BatchHolds({
       {canDecide &&
         (adding ? (
           <AddHold
+            lot={material}
             onCancel={() => setAdding(false)}
-            onAdd={async (batches) => {
-              const n = await placeHolds(d.id, batches, viewerName);
+            onAdd={async (items) => {
+              const n = material
+                ? await placeLots(d.id, items, viewerName)
+                : await placeHolds(d.id, items, viewerName);
               await refresh();
               toast.success(
                 n === 0
-                  ? "Already on hold."
-                  : n === 1
-                    ? "Hold placed."
-                    : `${n} holds placed.`,
+                  ? material
+                    ? "Already in quarantine."
+                    : "Already on hold."
+                  : material
+                    ? n === 1
+                      ? "Lot quarantined."
+                      : `${n} lots quarantined.`
+                    : n === 1
+                      ? "Hold placed."
+                      : `${n} holds placed.`,
               );
               setAdding(false);
             }}
@@ -158,7 +184,7 @@ export function BatchHolds({
             onClick={() => setAdding(true)}
             className="inline-flex h-9 items-center rounded-lg border border-line bg-surface px-3.5 text-sm font-semibold text-ink-3 shadow-soft transition hover:border-brand hover:text-brand"
           >
-            Put a batch on hold
+            {material ? "Quarantine a lot" : "Put a batch on hold"}
           </button>
         ))}
     </section>
@@ -167,6 +193,7 @@ export function BatchHolds({
 
 function HoldRow({
   hold: h,
+  labelKind,
   canDecide,
   deciding,
   onStart,
@@ -175,6 +202,8 @@ function HoldRow({
   investigationPending,
 }: {
   hold: BatchHold;
+  /** Say "Lot" or "Batch" before the number — a material NCR mixes both. */
+  labelKind: boolean;
   canDecide: boolean;
   deciding: "released" | "rejected" | null;
   onStart: (decision: "released" | "rejected") => void;
@@ -185,7 +214,14 @@ function HoldRow({
   return (
     <>
       <tr className="align-top">
-        <td className="px-3.5 py-2.5 font-mono">{h.batch_no}</td>
+        <td className="px-3.5 py-2.5 font-mono">
+          {labelKind && (
+            <span className="font-sans text-ink-4">
+              {h.kind === "lot" ? "Lot " : "Batch "}
+            </span>
+          )}
+          {h.batch_no}
+        </td>
         <td className={cn("px-3.5 py-2.5", STATUS_TEXT[h.status])}>
           {HOLD_STATUS_LABEL[h.status]}
         </td>
@@ -204,7 +240,10 @@ function HoldRow({
         </td>
         {canDecide && (
           <td className="whitespace-nowrap px-3.5 py-2.5 text-right">
-            {h.status === "on_hold" && !deciding && (
+            {h.status === "on_hold" && h.kind === "lot" && (
+              <span className="text-xs text-ink-5">By the disposition</span>
+            )}
+            {h.status === "on_hold" && h.kind !== "lot" && !deciding && (
               <>
                 <button
                   type="button"
@@ -332,9 +371,12 @@ export function DecisionForm({
 }
 
 function AddHold({
+  lot,
   onCancel,
   onAdd,
 }: {
+  /** Quarantine supplier lots, not batches. */
+  lot: boolean;
   onCancel: () => void;
   onAdd: (batches: string[]) => Promise<void>;
 }) {
@@ -342,14 +384,14 @@ function AddHold({
   const [busy, setBusy] = useState(false);
 
   async function submit() {
-    const batches = splitBatches(text);
-    if (batches.length === 0) {
-      toast.error("Name the batch to put on hold.");
+    const items = lot ? parseLots(text) : splitBatches(text);
+    if (items.length === 0) {
+      toast.error(lot ? "Name the lot to quarantine." : "Name the batch to put on hold.");
       return;
     }
     setBusy(true);
     try {
-      await onAdd(batches);
+      await onAdd(items);
     } catch (e) {
       toast.error((e as Error).message);
       setBusy(false);
@@ -359,24 +401,26 @@ function AddHold({
   return (
     <div className="space-y-2.5 rounded-xl border border-line bg-sunken p-3.5">
       <label htmlFor="hold-add" className="block text-sm font-semibold text-ink-2">
-        Batch number(s), separated by commas
+        {lot ? "Lot number(s), separated by commas" : "Batch number(s), separated by commas"}
       </label>
       <input
         id="hold-add"
+        autoFocus
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder="e.g. 46690, 46691"
+        placeholder={lot ? "e.g. CT-903, CT-904" : "e.g. 46690, 46691"}
         autoComplete="off"
-        className={CONTROL}
+        className={cn(CONTROL, "font-mono")}
       />
       <p className="text-xs text-ink-5">
-        Each batch must be in the product register. Its card goes On hold and
-        the shift log refuses preparatory and production work against it.
+        {lot
+          ? "Each lot is labelled “Quarantine — do not use” and cannot be issued until QA records the disposition."
+          : "Each batch must be in the product register. Its card goes On hold and the shift log refuses preparatory and production work against it."}
       </p>
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={submit} disabled={busy} className={PRIMARY_BUTTON}>
           {busy && <Loader2 className="size-4 animate-spin" />}
-          Put on hold
+          {lot ? "Quarantine" : "Put on hold"}
         </button>
         <button type="button" onClick={onCancel} disabled={busy} className={SECONDARY_BUTTON}>
           Cancel

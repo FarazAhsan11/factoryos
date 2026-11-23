@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
   Building2,
@@ -30,6 +30,7 @@ import {
 import { DevInvestigationTab } from "@/components/factory/deviations/dev-investigation-tab";
 import { CaseHistory } from "@/components/factory/deviations/case-history";
 import { InitiationTab } from "@/components/factory/deviations/deviation-tab-forms";
+import { NcrCompleteDetails } from "@/components/factory/deviations/ncr-complete-details";
 import { canReview } from "@/lib/factory/action-queries";
 import type { FactoryRole } from "@/lib/factory/context";
 import { capaKeys, fetchCapas, stepLabel, type Capa } from "@/lib/factory/capa-queries";
@@ -39,6 +40,8 @@ import {
   devRiskLabel,
   devStage,
   deviationKeys,
+  ncrNeedsDetails,
+  typeActsDone,
   fetchDeviations,
   nextStep,
   typeMeta,
@@ -46,6 +49,7 @@ import {
   type Deviation,
 } from "@/lib/factory/deviation-queries";
 import { fetchHolds, holdKeys } from "@/lib/factory/hold-queries";
+import { isMaterialItem, partyWord } from "@/lib/factory/ncr";
 import { useQualitySettings } from "@/lib/factory/quality-settings-queries";
 import { cn } from "@/lib/utils";
 
@@ -74,6 +78,16 @@ function resolveSection(value: string | null): CaseSection {
 function sectionState(d: Deviation, id: CaseSection): "ok" | "na" | "todo" | null {
   switch (id) {
     case "details":
+      if (d.type === "ncr") {
+        return d.occurred_at &&
+          d.department_id &&
+          d.detection_point &&
+          (d.specification ?? "").trim() &&
+          (d.immediate_action ?? "").trim() &&
+          d.hold_batch !== null
+          ? "ok"
+          : "todo";
+      }
       return d.occurred_at &&
         d.department_id &&
         d.detection_point &&
@@ -87,8 +101,9 @@ function sectionState(d: Deviation, id: CaseSection): "ok" | "na" | "todo" | nul
       if (d.investigation_required === false) return "na";
       return d.investigation_approved_at ? "ok" : "todo";
     case "actions":
-      return d.capa_needed === false ||
-        (d.capa_needed && Boolean(d.capa_plan_approved_at))
+      return (d.capa_needed === false ||
+        (d.capa_needed && Boolean(d.capa_plan_approved_at))) &&
+        typeActsDone(d)
         ? "ok"
         : "todo";
     case "closeout":
@@ -175,21 +190,36 @@ export function DeviationCasePage({
       </p>
     );
   }
-  if (!d || (d.type !== "planned" && d.type !== "unplanned")) {
+  // A deviation, or an NCR raised on the qms-v12 form (0076). An NCR raised
+  // before, and a complaint, open in the case dialog on the register — a
+  // link here sends them on to it.
+  if (d && d.type === "complaint") {
+    return <LegacyRedirect href={`${listHref}?tab=complaints&case=${d.id}`} />;
+  }
+  if (!d) {
     return (
       <div className="rounded-2xl border border-dashed border-line-strong px-4 py-16 text-center">
-        <p className="text-sm text-ink-3">This deviation could not be found.</p>
+        <p className="text-sm text-ink-3">This case could not be found.</p>
         <Link href={listHref} className="mt-2 inline-block text-sm text-brand hover:underline">
-          Back to Deviations
+          Back to the register
         </Link>
       </div>
     );
   }
 
+  const ncr = d.type === "ncr";
+  const material = ncr && isMaterialItem(d.nc_item);
+  const registerHref = ncr ? `${listHref}?tab=ncr` : listHref;
+
   const reviewer = canReview(role);
   const open = d.status === "open";
   const next = nextStep(d);
-  const onHold = holds.filter((h) => h.status === "on_hold").map((h) => h.batch_no);
+  const onHold = holds
+    .filter((h) => h.status === "on_hold" && h.kind === "batch")
+    .map((h) => h.batch_no);
+  const lotsHeld = holds
+    .filter((h) => h.status === "on_hold" && h.kind === "lot")
+    .map((h) => h.batch_no);
   const released = holds.filter((h) => h.status === "released").map((h) => h.batch_no);
   const pendingExtension = extensions.find((e) => e.status === "requested") ?? null;
 
@@ -197,15 +227,15 @@ export function DeviationCasePage({
     <div className="mx-auto w-full max-w-[1600px]">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <nav aria-label="Breadcrumb" className="text-sm text-ink-4">
-          <Link href={listHref} className="text-brand hover:underline">
-            Deviations
+          <Link href={registerHref} className="text-brand hover:underline">
+            {ncr ? "Non-conformances" : "Deviations"}
           </Link>
           <span className="mx-1.5 text-ink-5">/</span>
           <span className="font-mono">{d.deviation_no}</span>
         </nav>
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
           <Link
-            href={`${listHref}/${d.id}/print`}
+            href={`${listHref}/${d.id}/print${ncr ? "?tab=ncr" : ""}`}
             className="inline-flex items-center gap-1.5 text-sm font-medium text-brand hover:underline"
           >
             <Printer className="size-4" />
@@ -256,7 +286,15 @@ export function DeviationCasePage({
               )}
             </div>
           )}
-          {open && onHold.length > 0 ? (
+          {open && material && lotsHeld.length > 0 ? (
+            <p className="rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-deep">
+              Lot {lotsHeld.join(", ")} in quarantine — labelled “Quarantine —
+              do not use”; it cannot be issued until QA records the disposition
+              (Actions).
+              {onHold.length > 0 &&
+                ` Batch ${onHold.join(", ")} on hold — production work is blocked in the shift log.`}
+            </p>
+          ) : open && onHold.length > 0 ? (
             <p className="rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-deep">
               Batch {onHold.join(", ")} on hold — preparatory and production work
               is blocked in the shift log. QA can release it once the impact is
@@ -333,11 +371,15 @@ export function DeviationCasePage({
           <LockedBanner deviation={d} section={section} className="mb-6" />
           {section === "details" && (
             <div className="space-y-8">
-              <InitiationTab
-                deviation={d}
-                factoryId={factoryId}
-                readOnly={!open || !reviewer}
-              />
+              {reviewer && ncrNeedsDetails(d) ? (
+                <NcrCompleteDetails deviation={d} factoryId={factoryId} viewerName={viewerName} />
+              ) : (
+                <InitiationTab
+                  deviation={d}
+                  factoryId={factoryId}
+                  readOnly={!open || !reviewer}
+                />
+              )}
               <div className="border-t border-line-soft pt-6">
                 <BatchHolds
                   deviation={d}
@@ -392,7 +434,19 @@ export function DeviationCasePage({
               userId={userId}
             />
           )}
-          {section === "closeout" && (
+          {section === "closeout" && d.not_case_reason && (
+            <div className="space-y-3">
+              <p className="flex items-center gap-2 rounded-xl border border-teal-line bg-teal-soft px-4 py-3 text-sm text-teal-deep">
+                <Check className="size-4 shrink-0" />
+                Closed — not a non-conformance, by {d.qa_sign_name ?? "—"}
+                {d.closed_at && ` · ${formatDateTime(d.closed_at)}`}
+              </p>
+              <p className="rounded-xl border border-line-soft bg-sunken px-4 py-3 text-sm text-ink-3">
+                Reason: {d.not_case_reason}
+              </p>
+            </div>
+          )}
+          {section === "closeout" && !d.not_case_reason && (
             <DevCloseOutTab
               deviation={d}
               factoryId={factoryId}
@@ -416,6 +470,19 @@ export function DeviationCasePage({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** An older NCR or a complaint: on to its case dialog on the register. */
+function LegacyRedirect({ href }: { href: string }) {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace(href);
+  }, [router, href]);
+  return (
+    <div className="grid place-items-center py-24">
+      <Loader2 className="size-6 animate-spin text-ink-5" />
     </div>
   );
 }
@@ -553,8 +620,13 @@ export function CaseHeader({
             {d.deviation_no}
           </span>
           <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", type.pill)}>
-            {type.short} deviation
+            {d.type === "ncr" ? "Non-conformance" : `${type.short} deviation`}
           </span>
+          {d.type === "ncr" && d.nc_item && (
+            <span className="rounded-full bg-sunken-2 px-2 py-0.5 text-xs font-semibold text-ink-3">
+              {d.nc_item === "Other" ? (d.nc_item_other ?? "Other") : d.nc_item}
+            </span>
+          )}
           {!open && (
             <span className="rounded-full bg-sunken-2 px-2 py-0.5 text-xs font-semibold text-ink-4">
               Closed
@@ -575,8 +647,24 @@ export function CaseHeader({
             )}
           </MetaItem>
           {d.occurred_at && (
-            <MetaItem icon={Clock} label="Happened">
+            <MetaItem icon={Clock} label={d.type === "ncr" ? "Found" : "Happened"}>
               {formatDay(d.occurred_at)}
+            </MetaItem>
+          )}
+          {d.material_code && (
+            <MetaItem icon={Package} label="Material">
+              <span className="font-mono text-ink-3">{d.material_code}</span>
+              {d.supplier_lots.length > 0 && (
+                <span className="text-ink-5">
+                  {" "}· lot <span className="font-mono">{d.supplier_lots.join(", ")}</span>
+                </span>
+              )}
+              {d.supplier_name && (
+                <span className="text-ink-5">
+                  {" "}· {d.supplier_name}
+                  {d.supplied_by === "customer" && ` (${partyWord(d.supplied_by)})`}
+                </span>
+              )}
             </MetaItem>
           )}
           {d.department_name && (

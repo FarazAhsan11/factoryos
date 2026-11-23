@@ -60,6 +60,7 @@ import {
   scaleLabel,
   type Deviation,
 } from "@/lib/factory/deviation-queries";
+import { isMaterialItem, isProductItem } from "@/lib/factory/ncr";
 import { pipelineKeys } from "@/lib/factory/pipeline-queries";
 import { useWorkers } from "@/lib/factory/worker-queries";
 import { useForm } from "@/lib/use-form";
@@ -114,6 +115,10 @@ export function InitiationTab({
   // NCRs and complaints keep their editable form.
   if (deviation.type === "planned" || deviation.type === "unplanned") {
     return <DeviationInitiationFacts deviation={deviation} />;
+  }
+  // So is every NCR — raised on the qms-v12 form (0076), or brought onto it (0078).
+  if (deviation.type === "ncr") {
+    return <NcrInitiationFacts deviation={deviation} />;
   }
   return (
     <CaseInitiationTab
@@ -201,6 +206,87 @@ function DeviationInitiationFacts({ deviation }: { deviation: Deviation }) {
           <Fact label="Raised by">
             {deviation.raised_by ?? <Muted>—</Muted>}
           </Fact>
+        </dl>
+      </Group>
+    </div>
+  );
+}
+
+/** An NCR's raise answers (qms-v12), read-only, in the raise form's order. */
+function NcrInitiationFacts({ deviation: d }: { deviation: Deviation }) {
+  const material = isMaterialItem(d.nc_item);
+  const product = isProductItem(d.nc_item);
+  const party = d.supplied_by === "customer" ? "Customer" : "Supplier";
+  return (
+    <div className="space-y-6">
+      <Group title="Initiation">
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+          <Fact label="Title" wide>
+            {d.title}
+          </Fact>
+          <Fact label="What is non-conforming?">
+            {d.nc_item === "Other" ? `Other — ${d.nc_item_other ?? ""}` : d.nc_item}
+          </Fact>
+          {material && (
+            <>
+              <Fact label="Supplied by">
+                {d.supplied_by === "customer" ? "Customer (client-supplied)" : "Supplier"}
+              </Fact>
+              <Fact label="Material code" mono>
+                {d.material_code ?? <Muted>—</Muted>}
+              </Fact>
+              <Fact label={party}>{d.supplier_name ?? <Muted>—</Muted>}</Fact>
+              <Fact label={`${party} lot number(s)`} mono>
+                {d.supplier_lots.length > 0 ? d.supplier_lots.join(", ") : <Muted>—</Muted>}
+              </Fact>
+            </>
+          )}
+          {(material || product) && (
+            <Fact label={material ? "Affected batch(es)" : "Batches affected"} mono>
+              {d.batch_nos.length > 0 ? d.batch_nos.join(", ") : <Muted>—</Muted>}
+            </Fact>
+          )}
+          {d.product_names.length > 0 && (
+            <Fact label="Products">{d.product_names.join(", ")}</Fact>
+          )}
+          <Fact label="Quantity affected">{d.qty_affected ?? <Muted>—</Muted>}</Fact>
+          <Fact label="Detected at">{d.detection_point ?? <Muted>—</Muted>}</Fact>
+          <Fact label="Date found">
+            {d.occurred_at ? formatDateTime(d.occurred_at) : <Muted>Not recorded</Muted>}
+          </Fact>
+          <Fact label="Department">{d.department_name ?? <Muted>—</Muted>}</Fact>
+          <Fact label="Location">{d.location ?? <Muted>—</Muted>}</Fact>
+          <Fact label="Requirement / specification" wide>
+            {d.specification ?? <Muted>—</Muted>}
+          </Fact>
+          <Fact label="Description of non-conformance" wide>
+            {d.actual}
+          </Fact>
+          <Fact label="Immediate action" wide>
+            {d.immediate_action ?? <Muted>Not recorded</Muted>}
+          </Fact>
+          <Fact label={material ? "Lot quarantined" : "Batch on hold"}>
+            {d.hold_batch === null ? <Muted>Not asked</Muted> : d.hold_batch ? "Yes" : "No"}
+          </Fact>
+          {d.hold_batch === false && (
+            <Fact label="Why not">{d.hold_not_reason ?? <Muted>—</Muted>}</Fact>
+          )}
+          {product && (
+            <Fact label="Equipment">
+              {d.equipment_no ? (
+                <>
+                  <span className="font-mono">{d.equipment_no}</span>
+                  {d.equipment_name && ` · ${d.equipment_name}`}
+                </>
+              ) : (
+                <Muted>—</Muted>
+              )}
+            </Fact>
+          )}
+          <Fact label="Reference document / SOP" mono>
+            {d.sop_number ?? <Muted>—</Muted>}
+          </Fact>
+          <Fact label="Raised by">{d.raised_by ?? <Muted>—</Muted>}</Fact>
         </dl>
       </Group>
     </div>

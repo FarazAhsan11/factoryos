@@ -16,6 +16,12 @@ export interface BatchHold {
   deviation_id: string;
   batch_no: string;
   product_id: string | null;
+  /**
+   * `batch` — a batch in the product register (its card is held), or an NCR
+   * "Other"'s "(no batch)"; `lot` — a supplier's lot in quarantine, released
+   * or rejected only by the NCR's disposition (0076).
+   */
+  kind: "batch" | "lot";
   status: HoldStatus;
   placed_at: string;
   placed_by_name: string | null;
@@ -41,7 +47,7 @@ export async function fetchHolds(deviationId: string): Promise<BatchHold[]> {
   const { data, error } = await supabase
     .from("deviation_batch_holds")
     .select(
-      "id, deviation_id, batch_no, product_id, status, placed_at, placed_by_name, decided_at, decided_by_name, reason",
+      "id, deviation_id, batch_no, product_id, kind, status, placed_at, placed_by_name, decided_at, decided_by_name, reason",
     )
     .eq("deviation_id", deviationId)
     .order("placed_at", { ascending: true })
@@ -61,6 +67,22 @@ export async function placeHolds(
   const { data, error } = await supabase.rpc("place_batch_holds", {
     p_case: deviationId,
     p_batch_nos: batchNos,
+    p_by_name: byName,
+  });
+  if (error) throw new Error(error.message);
+  return (data as number) ?? 0;
+}
+
+/** Quarantine more lots on a material NCR; returns how many were placed. */
+export async function placeLots(
+  deviationId: string,
+  lots: string[],
+  byName: string,
+): Promise<number> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("place_lot_holds", {
+    p_case: deviationId,
+    p_lots: lots,
     p_by_name: byName,
   });
   if (error) throw new Error(error.message);

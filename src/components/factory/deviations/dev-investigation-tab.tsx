@@ -56,6 +56,8 @@ import { pipelineKeys } from "@/lib/factory/pipeline-queries";
 import { fetchProducts, productKeys } from "@/lib/factory/product-queries";
 import { useForm } from "@/lib/use-form";
 import { cn } from "@/lib/utils";
+import { NotACaseButton } from "@/components/factory/deviations/ncr-not-a-case";
+import { LAB_CHECK, NCR_CHECKS, isMaterialItem, requiredChecks } from "@/lib/factory/ncr";
 
 /**
  * A deviation's investigation, as the reference QMS lays it out (qms-v4):
@@ -103,6 +105,12 @@ export function DevInvestigationTab({
   const trained = useWatch({ control, name: "humanTrained" });
   const preventable = useWatch({ control, name: "humanPreventable" });
   const humanHint = proc === "no" || trained === "no" || preventable === "yes";
+  const ncr = d.type === "ncr";
+  const material = ncr && isMaterialItem(d.nc_item);
+  const labRequired = ncr && d.detection_point === "QC testing";
+  const labCheck = useWatch({ control, name: "labCheck" });
+  const checkItems: readonly string[] = ncr ? NCR_CHECKS : CHECKS_REVIEWED;
+  const mustCover = requiredChecks(d);
 
   const refresh = () =>
     queryClient.invalidateQueries({ queryKey: deviationKeys.all(factoryId) });
@@ -197,12 +205,64 @@ export function DevInvestigationTab({
         )}
         className="space-y-7"
       >
+        {labRequired && (
+          <Section title="Laboratory check">
+            <fieldset disabled={locked} className="grid min-w-0 gap-x-6 gap-y-5 md:grid-cols-2">
+              <Field
+                label="Lab error ruled out?"
+                required
+                error={errors.labCheck?.message}
+                hint={
+                  labCheck === "No"
+                    ? undefined
+                    : "Before an out-of-specification result is blamed on the material (FDA OOS guidance, GMP)."
+                }
+              >
+                <Segmented
+                  control={control}
+                  name="labCheck"
+                  label="Lab error ruled out?"
+                  options={LAB_CHECK.map((v) => ({ value: v, label: v }))}
+                />
+              </Field>
+              <Field
+                label="Lab investigation reference"
+                htmlFor="inv-lab-ref"
+                required
+                error={errors.labRef?.message}
+              >
+                <input
+                  id="inv-lab-ref"
+                  placeholder="e.g. OOS-2026-017"
+                  aria-invalid={Boolean(errors.labRef)}
+                  className={cn(CONTROL, "font-mono")}
+                  {...register("labRef")}
+                />
+              </Field>
+            </fieldset>
+            {labCheck === "No" && (
+              <div className="mt-4 space-y-3 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-deep">
+                <p>
+                  A lab error was found: the result is invalid. Close this case
+                  as not a non-conformance.
+                </p>
+                {canEdit &&
+                  (d.lab_check === "No" ? (
+                    <NotACaseButton deviation={d} factoryId={factoryId} viewerName={viewerName} />
+                  ) : (
+                    <p className="text-xs">Save the draft, then close it here.</p>
+                  ))}
+              </div>
+            )}
+          </Section>
+        )}
+
         <Section title="Impact">
           <div className="grid gap-x-6 gap-y-5 md:grid-cols-2">
             {/* Disabled with the rest of the form once submitted or approved. */}
             <fieldset disabled={locked} className="min-w-0">
               <Field
-                label="Other batches affected"
+                label={material ? "Other batches made with this lot" : "Other batches affected"}
                 htmlFor="inv-other"
                 note="(optional)"
               >
@@ -250,7 +310,12 @@ export function DevInvestigationTab({
         <fieldset disabled={locked} className="min-w-0 space-y-7">
 
           <Section title="What was reviewed">
-            <ReviewChecks control={control} error={errors.reviewChecks?.message} />
+            <ReviewChecks
+              control={control}
+              error={errors.reviewChecks?.message}
+              items={checkItems}
+              required={mustCover}
+            />
           </Section>
 
           <Section title="Root cause">
@@ -815,9 +880,15 @@ function Section({
 function ReviewChecks({
   control,
   error,
+  items: listed,
+  required,
 }: {
   control: Control<DevInvestigationValues>;
   error?: string;
+  /** The usual list — a deviation's or an NCR's. */
+  items: readonly string[];
+  /** Items the investigation must cover (an NCR's), marked Required. */
+  required: readonly string[];
 }) {
   const [adding, setAdding] = useState(false);
   const [other, setOther] = useState("");
@@ -831,8 +902,8 @@ function ReviewChecks({
           value.find((c) => c.item.toLowerCase() === item.toLowerCase());
         const extra = value
           .map((c) => c.item)
-          .filter((i) => !CHECKS_REVIEWED.some((x) => x.toLowerCase() === i.toLowerCase()));
-        const items = [...CHECKS_REVIEWED, ...extra];
+          .filter((i) => !listed.some((x) => x.toLowerCase() === i.toLowerCase()));
+        const items = [...listed, ...extra];
 
         const toggle = (item: string, on: boolean) =>
           field.onChange(
@@ -858,6 +929,12 @@ function ReviewChecks({
           <div className="space-y-3">
             <p className="text-xs text-ink-5">
               Tick each item the investigation looked at, and write what it showed.
+              {required.length > 0 && (
+                <>
+                  {" "}
+                  <span className="font-semibold text-ink-3">Required</span> items must be covered.
+                </>
+              )}
             </p>
             <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line">
               {items.map((item) => {
@@ -876,6 +953,11 @@ function ReviewChecks({
                         className="size-4 accent-brand"
                       />
                       {item}
+                      {required.includes(item) && (
+                        <span className="rounded-full bg-brand-soft px-1.5 py-0.5 text-[0.625rem] font-semibold text-brand-deep">
+                          Required
+                        </span>
+                      )}
                     </label>
                     {entry ? (
                       <input
@@ -977,9 +1059,27 @@ export function InvestigationFacts({ deviation: d }: { deviation: Deviation }) {
         </p>
       )}
 
+      {d.type === "ncr" && d.detection_point === "QC testing" && (
+        <Section title="Laboratory check">
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+            <Fact label="Lab error ruled out?">{d.lab_check ?? <Muted>Not answered</Muted>}</Fact>
+            <Fact label="Lab investigation reference" mono>
+              {d.lab_ref ?? <Muted>Not recorded</Muted>}
+            </Fact>
+          </dl>
+        </Section>
+      )}
+
       <Section title="Impact">
         <dl className="grid gap-3">
-          <Fact label="Other batches affected" mono>
+          <Fact
+            label={
+              d.type === "ncr" && isMaterialItem(d.nc_item)
+                ? "Other batches made with this lot"
+                : "Other batches affected"
+            }
+            mono
+          >
             {d.other_batch_nos.length > 0 ? d.other_batch_nos.join(", ") : <Muted>None</Muted>}
           </Fact>
           <Fact label="Product impact assessment" wide>

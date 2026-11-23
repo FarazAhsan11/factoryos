@@ -1,5 +1,6 @@
 "use client";
 
+import { isQmsCase } from "@/lib/factory/ncr";
 import { useEffect } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
@@ -77,6 +78,7 @@ export function DeviationReport({
   const extensions = useExtensions(factoryId, caseId);
   const d = deviations?.find((x) => x.id === caseId) ?? null;
   const caseHref = `/factory/${slug}/deviations/${caseId}`;
+  const caseLink = (t: string) => (t === "ncr" ? `${caseHref}?tab=ncr` : caseHref);
 
   // The document title is the PDF's default file name.
   const docTitle = d ? `${d.deviation_no} — ${d.title}` : null;
@@ -103,7 +105,7 @@ export function DeviationReport({
       </p>
     );
   }
-  if (!d || (d.type !== "planned" && d.type !== "unplanned")) {
+  if (!d || !isQmsCase(d)) {
     return (
       <div className="rounded-2xl border border-dashed border-line-strong px-4 py-16 text-center">
         <p className="text-sm text-ink-3">This deviation could not be found.</p>
@@ -127,7 +129,7 @@ export function DeviationReport({
   return (
     <div className="case-report mx-auto w-full max-w-[64rem]">
       <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
-        <Link href={caseHref} className="text-sm text-brand hover:underline">
+        <Link href={caseLink(d.type)} className="text-sm text-brand hover:underline">
           Back to <span className="font-mono">{d.deviation_no}</span>
         </Link>
         <button
@@ -143,7 +145,7 @@ export function DeviationReport({
 
       <article className="mt-3 rounded-2xl border border-line bg-surface p-5 shadow-soft sm:p-8 print:mt-0 print:rounded-none print:border-0 print:p-0 print:shadow-none">
         <p className="text-[0.6875rem] font-bold tracking-[0.09em] text-ink-4 uppercase">
-          {factoryName} · Deviation report
+          {factoryName} · {d.type === "ncr" ? "Non-conformance report" : "Deviation report"}
         </p>
         <CaseHeader
           deviation={d}

@@ -9,9 +9,27 @@ import {
   type DevInvestigationValues,
   type InitiationValues,
   type InvestigationValues,
+  type NcrCustomerValues,
+  type NcrDispositionValues,
+  type NcrInitiationValues,
+  type NcrSupplierValues,
   type RiskValues,
 } from "@/app/factory/[slug]/deviations/schemas";
 import type { ActionStage } from "@/lib/factory/action-queries";
+import {
+  NCR_DETECTION_POINTS,
+  dispositionLabel,
+  forcedInvestigation,
+  isMaterialItem,
+  isQmsCase,
+  parseLots,
+  partyWord,
+  requiredChecks,
+  type LabCheck,
+  type NcItem,
+  type NcrDispositionValue,
+  type SuppliedBy,
+} from "@/lib/factory/ncr";
 import { createClient } from "@/lib/supabase/client";
 
 /**
@@ -379,6 +397,56 @@ export interface Deviation {
   capa_plan_approved_at: string | null;
   /** How many cases the linked CAPA covers, this one included (0075). */
   capa_case_count: number | null;
+
+  /* ── A non-conformance's initiation (0076) ─────────────────────────── */
+  /** What is non-conforming. Null on an NCR raised before 0076 (and on every other type). */
+  nc_item: NcItem | null;
+  nc_item_other: string | null;
+  /** A material's: supplier, or our customer (client-supplied). */
+  supplied_by: SuppliedBy | null;
+  material_code: string | null;
+  /** A material's supplier (or customer) lot numbers — each quarantined on its own row. */
+  supplier_lots: string[];
+  qty_affected: string | null;
+  /** Why the lot was not quarantined / the batch not held. */
+  hold_not_reason: string | null;
+
+  /* ── A non-conformance's case (0077) ───────────────────────────────── */
+  /** An NCR's "Other" defect type, described. */
+  category_other: string | null;
+  lab_check: LabCheck | null;
+  lab_ref: string | null;
+  ncr_disposition: NcrDispositionValue | null;
+  concession_scope: string | null;
+  disposition_reason: string | null;
+  concession: "not_needed" | "customer" | null;
+  concession_ref: string | null;
+  sort_ref: string | null;
+  sort_accepted: string | null;
+  sort_rejected: string | null;
+  rework_instruction: string | null;
+  retest_result: "Pass" | "Fail" | null;
+  /** Signed with `sign_ncr_disposition`; it releases or rejects the holds. */
+  disposition_signed_at: string | null;
+  disposition_signed_by_name: string | null;
+  disposition_reopen_reason: string | null;
+  destruction_ref: string | null;
+  return_ref: string | null;
+  supplier_notified_on: string | null;
+  supplier_claim: string | null;
+  scar_requested: boolean | null;
+  scar_not_reason: string | null;
+  scar_ref: string | null;
+  scar_due: string | null;
+  scar_reply_on: string | null;
+  scar_accepted: boolean | null;
+  tightened_inspection: boolean | null;
+  tightened_lots: string | null;
+  customer_notify: "yes" | "not_needed" | null;
+  customer_notified_on: string | null;
+  customer_notify_reason: string | null;
+  /** Closed as not a non-conformance — why. */
+  not_case_reason: string | null;
 }
 
 const COLUMNS = `
@@ -416,7 +484,17 @@ const COLUMNS = `
   close_first_signed_at, close_first_signed_by_name,
   previous_case_ids, no_previous_found_at, no_previous_found_by_name,
   previous_cases_external, holds_on_hold, holds_total, review_checks,
-  capa_plan_approved_at, capa_case_count
+  capa_plan_approved_at, capa_case_count,
+  nc_item, nc_item_other, supplied_by, material_code, supplier_lots,
+  qty_affected, hold_not_reason,
+  category_other, lab_check, lab_ref, ncr_disposition, concession_scope,
+  disposition_reason, concession, concession_ref, sort_ref, sort_accepted,
+  sort_rejected, rework_instruction, retest_result, disposition_signed_at,
+  disposition_signed_by_name, disposition_reopen_reason, destruction_ref,
+  return_ref, supplier_notified_on, supplier_claim, scar_requested,
+  scar_not_reason, scar_ref, scar_due, scar_reply_on, scar_accepted,
+  tightened_inspection, tightened_lots, customer_notify, customer_notified_on,
+  customer_notify_reason, not_case_reason
 `;
 
 /**
@@ -615,6 +693,125 @@ export async function raiseDeviation(
   return data as { id: string; deviation_no: string };
 }
 
+/**
+ * Raise a non-conformance on the qms-v12 form (0076). What the item does not
+ * ask is sent empty and cleared by `deviations_ncr_initiation_guard`; a Yes
+ * quarantines each lot and holds each batch (`deviations_place_holds`).
+ */
+/** An NCR's raise answers as columns — raised or completed, the same shape. */
+function ncrInitiationPatch(values: NcrInitiationValues) {
+  const material = isMaterialItem(values.ncItem);
+  return {
+    nc_item: values.ncItem,
+    nc_item_other: text(values.ncItemOther),
+    title: values.title.trim(),
+    supplied_by: material ? values.suppliedBy : null,
+    material_code: material ? text(values.materialCode) : null,
+    supplier_name: material ? text(values.supplierName) : null,
+    supplier_lots: material ? parseLots(values.lots) : [],
+    qty_affected: text(values.qtyAffected),
+    batch_nos: values.ncItem === "Other" ? [] : parseBatches(values.batches),
+    detection_point: text(values.detectionPoint),
+    occurred_at: localToIso(values.occurredAt),
+    department_id: values.departmentId || null,
+    location: text(values.location),
+    specification: text(values.specification),
+    actual: values.actual.trim(),
+    immediate_action: text(values.immediateAction),
+    hold_batch: values.hold === "yes",
+    hold_not_reason: values.hold === "no" ? text(values.holdNotReason) : null,
+    equipment_no: material ? null : text(values.equipmentNo),
+    sop_number: text(values.sopNumber),
+  };
+}
+
+/**
+ * Raise a non-conformance on the qms-v12 form (0076). What the item does not
+ * ask is sent empty and cleared by `deviations_ncr_initiation_guard`; a Yes
+ * quarantines each lot and holds each batch (`deviations_place_holds`).
+ */
+export async function raiseNcr(
+  factoryId: string,
+  values: NcrInitiationValues,
+  createdBy: string,
+  raisedBy: string,
+): Promise<{ id: string; deviation_no: string }> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("deviations")
+    .insert({
+      factory_id: factoryId,
+      type: "ncr",
+      created_by: createdBy,
+      raised_by: text(raisedBy),
+      ...ncrInitiationPatch(values),
+    })
+    .select("id, deviation_no")
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data as { id: string; deviation_no: string };
+}
+
+/**
+ * Complete an NCR raised before the qms-v12 form (0078): its raise answers,
+ * saved on the case. Only while open and not yet assessed — the assessment's
+ * signature demands them. A hold answered Yes is placed by the caller.
+ */
+export function completeNcrInitiation(id: string, values: NcrInitiationValues): Promise<void> {
+  return patch(id, ncrInitiationPatch(values));
+}
+
+/** The form's values for an NCR's raise answers, as it stands. */
+export function ncrInitiationValues(d: Deviation): NcrInitiationValues {
+  return {
+    ncItem: d.nc_item ?? "Other",
+    ncItemOther: d.nc_item_other ?? "",
+    title: d.title,
+    suppliedBy: d.supplied_by ?? "supplier",
+    materialCode: d.material_code ?? "",
+    supplierName: d.supplier_name ?? "",
+    lots: d.supplier_lots.join(", "),
+    qtyAffected: d.qty_affected ?? "",
+    batches: d.batch_nos.join(", "),
+    detectionPoint: (NCR_DETECTION_POINT_SET.has(d.detection_point ?? "")
+      ? d.detection_point
+      : "") as NcrInitiationValues["detectionPoint"],
+    // Not recorded before: the raise date is the best first guess, shown to be checked.
+    occurredAt: isoToLocal(d.occurred_at ?? d.created_at),
+    departmentId: d.department_id ?? "",
+    location: d.location ?? "",
+    specification: d.specification ?? "",
+    actual: d.actual,
+    immediateAction: d.immediate_action ?? "",
+    // Unanswered on the earlier form: Yes, as the raise form starts (No needs a reason).
+    hold: d.hold_batch === false ? "no" : "yes",
+    holdNotReason: d.hold_not_reason ?? "",
+    equipmentNo: d.equipment_no ?? "",
+    sopNumber: d.sop_number ?? "",
+  };
+}
+
+const NCR_DETECTION_POINT_SET = new Set<string>(NCR_DETECTION_POINTS);
+
+/**
+ * An open NCR raised before the qms-v12 form, still missing raise answers the
+ * initial assessment demands (0078).
+ */
+export function ncrNeedsDetails(d: Deviation): boolean {
+  return (
+    d.type === "ncr" &&
+    d.status === "open" &&
+    !d.assessed_at &&
+    (!d.occurred_at ||
+      !d.department_id ||
+      !NCR_DETECTION_POINT_SET.has(d.detection_point ?? "") ||
+      !(d.specification ?? "").trim() ||
+      !(d.immediate_action ?? "").trim() ||
+      d.hold_batch === null)
+  );
+}
+
 /* ── The initial assessment (0063) ────────────────────────────────────── */
 
 /**
@@ -631,8 +828,12 @@ export function assessmentValues(
   const raisedAt = new Map(cases.map((c) => [c.id, c.created_at]));
   return {
     category: (deviation.nc_category ?? "") as AssessmentValues["category"],
+    categoryOther: deviation.category_other ?? "",
     ownerName: deviation.owner_name ?? "",
-    investigationRequired: yn(deviation.investigation_required),
+    // Found after receipt, an NCR's investigation cannot be skipped (0077).
+    investigationRequired: forcedInvestigation(deviation)
+      ? "yes"
+      : yn(deviation.investigation_required),
     investigationNotRequiredReason:
       deviation.investigation_not_required_reason ?? "",
     redFlags: deviation.red_flags as AssessmentValues["redFlags"],
@@ -653,6 +854,8 @@ export function assessmentValues(
       "") as AssessmentValues["classification"],
     classificationReason: deviation.classification_reason ?? "",
     rationale: deviation.risk_description ?? "",
+    ncr: deviation.type === "ncr",
+    forcedInvestigation: forcedInvestigation(deviation),
   };
 }
 
@@ -661,9 +864,14 @@ function assessmentPatch(v: AssessmentValues, by: string) {
   const noneFound = v.noPreviousFound && v.previousCases.length === 0;
   return {
     nc_category: text(v.category),
+    // Only an NCR's "Other" defect is described.
+    category_other: v.ncr && v.category === "Other" ? text(v.categoryOther) : null,
     owner_name: text(v.ownerName),
-    investigation_required:
-      v.investigationRequired === "" ? null : v.investigationRequired === "yes",
+    investigation_required: v.forcedInvestigation
+      ? true
+      : v.investigationRequired === ""
+        ? null
+        : v.investigationRequired === "yes",
     investigation_not_required_reason:
       v.investigationRequired === "no"
         ? text(v.investigationNotRequiredReason)
@@ -730,6 +938,10 @@ export function devInvestigationValues(d: Deviation): DevInvestigationValues {
     conclusion: (d.root_cause_conclusion ??
       "") as DevInvestigationValues["conclusion"],
     method: (d.rca_method ?? "") as DevInvestigationValues["method"],
+    labCheck: d.lab_check ?? "",
+    labRef: d.lab_ref ?? "",
+    labRequired: d.type === "ncr" && d.detection_point === "QC testing",
+    requiredChecks: requiredChecks(d),
   };
 }
 
@@ -752,6 +964,10 @@ function devInvestigationPatch(v: DevInvestigationValues) {
     root_cause: text(v.rootCause),
     root_cause_conclusion: text(v.conclusion),
     rca_method: text(v.method),
+    // Asked only of an NCR found at QC testing.
+    ...(v.labRequired
+      ? { lab_check: v.labCheck || null, lab_ref: text(v.labRef) }
+      : {}),
   };
 }
 
@@ -855,6 +1071,238 @@ export function closeDevCase(
   });
 }
 
+/* ── A non-conformance's actions (0077) ───────────────────────────────── */
+
+export function ncrDispositionValues(d: Deviation): NcrDispositionValues {
+  return {
+    disposition: d.ncr_disposition ?? "",
+    concessionScope: d.concession_scope ?? "",
+    dispositionReason: d.disposition_reason ?? "",
+    concession: d.concession ?? "",
+    concessionRef: d.concession_ref ?? "",
+    sortRef: d.sort_ref ?? "",
+    sortAccepted: d.sort_accepted ?? "",
+    sortRejected: d.sort_rejected ?? "",
+    reworkInstruction: d.rework_instruction ?? "",
+    retest: d.retest_result ?? "",
+  };
+}
+
+/** The decision's fields — only those of the chosen disposition are kept. */
+function ncrDispositionPatch(v: NcrDispositionValues) {
+  const is = (x: string) => v.disposition === x;
+  return {
+    ncr_disposition: v.disposition || null,
+    concession_scope: is("use_as_is") ? text(v.concessionScope) : null,
+    disposition_reason: is("use_as_is") ? text(v.dispositionReason) : null,
+    concession: is("use_as_is") ? v.concession || null : null,
+    concession_ref:
+      is("use_as_is") && v.concession === "customer" ? text(v.concessionRef) : null,
+    sort_ref: is("sort") ? text(v.sortRef) : null,
+    sort_accepted: is("sort") ? text(v.sortAccepted) : null,
+    sort_rejected: is("sort") ? text(v.sortRejected) : null,
+    rework_instruction: is("rework") ? text(v.reworkInstruction) : null,
+    retest_result: is("rework") ? v.retest || null : null,
+  };
+}
+
+export function saveNcrDisposition(id: string, v: NcrDispositionValues): Promise<void> {
+  return patch(id, ncrDispositionPatch(v));
+}
+
+/**
+ * Record the disposition: the fields are saved, then QA's signature —
+ * `sign_ncr_disposition` re-checks them, and releases or rejects the holds.
+ */
+export async function signNcrDisposition(
+  id: string,
+  v: NcrDispositionValues,
+  by: string,
+): Promise<void> {
+  await patch(id, ncrDispositionPatch(v));
+  const supabase = createClient();
+  const { error } = await supabase.rpc("sign_ncr_disposition", {
+    p_case: id,
+    p_by_name: by,
+  });
+  if (error) throw new Error(error.message);
+}
+
+/** Change a signed disposition — with a reason; its holds go back on hold. */
+export async function reopenNcrDisposition(
+  id: string,
+  reason: string,
+  by: string,
+): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc("reopen_ncr_disposition", {
+    p_case: id,
+    p_reason: reason,
+    p_by_name: by,
+  });
+  if (error) throw new Error(error.message);
+}
+
+/** The disposition's follow-up record — destruction record or return note / RMA. */
+export function saveNcrFollowUp(d: Deviation, ref: string): Promise<void> {
+  return patch(
+    d.id,
+    d.ncr_disposition === "destroy"
+      ? { destruction_ref: text(ref) }
+      : { return_ref: text(ref) },
+  );
+}
+
+export function ncrSupplierValues(d: Deviation): NcrSupplierValues {
+  const yn = (b: boolean | null) => (b === null ? "" : b ? "yes" : "no");
+  return {
+    notifiedOn: d.supplier_notified_on ?? "",
+    claim: d.supplier_claim ?? "",
+    scar: yn(d.scar_requested),
+    scarNotReason: d.scar_not_reason ?? "",
+    scarRef: d.scar_ref ?? "",
+    scarDue: d.scar_due ?? "",
+    scarReplyOn: d.scar_reply_on ?? "",
+    scarAccepted: yn(d.scar_accepted),
+    tightened: yn(d.tightened_inspection),
+    tightenedLots: d.tightened_lots ?? "",
+  };
+}
+
+export function saveNcrSupplier(id: string, v: NcrSupplierValues): Promise<void> {
+  const yn = (s: string) => (s === "" ? null : s === "yes");
+  const scar = v.scar === "yes";
+  return patch(id, {
+    supplier_notified_on: v.notifiedOn || null,
+    supplier_claim: text(v.claim),
+    scar_requested: yn(v.scar),
+    scar_not_reason: v.scar === "no" ? text(v.scarNotReason) : null,
+    scar_ref: scar ? text(v.scarRef) : null,
+    scar_due: scar ? v.scarDue || null : null,
+    scar_reply_on: scar ? v.scarReplyOn || null : null,
+    scar_accepted: scar ? yn(v.scarAccepted) : null,
+    tightened_inspection: yn(v.tightened),
+    tightened_lots: v.tightened === "yes" ? text(v.tightenedLots) : null,
+  });
+}
+
+export function ncrCustomerValues(d: Deviation): NcrCustomerValues {
+  return {
+    notify: d.customer_notify ?? "",
+    notifiedOn: d.customer_notified_on ?? "",
+    reason: d.customer_notify_reason ?? "",
+  };
+}
+
+export function saveNcrCustomer(id: string, v: NcrCustomerValues): Promise<void> {
+  return patch(id, {
+    customer_notify: v.notify || null,
+    customer_notified_on: v.notify === "yes" ? v.notifiedOn || null : null,
+    customer_notify_reason: v.notify === "not_needed" ? text(v.reason) : null,
+  });
+}
+
+/** Close as not a non-conformance — before the assessment, or after a lab error. */
+export async function closeNcrNotACase(id: string, reason: string, by: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc("close_ncr_not_a_case", {
+    p_case: id,
+    p_reason: reason,
+    p_by_name: by,
+  });
+  if (error) throw new Error(error.message);
+}
+
+/** May it still be closed as not a non-conformance? */
+export const canCloseNotACase = (d: Deviation) =>
+  d.type === "ncr" &&
+  d.nc_item !== null &&
+  d.status === "open" &&
+  (!d.assessed_at || d.lab_check === "No");
+
+/** The disposition's own fields are complete — `ncr_disposition_missing()` as a yes / no. */
+function dispositionComplete(d: Deviation): boolean {
+  switch (d.ncr_disposition) {
+    case "use_as_is":
+      return Boolean(
+        d.concession_scope &&
+          d.disposition_reason &&
+          d.concession &&
+          (d.concession !== "customer" || d.concession_ref),
+      );
+    case "sort":
+      return Boolean(d.sort_ref && d.sort_accepted && d.sort_rejected);
+    case "rework":
+      return Boolean(d.rework_instruction && d.retest_result === "Pass");
+    case "destroy":
+    case "return":
+      return true;
+    default:
+      return false;
+  }
+}
+
+/** The destruction record or return note the disposition still waits for, or null. */
+export function dispositionFollowUp(d: Deviation): "destruction record" | "return note" | null {
+  if (d.ncr_disposition === "destroy" && !d.destruction_ref) return "destruction record";
+  if (d.ncr_disposition === "return" && !d.return_ref) return "return note";
+  return null;
+}
+
+/** The disposition, signed, complete, and its follow-up recorded. */
+export const dispositionDone = (d: Deviation) =>
+  Boolean(d.disposition_signed_at) && dispositionComplete(d) && !dispositionFollowUp(d);
+
+/** A material's supplier (or customer) follow-up — `ncr_supplier_missing()`. */
+export function supplierDone(d: Deviation): boolean {
+  if (!isMaterialItem(d.nc_item)) return true;
+  if (!d.supplier_notified_on || d.tightened_inspection === null) return false;
+  if (d.tightened_inspection && !d.tightened_lots) return false;
+  if (d.scar_requested === false) return Boolean(d.scar_not_reason);
+  if (d.scar_requested === true) {
+    return Boolean(
+      d.scar_ref &&
+        d.scar_reply_on &&
+        (d.scar_accepted === true || (d.scar_accepted === false && d.capa_needed === true)),
+    );
+  }
+  return false;
+}
+
+/** A finished product's customer notification, or why it is not needed. */
+export const customerDone = (d: Deviation) =>
+  d.nc_item !== "Finished product" ||
+  (d.customer_notify === "yes" && Boolean(d.customer_notified_on)) ||
+  (d.customer_notify === "not_needed" && Boolean(d.customer_notify_reason));
+
+/** An NCR's actions besides the CAPA decision, done — a deviation has none. */
+export const typeActsDone = (d: Deviation) =>
+  d.type !== "ncr" || (dispositionDone(d) && supplierDone(d) && customerDone(d));
+
+/** What an NCR's Actions still need, in words — "disposition, supplier reply". */
+export function actsMissing(d: Deviation): string[] {
+  const m: string[] = [];
+  if (!(d.capa_needed === false || (d.capa_needed === true && d.capa_id))) {
+    m.push("CAPA decision");
+  }
+  if (d.type === "ncr") {
+    const party = partyWord(d.supplied_by);
+    if (!d.disposition_signed_at) m.push("disposition");
+    else if (dispositionFollowUp(d)) m.push(dispositionFollowUp(d)!);
+    if (!supplierDone(d)) {
+      m.push(
+        !d.supplier_notified_on
+          ? `${party} notification`
+          : d.scar_requested && !d.scar_reply_on
+            ? `${party} reply`
+            : `${party} follow-up`,
+      );
+    }
+    if (!customerDone(d)) m.push("customer notification");
+  }
+  return m;
+}
+
 /** How many QA signatures the close-out needs. */
 export const signaturesNeeded = (d: Deviation) =>
   d.classification === "Critical" ? 2 : 1;
@@ -905,6 +1353,30 @@ export function devChecklist(d: Deviation): ChecklistItem[] {
       done: Boolean(d.capa_plan_approved_at),
     });
   }
+  // A non-conformance's own actions (0077).
+  if (d.type === "ncr") {
+    list.push({
+      label: d.disposition_signed_at
+        ? `Disposition (${dispositionLabel(d.ncr_disposition)}) and its record`
+        : "Disposition recorded",
+      done: dispositionDone(d),
+    });
+    if (isMaterialItem(d.nc_item)) {
+      list.push({
+        label:
+          d.supplied_by === "customer"
+            ? "Customer (material owner) notified and its corrective action closed"
+            : "Supplier notified and its corrective action closed",
+        done: supplierDone(d),
+      });
+    }
+    if (d.nc_item === "Finished product") {
+      list.push({
+        label: "Customer (brand owner) notified, or not needed with a reason",
+        done: customerDone(d),
+      });
+    }
+  }
   // The close-out's own fields: checked when it is signed, beside each field,
   // not listed again above them (P1).
   list.push(
@@ -934,7 +1406,7 @@ export const isDeviationCase = (d: Pick<Deviation, "type">) =>
 export function approvedRootCause(d: Deviation): string | null {
   const root = d.root_cause?.trim();
   if (!root) return null;
-  return d.investigation_approved_at !== null || !isDeviationCase(d) ? root : null;
+  return d.investigation_approved_at !== null || !isQmsCase(d) ? root : null;
 }
 
 /**
@@ -943,7 +1415,7 @@ export function approvedRootCause(d: Deviation): string | null {
  */
 export function investigationPending(d: Deviation): boolean {
   return (
-    isDeviationCase(d) &&
+    isQmsCase(d) &&
     d.investigation_required !== false &&
     d.investigation_approved_at === null
   );
@@ -979,7 +1451,8 @@ export type DevStage =
   | "Batches on hold"
   | "Ready to close"
   | "Awaiting 2nd signature"
-  | "Closed";
+  | "Closed"
+  | "Closed — not a case";
 
 export type CaseSection =
   | "details"
@@ -989,17 +1462,21 @@ export type CaseSection =
   | "closeout"
   | "history";
 
-const isDeviation = (d: Deviation) =>
-  d.type === "planned" || d.type === "unplanned";
+/** A deviation, or an NCR on the qms-v12 form — scored, investigated and closed alike. */
+const isDeviation = (d: Deviation) => isQmsCase(d);
 
 /** Read from what the case holds — never stored. */
 export function devStage(d: Deviation): DevStage {
-  if (d.status === "closed") return "Closed";
+  if (d.status === "closed") {
+    return d.status_reason === "Not a non-conformance" ? "Closed — not a case" : "Closed";
+  }
   if (!d.assessed_at) return "Awaiting assessment";
   if (d.investigation_required !== false && !d.investigation_approved_at) {
     return d.investigation_submitted_at ? "Awaiting approval" : "Investigating";
   }
-  if (d.capa_needed === null || (d.capa_needed && !d.capa_id)) return "Actions";
+  if (d.capa_needed === null || (d.capa_needed && !d.capa_id) || !typeActsDone(d)) {
+    return "Actions";
+  }
   // Waiting for the CAPA's plan to be approved (0075) — not its effectiveness.
   if (d.capa_needed && !d.capa_plan_approved_at) return "Awaiting CAPA";
   // A batch still on hold is decided before the case closes (0069).
@@ -1028,7 +1505,10 @@ export function nextStep(d: Deviation): { text: string; tab: CaseSection } | nul
       };
     case "Actions":
       return {
-        text: `${owner}: decide on a CAPA, or resolve directly.`,
+        text:
+          d.type === "ncr"
+            ? `${owner}: still to do — ${actsMissing(d).join(", ")}.`
+            : `${owner}: decide on a CAPA, or resolve directly.`,
         tab: "actions",
       };
     case "Awaiting CAPA":
@@ -1063,6 +1543,7 @@ export const DEV_STAGE_DOT: Record<DevStage, string> = {
   "Ready to close": "bg-teal",
   "Awaiting 2nd signature": "bg-violet",
   Closed: "bg-ink-5",
+  "Closed — not a case": "bg-ink-5",
 };
 
 async function patch(id: string, values: Record<string, unknown>) {

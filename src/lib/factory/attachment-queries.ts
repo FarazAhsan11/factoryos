@@ -22,7 +22,9 @@ export type AttachmentSection =
   | "assessment"
   | "investigation"
   | "actions"
-  | "closeout";
+  | "closeout"
+  /** An NCR's disposition records — customer approval, destruction certificate, RMA (0077). */
+  | "disposition";
 
 export interface Attachment {
   id: string;

@@ -17,6 +17,13 @@ export type AuditAction =
   | "file_attached"
   | "file_removed"
   | "hold_placed"
+  | "quarantine_placed"
+  | "lot_released"
+  | "lot_rejected"
+  | "hold_restored"
+  | "disposition_signed"
+  | "disposition_reopened"
+  | "converted"
   | "batch_released"
   | "batch_rejected"
   | "extension_requested"
@@ -73,7 +80,11 @@ export type FieldKind =
   | "disposition"
   | "cases"
   | "checks"
-  | "mono";
+  | "mono"
+  /** An NCR's qms-v12 disposition, concession and customer notification (0077). */
+  | "ncrDisposition"
+  | "concession"
+  | "customerNotify";
 
 /** Each column a person can change, as the screens label it. */
 export const FIELD_LABELS: Record<string, { label: string; kind: FieldKind }> = {
@@ -109,7 +120,7 @@ export const FIELD_LABELS: Record<string, { label: string; kind: FieldKind }> = 
   action_id: { label: "Linked issue", kind: "mono" },
 
   // Assessment
-  nc_category: { label: "Category", kind: "text" },
+  nc_category: { label: "Category / defect type", kind: "text" },
   owner_name: { label: "Case owner", kind: "text" },
   investigation_required: { label: "Investigation required", kind: "bool" },
   investigation_not_required_reason: {
@@ -170,6 +181,36 @@ export const FIELD_LABELS: Record<string, { label: string; kind: FieldKind }> = 
   pa_closed_by_name: { label: "PA closed by", kind: "text" },
   pa_description: { label: "Preventive action", kind: "long" },
 
+  // A non-conformance (0076, 0077)
+  category_other: { label: "Defect (other), described", kind: "text" },
+  lab_check: { label: "Lab error ruled out?", kind: "text" },
+  lab_ref: { label: "Lab investigation reference", kind: "mono" },
+  ncr_disposition: { label: "Disposition", kind: "ncrDisposition" },
+  concession_scope: { label: "Scope of the concession", kind: "long" },
+  disposition_reason: { label: "Why it can be used as is", kind: "long" },
+  concession: { label: "Customer concession", kind: "concession" },
+  concession_ref: { label: "Concession reference", kind: "text" },
+  sort_ref: { label: "Sorting record", kind: "text" },
+  sort_accepted: { label: "Quantity accepted", kind: "text" },
+  sort_rejected: { label: "Quantity rejected", kind: "text" },
+  rework_instruction: { label: "Rework instruction", kind: "text" },
+  retest_result: { label: "Re-test result", kind: "text" },
+  destruction_ref: { label: "Destruction record", kind: "text" },
+  return_ref: { label: "Return note / RMA", kind: "text" },
+  supplier_notified_on: { label: "Supplier notified on", kind: "date" },
+  supplier_claim: { label: "Supplier claim or credit", kind: "text" },
+  scar_requested: { label: "Corrective action requested (SCAR)", kind: "bool" },
+  scar_not_reason: { label: "Why no corrective action request", kind: "long" },
+  scar_ref: { label: "SCAR reference", kind: "mono" },
+  scar_due: { label: "Supplier reply due", kind: "date" },
+  scar_reply_on: { label: "Supplier reply received on", kind: "date" },
+  scar_accepted: { label: "Supplier's root cause and fix accepted", kind: "bool" },
+  tightened_inspection: { label: "Tightened inspection", kind: "bool" },
+  tightened_lots: { label: "Tightened inspection — lots", kind: "text" },
+  customer_notify: { label: "Customer (brand owner) notified", kind: "customerNotify" },
+  customer_notified_on: { label: "Customer notified on", kind: "date" },
+  customer_notify_reason: { label: "Why the customer is not notified", kind: "long" },
+
   // Close-out
   unresolved_risk: { label: "Unresolved product or patient risk", kind: "bool" },
   closing_note: { label: "Close-out summary", kind: "long" },
@@ -197,4 +238,5 @@ export const SECTION_LABELS: Record<string, string> = {
   investigation: "Investigation",
   actions: "Actions",
   closeout: "Close-out",
+  disposition: "Disposition",
 };

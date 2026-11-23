@@ -62,12 +62,15 @@ import {
   unlinkCapa,
   type Deviation,
 } from "@/lib/factory/deviation-queries";
+import { isQmsCase } from "@/lib/factory/ncr";
+import { NcrActions } from "@/components/factory/deviations/ncr-actions";
 import { useWorkers } from "@/lib/factory/worker-queries";
 import { useForm } from "@/lib/use-form";
 import { useRenderClock } from "@/lib/use-render-clock";
 import { cn } from "@/lib/utils";
 
-const isDeviationType = (d: Deviation) => d.type === "planned" || d.type === "unplanned";
+/** A deviation, or an NCR on the qms-v12 form — assessed and investigated before actions. */
+const isDeviationType = (d: Deviation) => isQmsCase(d);
 
 /** Recurring at the initial assessment (likelihood 3, 0068): a CAPA is required. */
 function isRecurring(d: Deviation): boolean {
@@ -103,6 +106,9 @@ export function CapaTab({
 }) {
   const open = d.status === "open";
   const ed = !readOnly && open;
+  // An NCR's disposition, supplier and customer come first; its corrections
+  // are the "other" ones — the disposition is the main correction (qms-v12).
+  const ncr = d.type === "ncr" && d.nc_item !== null;
   return (
     <div className="space-y-8">
       {isDeviationType(d) && !d.assessed_at && open && (
@@ -112,12 +118,27 @@ export function CapaTab({
           done on the day can be recorded now.
         </p>
       )}
+      {ncr && (
+        <NcrActions
+          deviation={d}
+          factoryId={factoryId}
+          canEdit={ed}
+          viewerName={viewerName}
+          userId={userId}
+        />
+      )}
       <Corrections
         deviation={d}
         factoryId={factoryId}
         canEdit={ed && Boolean(userId)}
         userId={userId ?? ""}
         viewerName={viewerName}
+        title={ncr ? "Other corrections" : "Corrections"}
+        sub={
+          ncr
+            ? "Optional — the disposition is the main correction; add anything else done, e.g. line cleared, stock relabelled"
+            : "What was done to fix this case"
+        }
       />
       <CapaSection deviation={d} factoryId={factoryId} canEdit={ed} viewerName={viewerName} />
       {isDeviationType(d) && (
@@ -142,12 +163,16 @@ function Corrections({
   canEdit,
   userId,
   viewerName,
+  title,
+  sub,
 }: {
   deviation: Deviation;
   factoryId: string;
   canEdit: boolean;
   userId: string;
   viewerName: string;
+  title: string;
+  sub: string;
 }) {
   const [adding, setAdding] = useState(false);
   // The row whose "Reason for removing" is open.
@@ -160,8 +185,8 @@ function Corrections({
   return (
     <section className="space-y-3">
       <h3 className="flex flex-wrap items-baseline gap-x-2 text-base font-semibold text-ink">
-        Corrections
-        <span className="text-sm font-normal text-ink-4">What was done to fix this case</span>
+        {title}
+        <span className="text-sm font-normal text-ink-4">{sub}</span>
       </h3>
       {isPending ? (
         <Loader2 className="size-4 animate-spin text-ink-5" />

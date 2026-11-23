@@ -17,6 +17,7 @@ import { BatchActivityList } from "@/components/factory/batch/batch-activity-lis
 import { BatchEntryDialog } from "@/components/factory/batch/batch-entry-dialog";
 import { BatchSearch } from "@/components/factory/batch/batch-search";
 import { DeviationDetailDialog } from "@/components/factory/deviations/deviation-detail-dialog";
+
 import { DeviationsTable } from "@/components/factory/deviations/deviations-table";
 import { BatchTypeBadge } from "@/components/factory/pipeline/batch-type-badge";
 import { MaintenanceDetailDialog } from "@/components/factory/maintenance/maintenance-detail-dialog";
@@ -345,11 +346,14 @@ export function BatchRecordWorkspace({
               <DeviationsTable
                 deviations={batchDeviations}
                 onOpen={(id) => {
-                  // A deviation is worked on its own page; an NCR or a
-                  // complaint in the case dialog, as on the register.
+                  // A deviation and a qms-v12 NCR are worked on their own
+                  // page; an older NCR or a complaint in the case dialog, as
+                  // on the register.
                   const d = deviations.find((x) => x.id === id);
                   if (d && (d.type === "planned" || d.type === "unplanned")) {
                     router.push(`/factory/${slug}/deviations/${id}`);
+                  } else if (d && d.type === "ncr") {
+                    router.push(`/factory/${slug}/deviations/${id}?tab=ncr`);
                   } else {
                     setOpenDeviationId(id);
                   }

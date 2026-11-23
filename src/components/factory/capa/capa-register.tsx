@@ -213,7 +213,7 @@ export function CapaRegister({
                               e.stopPropagation();
                               // A deviation opens on its page; an NCR or a
                               // complaint in its dialog, on this screen.
-                              if (k.type === "planned" || k.type === "unplanned") {
+                              if (k.type !== "complaint") {
                                 router.push(caseHref(slug, k));
                               } else {
                                 onOpenCase(k.id);

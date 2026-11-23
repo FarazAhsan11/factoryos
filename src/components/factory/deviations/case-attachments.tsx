@@ -42,6 +42,7 @@ export function CaseAttachments({
   userId,
   userName,
   canAttach,
+  title = "Attachments",
 }: {
   factoryId: string;
   deviationId: string;
@@ -50,6 +51,8 @@ export function CaseAttachments({
   userName: string;
   /** Supervisor and up, on an open case. */
   canAttach: boolean;
+  /** The heading — "Attachments", or what the files are (an NCR's disposition records). */
+  title?: string;
 }) {
   const queryClient = useQueryClient();
   const input = useRef<HTMLInputElement>(null);
@@ -132,7 +135,7 @@ export function CaseAttachments({
 
   return (
     <section className="space-y-3">
-      <h3 className="text-base font-semibold text-ink">Attachments</h3>
+      <h3 className="text-base font-semibold text-ink">{title}</h3>
 
       {isPending ? (
         <Loader2 className="size-4 animate-spin text-ink-5" />

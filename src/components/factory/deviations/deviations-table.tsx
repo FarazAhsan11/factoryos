@@ -30,6 +30,7 @@ import {
   type Deviation,
   type DeviationType,
 } from "@/lib/factory/deviation-queries";
+import { dispositionLabel, isNcrCase } from "@/lib/factory/ncr";
 import { cn } from "@/lib/utils";
 
 /*
@@ -127,7 +128,8 @@ export function DeviationsTable({
         // A deviation reads its stage as its own page does (Awaiting
         // assessment, Investigating, …); an NCR or complaint keeps the
         // register's Open / Awaiting CAPA / Ready / Closed.
-        const devCase = d.type === "planned" || d.type === "unplanned";
+        const devCase =
+          d.type === "planned" || d.type === "unplanned" || isNcrCase(d);
         const stage = devCase
           ? { label: devStage(d), dot: DEV_STAGE_DOT[devStage(d)] }
           : CASE_STAGES[caseStage(d)];
@@ -182,7 +184,7 @@ export function DeviationsTable({
             <td className={CELL}>
               {/* A deviation scored on the risk table (0068) reads "S3 · L2"
                   once assessed; everything else shows its Low / Medium / High. */}
-              {(d.type === "planned" || d.type === "unplanned") &&
+              {(d.type === "planned" || d.type === "unplanned" || isNcrCase(d)) &&
               d.assessed_at &&
               !isLegacyRisk(d) ? (
                 <span className="font-mono text-ink-3">{devRiskLabel(d) ?? "—"}</span>
@@ -290,11 +292,14 @@ function ExtraCell({
     case "raw_material":
       return (
         <td className={CELL}>
-          {d.raw_material_code || d.raw_material_name ? (
+          {/* An NCR on the qms-v12 form keeps its material code (0076). */}
+          {d.material_code || d.raw_material_code || d.raw_material_name ? (
             <Val
-              value={[d.raw_material_code, d.raw_material_name]
-                .filter(Boolean)
-                .join(" · ")}
+              value={
+                d.material_code
+                  ? d.material_code
+                  : [d.raw_material_code, d.raw_material_name].filter(Boolean).join(" · ")
+              }
             />
           ) : (
             dash
@@ -308,6 +313,12 @@ function ExtraCell({
             <Badge className={dispositionMeta(d.disposition).pill}>
               {dispositionMeta(d.disposition).label}
             </Badge>
+          ) : d.ncr_disposition ? (
+            // The qms-v12 disposition (0077) — signed, or still a draft.
+            <span className={d.disposition_signed_at ? "text-ink-2" : "text-ink-5"}>
+              {dispositionLabel(d.ncr_disposition)}
+              {!d.disposition_signed_at && " (draft)"}
+            </span>
           ) : (
             dash
           )}

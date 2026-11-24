@@ -71,12 +71,17 @@ export function ComplaintInitiationFacts({ deviation: d }: { deviation: Deviatio
               : (d.product_label ?? <Muted>—</Muted>)}
           </Fact>
           <Fact label="Brand owner">{d.customer_name ?? <Muted>—</Muted>}</Fact>
-          <Fact label="Sponsor">
-            {d.sponsor === "us" ? "Us" : d.sponsor === "customer" ? (d.customer_name ?? "The customer") : <Muted>—</Muted>}
-          </Fact>
-          <Fact label="ARTG number" mono>
-            {d.artg_no ?? <Muted>—</Muted>}
-          </Fact>
+          {/* No longer asked (0080) — shown only on complaints that recorded them. */}
+          {d.sponsor && (
+            <Fact label="Sponsor">
+              {d.sponsor === "us" ? "Us" : (d.customer_name ?? "The customer")}
+            </Fact>
+          )}
+          {d.artg_no && (
+            <Fact label="ARTG number" mono>
+              {d.artg_no}
+            </Fact>
+          )}
           <Fact label="Expiry date">{d.expiry ?? <Muted>—</Muted>}</Fact>
           <Fact label="Number of units affected">{d.qty_affected ?? <Muted>—</Muted>}</Fact>
           <Fact label="Complaint description" wide>

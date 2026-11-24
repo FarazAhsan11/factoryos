@@ -19,6 +19,7 @@ import {
   AREA,
   CONTROL,
   Field,
+  ACTION_BUTTON_SM,
   PRIMARY_BUTTON,
   SECONDARY_BUTTON,
   formatDate,
@@ -29,7 +30,7 @@ import {
   uploadCapaFiles,
   type CapaFile,
 } from "@/lib/factory/capa-attachment-queries";
-import { addDays, localDay } from "@/lib/factory/dates";
+import { addDays } from "@/lib/factory/dates";
 import {
   addCapaAction,
   markCapaActionDone,
@@ -147,7 +148,7 @@ export function CapaActionTable({
           <button
             type="button"
             onClick={() => setAdding(true)}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-xs font-semibold text-ink-3 shadow-soft transition hover:border-brand hover:text-brand"
+            className={ACTION_BUTTON_SM}
           >
             <Plus className="size-3.5" />
             Add {head.word} action
@@ -222,8 +223,9 @@ function ActionRows({
               <button
                 type="button"
                 onClick={onStart}
-                className="h-8 rounded-lg border border-line bg-surface px-3 text-xs font-semibold text-ink-3 transition hover:border-brand hover:text-brand"
+                className={ACTION_BUTTON_SM}
               >
+                <Check className="size-3.5" />
                 Mark done
               </button>
             ) : (
@@ -298,19 +300,13 @@ function DoneForm({
 }) {
   const queryClient = useQueryClient();
   const [files, setFiles] = useState<File[]>([]);
-  // Not before the CAPA was raised, not after today.
-  const raised = localDay(capa.created_at);
   const form = useForm<CapaDoneValues>({
     resolver: zodResolver(capaDoneSchema),
-    defaultValues: { evidence: "", linkedRecord: "", doneOn: today },
+    defaultValues: { evidence: "", doneOn: today },
   });
   const errors = form.formState.errors;
   const save = useMutation({
     mutationFn: async (v: CapaDoneValues) => {
-      if (v.doneOn > today) throw new Error("The date done cannot be in the future.");
-      if (v.doneOn < raised) {
-        throw new Error(`The date done cannot be before ${capa.capa_no} was raised.`);
-      }
       // The files first, while the action is still open: if marking it done
       // is refused, they are removed again.
       const uploaded = await uploadCapaFiles(files, {
@@ -340,12 +336,13 @@ function DoneForm({
     <form
       noValidate
       onSubmit={form.handleSubmit((v) => save.mutateAsync(v).catch(() => {}))}
-      className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_14rem]"
+      className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_13rem] lg:grid-cols-[minmax(0,1fr)_13rem_13rem]"
     >
+      {/* One row: evidence, the date, the file — then the buttons. */}
       <Field label="Completion evidence" htmlFor="cd-evidence" required error={errors.evidence?.message}>
         <textarea
           id="cd-evidence"
-          rows={3}
+          rows={2}
           autoFocus
           placeholder="What was done and where it is recorded, e.g. Closing pins replaced on encapsulator 2 — WO-4471"
           aria-invalid={Boolean(errors.evidence)}
@@ -353,35 +350,18 @@ function DoneForm({
           {...form.register("evidence")}
         />
       </Field>
-      <div className="space-y-3">
-        <Field label="Date done" required error={errors.doneOn?.message}>
-          <Controller
-            name="doneOn"
-            control={form.control}
-            render={({ field }) => (
-              <DateField
-                value={field.value}
-                onChange={field.onChange}
-                min={raised}
-                max={today}
-                ariaLabel="Date done"
-              />
-            )}
-          />
-        </Field>
-        <Field label="Linked record" htmlFor="cd-link" note="(optional)" error={errors.linkedRecord?.message}>
-          <input
-            id="cd-link"
-            placeholder="Change control or training record"
-            className={cn(CONTROL, "font-mono")}
-            {...form.register("linkedRecord")}
-          />
-        </Field>
-      </div>
-      <div className="sm:col-span-2">
-        <PickFiles files={files} onChange={setFiles} disabled={save.isPending} />
-      </div>
-      <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
+      {/* Any date: the picker no longer limits it (0081). */}
+      <Field label="Date done" required error={errors.doneOn?.message}>
+        <Controller
+          name="doneOn"
+          control={form.control}
+          render={({ field }) => (
+            <DateField value={field.value} onChange={field.onChange} ariaLabel="Date done" />
+          )}
+        />
+      </Field>
+      <PickFiles files={files} onChange={setFiles} disabled={save.isPending} />
+      <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-3">
         <button type="submit" disabled={save.isPending} className={PRIMARY_BUTTON}>
           {save.isPending && <Loader2 className="size-4 animate-spin" />}
           Save

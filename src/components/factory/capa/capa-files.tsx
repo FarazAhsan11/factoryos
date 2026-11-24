@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { ATTACHMENT_MAX_BYTES } from "@/app/factory/[slug]/deviations/schemas";
 import { ACCEPT, MAX_FILES } from "@/components/factory/deviations/case-attachments";
+import { ACTION_BUTTON, ACTION_BUTTON_SM } from "@/components/factory/deviations/deviation-fields";
 import { attachmentProblem, formatBytes } from "@/lib/factory/attachment-queries";
 import {
   capaFileKeys,
@@ -198,7 +199,7 @@ export function CapaFiles({
             type="button"
             disabled={uploading !== null}
             onClick={() => input.current?.click()}
-            className="inline-flex h-9 items-center gap-2 rounded-lg border border-line bg-surface px-3.5 text-sm font-semibold text-ink-3 shadow-soft transition hover:border-brand hover:text-brand disabled:pointer-events-none disabled:opacity-60"
+            className={ACTION_BUTTON}
           >
             {uploading ? <Loader2 className="size-4 animate-spin" /> : <Paperclip className="size-4" />}
             {uploading ? `Uploading ${uploading}…` : "Attach files"}
@@ -290,7 +291,7 @@ export function PickFiles({
         type="button"
         disabled={disabled}
         onClick={() => input.current?.click()}
-        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-xs font-semibold text-ink-3 shadow-soft transition hover:border-brand hover:text-brand disabled:pointer-events-none disabled:opacity-60"
+        className={ACTION_BUTTON_SM}
       >
         <Paperclip className="size-3.5" />
         Attach file

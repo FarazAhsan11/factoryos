@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { ATTACHMENT_MAX_BYTES } from "@/app/factory/[slug]/deviations/schemas";
 import { ACCEPT, MAX_FILES } from "@/components/factory/deviations/case-attachments";
 import { attachmentProblem, formatBytes } from "@/lib/factory/attachment-queries";
+import { ACTION_BUTTON } from "@/components/factory/deviations/deviation-fields";
 
 /**
  * Files picked on the raise page, held in the browser until the case exists.
@@ -97,7 +98,7 @@ export function PendingAttachments({
           type="button"
           disabled={disabled}
           onClick={() => input.current?.click()}
-          className="inline-flex h-9 items-center gap-2 rounded-lg border border-line bg-surface px-3.5 text-sm font-semibold text-ink-3 shadow-soft transition hover:border-brand hover:text-brand disabled:pointer-events-none disabled:opacity-60"
+          className={ACTION_BUTTON}
         >
           <Paperclip className="size-4" />
           Attach files

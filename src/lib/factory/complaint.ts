@@ -47,11 +47,6 @@ const REGULATOR: Record<string, string> = {
 export const regulatorOf = (country: string | null | undefined) =>
   REGULATOR[country ?? ""] ?? "regulator";
 
-export const SPONSORS = [
-  { value: "customer", label: "The customer (brand owner)" },
-  { value: "us", label: "Us" },
-] as const;
-
 export const SAMPLE_STATES = ["Received", "Requested", "Not available"] as const;
 
 /** What the complaint is about — `deviations_nc_category_known` (0079). */

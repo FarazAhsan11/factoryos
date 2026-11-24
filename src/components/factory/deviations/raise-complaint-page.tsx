@@ -35,8 +35,6 @@ const BLANK: ComplaintInitiationValues = {
   batches: "",
   productLabel: "",
   customerName: "",
-  sponsor: "",
-  artg: "",
   expiry: "",
   unitsAffected: "",
   actual: "",

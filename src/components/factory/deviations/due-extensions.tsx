@@ -12,6 +12,7 @@ import {
   type DueExtensionValues,
 } from "@/app/factory/[slug]/deviations/schemas";
 import {
+  ACTION_BUTTON,
   AREA,
   Field,
   PRIMARY_BUTTON,
@@ -161,7 +162,7 @@ export function DueExtensions({
           <button
             type="button"
             onClick={() => setAsking(true)}
-            className="inline-flex h-9 items-center gap-2 rounded-lg border border-line bg-surface px-3.5 text-sm font-semibold text-ink-3 shadow-soft transition hover:border-brand hover:text-brand print:hidden"
+            className={ACTION_BUTTON}
           >
             <CalendarClock className="size-4" />
             Request an extension

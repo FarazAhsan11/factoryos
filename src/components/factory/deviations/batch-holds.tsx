@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
+  ACTION_BUTTON,
   AREA,
   CONTROL,
   PRIMARY_BUTTON,
@@ -182,7 +183,7 @@ export function BatchHolds({
           <button
             type="button"
             onClick={() => setAdding(true)}
-            className="inline-flex h-9 items-center rounded-lg border border-line bg-surface px-3.5 text-sm font-semibold text-ink-3 shadow-soft transition hover:border-brand hover:text-brand"
+            className={ACTION_BUTTON}
           >
             {material ? "Quarantine a lot" : "Put a batch on hold"}
           </button>

@@ -26,6 +26,7 @@ import { DecisionForm } from "@/components/factory/deviations/batch-holds";
 import { CaseAttachments } from "@/components/factory/deviations/case-attachments";
 import { Segmented } from "@/components/factory/deviations/deviation-initiation-fields";
 import {
+  ACTION_BUTTON,
   AREA,
   CONTROL,
   Fact,
@@ -1101,7 +1102,7 @@ function ReviewChecks({
               <button
                 type="button"
                 onClick={() => setAdding(true)}
-                className="inline-flex h-9 items-center rounded-lg border border-line bg-surface px-3.5 text-sm font-semibold text-ink-3 shadow-soft transition hover:border-brand hover:text-brand disabled:pointer-events-none disabled:opacity-60"
+                className={ACTION_BUTTON}
               >
                 Add other item
               </button>

@@ -1187,8 +1187,6 @@ export async function raiseComplaint(
       batch_nos: parseBatches(values.batches),
       product_label: text(values.productLabel),
       customer_name: text(values.customerName),
-      sponsor: values.sponsor || null,
-      artg_no: text(values.artg),
       expiry: text(values.expiry),
       qty_affected: text(values.unitsAffected),
       actual: values.actual.trim(),

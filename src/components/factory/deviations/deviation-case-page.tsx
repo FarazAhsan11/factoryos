@@ -80,7 +80,7 @@ function sectionState(d: Deviation, id: CaseSection): "ok" | "na" | "todo" | nul
   switch (id) {
     case "details":
       if (d.type === "complaint") {
-        return d.received_on && d.received_via && d.complainant && d.sponsor && d.sample
+        return d.received_on && d.received_via && d.complainant && d.sample
           ? "ok"
           : "todo";
       }

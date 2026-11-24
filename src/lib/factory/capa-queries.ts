@@ -517,7 +517,6 @@ export async function markCapaActionDone(
       closed_date: values.doneOn,
       closed_by_name: byName,
       evidence: values.evidence.trim(),
-      linked_record: values.linkedRecord.trim() || null,
     })
     .eq("id", id);
   if (error) throw new Error(error.message);

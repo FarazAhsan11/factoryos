@@ -22,6 +22,8 @@ import { CapaStepper } from "@/components/factory/capa/capa-stepper";
 import { WithdrawCapa } from "@/components/factory/capa/capa-withdraw";
 import { CaseAttachments } from "@/components/factory/deviations/case-attachments";
 import {
+  ACTION_BUTTON,
+  ACTION_BUTTON_SM,
   AREA,
   CONTROL,
   Field,
@@ -236,7 +238,7 @@ function Corrections({
           <button
             type="button"
             onClick={() => setAdding(true)}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3.5 text-sm font-semibold text-ink-3 shadow-soft transition hover:border-brand hover:text-brand"
+            className={ACTION_BUTTON}
           >
             <Plus className="size-4" />
             Add correction
@@ -937,8 +939,7 @@ function LinkList({
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const small =
-    "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-xs font-semibold text-ink-3 shadow-soft transition hover:border-brand hover:text-brand disabled:opacity-60";
+  const small = ACTION_BUTTON_SM;
 
   const addButton = (c: Capa, label = "Add this case") => (
     <button type="button" disabled={link.isPending} onClick={() => link.mutate(c)} className={small}>

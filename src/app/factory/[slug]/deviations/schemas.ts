@@ -562,16 +562,14 @@ export const capaActionAddSchema = z.object({
 
 export type CapaActionAddValues = z.infer<typeof capaActionAddSchema>;
 
-/** Marking an action done — the completion evidence, and any linked record. */
+/** Marking an action done — the completion evidence and the date. */
 export const capaDoneSchema = z.object({
   evidence: z
     .string()
     .trim()
     .min(3, "Add the completion evidence — what was done and where it is recorded.")
     .max(1000, "Keep the evidence under 1000 characters."),
-  linkedRecord: optional(120),
-  // The date it was done, not the day it is recorded (0075). The form keeps
-  // it between the CAPA's raise date and today; the guard re-checks both.
+  // The date it was done, not the day it is recorded (0075). Any date (0081).
   doneOn: z
     .string()
     .trim()
@@ -1051,8 +1049,6 @@ export const complaintInitiationSchema = z
     batches: optional(400),
     productLabel: optional(160),
     customerName: optional(160),
-    sponsor: z.union([z.enum(["us", "customer"]), z.literal("")]),
-    artg: optional(60),
     expiry: optional(20),
     unitsAffected: optional(120),
     actual: z
@@ -1075,7 +1071,6 @@ export const complaintInitiationSchema = z
     if (parseBatches(v.batches).length === 0 && !v.productLabel) {
       need("productLabel", "Needed when the batch is unknown.");
     }
-    if (!v.sponsor) need("sponsor", "Who is the sponsor?");
     if (!v.adverse) need("adverse", "Was an injury or adverse reaction reported?");
     if (v.adverse === "yes") {
       if (!v.adverseWhat) need("adverseWhat", "What reaction, and when?");

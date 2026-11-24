@@ -356,8 +356,17 @@ export function FooterActions({ children }: { children: React.ReactNode }) {
 export const PRIMARY_BUTTON =
   "inline-flex h-9 shrink-0 items-center gap-2 rounded-lg bg-[linear-gradient(180deg,var(--color-brand-bright)_0%,var(--color-brand)_100%)] px-4 text-sm font-semibold text-white shadow-brand transition hover:brightness-[1.06] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60";
 
+/** Neutral (Cancel, Back): a clear button outline, never mistaken for text or an input. */
 export const SECONDARY_BUTTON =
-  "inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-line bg-surface px-4 text-sm font-semibold text-ink-3 shadow-soft transition hover:border-brand hover:text-brand disabled:pointer-events-none disabled:opacity-60";
+  "inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-line-strong bg-surface px-4 text-sm font-semibold text-ink-2 shadow-soft transition hover:border-brand hover:bg-brand-tint hover:text-brand-deep active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60";
+
+/** An action inside a section (Mark done, Add action, Attach file): soft brand, clearly clickable. */
+export const ACTION_BUTTON =
+  "inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-brand-line bg-brand-soft px-3.5 text-sm font-semibold text-brand-deep shadow-soft transition hover:border-brand hover:bg-brand-tint active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60";
+
+/** ACTION_BUTTON, compact — in table rows and beside lists. */
+export const ACTION_BUTTON_SM =
+  "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-brand-line bg-brand-soft px-3 text-xs font-semibold text-brand-deep shadow-soft transition hover:border-brand hover:bg-brand-tint active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60";
 
 /**
  * The save button every tab ends with.

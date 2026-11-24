@@ -2,7 +2,11 @@
 
 import { Plus, X } from "lucide-react";
 
-import { CONTROL, formatDate } from "@/components/factory/deviations/deviation-fields";
+import {
+  ACTION_BUTTON_SM,
+  CONTROL,
+  formatDate,
+} from "@/components/factory/deviations/deviation-fields";
 import { DateField } from "@/components/ui/date-picker";
 import { addDays } from "@/lib/factory/dates";
 import {
@@ -126,7 +130,7 @@ export function CapaPlanEditor({
             <button
               type="button"
               onClick={() => onChange({ ...d, actions: [...d.actions, blankAction(kind)] })}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-xs font-semibold text-ink-3 shadow-soft transition hover:border-brand hover:text-brand"
+              className={ACTION_BUTTON_SM}
             >
               <Plus className="size-3.5" />
               Add {head.word} action

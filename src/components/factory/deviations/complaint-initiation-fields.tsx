@@ -25,7 +25,6 @@ import {
   COUNTRIES,
   SAMPLE_STATES,
   SERIOUS_HELP,
-  SPONSORS,
   regulatorOf,
 } from "@/lib/factory/complaint";
 import { deviationKeys, fetchDeviations } from "@/lib/factory/deviation-queries";
@@ -50,7 +49,7 @@ const dayStart = () => {
  *   Date received                     Received via
  *   Complainant                       Complainant contact
  *   Batch number(s)                   Market (country) — or Product, no batch
- *   brand owner, from the batch       Who is the sponsor?  ARTG number
+ *   brand owner, from the batch
  *   Expiry date                       Number of units affected
  *   Complaint description
  *   Complaint sample                  (Received → sample received on)
@@ -58,8 +57,8 @@ const dayStart = () => {
  *   Immediate action (optional)
  *
  * The brand owner is the batch's (or the picked product's) customer — not
- * typed. Who the sponsor is and the ARTG are asked here for now; the
- * reference reads them from the product.
+ * typed. Who the sponsor is and the ARTG are not asked (0080); complaints
+ * raised before keep what they recorded.
  */
 export function ComplaintInitiationFields({
   form,
@@ -241,29 +240,6 @@ export function ComplaintInitiationFields({
           </span>
         </p>
       </div>
-
-      <Field
-        label="Who is the sponsor?"
-        required
-        error={errors.sponsor?.message}
-        hint="The company on the ARTG — it reports to the regulator and runs any recall. Usually the customer; us for our own brand."
-      >
-        <Segmented
-          control={control}
-          name="sponsor"
-          label="Who is the sponsor?"
-          className="flex-wrap"
-          options={SPONSORS.map((s) => ({ value: s.value, label: s.label }))}
-        />
-      </Field>
-      <Field label="ARTG number" htmlFor="cmp-artg" note="(optional)">
-        <input
-          id="cmp-artg"
-          placeholder="e.g. AUST L 384211"
-          className={cn(CONTROL, "font-mono")}
-          {...register("artg")}
-        />
-      </Field>
 
       <Field label="Expiry date" htmlFor="cmp-expiry" note="(optional)">
         <input id="cmp-expiry" placeholder="MM/YYYY" className={CONTROL} {...register("expiry")} />

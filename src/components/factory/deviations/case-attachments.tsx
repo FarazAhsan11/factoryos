@@ -21,6 +21,7 @@ import {
   type AttachmentSection,
 } from "@/lib/factory/attachment-queries";
 import { formatDateTime } from "@/lib/factory/dates";
+import { ACTION_BUTTON } from "@/components/factory/deviations/deviation-fields";
 
 export const ACCEPT = Object.values(ATTACHMENT_TYPES).join(",");
 /** Per pick — a slip of the finger in a folder of four hundred photos. */
@@ -201,7 +202,7 @@ export function CaseAttachments({
             type="button"
             disabled={uploading !== null}
             onClick={() => input.current?.click()}
-            className="inline-flex h-9 items-center gap-2 rounded-lg border border-line bg-surface px-3.5 text-sm font-semibold text-ink-3 shadow-soft transition hover:border-brand hover:text-brand disabled:pointer-events-none disabled:opacity-60"
+            className={ACTION_BUTTON}
           >
             {uploading ? (
               <Loader2 className="size-4 animate-spin" />

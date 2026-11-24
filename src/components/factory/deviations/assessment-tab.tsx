@@ -27,6 +27,7 @@ import {
 } from "@/app/factory/[slug]/deviations/schemas";
 import { Segmented } from "@/components/factory/deviations/deviation-initiation-fields";
 import {
+  ACTION_BUTTON_SM,
   AREA,
   CONTROL,
   Fact,
@@ -915,7 +916,7 @@ function LikelihoodEvidence({
                   <button
                     type="button"
                     onClick={() => pick(c)}
-                    className="shrink-0 rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink-3 transition hover:border-brand hover:text-brand"
+                    className={ACTION_BUTTON_SM}
                   >
                     Same problem
                   </button>
@@ -1049,7 +1050,7 @@ function SupplierHistory({
                   <button
                     type="button"
                     onClick={() => pick(c)}
-                    className="shrink-0 rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink-3 transition hover:border-brand hover:text-brand"
+                    className={ACTION_BUTTON_SM}
                   >
                     Same problem
                   </button>

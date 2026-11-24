@@ -223,6 +223,22 @@ const WARMERS: Record<string, Warm> = {
       queryFn: () => fetchDeviations(factoryId),
     });
   },
+  // The Quality dashboard: every case, every CAPA, and the settings its
+  // acknowledgement figure counts from.
+  "/deviations?tab=dashboard": (client, factoryId) => {
+    void client.prefetchQuery({
+      queryKey: deviationKeys.all(factoryId),
+      queryFn: () => fetchDeviations(factoryId),
+    });
+    void client.prefetchQuery({
+      queryKey: capaKeys.all(factoryId),
+      queryFn: () => fetchCapas(factoryId),
+    });
+    void client.prefetchQuery({
+      queryKey: qualitySettingsKeys.all(factoryId),
+      queryFn: () => fetchQualitySettings(factoryId),
+    });
+  },
   // The CAPA register, plus the cases its rows open.
   "/deviations?tab=capa": (client, factoryId) => {
     workers(client, factoryId);

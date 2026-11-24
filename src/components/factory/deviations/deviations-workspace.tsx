@@ -7,6 +7,7 @@ import { Plus } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { CapaRegister } from "@/components/factory/capa/capa-register";
+import { QualityDashboard } from "@/components/factory/deviations/quality-dashboard";
 import { DeviationDetailDialog } from "@/components/factory/deviations/deviation-detail-dialog";
 import {
   DeviationsTable,
@@ -101,7 +102,7 @@ export function DeviationsWorkspace({
   const tab = resolveQualityTab(searchParams.get("tab"));
   // `?case=<id>` opens a case — where the raise page lands after raising.
   const caseParam = searchParams.get("case");
-  const screen = tab === "capa" ? null : CASE_SCREENS[tab];
+  const screen = tab === "capa" || tab === "dashboard" ? null : CASE_SCREENS[tab];
   // Each screen keeps its own view: "Awaiting CAPA" picked on Deviations
   // must not open Customer complaints on an empty list.
   const [viewByTab, setViewByTab] = useState<Partial<Record<string, View>>>(
@@ -237,6 +238,15 @@ export function DeviationsWorkspace({
       }}
     />
   );
+
+  if (tab === "dashboard") {
+    return (
+      <>
+        <QualityDashboard factoryId={factoryId} slug={slug} viewerName={viewerName} role={role} />
+        {dialog}
+      </>
+    );
+  }
 
   if (!screen) {
     return (

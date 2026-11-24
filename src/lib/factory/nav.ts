@@ -209,7 +209,7 @@ export const FACTORY_NAV: NavSection[] = [
             href: "/deviations?tab=dashboard",
             label: "Dashboard",
             roles: SUPERVISOR_UP,
-            ready: false,
+            ready: true,
           },
           {
             href: "/deviations?tab=deviations",

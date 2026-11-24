@@ -251,6 +251,22 @@
   --color-azure-soft: #dbeafe;
   --color-navy: #1e40af;
 
+  /* ── Charts — the Quality dashboard ─────────────────────────────────
+     Case class is a magnitude (Minor → Critical), so one hue light to dark;
+     "not assessed yet" is a neutral grey. The five categorical slots are in
+     fixed order, never cycled (NCR disposition). Both sets pass the dataviz
+     validator against `surface`; slots 3–5 are under 3:1, so every chart
+     that uses them shows its numbers as text too. */
+  --color-cls-minor: #6da7ec;
+  --color-cls-major: #256abf;
+  --color-cls-critical: #0d366b;
+  --color-cls-na: #d5d8dd;
+  --color-viz-1: #2a78d6;
+  --color-viz-2: #eb6834;
+  --color-viz-3: #1baf7a;
+  --color-viz-4: #eda100;
+  --color-viz-5: #e87ba4;
+
   /* ── Rail — the deep-navy sidebar ─────────────────────────────────────
      The one dark surface in the app. A navy that leans to indigo so the
      brand accent sits in it rather than on it, and its own text ramp,
